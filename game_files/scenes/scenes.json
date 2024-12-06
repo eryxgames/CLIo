@@ -1,0 +1,34 @@
+[
+    {
+        "id": "scene1",
+        "name": "Abandoned Spaceship",
+        "description": "You find yourself in the cockpit of an abandoned spaceship.",
+        "items": ["broken_communicator", "space_map"],
+        "characters": [],
+        "actions": ["explore", "look_at", "take"]
+    },
+    {
+        "id": "scene2",
+        "name": "Storage Room",
+        "description": "A storage room filled with supplies.",
+        "items": ["first_aid_kit", "energy_cells"],
+        "characters": ["friendly_robot"],
+        "actions": ["talk_to", "take"]
+    },
+    {
+        "id": "scene3",
+        "name": "Engine Room",
+        "description": "The engine room is overheating.",
+        "items": ["coolant_canister"],
+        "characters": ["hostile_droid"],
+        "actions": ["talk_to", "give", "fight"]
+    },
+    {
+        "id": "scene4",
+        "name": "Bridge",
+        "description": "The bridge controls the spaceship.",
+        "items": ["ship_log"],
+        "characters": ["neutral_ai"],
+        "actions": ["talk_to", "complete_objective"]
+    }
+]

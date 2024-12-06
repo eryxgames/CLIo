@@ -1,0 +1,36 @@
+{
+    "broken_communicator": {
+        "name": "Broken Communicator",
+        "description": "A damaged communicator that needs repair.",
+        "usable": false
+    },
+    "space_map": {
+        "name": "Space Map",
+        "description": "A map of nearby planets and coordinates.",
+        "usable": false
+    },
+    "first_aid_kit": {
+        "name": "First Aid Kit",
+        "description": "Medical supplies to heal injuries.",
+        "usable": true
+    },
+    "energy_cells": {
+        "name": "Energy Cells",
+        "description": "High-energy cells for powering devices.",
+        "usable": true
+    },
+    "coolant_canister": {
+        "name": "Coolant Canister",
+        "description": "A canister of coolant to reduce heat.",
+        "usable": true
+    },
+    "ship_log": {
+        "name": "Ship Log",
+        "description": "Log entries detailing the ship's journey.",
+        "usable": false
+    },
+    "combinations": {
+        "broken_communicator + energy_cells": "repaired_communicator",
+        "first_aid_kit + coolant_canister": "advanced_medkit"
+    }
+}

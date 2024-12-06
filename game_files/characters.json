@@ -1,0 +1,42 @@
+{
+  "friendly_robot": {
+    "name": "Friendly Robot",
+    "description": "A helpful robot willing to assist.",
+    "type": "friendly",
+    "dialogue": {
+      "greet": "Greetings! How can I assist you?",
+      "repair": "I can repair your communicator if you provide energy cells."
+    },
+    "interactions": {
+      "talk": "friendly_robot_greet",
+      "give_energy_cells": "friendly_robot_repair"
+    }
+  },
+  "hostile_droid": {
+    "name": "Hostile Security Droid",
+    "description": "A security droid on high alert.",
+    "type": "hostile",
+    "dialogue": {
+      "greet": "Intruder detected! Cease all actions immediately.",
+      "calm_down": "Thank you for cooperating. You may proceed."
+    },
+    "interactions": {
+      "talk": "hostile_droid_greet",
+      "give_coolant_canister": "hostile_droid_calm_down",
+      "fight": "engage_battle"
+    }
+  },
+  "neutral_ai": {
+    "name": "Neutral AI",
+    "description": "The ship's AI, observing your actions.",
+    "type": "neutral",
+    "dialogue": {
+      "greet": "Hello, traveler. What brings you here?",
+      "objective": "To complete your journey, you must reach the nearest space station."
+    },
+    "interactions": {
+      "talk": "neutral_ai_greet",
+      "complete_objective": "neutral_ai_objective"
+    }
+  }
+}

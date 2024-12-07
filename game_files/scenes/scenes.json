@@ -67,7 +67,7 @@
         "id": "scene3",
         "name": "Engine Room",
         "description": "The engine room is overheating.",
-        "items": ["coolant_canister"],
+        "items": ["coolant_canister", "battered_crowbar"],
         "characters": ["hostile_droid"],
         "exits": [
             {
@@ -77,6 +77,23 @@
                 "unlock_text": "",
                 "required_item": "",
                 "scene_id": "scene2"
+            },
+            {
+                "door_name": "Turbolift Doors",
+                "blocked": true,
+                "block_text": "The turbolift doors are blocked by the hostile droid.",
+                "unblock_text": "The hostile droid moves out of the way, allowing you to pass.",
+                "required_condition": "hostile_droid_defeated",
+                "scene_id": "scene5"
+            },
+            {
+                "door_name": "Maintenance Airlock",
+                "blocked": true,
+                "block_text": "The maintenance airlock is blocked. You need more strength to open it.",
+                "unblock_text": "With your increased strength, you force the maintenance airlock open.",
+                "required_stat": "attack",
+                "required_value": 15,
+                "scene_id": "scene4"
             }
         ],
         "music": "music/engine_room_music.mp3",

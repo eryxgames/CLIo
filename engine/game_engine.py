@@ -5,33 +5,26 @@ from engine import media_player
 from engine.battle_system import BattleSystem
 
 class GameEngine:
-    def __init__(self, scenes, items, characters, story_texts_filename):
-        self.scenes = scenes
-        self.items = items
-        self.characters = characters
-        self.story_texts = self.load_story_texts(story_texts_filename)
-        self.current_scene = next(scene for scene in self.scenes if scene["id"] == "scene1")
+    def __init__(self, config_file):
+        self.config = self.load_config(config_file)
+        self.scenes = self.load_data(self.config["scenes_file"])
+        self.items = self.load_data(self.config["items_file"])
+        self.characters = self.load_data(self.config["characters_file"])
+        self.story_texts = self.load_data(self.config["story_texts_file"])
+        self.current_scene = next(scene for scene in self.scenes if scene["id"] == self.config["initial_scene"])
         self.inventory = []
-        self.player_stats = {
-            "health": 100,
-            "strength": 10,
-            "defense": 5,
-            "equipment": []
-        }
+        self.player_stats = self.config["player_stats"]
         self.story_progress = {}
         self.hints_used = 0
-        self.max_hints = 5
+        self.max_hints = self.config["max_hints"]
 
-    def load_story_texts(self, filename):
-        try:
-            with open(filename, 'r') as f:
-                return json.load(f)
-        except FileNotFoundError:
-            print(f"Error: The file {filename} was not found.")
-            return {}
-        except json.JSONDecodeError:
-            print(f"Error: The file {filename} is not a valid JSON file.")
-            return {}
+    def load_config(self, filename):
+        with open(filename, 'r') as f:
+            return json.load(f)
+
+    def load_data(self, filename):
+        with open(filename, 'r') as f:
+            return json.load(f)
 
     def change_scene(self, scene_id):
         next_scene = next((scene for scene in self.scenes if scene["id"] == scene_id), None)
@@ -192,7 +185,8 @@ class GameEngine:
             item_id = item["id"]
             print(f"You take the {item['name']}.")
             self.inventory.append(item_id)
-            self.current_scene["items"].remove(item_id)
+            if item_id in self.current_scene["items"]:
+                self.current_scene["items"].remove(item_id)
             # Ensure the item does not reappear in lockers or other interactive items
             for passive_item in self.current_scene.get("passive_items", []):
                 passive_item_data = self.items[passive_item]
@@ -230,6 +224,8 @@ class GameEngine:
                 # Handle specific interactions based on the selected option
                 if selected_option == "repair_communicator":
                     self.repair_communicator()
+                elif selected_option == "calm_down":
+                    self.update_story_progress("hostile_droid_defeated", True)
             else:
                 print("Invalid choice.")
         else:
@@ -248,6 +244,8 @@ class GameEngine:
                     # Logic to handle the interaction
                     if interaction == "friendly_robot_repair":
                         self.repair_communicator()
+                    elif interaction == "hostile_droid_calm_down":
+                        self.update_story_progress("hostile_droid_defeated", True)
                 else:
                     print("This character doesn't want that item.")
             else:
@@ -264,6 +262,8 @@ class GameEngine:
                 enemy_stats = character["stats"]
                 battle = BattleSystem(self.player_stats, enemy_stats)
                 battle.engage_battle()
+                if self.player_stats["health"] > 0:
+                    self.update_story_progress("hostile_droid_defeated", True)
             else:
                 print("This character is not hostile.")
         else:
@@ -293,7 +293,21 @@ class GameEngine:
                 print("Invalid choice.")
 
     def attempt_to_exit(self, exit):
-        if exit["locked"]:
+        if exit.get("blocked", False):
+            required_condition = exit.get("required_condition")
+            required_stat = exit.get("required_stat")
+            required_value = exit.get("required_value")
+            if required_condition and self.get_story_progress(required_condition):
+                print(exit["unblock_text"])
+                exit["blocked"] = False  # Ensure the door stays unblocked
+                self.change_scene(exit["scene_id"])
+            elif required_stat and self.player_stats.get(required_stat, 0) >= required_value:
+                print(exit["unblock_text"])
+                exit["blocked"] = False  # Ensure the door stays unblocked
+                self.change_scene(exit["scene_id"])
+            else:
+                print(exit["block_text"])
+        elif exit.get("locked", False):
             required_item = exit["required_item"]
             if required_item in self.inventory:
                 print(exit["unlock_text"])
@@ -346,6 +360,7 @@ class GameEngine:
         print(f"Health: {self.player_stats['health']}")
         print(f"Strength: {self.player_stats['strength']}")
         print(f"Defense: {self.player_stats['defense']}")
+        print(f"Attack: {self.player_stats['attack']}")
         if self.player_stats["equipment"]:
             print("Equipment:")
             for item in self.player_stats["equipment"]:
@@ -373,6 +388,7 @@ class GameEngine:
         print(f"Health: {self.player_stats['health']}")
         print(f"Strength: {self.player_stats['strength']}")
         print(f"Defense: {self.player_stats['defense']}")
+        print(f"Attack: {self.player_stats['attack']}")
         if self.player_stats["equipment"]:
             print("Equipment:")
             for item in self.player_stats["equipment"]:

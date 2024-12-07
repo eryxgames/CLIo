@@ -32,11 +32,6 @@
         "description": "Log entries detailing the ship's journey.",
         "usable": false
     },
-    "passcard": {
-        "name": "Universal Maintenance Passcard",
-        "description": "This passcard allows access to service areas of the ship.",
-        "usable": false
-    },
     "spacesuit": {
         "name": "Spacesuit",
         "description": "A protective suit for space exploration.",
@@ -216,6 +211,21 @@
         "usable": true,
         "effect": {
             "health": 15
+        }
+    },
+    "passcard": {
+        "name": "Maintenance Passcard",
+        "description": "Universal  access passcard for technical personnel.",
+        "usable": false,
+        "key": true        
+    },
+    "battered_crowbar": {
+        "name": "Battered Crowbar",
+        "description": "A sturdy but worn crowbar.",
+        "usable": false,
+        "equippable": true,
+        "effect": {
+            "attack": 15
         }
     }
 }

@@ -26,20 +26,14 @@ def main():
     print("================================")
     print("                                ")
 
-    # Load data files
-    scenes = load_data('game_files/scenes/scenes.json')
-    items = load_data('game_files/items.json')
-    characters = load_data('game_files/characters.json')
-    story_texts = load_data('game_files/story_texts.json')
-
     # Initialize game components
     parser = Parser()
     inventory = Inventory()
     media_player = MediaPlayer()
     save_load = SaveLoad()
 
-    # Initialize game engine
-    game_engine = GameEngine(scenes, items, characters, 'game_files/story_texts.json')
+    # Initialize game engine with the configuration file
+    game_engine = GameEngine('game_files/config.json')
 
     # Start the game
     media_player.print_with_delay(game_engine.current_scene["description"])
@@ -69,7 +63,7 @@ def main():
                 save_load.save_game(save_game_state, "savegame.json")
             elif command == "load":
                 saved_state = save_load.load_game("savegame.json")
-                game_engine.current_scene = next(scene for scene in scenes if scene["id"] == saved_state["current_scene"])
+                game_engine.current_scene = next(scene for scene in game_engine.scenes if scene["id"] == saved_state["current_scene"])
                 inventory.items = saved_state["inventory"]
                 game_engine.player_stats = saved_state["player_stats"]
                 game_engine.story_progress = saved_state["story_progress"]

@@ -66,6 +66,22 @@ class GameEngine:
             print("You notice the following interactive items:")
             for item in self.current_scene["passive_items"]:
                 print(f"- {self.items[item]['name']}")
+        if "characters" in self.current_scene and self.current_scene["characters"]:
+            print("You notice the following characters in the scene:")
+            for character_id in self.current_scene["characters"]:
+                character = self.characters[character_id]
+                greeting = character.get("greeting", character["dialogue"]["greet"])
+                print(f"- {character['name']}: {greeting}")
+                random_text = self.get_random_character_text(character_id)
+                if random_text:
+                    print(f"  {random_text}")
+
+    def get_random_character_text(self, character_id):
+        character = self.characters[character_id]
+        random_events = character.get("random_events", [])
+        if random_events:
+            return random.choice(random_events)
+        return ""
 
     def interact_with_item(self, item_name):
         item = self.find_item_by_name(item_name)
@@ -151,6 +167,9 @@ class GameEngine:
         elif item["id"] == "rusty_metal_locker":
             self.current_scene["items"].append("chx_cargo_hauler_manual")
             print("You find a CHX Cargo Hauler Manual inside the locker.")
+        elif item["id"] == "glass_container":
+            self.current_scene["items"].append("specimen")
+            print("You find a Specimen inside the glass container.")
 
     def take_item(self, item_name):
         item = self.find_item_by_name(item_name)
@@ -170,8 +189,12 @@ class GameEngine:
             print("Item not found in this scene.")
 
     def talk_to_character(self, character_name):
-        if character_name in self.current_scene["characters"]:
-            character = self.characters[character_name]
+        matching_characters = [char for char in self.current_scene["characters"] if character_name.lower() in self.characters[char]["name"].lower()]
+        if len(matching_characters) == 0:
+            print("Character not found in this scene.")
+        elif len(matching_characters) == 1:
+            character_id = matching_characters[0]
+            character = self.characters[character_id]
             if "conditions" in character:
                 for condition, data in character["conditions"].items():
                     if condition == "has_energy_cells" and "energy_cells" in self.inventory:
@@ -181,24 +204,33 @@ class GameEngine:
                         return
             print(character["dialogue"]["greet"])
         else:
-            print("Character not found in this scene.")
+            print("Multiple characters match your query. Please be more specific:")
+            for char in matching_characters:
+                print(f"- {self.characters[char]['name']}")
 
     def give_item_to_character(self, item_name, character_name):
         item = self.find_item_by_name(item_name)
-        if item and item["id"] in self.inventory and character_name in self.current_scene["characters"]:
-            character = self.characters[character_name]
-            if "give_" + item["id"] in character["interactions"]:
-                interaction = character["interactions"]["give_" + item["id"]]
-                print(interaction)
-                # Logic to handle the interaction
+        if item and item["id"] in self.inventory:
+            matching_characters = [char for char in self.current_scene["characters"] if character_name.lower() in self.characters[char]["name"].lower()]
+            if len(matching_characters) == 1:
+                character_id = matching_characters[0]
+                character = self.characters[character_id]
+                if "give_" + item["id"] in character["interactions"]:
+                    interaction = character["interactions"]["give_" + item["id"]]
+                    print(interaction)
+                    # Logic to handle the interaction
+                else:
+                    print("This character doesn't want that item.")
             else:
-                print("This character doesn't want that item.")
+                print("Character not found in scene or multiple characters match your query.")
         else:
-            print("Item not in inventory or character not in scene.")
+            print("Item not in inventory.")
 
     def fight_character(self, character_name):
-        if character_name in self.current_scene["characters"]:
-            character = self.characters[character_name]
+        matching_characters = [char for char in self.current_scene["characters"] if character_name.lower() in self.characters[char]["name"].lower()]
+        if len(matching_characters) == 1:
+            character_id = matching_characters[0]
+            character = self.characters[character_id]
             if character["type"] == "hostile":
                 enemy_stats = character["stats"]
                 battle = BattleSystem(self.player_stats, enemy_stats)
@@ -206,7 +238,7 @@ class GameEngine:
             else:
                 print("This character is not hostile.")
         else:
-            print("Character not found in this scene.")
+            print("Character not found in this scene or multiple characters match your query.")
 
     def exit_room(self, direction=None):
         exits = self.current_scene.get("exits", [])

@@ -23,7 +23,12 @@
         "action": "repair_communicator"
       }
     },
-    "greeting": "A friendly robot greets you with a cheerful beep."
+    "greeting": "A friendly robot greets you with a cheerful beep.",
+    "random_events": [
+      "The friendly robot hums a tune while working.",
+      "The friendly robot checks its internal systems.",
+      "The friendly robot adjusts its sensors."
+    ]
   },
   "hostile_droid": {
     "name": "Hostile Security Droid",
@@ -43,7 +48,12 @@
       "attack": 20,
       "defense": 10
     },
-    "greeting": "A hostile security droid scans you with its sensors."
+    "greeting": "A hostile security droid scans you with its sensors.",
+    "random_events": [
+      "The hostile droid scans the area for threats.",
+      "The hostile droid adjusts its weapon settings.",
+      "The hostile droid communicates with other droids."
+    ]
   },
   "neutral_ai": {
     "name": "Neutral AI",
@@ -62,6 +72,11 @@
       "attack": 5,
       "defense": 20
     },
-    "greeting": "The ship's AI acknowledges your presence with a neutral tone."
+    "greeting": "The ship's AI acknowledges your presence with a neutral tone.",
+    "random_events": [
+      "The neutral AI processes data silently.",
+      "The neutral AI adjusts the ship's systems.",
+      "The neutral AI monitors the ship's status."
+    ]
   }
 }

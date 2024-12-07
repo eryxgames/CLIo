@@ -59,31 +59,31 @@
             "attack": 20
         }
     },
-    "metal_locker": {
+    "metal_suitcase": {
         "name": "Metal Suitcase",
-        "description": "A sturdy metal locker that seems to be locked.",
+        "description": "A sturdy metal suitcase that seems to be locked.",
         "type": "container",
         "usable": false,
         "interactive": true,
         "current_state": "closed",
         "states": {
             "closed": {
-                "description": "The locker is closed.",
+                "description": "The suitcase is closed.",
                 "action": "open",
                 "next_state": "open"
             },
             "open": {
-                "description": "The locker is open, revealing a Storage Room Key.",
+                "description": "The suitcase is open, revealing a Storage Room Key.",
                 "action": "take",
                 "next_state": "empty"
             },
             "empty": {
-                "description": "The locker is empty.",
+                "description": "The suitcase is empty.",
                 "action": null,
                 "next_state": null
             }
         },
-        "contents": ["storage_room_key"],
+        "contents": ["chx_cargo_hauler_manual"],
         "locked": true,
         "unlock_required_item": "bent_wire"
     },

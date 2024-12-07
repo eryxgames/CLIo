@@ -4,7 +4,7 @@
         "name": "Abandoned Spaceship",
         "description": "You find yourself in the utility room of a decrepit, possibly abandoned spaceship.",
         "items": ["broken_communicator", "space_map", "bent_wire","storage_room_key" ],
-        "passive_items": ["metal_locker", "rusty_metal_locker"],
+        "passive_items": ["metal_suitcase", "rusty_metal_locker"],
         "characters": [],
         "exits": [
             {

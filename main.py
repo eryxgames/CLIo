@@ -25,6 +25,7 @@ def main():
     print("Version 1.0")
     print("================================")
     print("                                ")
+
     # Load data files
     scenes = load_data('game_files/scenes/scenes.json')
     items = load_data('game_files/items.json')
@@ -63,15 +64,14 @@ def main():
             media_player.print_with_delay(response)
 
             # Further logic based on parsed command
-            if "explore" in command:
-                media_player.print_with_delay(game_engine.current_scene["description"])
+            if "explore" in command or "look around" in command:
+                game_engine.explore_scene()
             elif "look at" in command:
                 item_name = command.split("at")[-1].strip()
                 game_engine.interact_with_item(item_name)
-            elif "take" in command:
-                item_name = command.split("take")[-1].strip()
-                game_engine.interact_with_item(item_name)
-                inventory.add_item(item_name)
+            elif "take" in command or "pick up" in command:
+                item_name = command.split()[-1].strip()
+                game_engine.take_item(item_name)
             elif "talk to" in command:
                 character_name = command.split("to")[-1].strip()
                 game_engine.talk_to_character(character_name)
@@ -83,6 +83,18 @@ def main():
             elif "fight" in command:
                 character_name = command.split("fight")[-1].strip()
                 game_engine.fight_character(character_name)
+            elif "exit" in command or "go to" in command:
+                game_engine.exit_room()
+            elif "inventory" in command:
+                game_engine.list_inventory()
+            elif "examine" in command:
+                item_name = command.split()[-1].strip()
+                game_engine.examine_item(item_name)
+            elif "combine" in command:
+                parts = command.split()
+                item1 = parts[parts.index("combine") + 1]
+                item2 = parts[parts.index("with") + 1]
+                game_engine.combine_items(item1, item2)
 
 if __name__ == "__main__":
     main()

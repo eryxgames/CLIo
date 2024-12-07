@@ -2,11 +2,11 @@ import json
 import os
 
 class GameEngine:
-    def __init__(self, scenes, items, characters, story_texts_file):
+    def __init__(self, scenes, items, characters, story_texts_filename):
         self.scenes = scenes
         self.items = items
         self.characters = characters
-        self.story_texts = self.load_story_texts(story_texts_file)
+        self.story_texts = self.load_story_texts(story_texts_filename)
         self.current_scene = next(scene for scene in self.scenes if scene["id"] == "scene1")
         self.inventory = []
         self.player_stats = {
@@ -204,7 +204,7 @@ class GameEngine:
             else:
                 print(text_info["text"])
         else:
-            print("No story text available for this key.")
+            print("") # when there is no key defined
 
     def check_game_over(self):
         if self.player_stats["health"] <= 0:

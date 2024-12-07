@@ -39,7 +39,7 @@ def main():
     save_load = SaveLoad()
 
     # Initialize game engine
-    game_engine = GameEngine(scenes, items, characters, story_texts)
+    game_engine = GameEngine(scenes, items, characters, 'game_files/story_texts.json')
 
     # Start the game
     media_player.print_with_delay(game_engine.current_scene["description"])

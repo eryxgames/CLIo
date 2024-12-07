@@ -1,6 +1,6 @@
 {
     "intro": {
-        "text": "Welcome to the adventure! Your journey begins here.",
+        "text": "\nWelcome to the adventure! Your journey begins here.",
         "show_once": true
     },
     "outro_win": {

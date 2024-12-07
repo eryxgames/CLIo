@@ -115,7 +115,7 @@ class Parser:
         return "Please specify two items to combine."
 
     def examine_self(self, command):
-        return "Your stats:"
+        return "You examine yourself closely."
 
     def show_stats(self, command):
         return "Your stats:"

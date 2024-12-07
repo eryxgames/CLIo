@@ -30,6 +30,7 @@ def main():
     scenes = load_data('game_files/scenes/scenes.json')
     items = load_data('game_files/items.json')
     characters = load_data('game_files/characters.json')
+    story_texts = load_data('game_files/story_texts.json')
 
     # Initialize game components
     parser = Parser()
@@ -38,10 +39,11 @@ def main():
     save_load = SaveLoad()
 
     # Initialize game engine
-    game_engine = GameEngine(scenes, items, characters)
+    game_engine = GameEngine(scenes, items, characters, story_texts)
 
     # Start the game
     media_player.print_with_delay(game_engine.current_scene["description"])
+    game_engine.display_story_text("intro")
 
     try:
         while True:
@@ -60,7 +62,8 @@ def main():
                 save_game_state = {
                     "current_scene": game_engine.current_scene["id"],
                     "inventory": inventory.items,
-                    "player_stats": game_engine.player_stats
+                    "player_stats": game_engine.player_stats,
+                    "story_progress": game_engine.story_progress
                     # Add more game state as needed
                 }
                 save_load.save_game(save_game_state, "savegame.json")
@@ -69,6 +72,7 @@ def main():
                 game_engine.current_scene = next(scene for scene in scenes if scene["id"] == saved_state["current_scene"])
                 inventory.items = saved_state["inventory"]
                 game_engine.player_stats = saved_state["player_stats"]
+                game_engine.story_progress = saved_state["story_progress"]
                 media_player.print_with_delay(game_engine.current_scene["description"])
             else:
                 response = parser.parse_command(command)
@@ -111,6 +115,13 @@ def main():
                     game_engine.examine_self()
                 elif "stats" in command:
                     game_engine.show_stats()
+
+                # Check if the game is over
+                if game_engine.check_game_over():
+                    break
+
+                # Check conditions for displaying story texts
+                game_engine.check_conditions()
     except KeyboardInterrupt:
         print("\nGame interrupted. Thank you for playing! Goodbye!")
 

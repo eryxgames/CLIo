@@ -1,8 +1,12 @@
+import json
+import os
+
 class GameEngine:
-    def __init__(self, scenes, items, characters):
+    def __init__(self, scenes, items, characters, story_texts_file):
         self.scenes = scenes
         self.items = items
         self.characters = characters
+        self.story_texts = self.load_story_texts(story_texts_file)
         self.current_scene = next(scene for scene in self.scenes if scene["id"] == "scene1")
         self.inventory = []
         self.player_stats = {
@@ -11,6 +15,18 @@ class GameEngine:
             "defense": 5,
             "equipment": []
         }
+        self.story_progress = {}
+
+    def load_story_texts(self, filename):
+        try:
+            with open(filename, 'r') as f:
+                return json.load(f)
+        except FileNotFoundError:
+            print(f"Error: The file {filename} was not found.")
+            return {}
+        except json.JSONDecodeError:
+            print(f"Error: The file {filename} is not a valid JSON file.")
+            return {}
 
     def change_scene(self, scene_id):
         scene = next((scene for scene in self.scenes if scene["id"] == scene_id), None)
@@ -132,6 +148,7 @@ class GameEngine:
             print("One or both items not found in your inventory.")
 
     def examine_self(self):
+        print("You examine yourself closely.")
         print("Your stats:")
         print(f"Health: {self.player_stats['health']}")
         print(f"Strength: {self.player_stats['strength']}")
@@ -175,3 +192,40 @@ class GameEngine:
             if item_name.lower() in item["name"].lower():
                 return {"id": item_id, "name": item["name"], "description": item["description"], "usable": item["usable"]}
         return None
+
+    def display_story_text(self, text_key):
+        text_info = self.story_texts.get(text_key, None)
+        if text_info:
+            show_once = text_info.get("show_once", False)
+            if show_once:
+                if text_key not in self.story_progress:
+                    print(text_info["text"])
+                    self.story_progress[text_key] = True
+            else:
+                print(text_info["text"])
+        else:
+            print("No story text available for this key.")
+
+    def check_game_over(self):
+        if self.player_stats["health"] <= 0:
+            self.display_story_text("outro_lose")
+            return True
+        return False
+
+    def update_story_progress(self, event, value):
+        self.story_progress[event] = value
+
+    def get_story_progress(self, event):
+        return self.story_progress.get(event, None)
+
+    def check_conditions(self):
+        for condition, items in self.story_texts["conditions"].items():
+            for item_name, text_info in items.items():
+                if condition == "item_in_inventory" and item_name in self.inventory:
+                    self.display_story_text(text_info["text"])
+                elif condition == "enemy_defeated" and self.check_enemy_defeated(item_name):
+                    self.display_story_text(text_info["text"])
+
+    def check_enemy_defeated(self, enemy_name):
+        # Implement logic to check if the enemy is defeated
+        return True

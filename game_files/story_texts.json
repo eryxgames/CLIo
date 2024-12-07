@@ -1,0 +1,65 @@
+{
+    "intro": {
+        "text": "Welcome to the adventure! Your journey begins here.",
+        "show_once": true
+    },
+    "outro_win": {
+        "text": "Congratulations! You have successfully completed your adventure.",
+        "show_once": true
+    },
+    "outro_lose": {
+        "text": "Unfortunately, your adventure ends here. Better luck next time!",
+        "show_once": true
+    },
+    "scene1_description": {
+        "text": "You find yourself in a dark room. There is a faint light coming from a small window high above.",
+        "show_once": true
+    },
+    "scene2_description": {
+        "text": "You enter a large hall with multiple doors. The air is damp and the sound of dripping water echoes through the hall.",
+        "show_once": true
+    },
+    "scene3_description": {
+        "text": "You step into a brightly lit room filled with treasures and ancient artifacts.",
+        "show_once": true
+    },
+    "character1_greet": {
+        "text": "Hello, traveler. What brings you to this forsaken place?",
+        "show_once": false
+    },
+    "character2_greet": {
+        "text": "Ah, a visitor! It's been ages since I last saw someone new around here.",
+        "show_once": false
+    },
+    "item1_description": {
+        "text": "A rusty old key that looks like it might open something important.",
+        "show_once": false
+    },
+    "item2_description": {
+        "text": "A mysterious map with markings that seem to lead to a hidden treasure.",
+        "show_once": false
+    },
+    "combination1_description": {
+        "text": "You combine the rusty key and the mysterious map to reveal a hidden path to the treasure.",
+        "show_once": false
+    },
+    "conditions": {
+        "item_in_inventory": {
+            "Space Map": {
+                "text": "You have found the Space Map! This could be useful in your journey.",
+                "show_once": true
+            }
+        },
+        "enemy_defeated": {
+            "Battle Droid": {
+                "text": "You have defeated the Battle Droid! You feel a sense of accomplishment.",
+                "show_once": true
+            }
+        }
+    },
+    "default_texts": {
+        "scene1": "You find yourself in a dark room. There is a faint light coming from a small window high above.",
+        "scene2": "You enter a large hall with multiple doors. The air is damp and the sound of dripping water echoes through the hall.",
+        "scene3": "You step into a brightly lit room filled with treasures and ancient artifacts."
+    }
+}

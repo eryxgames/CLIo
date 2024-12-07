@@ -47,6 +47,7 @@ class GameEngine:
                 else:
                     print("The sound of silence!")
             print(self.current_scene["description"])
+            self.report_characters_in_scene()
         else:
             print("Invalid scene ID.")
 
@@ -88,10 +89,10 @@ class GameEngine:
                         else:
                             print(f"You open the {passive_item['name']}.")
                             passive_item["current_state"] = state_data.get("next_state", "open")
-                            if "reward" in state_data:
-                                reward_item = state_data["reward"]
-                                self.current_scene["items"].append(reward_item)
-                                print(f"You find a {self.items[reward_item]['name']} inside.")
+                            if "contents" in passive_item:
+                                for content_item in passive_item["contents"]:
+                                    self.current_scene["items"].append(content_item)
+                                    print(f"You find a {self.items[content_item]['name']} inside.")
                     elif action == "unlock":
                         if "bent_wire" in self.inventory:
                             print(f"You use the bent wire to pick the lock of the {passive_item['name']}.")
@@ -235,6 +236,7 @@ class GameEngine:
                 print(exit["unlock_text"])
                 if self.items[required_item].get("consumable", False):
                     self.inventory.remove(required_item)
+                exit["locked"] = False  # Ensure the door stays unlocked
                 self.change_scene(exit["scene_id"])
             else:
                 print(exit["lock_text"])
@@ -424,3 +426,11 @@ class GameEngine:
             self.hints_used += 1
         else:
             print("You have used all your hints.")
+
+    def report_characters_in_scene(self):
+        if "characters" in self.current_scene and self.current_scene["characters"]:
+            print("You notice the following characters in the scene:")
+            for character_id in self.current_scene["characters"]:
+                character = self.characters[character_id]
+                greeting = character.get("greeting", character["dialogue"]["greet"])
+                print(f"- {character['name']}: {greeting}")

@@ -60,8 +60,9 @@
         }
     },
     "metal_locker": {
-        "name": "Metal Locker",
+        "name": "Metal Suitcase",
         "description": "A sturdy metal locker that seems to be locked.",
+        "type": "container",
         "usable": false,
         "interactive": true,
         "current_state": "closed",
@@ -81,7 +82,10 @@
                 "action": null,
                 "next_state": null
             }
-        }
+        },
+        "contents": ["storage_room_key"],
+        "locked": true,
+        "unlock_required_item": "bent_wire"
     },
     "rusty_metal_locker": {
         "name": "Rusty Metal Locker",

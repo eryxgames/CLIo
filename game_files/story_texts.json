@@ -1,18 +1,26 @@
 {
     "intro": {
-        "text": "\nWelcome to the adventure! Your journey begins here.",
-        "show_once": true
-    },
-    "outro_win": {
-        "text": "Congratulations! You have successfully completed your adventure.",
-        "show_once": true
-    },
-    "outro_lose": {
-        "text": "Unfortunately, your adventure ends here. Better luck next time!",
+        "text": "Welcome to the adventure! Your journey begins in the abandoned spaceship. Be cautious, and remember, in space, no one can hear you scream... or your witty comebacks.",
         "show_once": true
     },
     "scene1_description": {
-        "text": "You find yourself in a dark room. There is a faint light coming from a small window high above.",
+        "text": "You find yourself in the utility room of a decrepit, possibly abandoned spaceship. The air is musty, and the broken screen on the wall shows a holographic map of some star system. It's like someone pressed the 'abandon ship' button a little too enthusiastically.",
+        "show_once": true
+    },
+    "character1_greet": {
+        "text": "Hello, traveler. What brings you to this forsaken piece of metal floating in space? Looking for a cosmic adventure or just lost?",
+        "show_once": false
+    },
+    "puzzle_solved": {
+        "text": "You did it! The console hums to life, and the spaceship's engines purr like a contented cat. Now, where to? The universe is your oyster, or something like that.",
+        "show_once": true
+    },
+    "outro_win": {
+        "text": "Congratulations! You've successfully navigated the perils of space and solved the mysteries of the abandoned spaceship. As you set course for home, remember: in space, everyone remembers your funny one-liners.",
+        "show_once": true
+    },
+    "outro_lose": {
+        "text": "Unfortunately, your adventure ends here. You've been sucked into the vacuum of space, taking your witty remarks with you. Better luck next time!",
         "show_once": true
     },
     "scene2_description": {
@@ -22,10 +30,6 @@
     "scene3_description": {
         "text": "You step into a brightly lit room filled with treasures and ancient artifacts.",
         "show_once": true
-    },
-    "character1_greet": {
-        "text": "Hello, traveler. What brings you to this forsaken place?",
-        "show_once": false
     },
     "character2_greet": {
         "text": "Ah, a visitor! It's been ages since I last saw someone new around here.",

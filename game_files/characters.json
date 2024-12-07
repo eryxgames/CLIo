@@ -22,7 +22,8 @@
         "text": "I see you have energy cells. Let me repair your communicator.",
         "action": "repair_communicator"
       }
-    }
+    },
+    "greeting": "A friendly robot greets you with a cheerful beep."
   },
   "hostile_droid": {
     "name": "Hostile Security Droid",
@@ -41,7 +42,8 @@
       "health": 150,
       "attack": 20,
       "defense": 10
-    }
+    },
+    "greeting": "A hostile security droid scans you with its sensors."
   },
   "neutral_ai": {
     "name": "Neutral AI",
@@ -59,6 +61,7 @@
       "health": 200,
       "attack": 5,
       "defense": 20
-    }
+    },
+    "greeting": "The ship's AI acknowledges your presence with a neutral tone."
   }
 }

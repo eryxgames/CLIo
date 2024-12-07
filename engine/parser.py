@@ -30,6 +30,7 @@ class Parser:
             "stats": self.show_stats,
             "use": self.use,
             "pick lock": self.pick_lock,
+            "lockpick": self.pick_lock,
             "help": self.help
         }
 

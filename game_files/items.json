@@ -65,15 +65,20 @@
         "type": "container",
         "usable": false,
         "interactive": true,
-        "current_state": "closed",
+        "current_state": "locked",
         "states": {
+            "locked": {
+                "description": "The suitcase is locked.",
+                "action": "unlock",
+                "next_state": "closed"
+            },
             "closed": {
                 "description": "The suitcase is closed.",
                 "action": "open",
                 "next_state": "open"
             },
             "open": {
-                "description": "The suitcase is open, revealing a Storage Room Key.",
+                "description": "The suitcase is open, revealing a Blue Apple.",
                 "action": "take",
                 "next_state": "empty"
             },
@@ -83,9 +88,9 @@
                 "next_state": null
             }
         },
-        "contents": ["chx_cargo_hauler_manual"],
+        "contents": ["blue_apple"],
         "locked": true,
-        "unlock_required_item": "bent_wire"
+        "unlock_required_item": "passcode"
     },
     "rusty_metal_locker": {
         "name": "Rusty Metal Locker",
@@ -97,10 +102,15 @@
             "locked": {
                 "description": "The locker is locked.",
                 "action": "unlock",
+                "next_state": "closed"
+            },
+            "closed": {
+                "description": "The locker is closed.",
+                "action": "open",
                 "next_state": "open"
             },
             "open": {
-                "description": "The locker is open, revealing a CHX Cargo Hauler Manual.",
+                "description": "The locker is open, revealing a Red Apple.",
                 "action": "take",
                 "next_state": "empty"
             },
@@ -109,7 +119,10 @@
                 "action": null,
                 "next_state": null
             }
-        }
+        },
+        "contents": ["red_apple"],
+        "locked": true,
+        "unlock_required_item": "bent_wire"
     },
     "bent_wire": {
         "name": "Bent Wire",
@@ -183,5 +196,21 @@
         "name": "Specimen",
         "description": "A mysterious specimen in a glass container.",
         "usable": false
+    },
+    "red_apple": {
+        "name": "Red Apple",
+        "description": "A shiny red apple.",
+        "usable": true,
+        "effect": {
+            "health": 10
+        }
+    },
+    "blue_apple": {
+        "name": "Blue Apple",
+        "description": "A vibrant blue apple.",
+        "usable": true,
+        "effect": {
+            "health": 15
+        }
     }
 }

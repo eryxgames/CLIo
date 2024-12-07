@@ -112,10 +112,18 @@ class GameEngine:
                                     self.current_scene["items"].append(content_item)
                                     print(f"You find a {self.items[content_item]['name']} inside.")
                     elif action == "unlock":
-                        if "bent_wire" in self.inventory:
+                        if passive_item["unlock_required_item"] == "passcode":
+                            passcode = input("Enter the passcode to unlock the item: ")
+                            if passcode == "321":
+                                print(f"You enter the correct passcode and unlock the {passive_item['name']}.")
+                                passive_item["locked"] = False
+                                passive_item["current_state"] = state_data.get("next_state", "closed")
+                            else:
+                                print("Incorrect passcode. The item remains locked.")
+                        elif "bent_wire" in self.inventory:
                             print(f"You use the bent wire to pick the lock of the {passive_item['name']}.")
                             passive_item["locked"] = False
-                            passive_item["current_state"] = state_data.get("next_state", "unlocked")
+                            passive_item["current_state"] = state_data.get("next_state", "closed")
                         else:
                             print("You need a tool to pick the lock.")
                     elif action == "take":
@@ -149,11 +157,18 @@ class GameEngine:
                 if next_state == "open":
                     self.reveal_item_from_interactive(item)
             elif action == "unlock":
-                if "bent_wire" in self.inventory:
+                if item["unlock_required_item"] == "passcode":
+                    passcode = input("Enter the passcode to unlock the item: ")
+                    if passcode == "321":
+                        print(f"You enter the correct passcode and unlock the {item['name']}.")
+                        item["locked"] = False
+                        item["current_state"] = next_state
+                    else:
+                        print("Incorrect passcode. The item remains locked.")
+                elif "bent_wire" in self.inventory:
                     print(f"You use the bent wire to pick the lock of the {item['name']}.")
+                    item["locked"] = False
                     item["current_state"] = next_state
-                    if next_state == "open":
-                        self.reveal_item_from_interactive(item)
                 else:
                     print(f"You need a tool to pick the lock of the {item['name']}.")
             elif action == "take":
@@ -165,11 +180,11 @@ class GameEngine:
             self.current_scene["items"].append("storage_room_key")
             print("You find a Storage Room Key inside the locker.")
         elif item["id"] == "rusty_metal_locker":
-            self.current_scene["items"].append("chx_cargo_hauler_manual")
-            print("You find a CHX Cargo Hauler Manual inside the locker.")
-        elif item["id"] == "glass_container":
-            self.current_scene["items"].append("specimen")
-            print("You find a Specimen inside the glass container.")
+            self.current_scene["items"].append("red_apple")
+            print("You find a Red Apple inside the locker.")
+        elif item["id"] == "metal_suitcase":
+            self.current_scene["items"].append("blue_apple")
+            print("You find a Blue Apple inside the suitcase.")
 
     def take_item(self, item_name):
         item = self.find_item_by_name(item_name)

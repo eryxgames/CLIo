@@ -91,9 +91,7 @@
                 "next_state": null
             }
         },
-        "contents": ["blue_apple"],
-        "locked": true,
-        "unlock_required_item": "passcode"
+        "contents": ["blue_apple"]
     },
     "rusty_metal_locker": {
         "name": "Rusty Metal Locker",
@@ -123,9 +121,7 @@
                 "next_state": null
             }
         },
-        "contents": ["red_apple"],
-        "locked": true,
-        "unlock_required_item": "bent_wire"
+        "contents": ["red_apple"]
     },
     "bent_wire": {
         "name": "Bent Wire",

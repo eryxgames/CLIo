@@ -241,6 +241,7 @@ class GameEngine:
                     self.repair_communicator()
                 elif selected_option == "calm_down":
                     self.update_story_progress("hostile_droid_defeated", True)
+                    character["type"] = "neutral"
             else:
                 print("Invalid choice.")
         else:
@@ -273,7 +274,7 @@ class GameEngine:
         if len(matching_characters) == 1:
             character_id = matching_characters[0]
             character = self.characters[character_id]
-            if character["type"] in ["hostile", "neutral"]:
+            if character["type"] in ["hostile", "neutral", "aggressive"]:
                 enemy_stats = character["stats"]
                 battle = BattleSystem(self.player_stats, enemy_stats)
                 battle.engage_battle()

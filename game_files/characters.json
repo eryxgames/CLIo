@@ -74,5 +74,28 @@
       "defense": 20
     },
     "greeting": "The ship's AI acknowledges your presence with a neutral tone."
+  },
+  "mutated_bugrat": {
+    "name": "Mutated Bugrat",
+    "description": "A small pest creature with sharp teeth and a nasty temper.",
+    "type": "aggressive",
+    "dialogue": {
+      "greet": "The creature hisses and bares its teeth.",
+      "calm_down": "The creature calms down and stops attacking."
+    },
+    "dialogue_options": {
+      "Calm down": "mutated_bugrat_calm_down"
+    },
+    "interactions": {
+      "talk": "mutated_bugrat_greet",
+      "touch": "mutated_bugrat_attack",
+      "hit": "mutated_bugrat_attack"
+    },
+    "stats": {
+      "health": 5,
+      "attack": 2,
+      "defense": 2
+    },
+    "greeting": "A small, mutated creature scurries around, hissing and baring its teeth."
   }
 }

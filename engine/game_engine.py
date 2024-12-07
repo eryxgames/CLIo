@@ -273,16 +273,25 @@ class GameEngine:
         if len(matching_characters) == 1:
             character_id = matching_characters[0]
             character = self.characters[character_id]
-            if character["type"] == "hostile":
+            if character["type"] in ["hostile", "neutral"]:
                 enemy_stats = character["stats"]
                 battle = BattleSystem(self.player_stats, enemy_stats)
                 battle.engage_battle()
                 if self.player_stats["health"] > 0:
                     self.update_story_progress("hostile_droid_defeated", True)
+                    self.drop_items_from_character(character_id)
             else:
                 print("This character is not hostile.")
         else:
             print("Character not found in this scene or multiple characters match your query.")
+
+    def drop_items_from_character(self, character_id):
+        character = self.characters[character_id]
+        if "inventory" in character:
+            for item_id in character["inventory"]:
+                item = self.items[item_id]
+                self.current_scene["items"].append(item_id)
+                print(f"The {character['name']} drops a {item['name']}.")
 
     def exit_room(self, direction=None):
         exits = self.current_scene.get("exits", [])
@@ -469,6 +478,55 @@ class GameEngine:
                 self.player_stats[stat] -= value
         else:
             print("Item not found in equipment.")
+
+    def get_random_event(self):
+        random_events = self.current_scene.get("random_events", [])
+        if random_events:
+            return random.choice(random_events)
+        return ""
+
+    def repair_communicator(self):
+        if "energy_cells" in self.inventory.items:
+            self.inventory.remove_item("energy_cells")
+            print("Your communicator has been repaired.")
+        else:
+            print("You don't have energy cells to repair the communicator.")
+
+    def provide_hint(self):
+        if self.hints_used < self.max_hints:
+            hint = self.current_scene.get("hint", "No hint available.")
+            print(hint)
+            self.hints_used += 1
+        else:
+            print("You have used all your hints.")
+
+    def report_characters_in_scene(self):
+        if "characters" in self.current_scene and self.current_scene["characters"]:
+            print("You notice the following characters in the scene:")
+            for character_id in self.current_scene["characters"]:
+                character = self.characters[character_id]
+                greeting = character.get("greeting", character["dialogue"]["greet"])
+                print(f"- {character['name']}: {greeting}")
+
+    def read_item(self, item_name):
+        item = self.find_item_by_name(item_name)
+        if item and "readable_item" in item and item["readable_item"]:
+            text = item["readable_item"]
+            print(f"You start reading the {item['name']}:")
+            media_player.print_with_delay(text)
+        else:
+            print(random.choice(self.item_not_found_messages))
+
+    def look_at(self, target_name):
+        item = self.find_item_by_name(target_name)
+        if item:
+            print(item["description"])
+        else:
+            character = next((char for char in self.characters.values() if target_name.lower() in char["name"].lower()), None)
+            if character:
+                print(character["description"])
+            else:
+                print(random.choice(self.item_not_found_messages))
 
     def get_random_event(self):
         random_events = self.current_scene.get("random_events", [])

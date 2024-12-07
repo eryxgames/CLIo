@@ -85,6 +85,42 @@ def main():
                 game_engine.interact_with_item(item_name)
             elif command == "hint":
                 game_engine.provide_hint()
+            elif command.startswith("read "):
+                item_name = command.split("read")[-1].strip()
+                game_engine.read_item(item_name)
+            elif command.startswith("look at "):
+                target_name = command.split("at")[-1].strip()
+                game_engine.look_at(target_name)
+            elif command.startswith("take "):
+                item_name = command.split("take")[-1].strip()
+                game_engine.take_item(item_name)
+            elif command.startswith("talk to "):
+                character_name = command.split("to")[-1].strip()
+                game_engine.talk_to_character(character_name)
+            elif command.startswith("give "):
+                parts = command.split()
+                item_name = parts[parts.index("give") + 1]
+                character_name = parts[parts.index("to") + 1]
+                game_engine.give_item_to_character(item_name, character_name)
+            elif command.startswith("fight "):
+                character_name = command.split("fight")[-1].strip()
+                game_engine.fight_character(character_name)
+            elif command.startswith("exit "):
+                game_engine.exit_room()
+            elif command == "inventory":
+                game_engine.list_inventory()
+            elif command.startswith("examine "):
+                item_name = command.split("examine")[-1].strip()
+                game_engine.examine_item(item_name)
+            elif command.startswith("combine "):
+                parts = command.split()
+                item1 = parts[parts.index("combine") + 1]
+                item2 = parts[parts.index("with") + 1]
+                game_engine.combine_items(item1, item2)
+            elif command == "examine yourself":
+                game_engine.examine_self()
+            elif command == "stats":
+                game_engine.show_stats()
             else:
                 response = parser.parse_command(command)
                 if response and response != "I don't understand that command. Try to use the exact command.":
@@ -93,9 +129,6 @@ def main():
                 # Further logic based on parsed command
                 if "explore" in command or "look around" in command:
                     game_engine.explore_scene()
-                elif "look at" in command and "yourself" not in command:
-                    item_name = command.split("at")[-1].strip()
-                    game_engine.interact_with_item(item_name)
                 elif "look" in command:
                     game_engine.explore_scene()
                 elif "take" in command or "pick up" in command or "grab" in command:

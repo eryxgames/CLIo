@@ -2,12 +2,14 @@
     "broken_communicator": {
         "name": "Broken Communicator",
         "description": "A damaged communicator that needs repair.",
-        "usable": false
+        "usable": false,
+        "readable_item": "The communicator is broken and needs repair. It has a label with instructions on how to repair it using energy cells."
     },
     "space_map": {
         "name": "Space Map",
         "description": "A map of nearby planets and coordinates.",
-        "usable": false
+        "usable": false,
+        "readable_item": "The map shows the locations of nearby planets and their coordinates. It has notes on important landmarks and dangerous areas."
     },
     "first_aid_kit": {
         "name": "First Aid Kit",
@@ -30,7 +32,8 @@
     "ship_log": {
         "name": "Ship Log",
         "description": "Log entries detailing the ship's journey.",
-        "usable": false
+        "usable": false,
+        "readable_item": "The ship log contains detailed entries of the ship's journey, including encounters with alien species and mysterious phenomena."
     },
     "spacesuit": {
         "name": "Spacesuit",
@@ -135,7 +138,8 @@
     "chx_cargo_hauler_manual": {
         "name": "CHX Cargo Hauler Manual",
         "description": "A user guide for the spaceship cargo hauler, with numbered illustrations but still heavy reading.",
-        "usable": false
+        "usable": false,
+        "readable_item": "The manual provides detailed instructions on operating the CHX Cargo Hauler, including safety procedures and maintenance tips."
     },
     "storage_room_key": {
         "name": "Storage Room Key",
@@ -215,9 +219,10 @@
     },
     "passcard": {
         "name": "Maintenance Passcard",
-        "description": "Universal  access passcard for technical personnel.",
+        "description": "Universal access passcard for technical personnel.",
         "usable": false,
-        "key": true        
+        "key": true,
+        "consumable": false
     },
     "battered_crowbar": {
         "name": "Battered Crowbar",
@@ -227,5 +232,11 @@
         "effect": {
             "attack": 15
         }
+    },
+    "torn_research_paper": {
+        "name": "Torn Research Paper",
+        "description": "A torn research paper with notes on quantum drive traveling and stained from unidentified liquid, hopefully coffee.",
+        "usable": false,
+        "readable_item": "The research paper discusses the challenges of quantum drive traveling and the potential risks involved. It is stained with an unidentified liquid, hopefully coffee."
     }
 }

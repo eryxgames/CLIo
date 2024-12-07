@@ -11,6 +11,11 @@ class BattleSystem:
             if self.enemy_stats["health"] > 0:
                 self.enemy_turn()
 
+        if self.player_stats["health"] <= 0:
+            print("You have been defeated.")
+        else:
+            print("You have defeated the enemy!")
+
     def player_turn(self):
         action = input("Do you want to attack or defend? ").lower()
         if action == "attack":
@@ -26,8 +31,11 @@ class BattleSystem:
 
     def enemy_turn(self):
         damage = random.randint(5, 15) - self.player_stats["defense"]
-        self.player_stats["health"] -= damage
-        print(f"The enemy attacks and deals {damage} damage to you.")
+        if damage > 0:
+            self.player_stats["health"] -= damage
+            print(f"The enemy attacks and deals {damage} damage to you.")
+        else:
+            print("Your defense blocks the enemy's attack.")
 
     def modify_attributes(self, item):
         if item in self.player_stats["inventory"]:

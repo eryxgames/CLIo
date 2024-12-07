@@ -1,5 +1,6 @@
 import json
 import os
+import random
 
 class GameEngine:
     def __init__(self, scenes, items, characters, story_texts_filename):
@@ -29,15 +30,21 @@ class GameEngine:
             return {}
 
     def change_scene(self, scene_id):
-        scene = next((scene for scene in self.scenes if scene["id"] == scene_id), None)
-        if scene:
-            self.current_scene = scene
+        next_scene = next((scene for scene in self.scenes if scene["id"] == scene_id), None)
+        if next_scene:
+            self.current_scene = next_scene
+            media_player.play_music(next_scene.get("music", ""))
+            if "sound_effects" in next_scene and "enter" in next_scene["sound_effects"]:
+                media_player.play_sound_effect(next_scene["sound_effects"]["enter"])
             print(self.current_scene["description"])
         else:
             print("Invalid scene ID.")
 
     def explore_scene(self):
         print(self.current_scene["description"])
+        weather = self.get_weather()
+        if weather:
+            print(weather)
         if "items" in self.current_scene and self.current_scene["items"]:
             print("You see the following items:")
             for item in self.current_scene["items"]:
@@ -66,6 +73,13 @@ class GameEngine:
     def talk_to_character(self, character_name):
         if character_name in self.current_scene["characters"]:
             character = self.characters[character_name]
+            if "conditions" in character:
+                for condition, data in character["conditions"].items():
+                    if condition == "has_energy_cells" and "energy_cells" in self.inventory:
+                        print(data["text"])
+                        if data["action"] == "repair_communicator":
+                            self.repair_communicator()
+                        return
             print(character["dialogue"]["greet"])
         else:
             print("Character not found in this scene.")
@@ -87,31 +101,47 @@ class GameEngine:
         if character_name in self.current_scene["characters"]:
             character = self.characters[character_name]
             if character["type"] == "hostile":
-                # Engage battle system
-                pass
+                enemy_stats = character["stats"]
+                battle = BattleSystem(self.player_stats, enemy_stats)
+                battle.engage_battle()
             else:
                 print("This character is not hostile.")
         else:
             print("Character not found in this scene.")
 
-    def exit_room(self):
-        if "exits" in self.current_scene:
-            exits = self.current_scene["exits"]
-            if len(exits) == 1:
-                next_scene_id = exits[0]["scene_id"]
-                self.change_scene(next_scene_id)
-            else:
-                print("There are multiple exits. Where do you want to go?")
-                for i, exit in enumerate(exits):
-                    print(f"{i + 1}. {exit['description']}")
-                choice = int(input("Enter the number of your choice: ")) - 1
-                if 0 <= choice < len(exits):
-                    next_scene_id = exits[choice]["scene_id"]
-                    self.change_scene(next_scene_id)
-                else:
-                    print("Invalid choice.")
-        else:
+    def exit_room(self, direction=None):
+        exits = self.current_scene.get("exits", [])
+        if not exits:
             print("There are no exits in this scene.")
+            return
+
+        if direction:
+            for exit in exits:
+                if direction in exit["door_name"].lower():
+                    self.attempt_to_exit(exit)
+                    return
+            print("Invalid direction.")
+        else:
+            print("There are multiple exits. Where do you want to go?")
+            for i, exit in enumerate(exits):
+                print(f"{i + 1}. {exit['door_name']}")
+            choice = int(input("Enter the number of your choice: ")) - 1
+            if 0 <= choice < len(exits):
+                self.attempt_to_exit(exits[choice])
+            else:
+                print("Invalid choice.")
+
+    def attempt_to_exit(self, exit):
+        if exit["locked"]:
+            required_item = exit["required_item"]
+            if required_item in self.inventory:
+                print(exit["unlock_text"])
+                self.inventory.remove(required_item)
+                self.change_scene(exit["scene_id"])
+            else:
+                print(exit["lock_text"])
+        else:
+            self.change_scene(exit["scene_id"])
 
     def list_inventory(self):
         if self.inventory:
@@ -190,7 +220,7 @@ class GameEngine:
     def find_item_by_name(self, item_name):
         for item_id, item in self.items.items():
             if item_name.lower() in item["name"].lower():
-                return {"id": item_id, "name": item["name"], "description": item["description"], "usable": item["usable"]}
+                return {"id": item_id, "name": item["name"], "description": item["description"], "usable": item["usable"], "equipable": item.get("equipable", False), "effect": item.get("effect", {})}
         return None
 
     def display_story_text(self, text_key):
@@ -229,3 +259,62 @@ class GameEngine:
     def check_enemy_defeated(self, enemy_name):
         # Implement logic to check if the enemy is defeated
         return True
+
+    def use_item(self, item_name):
+        item = self.find_item_by_name(item_name)
+        if item and item["id"] in self.inventory and item["usable"]:
+            if "effect" in item:
+                effect = item["effect"]
+                if "health" in effect:
+                    self.player_stats["health"] += effect["health"]
+                    print(f"You used the {item['name']} and regained {effect['health']} health.")
+                    self.inventory.remove(item["id"])
+                # Add more effects as needed
+            else:
+                print("This item cannot be used.")
+        else:
+            print("Item not found in inventory or cannot be used.")
+
+    def equip_item(self, item_name):
+        item = self.find_item_by_name(item_name)
+        if item and item["id"] in self.inventory and item["equipable"]:
+            self.player_stats["equipment"].append(item["id"])
+            self.inventory.remove(item["id"])
+            if "effect" in item:
+                for stat, value in item["effect"].items():
+                    self.player_stats[stat] += value
+            print(f"You equipped the {item['name']}.")
+        else:
+            print("Item not found in inventory or cannot be equipped.")
+
+    def unequip_item(self, item_name):
+        item = self.find_item_by_name(item_name)
+        if item and item["id"] in self.player_stats["equipment"]:
+            self.player_stats["equipment"].remove(item["id"])
+            self.inventory.append(item["id"])
+            if "effect" in item:
+                for stat, value in item["effect"].items():
+                    self.player_stats[stat] -= value
+            print(f"You unequipped the {item['name']}.")
+        else:
+            print("Item not found in equipment.")
+
+    def get_weather(self):
+        weather_conditions = ["sunny", "cloudy", "rainy", "stormy"]
+        condition = random.choice(weather_conditions)
+        if condition == "sunny":
+            return "The sun is shining brightly."
+        elif condition == "cloudy":
+            return "The sky is cloudy."
+        elif condition == "rainy":
+            return "It's raining outside."
+        elif condition == "stormy":
+            return "There's a storm brewing."
+        return ""
+
+    def repair_communicator(self):
+        if "energy_cells" in self.inventory:
+            self.inventory.remove("energy_cells")
+            print("Your communicator has been repaired.")
+        else:
+            print("You don't have energy cells to repair the communicator.")

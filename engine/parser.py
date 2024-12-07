@@ -20,7 +20,8 @@ class Parser:
             "combine": self.combine_items,
             "examine yourself": self.examine_self,
             "look at yourself": self.examine_self,
-            "stats": self.show_stats
+            "stats": self.show_stats,
+            "use": self.use
         }
 
     def parse_command(self, command):
@@ -119,3 +120,9 @@ class Parser:
 
     def show_stats(self, command):
         return "Your stats:"
+
+    def use(self, command):
+        item_name = command.split("use")[-1].strip()
+        if not item_name:
+            return "Please specify an item to use."
+        return f"You use the {item_name}."

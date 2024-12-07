@@ -5,11 +5,23 @@
     "type": "friendly",
     "dialogue": {
       "greet": "Greetings! How can I assist you?",
-      "repair": "I can repair your communicator if you provide energy cells."
+      "repair": "I can repair your communicator if you provide energy cells.",
+      "thanks": "You're welcome! Safe travels."
     },
     "interactions": {
       "talk": "friendly_robot_greet",
       "give_energy_cells": "friendly_robot_repair"
+    },
+    "stats": {
+      "health": 100,
+      "attack": 10,
+      "defense": 5
+    },
+    "conditions": {
+      "has_energy_cells": {
+        "text": "I see you have energy cells. Let me repair your communicator.",
+        "action": "repair_communicator"
+      }
     }
   },
   "hostile_droid": {
@@ -24,6 +36,11 @@
       "talk": "hostile_droid_greet",
       "give_coolant_canister": "hostile_droid_calm_down",
       "fight": "engage_battle"
+    },
+    "stats": {
+      "health": 150,
+      "attack": 20,
+      "defense": 10
     }
   },
   "neutral_ai": {
@@ -37,6 +54,11 @@
     "interactions": {
       "talk": "neutral_ai_greet",
       "complete_objective": "neutral_ai_objective"
+    },
+    "stats": {
+      "health": 200,
+      "attack": 5,
+      "defense": 20
     }
   }
 }

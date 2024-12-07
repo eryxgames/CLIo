@@ -5,7 +5,20 @@
         "description": "You find yourself in the cockpit of an abandoned spaceship.",
         "items": ["broken_communicator", "space_map"],
         "characters": [],
-        "actions": ["explore", "look_at", "take"]
+        "exits": [
+            {
+                "door_name": "Storage Room Door",
+                "locked": true,
+                "lock_text": "The door is locked. You need a key to open it.",
+                "unlock_text": "You use the key to unlock the door.",
+                "required_item": "key",
+                "scene_id": "scene2"
+            }
+        ],
+        "music": "music/cockpit_music.mp3",
+        "sound_effects": {
+            "enter": "sounds/door_open.mp3"
+        }
     },
     {
         "id": "scene2",
@@ -13,7 +26,28 @@
         "description": "A storage room filled with supplies.",
         "items": ["first_aid_kit", "energy_cells"],
         "characters": ["friendly_robot"],
-        "actions": ["talk_to", "take"]
+        "exits": [
+            {
+                "door_name": "Cockpit Door",
+                "locked": false,
+                "lock_text": "",
+                "unlock_text": "",
+                "required_item": "",
+                "scene_id": "scene1"
+            },
+            {
+                "door_name": "Engine Room Door",
+                "locked": true,
+                "lock_text": "The door is sealed. You need a special passcard.",
+                "unlock_text": "You insert the passcard and the door slides open.",
+                "required_item": "passcard",
+                "scene_id": "scene3"
+            }
+        ],
+        "music": "music/storage_room_music.mp3",
+        "sound_effects": {
+            "enter": "sounds/door_open.mp3"
+        }
     },
     {
         "id": "scene3",
@@ -21,7 +55,20 @@
         "description": "The engine room is overheating.",
         "items": ["coolant_canister"],
         "characters": ["hostile_droid"],
-        "actions": ["talk_to", "give", "fight"]
+        "exits": [
+            {
+                "door_name": "Storage Room Door",
+                "locked": false,
+                "lock_text": "",
+                "unlock_text": "",
+                "required_item": "",
+                "scene_id": "scene2"
+            }
+        ],
+        "music": "music/engine_room_music.mp3",
+        "sound_effects": {
+            "enter": "sounds/door_open.mp3"
+        }
     },
     {
         "id": "scene4",
@@ -29,6 +76,19 @@
         "description": "The bridge controls the spaceship.",
         "items": ["ship_log"],
         "characters": ["neutral_ai"],
-        "actions": ["talk_to", "complete_objective"]
+        "exits": [
+            {
+                "door_name": "Cockpit Door",
+                "locked": false,
+                "lock_text": "",
+                "unlock_text": "",
+                "required_item": "",
+                "scene_id": "scene1"
+            }
+        ],
+        "music": "music/bridge_music.mp3",
+        "sound_effects": {
+            "enter": "sounds/door_open.mp3"
+        }
     }
 ]

@@ -12,7 +12,10 @@
     "first_aid_kit": {
         "name": "First Aid Kit",
         "description": "Medical supplies to heal injuries.",
-        "usable": true
+        "usable": true,
+        "effect": {
+            "health": 50
+        }
     },
     "energy_cells": {
         "name": "Energy Cells",
@@ -28,6 +31,33 @@
         "name": "Ship Log",
         "description": "Log entries detailing the ship's journey.",
         "usable": false
+    },
+    "spacesuit": {
+        "name": "Spacesuit",
+        "description": "A protective suit for space exploration.",
+        "usable": false,
+        "equipable": true,
+        "effect": {
+            "defense": 10
+        }
+    },
+    "plasma_cutter": {
+        "name": "Plasma Cutter",
+        "description": "A powerful cutting tool.",
+        "usable": false,
+        "equipable": true,
+        "effect": {
+            "attack": 10
+        }
+    },
+    "laser_repeater_gun": {
+        "name": "Laser Repeater Gun",
+        "description": "A high-powered laser weapon.",
+        "usable": false,
+        "equipable": true,
+        "effect": {
+            "attack": 20
+        }
     },
     "combinations": {
         "broken_communicator + energy_cells": "repaired_communicator",

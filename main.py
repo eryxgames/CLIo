@@ -74,6 +74,15 @@ def main():
                 game_engine.player_stats = saved_state["player_stats"]
                 game_engine.story_progress = saved_state["story_progress"]
                 media_player.print_with_delay(game_engine.current_scene["description"])
+            elif command.startswith("use "):
+                item_name = command.split("use")[-1].strip()
+                game_engine.use_item(item_name)
+            elif command.startswith("equip "):
+                item_name = command.split("equip")[-1].strip()
+                game_engine.equip_item(item_name)
+            elif command.startswith("unequip "):
+                item_name = command.split("unequip")[-1].strip()
+                game_engine.unequip_item(item_name)
             else:
                 response = parser.parse_command(command)
                 if response and response != "I don't understand that command.":

@@ -32,7 +32,7 @@
         "id": "scene2",
         "name": "Storage Room",
         "description": "A storage room filled with supplies.",
-        "items": ["first_aid_kit", "energy_cells"],
+        "items": ["first_aid_kit", "energy_cells", "passcard"],
         "characters": ["friendly_robot"],
         "exits": [
             {

@@ -32,6 +32,11 @@
         "description": "Log entries detailing the ship's journey.",
         "usable": false
     },
+    "passcard": {
+        "name": "Universal Maintenance Passcard",
+        "description": "This passcard allows access to service areas of the ship.",
+        "usable": false
+    },
     "spacesuit": {
         "name": "Spacesuit",
         "description": "A protective suit for space exploration.",

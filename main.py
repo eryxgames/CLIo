@@ -104,10 +104,10 @@ def main():
                     game_engine.interact_with_item(item_name)
                 elif "look" in command:
                     game_engine.explore_scene()
-                elif "take" in command or "pick up" in command:
+                elif "take" in command or "pick up" in command or "grab" in command:
                     item_name = command.split()[-1].strip()
                     game_engine.take_item(item_name)
-                elif "talk to" in command:
+                elif "talk to" in command or "speak to" in command or "converse with" in command:
                     character_name = command.split("to")[-1].strip()
                     game_engine.talk_to_character(character_name)
                 elif "give" in command:
@@ -122,10 +122,10 @@ def main():
                     game_engine.exit_room()
                 elif "inventory" in command:
                     game_engine.list_inventory()
-                elif "examine" in command and "yourself" not in command:
+                elif "examine" in command and "yourself" not in command or "inspect" in command or "study" in command:
                     item_name = command.split("examine")[-1].strip()
                     game_engine.examine_item(item_name)
-                elif "combine" in command:
+                elif "combine" in command or "merge" in command:
                     parts = command.split()
                     item1 = parts[parts.index("combine") + 1]
                     item2 = parts[parts.index("with") + 1]

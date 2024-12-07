@@ -67,12 +67,50 @@ class GameEngine:
     def interact_with_item(self, item_name):
         item = self.find_item_by_name(item_name)
         if item:
-            print(item["description"])
-            if item["usable"]:
-                # Logic to use the item
-                pass
-            elif item.get("interactive"):
-                self.handle_interactive_item(item)
+            item_id = item["id"]
+            if item_id in self.current_scene["items"]:
+                print(item["description"])
+                if item["usable"]:
+                    # Logic to use the item
+                    pass
+                elif item.get("interactive"):
+                    self.handle_interactive_item(item)
+            elif item_id in self.current_scene.get("passive_items", []):
+                passive_item = self.items[item_id]
+                current_state = passive_item.get("current_state", "default")
+                state_data = passive_item.get("states", {}).get(current_state, {})
+                print(state_data.get("description", "No description available."))
+                action = state_data.get("action")
+                if action:
+                    if action == "open":
+                        if "locked" in passive_item and passive_item["locked"]:
+                            print("The item is locked. You need to unlock it first.")
+                        else:
+                            print(f"You open the {passive_item['name']}.")
+                            passive_item["current_state"] = state_data.get("next_state", "open")
+                            if "reward" in state_data:
+                                reward_item = state_data["reward"]
+                                self.current_scene["items"].append(reward_item)
+                                print(f"You find a {self.items[reward_item]['name']} inside.")
+                    elif action == "unlock":
+                        if "bent_wire" in self.inventory:
+                            print(f"You use the bent wire to pick the lock of the {passive_item['name']}.")
+                            passive_item["locked"] = False
+                            passive_item["current_state"] = state_data.get("next_state", "unlocked")
+                        else:
+                            print("You need a tool to pick the lock.")
+                    elif action == "take":
+                        reward_item = state_data.get("reward")
+                        if reward_item:
+                            if reward_item in self.current_scene["items"]:
+                                self.take_item(reward_item)
+                                passive_item["current_state"] = state_data.get("next_state", "empty")
+                            else:
+                                print("There is nothing left to take.")
+                        else:
+                            print("There is nothing to take.")
+            else:
+                print("Item not found in this scene.")
         else:
             print("Item not found in this scene. Try to use the exact command.")
 
@@ -279,8 +317,15 @@ class GameEngine:
 
     def find_item_by_name(self, item_name):
         for item_id, item in self.items.items():
-            if item_name.lower() in item["name"].lower():
-                return {"id": item_id, "name": item["name"], "description": item["description"], "usable": item["usable"], "interactive": item.get("interactive", False), "states": item.get("states", {})}
+            if item_name.lower() in item.get("name", "").lower():
+                return {
+                    "id": item_id,
+                    "name": item.get("name", "Unknown Item"),
+                    "description": item.get("description", "No description available."),
+                    "usable": item.get("usable", False),
+                    "interactive": item.get("interactive", False),
+                    "states": item.get("states", {})
+                }
         return None
 
     def display_story_text(self, text_key):

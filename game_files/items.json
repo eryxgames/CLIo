@@ -130,5 +130,24 @@
     "combinations": {
         "broken_communicator + energy_cells": "repaired_communicator",
         "first_aid_kit + coolant_canister": "advanced_medkit"
+    },
+    "spaceship_console": {
+        "name": "Spaceship Console",
+        "description": "A control console for the spaceship. It requires a valid access code to activate.",
+        "usable": false,
+        "interactive": true,
+        "current_state": "inactive",
+        "states": {
+            "inactive": {
+                "description": "The console is inactive. You need to enter the correct access code.",
+                "action": "enter_code",
+                "next_state": "active"
+            },
+            "active": {
+                "description": "The console is now active. You can pilot the spaceship.",
+                "action": null,
+                "next_state": null
+            }
+        }
     }
 }

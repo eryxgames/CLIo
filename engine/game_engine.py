@@ -77,7 +77,11 @@ class GameEngine:
             print("Item not found in this scene. Try to use the exact command.")
 
     def handle_interactive_item(self, item):
-        current_state = item["states"].get(item.get("current_state", "locked"), item["states"]["locked"])
+        current_state_key = item.get("current_state", "default")
+        if current_state_key not in item["states"]:
+            print("Invalid state for this item.")
+            return
+        current_state = item["states"][current_state_key]
         print(current_state["description"])
         action = current_state["action"]
         if action:

@@ -64,6 +64,7 @@
         "description": "A sturdy metal locker that seems to be locked.",
         "usable": false,
         "interactive": true,
+        "current_state": "closed",
         "states": {
             "closed": {
                 "description": "The locker is closed.",
@@ -87,6 +88,7 @@
         "description": "A rusty metal locker that seems to be locked.",
         "usable": false,
         "interactive": true,
+        "current_state": "locked",
         "states": {
             "locked": {
                 "description": "The locker is locked.",

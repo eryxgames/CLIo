@@ -89,6 +89,8 @@ def main():
             elif command.startswith("pick lock of "):
                 item_name = command.split("lock of")[-1].strip()
                 game_engine.interact_with_item(item_name)
+            elif command == "hint":
+                game_engine.provide_hint()
             else:
                 response = parser.parse_command(command)
                 if response and response != "I don't understand that command. Try to use the exact command.":
@@ -100,6 +102,8 @@ def main():
                 elif "look at" in command and "yourself" not in command:
                     item_name = command.split("at")[-1].strip()
                     game_engine.interact_with_item(item_name)
+                elif "look" in command:
+                    game_engine.explore_scene()
                 elif "take" in command or "pick up" in command:
                     item_name = command.split()[-1].strip()
                     game_engine.take_item(item_name)

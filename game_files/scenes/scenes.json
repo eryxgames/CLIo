@@ -2,7 +2,7 @@
     {
         "id": "scene1",
         "name": "Abandoned Spaceship",
-        "description": "You find yourself in the cockpit of an abandoned spaceship.",
+        "description": "You find yourself in the utility room of a decrepit, possibly abandoned spaceship.",
         "items": ["broken_communicator", "space_map", "bent_wire"],
         "passive_items": ["metal_locker", "rusty_metal_locker"],
         "characters": [],
@@ -21,11 +21,12 @@
             "enter": "sounds/door_open.mp3"
         },
         "random_events": [
-            "The sun is shining brightly.",
-            "The sky is cloudy.",
-            "It's raining outside.",
-            "There's a storm brewing."
-        ]
+            "The broken screen on the wall shows a holographic map of some star system.",
+            "There is a distant hum of some device.",
+            "This starship remembers a better days.",
+            "The broken screen on the wall shows an undecipherable code with an error of some sort."
+        ],
+        "hint": "Try using the bent wire to pick the lock of the rusty metal locker."
     },
     {
         "id": "scene2",
@@ -59,7 +60,8 @@
             "Air conditioning is humming softly.",
             "You hear water dripping from an unknown source.",
             "The artificial lights are flickering."
-        ]
+        ],
+        "hint": "Look for the passcard to open the Engine Room Door."
     },
     {
         "id": "scene3",
@@ -85,7 +87,8 @@
             "The engine is making a loud whirring sound.",
             "You hear the sound of metal clanking.",
             "The room is filled with the smell of oil."
-        ]
+        ],
+        "hint": "Use the coolant canister to cool down the engine."
     },
     {
         "id": "scene4",
@@ -111,7 +114,8 @@
             "The control panels are beeping softly.",
             "You hear the distant hum of the ship's engines.",
             "The bridge is quiet, with only the sound of your own breathing."
-        ]
+        ],
+        "hint": "Explore the bridge to find useful items."
     },
     {
         "id": "scene5",
@@ -137,6 +141,7 @@
             "The sun is shining brightly through the glass ceiling.",
             "It starts to rain, and you hear the sound of water dripping from the leaves.",
             "A gentle breeze rustles the leaves of the plants."
-        ]
+        ],
+        "hint": "Enjoy the peaceful atmosphere of the hydroponic bay."
     }
 ]

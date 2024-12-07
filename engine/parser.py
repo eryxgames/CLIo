@@ -4,6 +4,7 @@ class Parser:
             "explore": self.explore,
             "look around": self.explore,
             "look at": self.look_at,
+            "look": self.look,
             "take": self.take,
             "pick up": self.take,
             "open": self.open,
@@ -22,7 +23,8 @@ class Parser:
             "look at yourself": self.examine_self,
             "stats": self.show_stats,
             "use": self.use,
-            "pick lock": self.pick_lock
+            "pick lock": self.pick_lock,
+            "help": self.help
         }
 
     def parse_command(self, command):
@@ -41,6 +43,9 @@ class Parser:
         if not item_name:
             return "Please specify an item to look at."
         return f"You carefully examine the {item_name}."
+
+    def look(self, command):
+        return "You look around the area, taking in every detail."
 
     def take(self, command):
         item_name = command.split()[-1].strip()
@@ -133,3 +138,30 @@ class Parser:
         if not item_name:
             return "Please specify an item to pick the lock of."
         return f"You attempt to pick the lock of the {item_name}."
+
+    def help(self, command):
+        return (
+            "Available commands:\n"
+            "explore - Look around the area.\n"
+            "look at [item] - Examine a specific item.\n"
+            "look - Look around the area.\n"
+            "take [item] - Pick up an item.\n"
+            "open [item] - Open an item.\n"
+            "close [item] - Close an item.\n"
+            "equip [item] - Equip an item.\n"
+            "unequip [item] - Unequip an item.\n"
+            "talk to [character] - Talk to a character.\n"
+            "give [item] to [character] - Give an item to a character.\n"
+            "fight [character] - Fight a character.\n"
+            "exit - Look for a way out of the room.\n"
+            "go to [exit] - Go to a specific exit.\n"
+            "inventory - Check your inventory.\n"
+            "examine [item] - Examine an item closely.\n"
+            "combine [item1] with [item2] - Combine two items.\n"
+            "examine yourself - Examine yourself closely.\n"
+            "look at yourself - Examine yourself closely.\n"
+            "stats - Show your stats.\n"
+            "use [item] - Use an item.\n"
+            "pick lock of [item] - Pick the lock of an item.\n"
+            "help - Show this help message."
+        )

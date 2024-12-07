@@ -36,7 +36,7 @@
         "name": "Spacesuit",
         "description": "A protective suit for space exploration.",
         "usable": false,
-        "equipable": true,
+        "equippable": true,
         "effect": {
             "defense": 10
         }
@@ -45,7 +45,7 @@
         "name": "Plasma Cutter",
         "description": "A powerful cutting tool.",
         "usable": false,
-        "equipable": true,
+        "equippable": true,
         "effect": {
             "attack": 10
         }
@@ -54,7 +54,7 @@
         "name": "Laser Repeater Gun",
         "description": "A high-powered laser weapon.",
         "usable": false,
-        "equipable": true,
+        "equippable": true,
         "effect": {
             "attack": 20
         }

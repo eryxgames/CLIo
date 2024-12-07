@@ -17,6 +17,8 @@ class GameEngine:
             "equipment": []
         }
         self.story_progress = {}
+        self.hints_used = 0
+        self.max_hints = 5
 
     def load_story_texts(self, filename):
         try:
@@ -331,7 +333,7 @@ class GameEngine:
 
     def equip_item(self, item_name):
         item = self.find_item_by_name(item_name)
-        if item and item["id"] in self.inventory and item.get("equipable", False):
+        if item and item["id"] in self.inventory and item.get("equippable", False):
             self.player_stats["equipment"].append(item["id"])
             self.inventory.remove(item["id"])
             if "effect" in item:
@@ -365,3 +367,11 @@ class GameEngine:
             print("Your communicator has been repaired.")
         else:
             print("You don't have energy cells to repair the communicator.")
+
+    def provide_hint(self):
+        if self.hints_used < self.max_hints:
+            hint = self.current_scene.get("hint", "No hint available.")
+            print(hint)
+            self.hints_used += 1
+        else:
+            print("You have used all your hints.")

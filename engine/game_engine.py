@@ -132,7 +132,7 @@ class GameEngine:
             print("One or both items not found in your inventory.")
 
     def examine_self(self):
-        print("You examine yourself:")
+        print("Your stats:")
         print(f"Health: {self.player_stats['health']}")
         print(f"Strength: {self.player_stats['strength']}")
         print(f"Defense: {self.player_stats['defense']}")
@@ -159,7 +159,7 @@ class GameEngine:
             print("You are critically injured.")
 
     def show_stats(self):
-        print("You check your stats:")
+        print("Your stats:")
         print(f"Health: {self.player_stats['health']}")
         print(f"Strength: {self.player_stats['strength']}")
         print(f"Defense: {self.player_stats['defense']}")

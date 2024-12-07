@@ -78,7 +78,7 @@ def main():
                 # Further logic based on parsed command
                 if "explore" in command or "look around" in command:
                     game_engine.explore_scene()
-                elif "look at" in command:
+                elif "look at" in command and "yourself" not in command:
                     item_name = command.split("at")[-1].strip()
                     game_engine.interact_with_item(item_name)
                 elif "take" in command or "pick up" in command:
@@ -99,7 +99,7 @@ def main():
                     game_engine.exit_room()
                 elif "inventory" in command:
                     game_engine.list_inventory()
-                elif "examine" in command:
+                elif "examine" in command and "yourself" not in command:
                     item_name = command.split("examine")[-1].strip()
                     game_engine.examine_item(item_name)
                 elif "combine" in command:

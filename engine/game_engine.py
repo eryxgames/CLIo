@@ -33,21 +33,33 @@ class GameEngine:
         next_scene = next((scene for scene in self.scenes if scene["id"] == scene_id), None)
         if next_scene:
             self.current_scene = next_scene
-            media_player.play_music(next_scene.get("music", ""))
+            music_file = next_scene.get("music", "")
+            if music_file and os.path.exists(music_file):
+                media_player.play_music(music_file)
+            else:
+                print("The sound of silence!")
             if "sound_effects" in next_scene and "enter" in next_scene["sound_effects"]:
-                media_player.play_sound_effect(next_scene["sound_effects"]["enter"])
+                sound_effect_file = next_scene["sound_effects"]["enter"]
+                if sound_effect_file and os.path.exists(sound_effect_file):
+                    media_player.play_sound_effect(sound_effect_file)
+                else:
+                    print("The sound of silence!")
             print(self.current_scene["description"])
         else:
             print("Invalid scene ID.")
 
     def explore_scene(self):
         print(self.current_scene["description"])
-        weather = self.get_weather()
-        if weather:
-            print(weather)
+        random_event = self.get_random_event()
+        if random_event:
+            print(random_event)
         if "items" in self.current_scene and self.current_scene["items"]:
             print("You see the following items:")
             for item in self.current_scene["items"]:
+                print(f"- {self.items[item]['name']}")
+        if "passive_items" in self.current_scene and self.current_scene["passive_items"]:
+            print("You notice the following interactive items:")
+            for item in self.current_scene["passive_items"]:
                 print(f"- {self.items[item]['name']}")
 
     def interact_with_item(self, item_name):
@@ -57,8 +69,41 @@ class GameEngine:
             if item["usable"]:
                 # Logic to use the item
                 pass
+            elif item.get("interactive"):
+                self.handle_interactive_item(item)
         else:
-            print("Item not found in this scene.")
+            print("Item not found in this scene. Try to use the exact command.")
+
+    def handle_interactive_item(self, item):
+        current_state = item["states"].get(item.get("current_state", "locked"), item["states"]["locked"])
+        print(current_state["description"])
+        action = current_state["action"]
+        if action:
+            next_state = current_state["next_state"]
+            if action == "open":
+                print(f"You open the {item['name']}.")
+                item["current_state"] = next_state
+                if next_state == "open":
+                    self.reveal_item_from_interactive(item)
+            elif action == "unlock":
+                if "bent_wire" in self.inventory:
+                    print(f"You use the bent wire to pick the lock of the {item['name']}.")
+                    item["current_state"] = next_state
+                    if next_state == "open":
+                        self.reveal_item_from_interactive(item)
+                else:
+                    print(f"You need a tool to pick the lock of the {item['name']}.")
+            elif action == "take":
+                print(f"You take the item from the {item['name']}.")
+                item["current_state"] = next_state
+
+    def reveal_item_from_interactive(self, item):
+        if item["id"] == "metal_locker":
+            self.current_scene["items"].append("storage_room_key")
+            print("You find a Storage Room Key inside the locker.")
+        elif item["id"] == "rusty_metal_locker":
+            self.current_scene["items"].append("chx_cargo_hauler_manual")
+            print("You find a CHX Cargo Hauler Manual inside the locker.")
 
     def take_item(self, item_name):
         item = self.find_item_by_name(item_name)
@@ -67,6 +112,13 @@ class GameEngine:
             print(f"You take the {item['name']}.")
             self.inventory.append(item_id)
             self.current_scene["items"].remove(item_id)
+            # Ensure the item does not reappear in lockers or other interactive items
+            for passive_item in self.current_scene.get("passive_items", []):
+                passive_item_data = self.items[passive_item]
+                if "states" in passive_item_data:
+                    for state in passive_item_data["states"].values():
+                        if state["action"] == "take" and state["next_state"] == "empty":
+                            passive_item_data["current_state"] = "empty"
         else:
             print("Item not found in this scene.")
 
@@ -115,12 +167,13 @@ class GameEngine:
             print("There are no exits in this scene.")
             return
 
-        if direction:
-            for exit in exits:
-                if direction in exit["door_name"].lower():
-                    self.attempt_to_exit(exit)
-                    return
-            print("Invalid direction.")
+        if len(exits) == 1:
+            print("There is just one exit from here. Do you want to leave?")
+            choice = input("Enter 'yes' to leave or 'no' to stay: ").lower()
+            if choice == "yes":
+                self.attempt_to_exit(exits[0])
+            else:
+                print("You decide to stay.")
         else:
             print("There are multiple exits. Where do you want to go?")
             for i, exit in enumerate(exits):
@@ -136,7 +189,8 @@ class GameEngine:
             required_item = exit["required_item"]
             if required_item in self.inventory:
                 print(exit["unlock_text"])
-                self.inventory.remove(required_item)
+                if self.items[required_item].get("consumable", False):
+                    self.inventory.remove(required_item)
                 self.change_scene(exit["scene_id"])
             else:
                 print(exit["lock_text"])
@@ -220,7 +274,7 @@ class GameEngine:
     def find_item_by_name(self, item_name):
         for item_id, item in self.items.items():
             if item_name.lower() in item["name"].lower():
-                return {"id": item_id, "name": item["name"], "description": item["description"], "usable": item["usable"], "equipable": item.get("equipable", False), "effect": item.get("effect", {})}
+                return {"id": item_id, "name": item["name"], "description": item["description"], "usable": item["usable"], "interactive": item.get("interactive", False), "states": item.get("states", {})}
         return None
 
     def display_story_text(self, text_key):
@@ -234,7 +288,7 @@ class GameEngine:
             else:
                 print(text_info["text"])
         else:
-            print("") # when there is no key defined
+            print("")  # when there is no key defined
 
     def check_game_over(self):
         if self.player_stats["health"] <= 0:
@@ -277,7 +331,7 @@ class GameEngine:
 
     def equip_item(self, item_name):
         item = self.find_item_by_name(item_name)
-        if item and item["id"] in self.inventory and item["equipable"]:
+        if item and item["id"] in self.inventory and item.get("equipable", False):
             self.player_stats["equipment"].append(item["id"])
             self.inventory.remove(item["id"])
             if "effect" in item:
@@ -299,17 +353,10 @@ class GameEngine:
         else:
             print("Item not found in equipment.")
 
-    def get_weather(self):
-        weather_conditions = ["sunny", "cloudy", "rainy", "stormy"]
-        condition = random.choice(weather_conditions)
-        if condition == "sunny":
-            return "The sun is shining brightly."
-        elif condition == "cloudy":
-            return "The sky is cloudy."
-        elif condition == "rainy":
-            return "It's raining outside."
-        elif condition == "stormy":
-            return "There's a storm brewing."
+    def get_random_event(self):
+        random_events = self.current_scene.get("random_events", [])
+        if random_events:
+            return random.choice(random_events)
         return ""
 
     def repair_communicator(self):

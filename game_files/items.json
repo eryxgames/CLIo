@@ -59,6 +59,72 @@
             "attack": 20
         }
     },
+    "metal_locker": {
+        "name": "Metal Locker",
+        "description": "A sturdy metal locker that seems to be locked.",
+        "usable": false,
+        "interactive": true,
+        "states": {
+            "closed": {
+                "description": "The locker is closed.",
+                "action": "open",
+                "next_state": "open"
+            },
+            "open": {
+                "description": "The locker is open, revealing a Storage Room Key.",
+                "action": "take",
+                "next_state": "empty"
+            },
+            "empty": {
+                "description": "The locker is empty.",
+                "action": null,
+                "next_state": null
+            }
+        }
+    },
+    "rusty_metal_locker": {
+        "name": "Rusty Metal Locker",
+        "description": "A rusty metal locker that seems to be locked.",
+        "usable": false,
+        "interactive": true,
+        "states": {
+            "locked": {
+                "description": "The locker is locked.",
+                "action": "unlock",
+                "next_state": "open"
+            },
+            "open": {
+                "description": "The locker is open, revealing a CHX Cargo Hauler Manual.",
+                "action": "take",
+                "next_state": "empty"
+            },
+            "empty": {
+                "description": "The locker is empty.",
+                "action": null,
+                "next_state": null
+            }
+        }
+    },
+    "bent_wire": {
+        "name": "Bent Wire",
+        "description": "A bent wire that might be useful for picking locks.",
+        "usable": true,
+        "effect": {
+            "unlock": true
+        }
+    },
+    "chx_cargo_hauler_manual": {
+        "name": "CHX Cargo Hauler Manual",
+        "description": "A user guide for the spaceship cargo hauler, with numbered illustrations but still heavy reading.",
+        "usable": false
+    },
+    "storage_room_key": {
+        "name": "Storage Room Key",
+        "description": "A key that opens the Storage Room Door.",
+        "usable": false,
+        "key": true,
+        "consumable": true
+    },
     "combinations": {
         "broken_communicator + energy_cells": "repaired_communicator",
         "first_aid_kit + coolant_canister": "advanced_medkit"

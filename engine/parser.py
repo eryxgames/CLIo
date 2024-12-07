@@ -21,7 +21,8 @@ class Parser:
             "examine yourself": self.examine_self,
             "look at yourself": self.examine_self,
             "stats": self.show_stats,
-            "use": self.use
+            "use": self.use,
+            "pick lock": self.pick_lock
         }
 
     def parse_command(self, command):
@@ -30,7 +31,7 @@ class Parser:
         for keyword, action in self.keywords.items():
             if keyword in command:
                 return action(command)
-        return "I don't understand that command."
+        return "I don't understand that command. Try to use the exact command."
 
     def explore(self, command):
         return "You explore the area, taking in every detail."
@@ -126,3 +127,9 @@ class Parser:
         if not item_name:
             return "Please specify an item to use."
         return f"You use the {item_name}."
+
+    def pick_lock(self, command):
+        item_name = command.split("lock of")[-1].strip()
+        if not item_name:
+            return "Please specify an item to pick the lock of."
+        return f"You attempt to pick the lock of the {item_name}."

@@ -3,7 +3,8 @@
         "id": "scene1",
         "name": "Abandoned Spaceship",
         "description": "You find yourself in the cockpit of an abandoned spaceship.",
-        "items": ["broken_communicator", "space_map"],
+        "items": ["broken_communicator", "space_map", "bent_wire"],
+        "passive_items": ["metal_locker", "rusty_metal_locker"],
         "characters": [],
         "exits": [
             {
@@ -11,14 +12,20 @@
                 "locked": true,
                 "lock_text": "The door is locked. You need a key to open it.",
                 "unlock_text": "You use the key to unlock the door.",
-                "required_item": "key",
+                "required_item": "storage_room_key",
                 "scene_id": "scene2"
             }
         ],
         "music": "music/cockpit_music.mp3",
         "sound_effects": {
             "enter": "sounds/door_open.mp3"
-        }
+        },
+        "random_events": [
+            "The sun is shining brightly.",
+            "The sky is cloudy.",
+            "It's raining outside.",
+            "There's a storm brewing."
+        ]
     },
     {
         "id": "scene2",
@@ -47,7 +54,12 @@
         "music": "music/storage_room_music.mp3",
         "sound_effects": {
             "enter": "sounds/door_open.mp3"
-        }
+        },
+        "random_events": [
+            "Air conditioning is humming softly.",
+            "You hear water dripping from an unknown source.",
+            "The artificial lights are flickering."
+        ]
     },
     {
         "id": "scene3",
@@ -68,7 +80,12 @@
         "music": "music/engine_room_music.mp3",
         "sound_effects": {
             "enter": "sounds/door_open.mp3"
-        }
+        },
+        "random_events": [
+            "The engine is making a loud whirring sound.",
+            "You hear the sound of metal clanking.",
+            "The room is filled with the smell of oil."
+        ]
     },
     {
         "id": "scene4",
@@ -89,6 +106,37 @@
         "music": "music/bridge_music.mp3",
         "sound_effects": {
             "enter": "sounds/door_open.mp3"
-        }
+        },
+        "random_events": [
+            "The control panels are beeping softly.",
+            "You hear the distant hum of the ship's engines.",
+            "The bridge is quiet, with only the sound of your own breathing."
+        ]
+    },
+    {
+        "id": "scene5",
+        "name": "Hydroponic Bay",
+        "description": "A lush greenhouse filled with plants and the sound of flowing water.",
+        "items": [],
+        "characters": [],
+        "exits": [
+            {
+                "door_name": "Exit to Storage Room",
+                "locked": false,
+                "lock_text": "",
+                "unlock_text": "",
+                "required_item": "",
+                "scene_id": "scene2"
+            }
+        ],
+        "music": "music/hydroponic_bay_music.mp3",
+        "sound_effects": {
+            "enter": "sounds/water_flowing.mp3"
+        },
+        "random_events": [
+            "The sun is shining brightly through the glass ceiling.",
+            "It starts to rain, and you hear the sound of water dripping from the leaves.",
+            "A gentle breeze rustles the leaves of the plants."
+        ]
     }
 ]

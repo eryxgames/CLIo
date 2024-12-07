@@ -83,9 +83,15 @@ def main():
             elif command.startswith("unequip "):
                 item_name = command.split("unequip")[-1].strip()
                 game_engine.unequip_item(item_name)
+            elif command.startswith("open "):
+                item_name = command.split("open")[-1].strip()
+                game_engine.interact_with_item(item_name)
+            elif command.startswith("pick lock of "):
+                item_name = command.split("lock of")[-1].strip()
+                game_engine.interact_with_item(item_name)
             else:
                 response = parser.parse_command(command)
-                if response and response != "I don't understand that command.":
+                if response and response != "I don't understand that command. Try to use the exact command.":
                     media_player.print_with_delay(response)
 
                 # Further logic based on parsed command

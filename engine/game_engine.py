@@ -5,6 +5,12 @@ class GameEngine:
         self.characters = characters
         self.current_scene = next(scene for scene in self.scenes if scene["id"] == "scene1")
         self.inventory = []
+        self.player_stats = {
+            "health": 100,
+            "strength": 10,
+            "defense": 5,
+            "equipment": []
+        }
 
     def change_scene(self, scene_id):
         scene = next((scene for scene in self.scenes if scene["id"] == scene_id), None)
@@ -22,8 +28,8 @@ class GameEngine:
                 print(f"- {self.items[item]['name']}")
 
     def interact_with_item(self, item_name):
-        if item_name in self.current_scene["items"]:
-            item = self.items[item_name]
+        item = self.find_item_by_name(item_name)
+        if item:
             print(item["description"])
             if item["usable"]:
                 # Logic to use the item
@@ -32,11 +38,12 @@ class GameEngine:
             print("Item not found in this scene.")
 
     def take_item(self, item_name):
-        if item_name in self.current_scene["items"]:
-            item = self.items[item_name]
+        item = self.find_item_by_name(item_name)
+        if item:
+            item_id = item["id"]
             print(f"You take the {item['name']}.")
-            self.inventory.append(item_name)
-            self.current_scene["items"].remove(item_name)
+            self.inventory.append(item_id)
+            self.current_scene["items"].remove(item_id)
         else:
             print("Item not found in this scene.")
 
@@ -48,10 +55,11 @@ class GameEngine:
             print("Character not found in this scene.")
 
     def give_item_to_character(self, item_name, character_name):
-        if item_name in self.inventory and character_name in self.current_scene["characters"]:
+        item = self.find_item_by_name(item_name)
+        if item and item["id"] in self.inventory and character_name in self.current_scene["characters"]:
             character = self.characters[character_name]
-            if "give_" + item_name in character["interactions"]:
-                interaction = character["interactions"]["give_" + item_name]
+            if "give_" + item["id"] in character["interactions"]:
+                interaction = character["interactions"]["give_" + item["id"]]
                 print(interaction)
                 # Logic to handle the interaction
             else:
@@ -98,22 +106,72 @@ class GameEngine:
             print("Your inventory is empty.")
 
     def examine_item(self, item_name):
-        if item_name in self.inventory:
-            item = self.items[item_name]
+        if not item_name:
+            print("Please specify an item to examine.")
+            return
+        item = self.find_item_by_name(item_name)
+        if item and item["id"] in self.inventory:
             print(item["description"])
         else:
             print("Item not found in your inventory.")
 
     def combine_items(self, item1, item2):
-        if item1 in self.inventory and item2 in self.inventory:
-            combination = f"{item1} + {item2}"
+        item1_id = self.find_item_by_name(item1)["id"]
+        item2_id = self.find_item_by_name(item2)["id"]
+        if item1_id in self.inventory and item2_id in self.inventory:
+            combination = f"{item1_id} + {item2_id}"
             if combination in self.items["combinations"]:
                 new_item = self.items["combinations"][combination]
                 print(f"You combine {item1} and {item2} to create {new_item}.")
-                self.inventory.remove(item1)
-                self.inventory.remove(item2)
+                self.inventory.remove(item1_id)
+                self.inventory.remove(item2_id)
                 self.inventory.append(new_item)
             else:
                 print("These items cannot be combined.")
         else:
             print("One or both items not found in your inventory.")
+
+    def examine_self(self):
+        print("You examine yourself:")
+        print(f"Health: {self.player_stats['health']}")
+        print(f"Strength: {self.player_stats['strength']}")
+        print(f"Defense: {self.player_stats['defense']}")
+        if self.player_stats["equipment"]:
+            print("Equipment:")
+            for item in self.player_stats["equipment"]:
+                print(f"- {self.items[item]['name']}")
+        else:
+            print("You are not equipped with any items.")
+        self.list_inventory()
+        self.describe_health_status()
+
+    def describe_health_status(self):
+        health = self.player_stats["health"]
+        if health >= 75:
+            print("You are feeling great.")
+        elif 50 <= health < 75:
+            print("You are slightly injured.")
+        elif 25 <= health < 50:
+            print("You are moderately injured.")
+        elif 10 <= health < 25:
+            print("You are heavily injured.")
+        else:
+            print("You are critically injured.")
+
+    def show_stats(self):
+        print("You check your stats:")
+        print(f"Health: {self.player_stats['health']}")
+        print(f"Strength: {self.player_stats['strength']}")
+        print(f"Defense: {self.player_stats['defense']}")
+        if self.player_stats["equipment"]:
+            print("Equipment:")
+            for item in self.player_stats["equipment"]:
+                print(f"- {self.items[item]['name']}")
+        else:
+            print("You are not equipped with any items.")
+
+    def find_item_by_name(self, item_name):
+        for item_id, item in self.items.items():
+            if item_name.lower() in item["name"].lower():
+                return {"id": item_id, "name": item["name"], "description": item["description"], "usable": item["usable"]}
+        return None

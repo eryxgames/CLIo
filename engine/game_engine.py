@@ -3,6 +3,7 @@ import os
 import random
 from engine import media_player
 from engine.battle_system import BattleSystem
+from engine.inventory import Inventory
 
 class GameEngine:
     def __init__(self, config_file):
@@ -12,11 +13,28 @@ class GameEngine:
         self.characters = self.load_data(self.config["characters_file"])
         self.story_texts = self.load_data(self.config["story_texts_file"])
         self.current_scene = next(scene for scene in self.scenes if scene["id"] == self.config["initial_scene"])
-        self.inventory = []
+        self.inventory = Inventory()
         self.player_stats = self.config["player_stats"]
         self.story_progress = {}
         self.hints_used = 0
         self.max_hints = self.config["max_hints"]
+        self.item_not_found_messages = [
+            "No such item in sight.",
+            "Such item is not within reach.",
+            "No can do.",
+            "You can't see that item here.",
+            "That item is not available.",
+            "You can't reach that item.",
+            "That item is out of your reach."
+        ]
+        self.unclear_command_messages = [
+            "Be more clear than that.",
+            "Be more specific.",
+            "I don't understand that command.",
+            "Please provide more details.",
+            "That command is unclear.",
+            "I need more information to proceed."
+        ]
 
     def load_config(self, filename):
         with open(filename, 'r') as f:
@@ -113,7 +131,7 @@ class GameEngine:
                                 passive_item["current_state"] = state_data.get("next_state", "closed")
                             else:
                                 print("Incorrect passcode. The item remains locked.")
-                        elif "bent_wire" in self.inventory:
+                        elif "bent_wire" in self.inventory.items:
                             print(f"You use the bent wire to pick the lock of the {passive_item['name']}.")
                             passive_item["locked"] = False
                             passive_item["current_state"] = state_data.get("next_state", "closed")
@@ -130,9 +148,9 @@ class GameEngine:
                         else:
                             print("There is nothing to take.")
             else:
-                print("Item not found in this scene.")
+                print(random.choice(self.item_not_found_messages))
         else:
-            print("Item not found in this scene. Try to use the exact command.")
+            print(random.choice(self.item_not_found_messages))
 
     def handle_interactive_item(self, item):
         current_state_key = item.get("current_state", "default")
@@ -158,7 +176,7 @@ class GameEngine:
                         item["current_state"] = next_state
                     else:
                         print("Incorrect passcode. The item remains locked.")
-                elif "bent_wire" in self.inventory:
+                elif "bent_wire" in self.inventory.items:
                     print(f"You use the bent wire to pick the lock of the {item['name']}.")
                     item["locked"] = False
                     item["current_state"] = next_state
@@ -169,24 +187,21 @@ class GameEngine:
                 item["current_state"] = next_state
 
     def reveal_item_from_interactive(self, item):
-        if item["id"] == "metal_locker":
-            self.current_scene["items"].append("storage_room_key")
-            print("You find a Storage Room Key inside the locker.")
-        elif item["id"] == "rusty_metal_locker":
-            self.current_scene["items"].append("red_apple")
-            print("You find a Red Apple inside the locker.")
-        elif item["id"] == "metal_suitcase":
-            self.current_scene["items"].append("blue_apple")
-            print("You find a Blue Apple inside the suitcase.")
+        if "contents" in item:
+            for content_item in item["contents"]:
+                self.current_scene["items"].append(content_item)
+                print(f"You find a {self.items[content_item]['name']} inside.")
 
     def take_item(self, item_name):
+        if not item_name:
+            print(random.choice(self.unclear_command_messages))
+            return
         item = self.find_item_by_name(item_name)
-        if item:
+        if item and item["id"] in self.current_scene["items"]:
             item_id = item["id"]
             print(f"You take the {item['name']}.")
-            self.inventory.append(item_id)
-            if item_id in self.current_scene["items"]:
-                self.current_scene["items"].remove(item_id)
+            self.inventory.add_item(item_id, self.items)
+            self.current_scene["items"].remove(item_id)
             # Ensure the item does not reappear in lockers or other interactive items
             for passive_item in self.current_scene.get("passive_items", []):
                 passive_item_data = self.items[passive_item]
@@ -195,7 +210,7 @@ class GameEngine:
                         if state["action"] == "take" and state["next_state"] == "empty":
                             passive_item_data["current_state"] = "empty"
         else:
-            print("Item not found in this scene.")
+            print(random.choice(self.item_not_found_messages))
 
     def talk_to_character(self, character_name):
         matching_characters = [char for char in self.current_scene["characters"] if character_name.lower() in self.characters[char]["name"].lower()]
@@ -233,7 +248,7 @@ class GameEngine:
 
     def give_item_to_character(self, item_name, character_name):
         item = self.find_item_by_name(item_name)
-        if item and item["id"] in self.inventory:
+        if item and item["id"] in self.inventory.items:
             matching_characters = [char for char in self.current_scene["characters"] if character_name.lower() in self.characters[char]["name"].lower()]
             if len(matching_characters) == 1:
                 character_id = matching_characters[0]
@@ -309,10 +324,10 @@ class GameEngine:
                 print(exit["block_text"])
         elif exit.get("locked", False):
             required_item = exit["required_item"]
-            if required_item in self.inventory:
+            if required_item in self.inventory.items:
                 print(exit["unlock_text"])
                 if self.items[required_item].get("consumable", False):
-                    self.inventory.remove(required_item)
+                    self.inventory.remove_item(required_item)
                 exit["locked"] = False  # Ensure the door stays unlocked
                 self.change_scene(exit["scene_id"])
             else:
@@ -321,38 +336,24 @@ class GameEngine:
             self.change_scene(exit["scene_id"])
 
     def list_inventory(self):
-        if self.inventory:
-            print("You have the following items in your inventory:")
-            for item in self.inventory:
-                print(f"- {self.items[item]['name']}")
-        else:
-            print("Your inventory is empty.")
+        self.inventory.list_inventory(self.items)
 
     def examine_item(self, item_name):
         if not item_name:
-            print("Please specify an item to examine.")
+            print(random.choice(self.unclear_command_messages))
             return
         item = self.find_item_by_name(item_name)
-        if item and item["id"] in self.inventory:
+        if item and item["id"] in self.inventory.items:
             print(item["description"])
         else:
-            print("Item not found in your inventory.")
+            print(random.choice(self.item_not_found_messages))
 
     def combine_items(self, item1, item2):
         item1_id = self.find_item_by_name(item1)["id"]
         item2_id = self.find_item_by_name(item2)["id"]
-        if item1_id in self.inventory and item2_id in self.inventory:
-            combination = f"{item1_id} + {item2_id}"
-            if combination in self.items["combinations"]:
-                new_item = self.items["combinations"][combination]
-                print(f"You combine {item1} and {item2} to create {new_item}.")
-                self.inventory.remove(item1_id)
-                self.inventory.remove(item2_id)
-                self.inventory.append(new_item)
-            else:
-                print("These items cannot be combined.")
-        else:
-            print("One or both items not found in your inventory.")
+        new_item_id = self.inventory.combine_items(item1_id, item2_id, self.items)
+        if new_item_id:
+            print(f"You have created a new item: {self.items[new_item_id]['name']}.")
 
     def examine_self(self):
         print("You examine yourself closely.")
@@ -361,12 +362,7 @@ class GameEngine:
         print(f"Strength: {self.player_stats['strength']}")
         print(f"Defense: {self.player_stats['defense']}")
         print(f"Attack: {self.player_stats['attack']}")
-        if self.player_stats["equipment"]:
-            print("Equipment:")
-            for item in self.player_stats["equipment"]:
-                print(f"- {self.items[item]['name']}")
-        else:
-            print("You are not equipped with any items.")
+        self.inventory.list_equipped_items(self.items)
         self.list_inventory()
         self.describe_health_status()
 
@@ -389,12 +385,7 @@ class GameEngine:
         print(f"Strength: {self.player_stats['strength']}")
         print(f"Defense: {self.player_stats['defense']}")
         print(f"Attack: {self.player_stats['attack']}")
-        if self.player_stats["equipment"]:
-            print("Equipment:")
-            for item in self.player_stats["equipment"]:
-                print(f"- {self.items[item]['name']}")
-        else:
-            print("You are not equipped with any items.")
+        self.inventory.list_equipped_items(self.items)
 
     def find_item_by_name(self, item_name):
         for item_id, item in self.items.items():
@@ -437,7 +428,7 @@ class GameEngine:
     def check_conditions(self):
         for condition, items in self.story_texts["conditions"].items():
             for item_name, text_info in items.items():
-                if condition == "item_in_inventory" and item_name in self.inventory:
+                if condition == "item_in_inventory" and item_name in self.inventory.items:
                     self.display_story_text(text_info["text"])
                 elif condition == "enemy_defeated" and self.check_enemy_defeated(item_name):
                     self.display_story_text(text_info["text"])
@@ -448,13 +439,13 @@ class GameEngine:
 
     def use_item(self, item_name):
         item = self.find_item_by_name(item_name)
-        if item and item["id"] in self.inventory and item["usable"]:
+        if item and item["id"] in self.inventory.items and item["usable"]:
             if "effect" in item:
                 effect = item["effect"]
                 if "health" in effect:
                     self.player_stats["health"] += effect["health"]
                     print(f"You used the {item['name']} and regained {effect['health']} health.")
-                    self.inventory.remove(item["id"])
+                    self.inventory.remove_item(item["id"])
                 # Add more effects as needed
             else:
                 print("This item cannot be used.")
@@ -463,25 +454,19 @@ class GameEngine:
 
     def equip_item(self, item_name):
         item = self.find_item_by_name(item_name)
-        if item and item["id"] in self.inventory and item.get("equippable", False):
-            self.player_stats["equipment"].append(item["id"])
-            self.inventory.remove(item["id"])
-            if "effect" in item:
-                for stat, value in item["effect"].items():
-                    self.player_stats[stat] += value
-            print(f"You equipped the {item['name']}.")
+        if item:
+            effect = self.inventory.equip_item(item["id"], self.items)
+            for stat, value in effect.items():
+                self.player_stats[stat] += value
         else:
             print("Item not found in inventory or cannot be equipped.")
 
     def unequip_item(self, item_name):
         item = self.find_item_by_name(item_name)
-        if item and item["id"] in self.player_stats["equipment"]:
-            self.player_stats["equipment"].remove(item["id"])
-            self.inventory.append(item["id"])
-            if "effect" in item:
-                for stat, value in item["effect"].items():
-                    self.player_stats[stat] -= value
-            print(f"You unequipped the {item['name']}.")
+        if item:
+            effect = self.inventory.unequip_item(item["id"], self.items)
+            for stat, value in effect.items():
+                self.player_stats[stat] -= value
         else:
             print("Item not found in equipment.")
 
@@ -492,8 +477,8 @@ class GameEngine:
         return ""
 
     def repair_communicator(self):
-        if "energy_cells" in self.inventory:
-            self.inventory.remove("energy_cells")
+        if "energy_cells" in self.inventory.items:
+            self.inventory.remove_item("energy_cells")
             print("Your communicator has been repaired.")
         else:
             print("You don't have energy cells to repair the communicator.")

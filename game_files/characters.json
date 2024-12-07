@@ -8,6 +8,10 @@
       "repair": "I can repair your communicator if you provide energy cells.",
       "thanks": "You're welcome! Safe travels."
     },
+    "dialogue_options": {
+      "Ask for help": "What do you need help with?",
+      "Repair communicator": "friendly_robot_repair"
+    },
     "interactions": {
       "talk": "friendly_robot_greet",
       "give_energy_cells": "friendly_robot_repair"
@@ -38,6 +42,10 @@
       "greet": "Intruder detected! Cease all actions immediately.",
       "calm_down": "Thank you for cooperating. You may proceed."
     },
+    "dialogue_options": {
+      "Ask for help": "What do you need help with?",
+      "Calm down": "hostile_droid_calm_down"
+    },
     "interactions": {
       "talk": "hostile_droid_greet",
       "give_coolant_canister": "hostile_droid_calm_down",
@@ -62,6 +70,10 @@
     "dialogue": {
       "greet": "Hello, traveler. What brings you here?",
       "objective": "To complete your journey, you must reach the nearest space station."
+    },
+    "dialogue_options": {
+      "Ask for help": "What do you need help with?",
+      "Complete objective": "neutral_ai_objective"
     },
     "interactions": {
       "talk": "neutral_ai_greet",

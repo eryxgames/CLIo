@@ -195,18 +195,30 @@ class GameEngine:
         elif len(matching_characters) == 1:
             character_id = matching_characters[0]
             character = self.characters[character_id]
-            if "conditions" in character:
-                for condition, data in character["conditions"].items():
-                    if condition == "has_energy_cells" and "energy_cells" in self.inventory:
-                        print(data["text"])
-                        if data["action"] == "repair_communicator":
-                            self.repair_communicator()
-                        return
-            print(character["dialogue"]["greet"])
+            self.start_dialogue(character)
         else:
             print("Multiple characters match your query. Please be more specific:")
             for char in matching_characters:
                 print(f"- {self.characters[char]['name']}")
+
+    def start_dialogue(self, character):
+        print(character["dialogue"]["greet"])
+        options = character.get("dialogue_options", {})
+        if options:
+            print("Choose an option:")
+            for i, (option, response) in enumerate(options.items(), start=1):
+                print(f"{i}. {option}")
+            choice = int(input("Enter the number of your choice: ")) - 1
+            if 0 <= choice < len(options):
+                selected_option = list(options.keys())[choice]
+                print(options[selected_option])
+                # Handle specific interactions based on the selected option
+                if selected_option == "repair_communicator":
+                    self.repair_communicator()
+            else:
+                print("Invalid choice.")
+        else:
+            print("No dialogue options available.")
 
     def give_item_to_character(self, item_name, character_name):
         item = self.find_item_by_name(item_name)
@@ -215,10 +227,12 @@ class GameEngine:
             if len(matching_characters) == 1:
                 character_id = matching_characters[0]
                 character = self.characters[character_id]
-                if "give_" + item["id"] in character["interactions"]:
-                    interaction = character["interactions"]["give_" + item["id"]]
+                if f"give_{item['id']}" in character["interactions"]:
+                    interaction = character["interactions"][f"give_{item['id']}"]
                     print(interaction)
                     # Logic to handle the interaction
+                    if interaction == "friendly_robot_repair":
+                        self.repair_communicator()
                 else:
                     print("This character doesn't want that item.")
             else:

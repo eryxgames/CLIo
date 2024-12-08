@@ -97,8 +97,8 @@ def main():
                 item_name = parts[parts.index("give") + 1]
                 character_name = parts[parts.index("to") + 1]
                 game_engine.give_item_to_character(item_name, character_name)
-            elif command.startswith("fight "):
-                character_name = command.split("fight")[-1].strip()
+            elif command.startswith("fight ") or command.startswith("attack "):
+                character_name = command.split()[-1].strip()
                 game_engine.fight_character(character_name)
             elif command.startswith("exit "):
                 game_engine.exit_room()
@@ -136,8 +136,8 @@ def main():
                     item_name = parts[parts.index("give") + 1]
                     character_name = parts[parts.index("to") + 1]
                     game_engine.give_item_to_character(item_name, character_name)
-                elif "fight" in command:
-                    character_name = command.split("fight")[-1].strip()
+                elif "fight" in command or "attack" in command:
+                    character_name = command.split()[-1].strip()
                     game_engine.fight_character(character_name)
                 elif "exit" in command or "go to" in command:
                     game_engine.exit_room()

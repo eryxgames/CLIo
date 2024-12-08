@@ -17,6 +17,10 @@ class Parser:
             "converse with": self.talk_to,
             "give": self.give,
             "fight": self.fight,
+            "attack": self.fight,  # Adding attack command
+            "hit": self.hit,  # Adding hit command
+            "push": self.push,  # Adding push command
+            "pull": self.pull,  # Adding pull command
             "exit": self.exit_room,
             "go to": self.exit_room,
             "inventory": self.list_inventory,
@@ -25,12 +29,13 @@ class Parser:
             "study": self.examine_item,
             "combine": self.combine_items,
             "merge": self.combine_items,
-            "examine yourself": self.examine_self,
-            "look at yourself": self.examine_self,
+            "examine yourself": self.examine_self,  # Adding exception for examine yourself
+            "look at yourself": self.examine_self,  # Adding exception for look at yourself
             "stats": self.show_stats,
             "use": self.use,
             "pick lock": self.pick_lock,
             "lockpick": self.pick_lock,
+            "read": self.read,  # Adding read command
             "help": self.help
         }
 
@@ -101,10 +106,28 @@ class Parser:
         return "Please specify an item to give and a character to give it to."
 
     def fight(self, command):
-        character_name = command.split("fight")[-1].strip()
+        character_name = command.split()[-1].strip()
         if not character_name:
             return "Please specify a character to fight."
         return f"You prepare to fight {character_name}, your heart racing."
+
+    def hit(self, command):
+        target_name = command.split("hit")[-1].strip()
+        if not target_name:
+            return "Pull (hit, push) what exactly?"
+        return f"You hit the {target_name}."
+
+    def push(self, command):
+        target_name = command.split("push")[-1].strip()
+        if not target_name:
+            return "Nothing to push (hit,pull)"
+        return f"You push the {target_name}."
+
+    def pull(self, command):
+        target_name = command.split("pull")[-1].strip()
+        if not target_name:
+            return "Pull (hit, push) what exactly?"
+        return f"You pull the {target_name}."
 
     def exit_room(self, command):
         return "You look for a way out of the room."
@@ -146,6 +169,12 @@ class Parser:
             return "Please specify an item to pick the lock of."
         return f"You attempt to pick the lock of the {item_name}."
 
+    def read(self, command):
+        item_name = command.split("read")[-1].strip()
+        if not item_name:
+            return "Please specify an item to read."
+        return f"You start reading the {item_name}."
+
     def help(self, command):
         return (
             "Available commands:\n"
@@ -160,6 +189,10 @@ class Parser:
             "talk to [character] - Talk to a character.\n"
             "give [item] to [character] - Give an item to a character.\n"
             "fight [character] - Fight a character.\n"
+            "attack [character] - Attack a character.\n"
+            "hit [target] - Hit a target.\n"
+            "push [target] - Push a target.\n"
+            "pull [target] - Pull a target.\n"
             "exit - Look for a way out of the room.\n"
             "go to [exit] - Go to a specific exit.\n"
             "inventory - Check your inventory.\n"
@@ -170,5 +203,6 @@ class Parser:
             "stats - Show your stats.\n"
             "use [item] - Use an item.\n"
             "pick lock of [item] - Pick the lock of an item.\n"
+            "read [item] - Read an item.\n"
             "help - Show this help message."
         )

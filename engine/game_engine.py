@@ -281,11 +281,17 @@ class GameEngine:
                 battle.start_battle()
                 if self.player_stats["health"] > 0:
                     self.update_story_progress("hostile_droid_defeated", True)
+                    self.remove_enemy_from_scene(character_id)
                     self.drop_items_from_character(character_id)
             else:
                 print("This character is not hostile.")
         else:
             print("Character not found in this scene or multiple characters match your query.")
+
+    def remove_enemy_from_scene(self, character_id):
+        self.current_scene["characters"].remove(character_id)
+        print(f"The {self.characters[character_id]['name']} has been defeated and removed from the scene.")
+        print("There are signs of recent fight all over the place.")
 
     def drop_items_from_character(self, character_id):
         character = self.characters[character_id]

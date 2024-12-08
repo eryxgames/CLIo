@@ -1,5 +1,6 @@
 import json
 import os
+import time
 import random
 from engine import media_player
 from engine.battle_system import BattleSystem

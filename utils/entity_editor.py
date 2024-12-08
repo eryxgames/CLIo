@@ -137,24 +137,6 @@ class GameDataEditor:
         self.item_details_text = tk.Text(self.item_details_frame, height=30, width=80)
         self.item_details_text.pack(fill=tk.BOTH, expand=1)
 
-        self.item_combinations_frame = ttk.Frame(self.items_tab)
-        self.item_combinations_frame.pack(pady=10)
-
-        self.item_combinations_label = ttk.Label(self.item_combinations_frame, text="Item Combinations:")
-        self.item_combinations_label.pack(anchor=tk.W)
-
-        self.item_combinations_text = tk.Text(self.item_combinations_frame, height=30, width=80)
-        self.item_combinations_text.pack(fill=tk.BOTH, expand=1)
-
-        self.item_combinations_buttons_frame = ttk.Frame(self.items_tab)
-        self.item_combinations_buttons_frame.pack(pady=10)
-
-        self.add_item_combo_button = ttk.Button(self.item_combinations_buttons_frame, text="Add Item Combo", command=self.add_item_combo)
-        self.add_item_combo_button.pack(side=tk.LEFT, padx=5)
-
-        self.save_button = ttk.Button(self.item_combinations_buttons_frame, text="Save Changes", command=self.save_data)
-        self.save_button.pack(side=tk.LEFT, padx=5)
-
     def create_characters_tab(self):
         self.characters_frame = ttk.Frame(self.characters_tab)
         self.characters_frame.pack(padx=10, pady=10)
@@ -773,7 +755,7 @@ class GameDataEditor:
 
     def draw_scene_structure(self, canvas, scene_structure):
         padding = 50
-        box_size = 120  # Increased box size to fit more text
+        box_size = 200  # Increased box size to fit more text
         arrow_length = 40
 
         positions = {}
@@ -795,11 +777,11 @@ class GameDataEditor:
             y_offset = 30
             for item_id in scene_info["items"]:
                 item_name = self.items_data.get(item_id, {}).get("name", "Unknown Item")
-                canvas.create_text(x + 10, y + y_offset, text=item_name, anchor=tk.W)
+                canvas.create_text(x + 10, y + y_offset, text=item_name, anchor=tk.W, fill="dark green")
                 y_offset += 20
             for char_id in scene_info["characters"]:
                 char_name = self.characters_data.get(char_id, {}).get("name", "Unknown Character")
-                canvas.create_text(x + 10, y + y_offset, text=char_name, anchor=tk.W)
+                canvas.create_text(x + 10, y + y_offset, text=char_name, anchor=tk.W, fill="dark red")
                 y_offset += 20
 
         for scene_id, (x, y) in positions.items():
@@ -812,7 +794,7 @@ class GameDataEditor:
                     target_arrow_x = target_x
                     target_arrow_y = target_y + box_size / 2
                     canvas.create_line(arrow_x, arrow_y, target_arrow_x, target_arrow_y, arrow=tk.LAST, fill="blue")
-                    canvas.create_text((arrow_x + target_arrow_x) / 2, (arrow_y + target_arrow_y) / 2, text=exit_name, fill="blue")
+                    canvas.create_text(arrow_x + 10, arrow_y, text=exit_name, anchor=tk.W, fill="blue")
 
         canvas.configure(scrollregion=canvas.bbox(tk.ALL))
 
@@ -900,19 +882,6 @@ class GameDataEditor:
 
     def redo(self):
         self.root.edit_redo()
-
-    def add_item_combo(self):
-        item_combo_name = simpledialog.askstring("Add Item Combo", "Enter item combo name:")
-        if item_combo_name:
-            item_combo_data = {
-                "name": item_combo_name,
-                "items": [],
-                "description": ""
-            }
-            self.item_combinations_data[item_combo_name] = item_combo_data
-            self.item_combinations_listbox.insert(tk.END, item_combo_name)
-            self.item_combinations_listbox.selection_set(tk.END)
-            self.modified_files.add('item_combinations')
 
     def preview_scene_map(self):
         scene_map = self.generate_scene_map()

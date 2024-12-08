@@ -1,4 +1,5 @@
 import random
+import time
 
 class BattleSystem:
     def __init__(self, player_stats, enemy_stats):
@@ -41,3 +42,7 @@ class BattleSystem:
         if item in self.player_stats["inventory"]:
             # Modify player attributes based on the item
             pass
+
+    def start_battle(self):
+        print("A battle has started!")
+        self.engage_battle()

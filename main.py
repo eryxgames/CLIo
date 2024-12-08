@@ -18,7 +18,6 @@ def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def main():
-    # Clear the screen and display the game name and version
     clear_screen()
     print("================================")
     print("CLIo - Text-Based CLI Game Maker")
@@ -26,16 +25,13 @@ def main():
     print("================================")
     print("                                ")
 
-    # Initialize game components
     parser = Parser()
     inventory = Inventory()
     media_player = MediaPlayer()
     save_load = SaveLoad()
 
-    # Initialize game engine with the configuration file
     game_engine = GameEngine('game_files/config.json')
 
-    # Start the game
     media_player.print_with_delay(game_engine.current_scene["description"])
     game_engine.display_story_text("intro")
 
@@ -58,7 +54,6 @@ def main():
                     "inventory": inventory.items,
                     "player_stats": game_engine.player_stats,
                     "story_progress": game_engine.story_progress
-                    # Add more game state as needed
                 }
                 save_load.save_game(save_game_state, "savegame.json")
             elif command == "load":
@@ -126,7 +121,6 @@ def main():
                 if response and response != "I don't understand that command. Try to use the exact command.":
                     media_player.print_with_delay(response)
 
-                # Further logic based on parsed command
                 if "explore" in command or "look around" in command:
                     game_engine.explore_scene()
                 elif "look" in command:
@@ -162,11 +156,9 @@ def main():
                 elif "stats" in command:
                     game_engine.show_stats()
 
-                # Check if the game is over
                 if game_engine.check_game_over():
                     break
 
-                # Check conditions for displaying story texts
                 game_engine.check_conditions()
     except KeyboardInterrupt:
         print("\nGame interrupted. Thank you for playing! Goodbye!")

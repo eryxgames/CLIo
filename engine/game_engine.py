@@ -277,7 +277,7 @@ class GameEngine:
             if character["type"] in ["hostile", "neutral", "aggressive"]:
                 enemy_stats = character["stats"]
                 battle = BattleSystem(self.player_stats, enemy_stats)
-                battle.engage_battle()
+                battle.start_battle()
                 if self.player_stats["health"] > 0:
                     self.update_story_progress("hostile_droid_defeated", True)
                     self.drop_items_from_character(character_id)
@@ -514,7 +514,7 @@ class GameEngine:
         if item and "readable_item" in item and item["readable_item"]:
             text = item["readable_item"]
             print(f"You start reading the {item['name']}:")
-            media_player.print_with_delay(text)
+            self.print_with_delay(text)
         else:
             print(random.choice(self.item_not_found_messages))
 
@@ -528,6 +528,15 @@ class GameEngine:
                 print(character["description"])
             else:
                 print(random.choice(self.item_not_found_messages))
+
+    def print_with_delay(self, text, delay=0.05):
+        paragraphs = text.split("\n\n")
+        for paragraph in paragraphs:
+            for char in paragraph:
+                print(char, end='', flush=True)
+                time.sleep(delay)
+            print("\n")
+            time.sleep(1)  # Pause between paragraphs
 
     def get_random_event(self):
         random_events = self.current_scene.get("random_events", [])

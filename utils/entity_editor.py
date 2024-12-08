@@ -122,6 +122,9 @@ class GameDataEditor:
         self.duplicate_item_button = ttk.Button(self.items_buttons_frame, text="Duplicate Item", command=self.duplicate_item)
         self.duplicate_item_button.pack(side=tk.LEFT, padx=5)
 
+        self.combine_items_button = ttk.Button(self.items_buttons_frame, text="Combine Items", command=self.combine_items)
+        self.combine_items_button.pack(side=tk.LEFT, padx=5)
+
         self.save_button = ttk.Button(self.items_buttons_frame, text="Save Changes", command=self.save_data)
         self.save_button.pack(side=tk.LEFT, padx=5)
 
@@ -133,6 +136,24 @@ class GameDataEditor:
 
         self.item_details_text = tk.Text(self.item_details_frame, height=30, width=80)
         self.item_details_text.pack(fill=tk.BOTH, expand=1)
+
+        self.item_combinations_frame = ttk.Frame(self.items_tab)
+        self.item_combinations_frame.pack(pady=10)
+
+        self.item_combinations_label = ttk.Label(self.item_combinations_frame, text="Item Combinations:")
+        self.item_combinations_label.pack(anchor=tk.W)
+
+        self.item_combinations_text = tk.Text(self.item_combinations_frame, height=30, width=80)
+        self.item_combinations_text.pack(fill=tk.BOTH, expand=1)
+
+        self.item_combinations_buttons_frame = ttk.Frame(self.items_tab)
+        self.item_combinations_buttons_frame.pack(pady=10)
+
+        self.add_item_combo_button = ttk.Button(self.item_combinations_buttons_frame, text="Add Item Combo", command=self.add_item_combo)
+        self.add_item_combo_button.pack(side=tk.LEFT, padx=5)
+
+        self.save_button = ttk.Button(self.item_combinations_buttons_frame, text="Save Changes", command=self.save_data)
+        self.save_button.pack(side=tk.LEFT, padx=5)
 
     def create_characters_tab(self):
         self.characters_frame = ttk.Frame(self.characters_tab)
@@ -215,31 +236,34 @@ class GameDataEditor:
         try:
             with open('../game_files/scenes/scenes.json', 'r') as f:
                 self.scenes_data = json.load(f)
-                for scene in self.scenes_data:
+                for index, scene in enumerate(self.scenes_data):
                     self.scenes_listbox.insert(tk.END, scene['name'])
+                    self.scenes_listbox.selection_set(index)
         except FileNotFoundError:
             messagebox.showerror("Error", "Scenes file not found.")
 
         try:
             with open('../game_files/items.json', 'r') as f:
                 self.items_data = json.load(f)
-                for item in self.items_data:
+                for index, item in enumerate(self.items_data):
                     self.items_listbox.insert(tk.END, item)
+                    self.items_listbox.selection_set(index)
         except FileNotFoundError:
             messagebox.showerror("Error", "Items file not found.")
 
         try:
             with open('../game_files/characters.json', 'r') as f:
                 self.characters_data = json.load(f)
-                for character in self.characters_data:
+                for index, character in enumerate(self.characters_data):
                     self.characters_listbox.insert(tk.END, character)
+                    self.characters_listbox.selection_set(index)
         except FileNotFoundError:
             messagebox.showerror("Error", "Characters file not found.")
 
         try:
             with open('../game_files/story_texts.json', 'r') as f:
                 self.dialogues_data = json.load(f)
-                for dialogue in self.dialogues_data:
+                for index, dialogue in enumerate(self.dialogues_data):
                     self.dialogues_listbox.insert(tk.END, dialogue)
         except FileNotFoundError:
             messagebox.showerror("Error", "Dialogues file not found.")
@@ -295,6 +319,7 @@ class GameDataEditor:
             }
             self.scenes_data.append(scene_data)
             self.scenes_listbox.insert(tk.END, scene_name)
+            self.scenes_listbox.selection_set(tk.END)
             self.modified_files.add('scenes')
 
     def generate_scene_id(self, scene_name):
@@ -310,17 +335,17 @@ class GameDataEditor:
         selected_scene = self.scenes_listbox.get(self.scenes_listbox.curselection())
         if selected_scene:
             try:
-                scene_data = next(scene for scene in self.scenes_data if scene["id"] == selected_scene)
+                scene_data = next(scene for scene in self.scenes_data if scene["name"] == selected_scene)
                 scene_data["description"] = simpledialog.askstring("Edit Scene", f"Enter description for {selected_scene}:", initialvalue=scene_data["description"])
                 self.display_scene_details(scene_data)
                 self.modified_files.add('scenes')
             except StopIteration:
-                messagebox.showerror("Error", f"Scene with ID {selected_scene} not found.")
+                messagebox.showerror("Error", f"Scene with name {selected_scene} not found.")
 
     def delete_scene(self):
         selected_scene = self.scenes_listbox.get(self.scenes_listbox.curselection())
         if selected_scene:
-            self.scenes_data = [scene for scene in self.scenes_data if scene["id"] != selected_scene]
+            self.scenes_data = [scene for scene in self.scenes_data if scene["name"] != selected_scene]
             self.scenes_listbox.delete(self.scenes_listbox.curselection())
             self.modified_files.add('scenes')
 
@@ -336,6 +361,7 @@ class GameDataEditor:
                 "type": "Story"
             }
             self.items_listbox.insert(tk.END, item_id)
+            self.items_listbox.selection_set(tk.END)
             self.modified_files.add('items')
 
     def generate_item_id(self, item_name):
@@ -368,7 +394,72 @@ class GameDataEditor:
             new_item_id = self.generate_item_id(selected_item + "_copy")
             self.items_data[new_item_id] = self.items_data[selected_item].copy()
             self.items_listbox.insert(tk.END, new_item_id)
+            self.items_listbox.selection_set(tk.END)
             self.modified_files.add('items')
+
+    def combine_items(self):
+        item_ids = list(self.items_data.keys())
+        if len(item_ids) < 2:
+            messagebox.showerror("Error", "Not enough items to combine.")
+            return
+
+        item1_var = tk.StringVar(value=item_ids[0])
+        item2_var = tk.StringVar(value=item_ids[1])
+
+        combine_window = tk.Toplevel(self.root)
+        combine_window.title("Combine Items")
+        combine_window.geometry("400x200")
+
+        combine_frame = ttk.Frame(combine_window)
+        combine_frame.pack(padx=10, pady=10)
+
+        item1_label = ttk.Label(combine_frame, text="Select first item:")
+        item1_label.pack(anchor=tk.W)
+        item1_dropdown = ttk.Combobox(combine_frame, textvariable=item1_var)
+        item1_dropdown['values'] = item_ids
+        item1_dropdown.pack(pady=5)
+
+        item2_label = ttk.Label(combine_frame, text="Select second item:")
+        item2_label.pack(anchor=tk.W)
+        item2_dropdown = ttk.Combobox(combine_frame, textvariable=item2_var)
+        item2_dropdown['values'] = item_ids
+        item2_dropdown.pack(pady=5)
+
+        new_item_name_var = tk.StringVar()
+        new_item_name_label = ttk.Label(combine_frame, text="Enter the name of the combined item:")
+        new_item_name_label.pack(anchor=tk.W)
+        new_item_name_entry = ttk.Entry(combine_frame, textvariable=new_item_name_var)
+        new_item_name_entry.pack(pady=5)
+
+        def on_combine():
+            item1_id = item1_var.get()
+            item2_id = item2_var.get()
+            new_item_name = new_item_name_var.get()
+            if not new_item_name:
+                messagebox.showerror("Error", "New item name cannot be empty.")
+                return
+
+            combination_key = f"{item1_id} + {item2_id}"
+            new_item_id = self.generate_item_id(new_item_name)
+            self.items_data[new_item_id] = {
+                "name": new_item_name,
+                "description": f"Combined from {item1_id} and {item2_id}",
+                "usable": False,
+                "readable_item": "",
+                "type": "Story"
+            }
+            if "combinations" not in self.items_data:
+                self.items_data["combinations"] = {}
+            self.items_data["combinations"][combination_key] = new_item_id
+            self.items_listbox.insert(tk.END, new_item_id)
+            self.items_listbox.selection_set(tk.END)
+            self.modified_files.add('items')
+            combine_window.destroy()
+
+        combine_button = ttk.Button(combine_frame, text="Combine", command=on_combine)
+        combine_button.pack(pady=5)
+
+        combine_window.wait_window(combine_window)
 
     def add_character(self):
         character_name = simpledialog.askstring("Add Character", "Enter character name:")
@@ -385,6 +476,7 @@ class GameDataEditor:
                 "greeting": ""
             }
             self.characters_listbox.insert(tk.END, character_id)
+            self.characters_listbox.selection_set(tk.END)
             self.modified_files.add('characters')
 
     def generate_character_id(self, character_name):
@@ -417,6 +509,7 @@ class GameDataEditor:
             new_character_id = self.generate_character_id(selected_character + "_copy")
             self.characters_data[new_character_id] = self.characters_data[selected_character].copy()
             self.characters_listbox.insert(tk.END, new_character_id)
+            self.characters_listbox.selection_set(tk.END)
             self.modified_files.add('characters')
 
     def add_dialogue(self):
@@ -450,19 +543,19 @@ class GameDataEditor:
             selected_scene = self.get_current_scene()
         if selected_scene:
             try:
-                scene_data = next(scene for scene in self.scenes_data if scene["id"] == selected_scene)
+                scene_data = next(scene for scene in self.scenes_data if scene["name"] == selected_scene)
                 item_id = self.select_or_create_item()
                 if item_id:
                     scene_data["items"].append(item_id)
                     self.display_scene_details(scene_data)
                     self.modified_files.add('scenes')
             except StopIteration:
-                messagebox.showerror("Error", f"Scene with ID {selected_scene} not found.")
+                messagebox.showerror("Error", f"Scene with name {selected_scene} not found.")
 
     def get_current_scene(self):
         selected_scene = self.scenes_listbox.get(self.scenes_listbox.curselection())
         if selected_scene:
-            return next(scene for scene in self.scenes_data if scene["id"] == selected_scene)["id"]
+            return next(scene for scene in self.scenes_data if scene["name"] == selected_scene)["id"]
         return None
 
     def select_or_create_item(self):
@@ -497,6 +590,7 @@ class GameDataEditor:
                         "type": "Story"
                     }
                     self.items_listbox.insert(tk.END, item_id)
+                    self.items_listbox.selection_set(tk.END)
                     self.modified_files.add('items')
             item_window.destroy()
 
@@ -512,14 +606,14 @@ class GameDataEditor:
             selected_scene = self.get_current_scene()
         if selected_scene:
             try:
-                scene_data = next(scene for scene in self.scenes_data if scene["id"] == selected_scene)
+                scene_data = next(scene for scene in self.scenes_data if scene["name"] == selected_scene)
                 character_id = self.select_or_create_character()
                 if character_id:
                     scene_data["characters"].append(character_id)
                     self.display_scene_details(scene_data)
                     self.modified_files.add('scenes')
             except StopIteration:
-                messagebox.showerror("Error", f"Scene with ID {selected_scene} not found.")
+                messagebox.showerror("Error", f"Scene with name {selected_scene} not found.")
 
     def select_or_create_character(self):
         character_id = None  # Initialize character_id here
@@ -556,6 +650,7 @@ class GameDataEditor:
                         "greeting": ""
                     }
                     self.characters_listbox.insert(tk.END, character_id)
+                    self.characters_listbox.selection_set(tk.END)
                     self.modified_files.add('characters')
             character_window.destroy()
 
@@ -571,7 +666,7 @@ class GameDataEditor:
             selected_scene = self.get_current_scene()
         if selected_scene:
             try:
-                scene_data = next(scene for scene in self.scenes_data if scene["id"] == selected_scene)
+                scene_data = next(scene for scene in self.scenes_data if scene["name"] == selected_scene)
                 door_name = simpledialog.askstring("Add Exit to Scene", "Enter door name:")
                 if door_name:
                     target_scene_id = self.select_or_create_scene()
@@ -588,7 +683,7 @@ class GameDataEditor:
                         self.display_scene_details(scene_data)
                         self.modified_files.add('scenes')
             except StopIteration:
-                messagebox.showerror("Error", f"Scene with ID {selected_scene} not found.")
+                messagebox.showerror("Error", f"Scene with name {selected_scene} not found.")
 
     def select_or_create_scene(self):
         scene_id = None  # Initialize scene_id here
@@ -627,6 +722,7 @@ class GameDataEditor:
                     }
                     self.scenes_data.append(scene_data)
                     self.scenes_listbox.insert(tk.END, scene_name)
+                    self.scenes_listbox.selection_set(tk.END)
                     self.modified_files.add('scenes')
                     scene_id = scene_data["id"]
             scene_window.destroy()
@@ -671,68 +767,43 @@ class GameDataEditor:
                 "description": scene["description"],
                 "items": scene["items"],
                 "characters": scene["characters"],
-                "exits": [exit["door_name"] for exit in scene["exits"]]
+                "exits": [(exit["door_name"], exit["scene_id"]) for exit in scene["exits"]]
             }
         return scene_structure
 
     def draw_scene_structure(self, canvas, scene_structure):
-        x_offset = 50
-        y_offset = 50
-        y_step = 100
-
-        for scene_id, scene_info in scene_structure.items():
-            canvas.create_text(x_offset, y_offset, text=scene_info["name"], anchor=tk.W)
-            canvas.create_text(x_offset + 10, y_offset + 20, text=f"Description: {scene_info['description']}", anchor=tk.W)
-            canvas.create_text(x_offset + 10, y_offset + 40, text=f"Items: {', '.join(scene_info['items'])}", anchor=tk.W)
-            canvas.create_text(x_offset + 10, y_offset + 60, text=f"Characters: {', '.join(scene_info['characters'])}", anchor=tk.W)
-            canvas.create_text(x_offset + 10, y_offset + 80, text=f"Exits: {', '.join(scene_info['exits'])}", anchor=tk.W)
-
-            y_offset += y_step
-
-    def preview_scene_map(self):
-        scene_map = self.generate_scene_map()
-        preview_window = tk.Toplevel(self.root)
-        preview_window.title("Scene Map Preview")
-
-        canvas = tk.Canvas(preview_window, width=800, height=600)
-        canvas.pack(fill=tk.BOTH, expand=1)
-
-        self.draw_scene_map(canvas, scene_map)
-
-    def generate_scene_map(self):
-        scene_map = {}
-        for scene in self.scenes_data:
-            scene_map[scene["id"]] = {
-                "name": scene["name"],
-                "exits": [(exit["door_name"], exit["scene_id"]) for exit in scene["exits"]]
-            }
-        return scene_map
-
-    def draw_scene_map(self, canvas, scene_map):
         padding = 50
-        box_size = 80
+        box_size = 120  # Increased box size to fit more text
         arrow_length = 40
 
-        # Calculate positions
         positions = {}
         x = padding
         y = padding
-        for scene_id in scene_map:
+        for scene_id in scene_structure:
             positions[scene_id] = (x, y)
             x += box_size + padding
             if x > canvas.winfo_width() - box_size - padding:
                 x = padding
                 y += box_size + padding
 
-        # Draw scenes
         for scene_id, (x, y) in positions.items():
-            scene_info = scene_map[scene_id]
+            scene_info = scene_structure[scene_id]
             canvas.create_rectangle(x, y, x + box_size, y + box_size, outline="black")
-            canvas.create_text(x + box_size / 2, y + box_size / 2, text=scene_info["name"])
+            canvas.create_text(x + box_size / 2, y + 10, text=scene_info["name"])
 
-        # Draw exits
+            # Display items and characters
+            y_offset = 30
+            for item_id in scene_info["items"]:
+                item_name = self.items_data.get(item_id, {}).get("name", "Unknown Item")
+                canvas.create_text(x + 10, y + y_offset, text=item_name, anchor=tk.W)
+                y_offset += 20
+            for char_id in scene_info["characters"]:
+                char_name = self.characters_data.get(char_id, {}).get("name", "Unknown Character")
+                canvas.create_text(x + 10, y + y_offset, text=char_name, anchor=tk.W)
+                y_offset += 20
+
         for scene_id, (x, y) in positions.items():
-            scene_info = scene_map[scene_id]
+            scene_info = scene_structure[scene_id]
             for exit_name, target_scene_id in scene_info["exits"]:
                 if target_scene_id in positions:
                     target_x, target_y = positions[target_scene_id]
@@ -740,10 +811,9 @@ class GameDataEditor:
                     arrow_y = y + box_size / 2
                     target_arrow_x = target_x
                     target_arrow_y = target_y + box_size / 2
-                    canvas.create_line(arrow_x, arrow_y, target_arrow_x, target_arrow_y, arrow=tk.LAST)
-                    canvas.create_text((arrow_x + target_arrow_x) / 2, (arrow_y + target_arrow_y) / 2, text=exit_name)
+                    canvas.create_line(arrow_x, arrow_y, target_arrow_x, target_arrow_y, arrow=tk.LAST, fill="blue")
+                    canvas.create_text((arrow_x + target_arrow_x) / 2, (arrow_y + target_arrow_y) / 2, text=exit_name, fill="blue")
 
-        # Update canvas scroll region
         canvas.configure(scrollregion=canvas.bbox(tk.ALL))
 
     def create_settings_menu(self):
@@ -785,10 +855,10 @@ class GameDataEditor:
         selected_scene = self.scenes_listbox.get(self.scenes_listbox.curselection())
         if selected_scene:
             try:
-                scene_data = next(scene for scene in self.scenes_data if scene["id"] == selected_scene)
+                scene_data = next(scene for scene in self.scenes_data if scene["name"] == selected_scene)
                 self.display_scene_details(scene_data)
             except StopIteration:
-                messagebox.showerror("Error", f"Scene with ID {selected_scene} not found.")
+                messagebox.showerror("Error", f"Scene with name {selected_scene} not found.")
 
     def on_item_double_click(self, event):
         selected_item = self.items_listbox.get(self.items_listbox.curselection())
@@ -830,6 +900,73 @@ class GameDataEditor:
 
     def redo(self):
         self.root.edit_redo()
+
+    def add_item_combo(self):
+        item_combo_name = simpledialog.askstring("Add Item Combo", "Enter item combo name:")
+        if item_combo_name:
+            item_combo_data = {
+                "name": item_combo_name,
+                "items": [],
+                "description": ""
+            }
+            self.item_combinations_data[item_combo_name] = item_combo_data
+            self.item_combinations_listbox.insert(tk.END, item_combo_name)
+            self.item_combinations_listbox.selection_set(tk.END)
+            self.modified_files.add('item_combinations')
+
+    def preview_scene_map(self):
+        scene_map = self.generate_scene_map()
+        preview_window = tk.Toplevel(self.root)
+        preview_window.title("Scene Map Preview")
+
+        canvas = tk.Canvas(preview_window, width=800, height=600)
+        canvas.pack(fill=tk.BOTH, expand=1)
+
+        self.draw_scene_map(canvas, scene_map)
+
+    def generate_scene_map(self):
+        scene_map = {}
+        for scene in self.scenes_data:
+            scene_map[scene["id"]] = {
+                "name": scene["name"],
+                "exits": [(exit["door_name"], exit["scene_id"]) for exit in scene["exits"]]
+            }
+        return scene_map
+
+    def draw_scene_map(self, canvas, scene_map):
+        padding = 50
+        box_size = 80
+        arrow_length = 40
+
+        positions = {}
+        x = padding
+        y = padding
+        for scene_id in scene_map:
+            positions[scene_id] = (x, y)
+            x += box_size + padding
+            if x > canvas.winfo_width() - box_size - padding:
+                x = padding
+                y += box_size + padding
+
+        for scene_id, (x, y) in positions.items():
+            scene_info = scene_map[scene_id]
+            canvas.create_rectangle(x, y, x + box_size, y + box_size, outline="black")
+            canvas.create_text(x + box_size / 2, y + box_size / 2, text=scene_info["name"])
+
+        for scene_id, (x, y) in positions.items():
+            scene_info = scene_map[scene_id]
+            for exit_name, target_scene_id in scene_info["exits"]:
+                if target_scene_id in positions:
+                    target_x, target_y = positions[target_scene_id]
+                    arrow_x = x + box_size
+                    arrow_y = y + box_size / 2
+                    target_arrow_x = target_x
+                    target_arrow_y = target_y + box_size / 2
+                    canvas.create_line(arrow_x, arrow_y, target_arrow_x, target_arrow_y, arrow=tk.LAST, fill="red")
+                    canvas.create_rectangle(arrow_x + 10, arrow_y - 10, arrow_x + 110, arrow_y + 10, fill="white")
+                    canvas.create_text(arrow_x + 60, arrow_y, text=exit_name, fill="black")
+
+        canvas.configure(scrollregion=canvas.bbox(tk.ALL))
 
 if __name__ == "__main__":
     root = tk.Tk()

@@ -739,7 +739,15 @@ class GameDataEditor:
         canvas = tk.Canvas(preview_window, width=800, height=600)
         canvas.pack(fill=tk.BOTH, expand=1)
 
+        scrollbar = ttk.Scrollbar(preview_window, orient=tk.VERTICAL, command=canvas.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas.configure(yscrollcommand=scrollbar.set)
+
         self.draw_scene_structure(canvas, scene_structure)
+
+        # Add zoom functionality
+        self.zoom_level = 1.0
+        canvas.bind("<MouseWheel>", self.on_mouse_wheel)
 
     def generate_scene_structure(self):
         scene_structure = {}
@@ -786,6 +794,7 @@ class GameDataEditor:
 
         for scene_id, (x, y) in positions.items():
             scene_info = scene_structure[scene_id]
+            exit_y_offset = y + box_size + 10
             for exit_name, target_scene_id in scene_info["exits"]:
                 if target_scene_id in positions:
                     target_x, target_y = positions[target_scene_id]
@@ -794,9 +803,18 @@ class GameDataEditor:
                     target_arrow_x = target_x
                     target_arrow_y = target_y + box_size / 2
                     canvas.create_line(arrow_x, arrow_y, target_arrow_x, target_arrow_y, arrow=tk.LAST, fill="blue")
-                    canvas.create_text(arrow_x + 10, arrow_y, text=exit_name, anchor=tk.W, fill="blue")
+                    canvas.create_text(canvas.winfo_width() - 10, exit_y_offset, text=exit_name, anchor=tk.W, fill="blue")
+                    exit_y_offset += 20
 
         canvas.configure(scrollregion=canvas.bbox(tk.ALL))
+
+    def on_mouse_wheel(self, event):
+        if event.delta > 0:
+            self.zoom_level *= 1.1
+        else:
+            self.zoom_level /= 1.1
+        self.zoom_level = max(0.5, min(2.0, self.zoom_level))
+        self.preview_scene_structure()
 
     def create_settings_menu(self):
         settings_window = tk.Toplevel(self.root)

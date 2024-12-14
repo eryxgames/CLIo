@@ -67,7 +67,7 @@ class Parser:
                 "parameters": []
             },
             {
-                "names": ["examine", "inspect", "study"],
+                "names": ["examine", "inspect", "study", "look at"],
                 "action": "examine_item",
                 "parameters": ["item_name"]
             },
@@ -110,55 +110,42 @@ class Parser:
                 "names": ["help"],
                 "action": "help",
                 "parameters": []
-            },
-            {
-                "names": ["look at"],
-                "action": "examine_item",
-                "parameters": ["item_name"]
             }
         ]
 
     def parse_command(self, command):
-        words = command.lower().split()
+        command = command.lower()
         for action in self.actions:
             for name in action["names"]:
-                if name in command.lower():
+                if command.startswith(name):
                     params = {}
                     for param in action["parameters"]:
-                        value = self.extract_parameter(words, name, param)
+                        value = self.extract_parameter(command, name, param)
                         if value is None:
                             return {"action": "invalid", "message": f"Missing {param} for this action."}
                         params[param] = value
                     return {"action": action["action"], "parameters": params}
         return {"action": "invalid", "message": "I don't understand that command. Try to use the exact command."}
 
-    def extract_parameter(self, words, action_name, param):
+    def extract_parameter(self, command, action_name, param):
+        # Remove the action name from the command
+        remaining_command = command[len(action_name):].strip()
         if param == "item_name":
-            # Assuming item name follows the verb
-            index = words.index(action_name) + 1
-            if index < len(words):
-                return ' '.join(words[index:])
-            else:
-                return None
+            return remaining_command
         elif param == "character_name":
-            # Assuming character name follows the verb
-            index = words.index(action_name) + 1
-            if index < len(words):
-                return ' '.join(words[index:])
-            else:
-                return None
+            return remaining_command
         elif param == "item1_name":
-            # Assuming item1 name follows the verb
-            index = words.index(action_name) + 1
-            if index < len(words):
-                return ' '.join(words[index:])
+            # Assuming item1 name is the first item mentioned
+            items = remaining_command.split(',')
+            if items:
+                return items[0].strip()
             else:
                 return None
         elif param == "item2_name":
-            # Assuming item2 name follows the verb
-            index = words.index(action_name) + 1
-            if index < len(words):
-                return ' '.join(words[index:])
+            # Assuming item2 name is the second item mentioned
+            items = remaining_command.split(',')
+            if len(items) > 1:
+                return items[1].strip()
             else:
                 return None
         # Add more parameter extraction logic if needed

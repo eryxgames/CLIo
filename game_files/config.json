@@ -1,16 +1,15 @@
 {
-    "scenes_file": "game_files/scenes/scenes.json",
-    "items_file": "game_files/items.json",
-    "characters_file": "game_files/characters.json",
-    "story_texts_file": "game_files/story_texts.json",
-    "initial_scene": "scene1",
-    "player_stats": {
-      "health": 100,
-      "strength": 10,
-      "defense": 5,
-      "attack": 5,
-      "equipment": []
-    },
-    "max_hints": 5
-  }
-  
+  "scenes_file": "game_files/scenes/scenes.json",
+  "items_file": "game_files/items.json",
+  "characters_file": "game_files/characters.json",
+  "story_texts_file": "game_files/story_texts.json",
+  "initial_scene": "scene1",
+  "player_stats": {
+    "health": 100,
+    "strength": 10,
+    "defense": 5,
+    "attack": 5,
+    "equipment": []
+  },
+  "max_hints": 5
+}

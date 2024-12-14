@@ -42,6 +42,13 @@ class GameEngine:
         self.media_player = media_player
         self.parser = parser  # Initialize the Parser
 
+        # Ensure that all possible stats are present in player_stats
+        for item_id, item in self.items.items():
+            if "effect" in item:
+                for stat in item["effect"]:
+                    if stat not in self.player_stats:
+                        self.player_stats[stat] = 0
+
     def process_command(self, command):
         if not command.strip():
             return
@@ -59,9 +66,9 @@ class GameEngine:
                 "player_stats": self.player_stats,
                 "story_progress": self.story_progress
             }
-            SaveLoad.save_game(save_game_state, "savegame.json")
+            SaveLoad().save_game(save_game_state, "savegame.json")
         elif command == "load":
-            saved_state = SaveLoad.load_game("savegame.json")
+            saved_state = SaveLoad().load_game("savegame.json")
             self.load_game_state(saved_state)
         else:
             parsed = self.parser.parse_command(command)

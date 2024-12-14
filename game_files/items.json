@@ -222,13 +222,39 @@
     },
     "battered_crowbar": {
         "name": "Battered Crowbar",
-        "description": "A sturdy but worn crowbar.",
+        "description": "A sturdy but worn crowbar. Feels familiar.",
         "usable": false,
         "equippable": true,
         "effect": {
             "attack": 15
         }
     },
+    "fission_relay": {
+        "name": "Fission Relay",
+        "description": "A small nuclear fission reactor.",
+        "usable": false,
+        "equippable": false
+    },
+    "screwdriver": {
+        "name": "Screwdriver",
+        "description": "A standard screwdriver. Powered by clean, nuclear energy. Discharged.",
+        "usable": false,
+        "equippable": true,
+        "effect": {
+            "repair": 10
+        }
+    },
+    "charged_screwdriver": {
+        "name": "Charged Screwdriver",
+        "description": "A universal screwdriver powered by nuclear fission.",
+        "usable": true,
+        "equippable": true,
+        "effect": {
+            "repair": 20,
+            "attack": 15
+        },
+        "components": ["fission_relay", "screwdriver"]
+    },  
     "torn_research_paper": {
         "name": "Torn Research Paper",
         "description": "A torn research paper with notes on quantum drive traveling and stained from unidentified liquid, hopefully coffee.",

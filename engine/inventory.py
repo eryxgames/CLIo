@@ -53,6 +53,17 @@ class Inventory:
         else:
             print("You are not equipped with any items.")
 
+    def craft_item(self, item_id, items_data):
+        item = items_data[item_id]
+        components = item.get("components", [])
+        if all(component in self.items for component in components):
+            for component in components:
+                self.remove_item(component)
+            self.add_item(item_id)
+            print(f"You have crafted a {item['name']}.")
+        else:
+            print("You don't have the required components to craft this item.")
+
     def combine_items(self, item1_id, item2_id, items_data):
         item1 = items_data[item1_id]
         item2 = items_data[item2_id]

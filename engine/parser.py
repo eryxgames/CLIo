@@ -28,6 +28,7 @@ class Parser:
             "inspect": self.examine_item,
             "study": self.examine_item,
             "combine": self.combine_items,
+            "craft": self.craft,  # Adding craft command to create a new item
             "merge": self.combine_items,
             "examine yourself": self.examine_self,  # Adding exception for examine yourself
             "look at yourself": self.examine_self,  # Adding exception for look at yourself
@@ -140,6 +141,12 @@ class Parser:
         if not item_name:
             return "Please specify an item to examine."
         return f"You examine the {item_name} closely."
+
+    def craft(self, command):
+        item_name = command.split("craft")[-1].strip()
+        if not item_name:
+            return "Please specify an item to craft."
+        return f"You attempt to craft the {item_name}."
 
     def combine_items(self, command):
         parts = command.split()

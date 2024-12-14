@@ -365,6 +365,13 @@ class GameEngine:
         else:
             print(random.choice(self.item_not_found_messages))
 
+    def craft_item(self, item_name):
+        item = self.find_item_by_name(item_name)
+        if item:
+            self.inventory.craft_item(item["id"], self.items)
+        else:
+            print("Item not found in the game data.")
+
     def combine_items(self, item1, item2):
         item1_id = self.find_item_by_name(item1)["id"]
         item2_id = self.find_item_by_name(item2)["id"]

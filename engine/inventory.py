@@ -53,26 +53,30 @@ class Inventory:
         else:
             print("You are not equipped with any items.")
 
-    def craft_item(self, item_id, items_data):
-        item = items_data[item_id]
-        components = item.get("components", [])
-        if all(component in self.items for component in components):
-            for component in components:
-                self.remove_item(component)
-            self.add_item(item_id)
-            print(f"You have crafted a {item['name']}.")
+    def craft_item(self, item_name, items_data):
+        item_id = next((item_id for item_id, item in items_data.items() if item_name.lower() in item["name"].lower()), None)
+        if item_id:
+            item = items_data[item_id]
+            components = item.get("components", [])
+            if all(component in self.items for component in components):
+                for component in components:
+                    self.remove_item(component)
+                self.add_item(item_id, items_data)
+                print(f"You have crafted a {item['name']}.")
+            else:
+                print("You don't have the required components to craft this item.")
         else:
-            print("You don't have the required components to craft this item.")
+            print("Item not found in the game data.")
 
-    def combine_items(self, item1_id, item2_id, items_data):
-        item1 = items_data[item1_id]
-        item2 = items_data[item2_id]
-        if item1_id in self.items and item2_id in self.items:
+    def combine_items(self, item1_name, item2_name, items_data):
+        item1_id = next((item_id for item_id, item in items_data.items() if item1_name.lower() in item["name"].lower()), None)
+        item2_id = next((item_id for item_id, item in items_data.items() if item2_name.lower() in item["name"].lower()), None)
+        if item1_id and item2_id:
             combination = f"{item1_id} + {item2_id}"
             if combination in items_data.get("combinations", {}):
                 new_item_id = items_data["combinations"][combination]
                 new_item = items_data[new_item_id]
-                print(f"You combine {item1['name']} and {item2['name']} to create {new_item['name']}.")
+                print(f"You combine {items_data[item1_id]['name']} and {items_data[item2_id]['name']} to create {new_item['name']}.")
                 self.items.remove(item1_id)
                 self.items.remove(item2_id)
                 self.items.append(new_item_id)

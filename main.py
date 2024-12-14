@@ -11,8 +11,7 @@ from utils.save_load import SaveLoad
 
 def load_data(filename):
     with open(filename, 'r') as f:
-        data = json.load(f)
-    return data
+        return json.load(f)
 
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
@@ -109,8 +108,12 @@ def main():
                 game_engine.examine_item(item_name)
             elif command.startswith("combine "):
                 parts = command.split()
-                item1 = parts[parts.index("combine") + 1]
-                item2 = parts[parts.index("with") + 1]
+                if "with" in parts:
+                    item1 = parts[parts.index("combine") + 1]
+                    item2 = parts[parts.index("with") + 1]
+                elif "+" in parts:
+                    item1 = parts[parts.index("combine") + 1]
+                    item2 = parts[parts.index("+") + 1]
                 game_engine.combine_items(item1, item2)
             elif command == "examine yourself":
                 game_engine.examine_self()
@@ -148,8 +151,12 @@ def main():
                     game_engine.examine_item(item_name)
                 elif "combine" in command or "merge" in command:
                     parts = command.split()
-                    item1 = parts[parts.index("combine") + 1]
-                    item2 = parts[parts.index("with") + 1]
+                    if "with" in parts:
+                        item1 = parts[parts.index("combine") + 1]
+                        item2 = parts[parts.index("with") + 1]
+                    elif "+" in parts:
+                        item1 = parts[parts.index("combine") + 1]
+                        item2 = parts[parts.index("+") + 1]
                     game_engine.combine_items(item1, item2)
                 elif "examine yourself" in command or "look at yourself" in command:
                     game_engine.examine_self()

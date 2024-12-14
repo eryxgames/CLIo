@@ -143,16 +143,20 @@ class Parser:
         return f"You examine the {item_name} closely."
 
     def craft(self, command):
-        item_name = command.split("craft")[-1].strip()
+        item_name = command.split("craft")[-1].strip().lower()
         if not item_name:
             return "Please specify an item to craft."
         return f"You attempt to craft the {item_name}."
 
     def combine_items(self, command):
         parts = command.split()
-        if "combine" in parts and "with" in parts:
-            item1 = parts[parts.index("combine") + 1]
-            item2 = parts[parts.index("with") + 1]
+        if "combine" in parts and ("with" in parts or "+" in parts):
+            if "with" in parts:
+                item1 = parts[parts.index("combine") + 1]
+                item2 = parts[parts.index("with") + 1]
+            elif "+" in parts:
+                item1 = parts[parts.index("combine") + 1]
+                item2 = parts[parts.index("+") + 1]
             if not item1 or not item2:
                 return "Please specify two items to combine."
             return f"You attempt to combine {item1} with {item2}."

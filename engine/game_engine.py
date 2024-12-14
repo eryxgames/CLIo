@@ -372,12 +372,13 @@ class GameEngine:
         else:
             print("Item not found in the game data.")
 
-    def combine_items(self, item1, item2):
-        item1_id = self.find_item_by_name(item1)["id"]
-        item2_id = self.find_item_by_name(item2)["id"]
-        new_item_id = self.inventory.combine_items(item1_id, item2_id, self.items)
-        if new_item_id:
-            print(f"You have created a new item: {self.items[new_item_id]['name']}.")
+    def combine_items(self, item1_name, item2_name):
+        item1 = self.find_item_by_name(item1_name)
+        item2 = self.find_item_by_name(item2_name)
+        if item1 and item2:
+            self.inventory.combine_items(item1["id"], item2["id"], self.items)
+        else:
+            print("One or both items not found in your inventory.")
 
     def examine_self(self):
         print("You examine yourself closely.")

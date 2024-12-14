@@ -14,6 +14,13 @@ def load_data(filename):
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
+def display_menu():
+    print("1. Start New Game")
+    print("2. Continue (Load Game)")
+    print("3. Options")
+    print("4. Hall of Fame")
+    print("5. Quit")
+
 def main():
     clear_screen()
     print("================================")
@@ -22,14 +29,42 @@ def main():
     print("================================")
     print("                                ")
 
-    media_player = MediaPlayer()
-    save_load = SaveLoad()
-    parser = Parser()  # Initialize the Parser
-    game_engine = GameEngine('game_files/config.json', media_player, parser)  # Pass the parser to GameEngine
+    media_player = MediaPlayer()  # Create an instance of MediaPlayer
+    parser = Parser()  # Create an instance of Parser
 
-    media_player.print_with_delay(game_engine.current_scene["description"])
-    game_engine.display_story_text("intro")
+    while True:
+        display_menu()
+        choice = input("Enter your choice: ")
 
+        if choice == "1":
+            # Start New Game
+            game_engine = GameEngine('game_files/config.json', media_player, parser)
+            media_player.print_with_delay(game_engine.current_scene["description"])
+            game_engine.display_story_text("intro")
+            game_loop(game_engine)
+        elif choice == "2":
+            # Continue (Load Game)
+            saved_state = SaveLoad.load_game("savegame.json")
+            if saved_state:
+                game_engine = GameEngine('game_files/config.json', media_player, parser)
+                game_engine.load_game_state(saved_state)
+                game_loop(game_engine)
+            else:
+                print("No saved game found.")
+        elif choice == "3":
+            # Options
+            print("Options not implemented yet.")
+        elif choice == "4":
+            # Hall of Fame
+            print("Hall of Fame not implemented yet.")
+        elif choice == "5":
+            # Quit
+            print("Thank you for playing! Goodbye!")
+            break
+        else:
+            print("Invalid choice. Please select again.")
+
+def game_loop(game_engine):
     try:
         while True:
             command = input(">> ").lower()

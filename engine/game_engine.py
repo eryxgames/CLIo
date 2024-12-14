@@ -1,3 +1,5 @@
+# engine/game_engine.py
+
 import json
 import os
 import re
@@ -17,7 +19,8 @@ class GameEngine:
         self.characters = self.load_data(self.config["characters_file"])
         self.story_texts = self.load_data(self.config["story_texts_file"])
         self.current_scene = next(scene for scene in self.scenes if scene["id"] == self.config["initial_scene"])
-        self.inventory = Inventory()
+        self.item_name_mapping = {item_data['name'].lower().replace(' ', '_'): item_id for item_id, item_data in self.items.items() if 'name' in item_data} # Item mapping to solve lowercase
+        self.inventory = Inventory(self.items)  # Initialize Inventory with items_data
         self.player_stats = self.config["player_stats"]
         self.story_progress = {}
         self.hints_used = 0
@@ -64,7 +67,7 @@ class GameEngine:
             saved_state = SaveLoad.load_game("savegame.json")
             self.load_game_state(saved_state)
         else:
-            parsed = self.parser.parse_command(command)
+            parsed = self.parser.parse_command(command)  # Use the Parser instance to parse the command
             action = parsed.get("action")
             if action == "invalid":
                 print(parsed.get("message"))
@@ -197,6 +200,32 @@ class GameEngine:
         else:
             print(random.choice(self.item_not_found_messages))
 
+    def repair_item(self, item_name):
+        item = self.find_item_by_name(item_name)
+        if item and item.get("repairable", False):
+            repair_items = item.get("repair_items", [])
+            required_items = [self.items[repair_item_id] for repair_item_id in repair_items]
+            # Check if all required items are in the inventory
+            if all(repair_item_id in self.inventory.items for repair_item_id in repair_items):
+                for repair_item_id in repair_items:
+                    self.inventory.remove_item(repair_item_id)
+                new_item_id = item.get("repaired_item_id")
+                new_item = self.items[new_item_id]
+                print(f"You repair the {item['name']} using the required items and create a {new_item['name']}.")
+                # Remove the original item, whether it's in the inventory or the scene
+                if item["id"] in self.inventory.items:
+                    self.inventory.remove_item(item["id"])
+                elif item["id"] in self.current_scene["items"]:
+                    self.current_scene["items"].remove(item["id"])
+                else:
+                    print("Original item not found.")
+                # Add the new repaired item to the inventory
+                self.inventory.add_item(new_item_id)
+            else:
+                print("You don't have all the required items to repair this.")
+        else:
+            print("Item not found or cannot be repaired.")
+
     def handle_interactive_item(self, item):
         current_state_key = item.get("current_state", "default")
         if current_state_key not in item["states"]:
@@ -245,7 +274,7 @@ class GameEngine:
         if item and item["id"] in self.current_scene["items"]:
             item_id = item["id"]
             print(f"You take the {item['name']}.")
-            self.inventory.add_item(item_id, self.items)
+            self.inventory.add_item(item_id)
             self.current_scene["items"].remove(item_id)
             # Ensure the item does not reappear in lockers or other interactive items
             for passive_item in self.current_scene.get("passive_items", []):
@@ -397,7 +426,7 @@ class GameEngine:
             self.change_scene(exit["scene_id"])
 
     def list_inventory(self):
-        self.inventory.list_inventory(self.items)
+        self.inventory.list_inventory()
 
     def examine_item(self, item_name):
         if not item_name:
@@ -410,19 +439,40 @@ class GameEngine:
             print(random.choice(self.item_not_found_messages))
 
     def craft_item(self, item_name):
-        item = self.find_item_by_name(item_name)
-        if item:
-            self.inventory.craft_item(item["id"], self.items)
-        else:
-            print("Item not found in the game data.")
+        self.inventory.craft_item(item_name)
 
     def combine_items(self, item1_name, item2_name):
-        item1 = self.find_item_by_name(item1_name)
-        item2 = self.find_item_by_name(item2_name)
-        if item1 and item2:
-            self.inventory.combine_items(item1["id"], item2["id"], self.items)
+        self.inventory.combine_items(item1_name, item2_name)
+
+    def equip_item(self, item_name):
+        effect = self.inventory.equip_item(item_name)
+        for stat, value in effect.items():
+            self.player_stats[stat] += value
+
+    def unequip_item(self, item_name):
+        effect = self.inventory.unequip_item(item_name)
+        for stat, value in effect.items():
+            self.player_stats[stat] -= value
+
+    def examine(self, target_name):
+        # Check if the target is a character in the scene
+        matching_characters = [char for char in self.current_scene["characters"] if target_name.lower() in self.characters[char]["name"].lower()]
+        if matching_characters:
+            if len(matching_characters) == 1:
+                character_id = matching_characters[0]
+                character = self.characters[character_id]
+                print(character["description"])
+            else:
+                print("Multiple characters match your query. Please be more specific:")
+                for char in matching_characters:
+                    print(f"- {self.characters[char]['name']}")
         else:
-            print("One or both items not found in your inventory.")
+            # Then, check if the target is an item in the scene
+            item = self.find_item_by_name(target_name)
+            if item and item["id"] in self.current_scene["items"]:
+                print(item["description"])
+            else:
+                print("No such item or character in sight.")            
 
     def examine_self(self):
         print("You examine yourself closely.")
@@ -431,7 +481,7 @@ class GameEngine:
         print(f"Strength: {self.player_stats['strength']}")
         print(f"Defense: {self.player_stats['defense']}")
         print(f"Attack: {self.player_stats['attack']}")
-        self.inventory.list_equipped_items(self.items)
+        self.inventory.list_equipped_items()
         self.list_inventory()
         self.describe_health_status()
 
@@ -454,19 +504,19 @@ class GameEngine:
         print(f"Strength: {self.player_stats['strength']}")
         print(f"Defense: {self.player_stats['defense']}")
         print(f"Attack: {self.player_stats['attack']}")
-        self.inventory.list_equipped_items(self.items)
+        self.inventory.list_equipped_items()
 
     def find_item_by_name(self, item_name):
-        for item_id, item in self.items.items():
-            if item_name.lower() in item.get("name", "").lower():
-                return {
-                    "id": item_id,
-                    "name": item.get("name", "Unknown Item"),
-                    "description": item.get("description", "No description available."),
-                    "usable": item.get("usable", False),
-                    "interactive": item.get("interactive", False),
-                    "states": item.get("states", {})
-                }
+        item_id = self.item_name_mapping.get(item_name.lower().replace(' ', '_'))
+        if item_id:
+            return {
+                "id": item_id,
+                "name": self.items[item_id].get("name", "Unknown Item"),
+                "description": self.items[item_id].get("description", "No description available."),
+                "usable": self.items[item_id].get("usable", False),
+                "interactive": self.items[item_id].get("interactive", False),
+                "states": self.items[item_id].get("states", {})
+            }
         return None
 
     def display_story_text(self, text_key):
@@ -521,36 +571,11 @@ class GameEngine:
         else:
             print("Item not found in inventory or cannot be used.")
 
-    def equip_item(self, item_name):
-        item = self.find_item_by_name(item_name)
-        if item:
-            effect = self.inventory.equip_item(item["id"], self.items)
-            for stat, value in effect.items():
-                self.player_stats[stat] += value
-        else:
-            print("Item not found in inventory or cannot be equipped.")
-
-    def unequip_item(self, item_name):
-        item = self.find_item_by_name(item_name)
-        if item:
-            effect = self.inventory.unequip_item(item["id"], self.items)
-            for stat, value in effect.items():
-                self.player_stats[stat] -= value
-        else:
-            print("Item not found in equipment.")
-
     def get_random_event(self):
         random_events = self.current_scene.get("random_events", [])
         if random_events:
             return random.choice(random_events)
         return ""
-
-    def repair_item(self, item_name):
-        item = self.find_item_by_name(item_name)
-        if item and item.get("repairable", False):
-            self.inventory.repair_item(item_name, self.items)
-        else:
-            print("Item not found in the game data or cannot be repaired.")
 
     def provide_hint(self):
         if self.hints_used < self.max_hints:
@@ -596,13 +621,6 @@ class GameEngine:
                 time.sleep(delay)
             print("\n")
             time.sleep(1)  # Pause between paragraphs
-
-    def repair_communicator(self):
-        if "energy_cells" in self.inventory.items:
-            self.inventory.remove_item("energy_cells")
-            print("Your communicator has been repaired.")
-        else:
-            print("You don't have energy cells to repair the communicator.")
 
     def load_game_state(self, saved_state):
         self.current_scene = next(scene for scene in self.scenes if scene["id"] == saved_state["current_scene"])

@@ -5,6 +5,59 @@
         "usable": false,
         "readable_item": "The communicator is broken and needs repair. It has a label with instructions on how to repair it using energy cells."
     },
+    "energy_cells": {
+        "name": "Energy Cells",
+        "description": "High-energy cells for powering devices.",
+        "usable": false,
+        "equippable": false
+    },
+    "repaired_communicator": {
+        "name": "Repaired Communicator",
+        "description": "A repaired communicator that is now functional.",
+        "usable": true,
+        "effect": {
+            "health": 10
+        }
+    },
+    "broken_chip": {
+        "name": "Broken Chip",
+        "description": "A broken chip that needs repair.",
+        "usable": false,
+        "repairable": true,
+        "repair_items": ["screwdriver", "charged_screwdriver"],
+        "repaired_item_id": "fixed_chip"
+    },
+    "screwdriver": {
+        "name": "Screwdriver",
+        "description": "A standard screwdriver. Powered by clean, nuclear energy. Discharged.",
+        "usable": false,
+        "equippable": true,
+        "effect": {
+            "repair": 10
+        }
+    },
+    "fission_relay": {
+        "name": "Fission Relay",
+        "description": "A small nuclear fission reactor.",
+        "usable": false,
+        "equippable": false
+    },
+    "charged_screwdriver": {
+        "name": "Charged Screwdriver",
+        "description": "A universal screwdriver powered by nuclear fission.",
+        "usable": true,
+        "equippable": true,
+        "effect": {
+            "repair": 20,
+            "attack": 15
+        },
+        "components": ["fission_relay", "screwdriver"]
+    },
+    "fixed_chip": {
+        "name": "Fixed Chip",
+        "description": "A fixed chip that was previously broken.",
+        "usable": false
+    },
     "space_map": {
         "name": "Space Map",
         "description": "A map of nearby planets and coordinates.",
@@ -18,12 +71,6 @@
         "effect": {
             "health": 50
         }
-    },
-    "energy_cells": {
-        "name": "Energy Cells",
-        "description": "High-energy cells for powering devices.",
-        "usable": false,
-        "equippable": false
     },
     "coolant_canister": {
         "name": "Coolant Canister",
@@ -143,10 +190,6 @@
         "key": true,
         "consumable": true
     },
-    "combinations": {
-        "broken_communicator + energy_cells": "repaired_communicator",
-        "first_aid_kit + coolant_canister": "advanced_medkit"
-    },
     "spaceship_console": {
         "name": "Spaceship Console",
         "description": "A control console for the spaceship. It requires a valid access code to activate.",
@@ -228,48 +271,14 @@
             "attack": 15
         }
     },
-    "fission_relay": {
-        "name": "Fission Relay",
-        "description": "A small nuclear fission reactor.",
-        "usable": false,
-        "equippable": false
-    },
-    "screwdriver": {
-        "name": "Screwdriver",
-        "description": "A standard screwdriver. Powered by clean, nuclear energy. Discharged.",
-        "usable": false,
-        "equippable": true,
-        "effect": {
-            "repair": 10
-        }
-    },
-    "charged_screwdriver": {
-        "name": "Charged Screwdriver",
-        "description": "A universal screwdriver powered by nuclear fission.",
-        "usable": true,
-        "equippable": true,
-        "effect": {
-            "repair": 20,
-            "attack": 15
-        },
-        "components": ["fission_relay", "screwdriver"]
-    },
     "torn_research_paper": {
         "name": "Torn Research Paper",
         "description": "A torn research paper with notes on quantum drive traveling and stained from unidentified liquid, hopefully coffee.",
         "usable": false,
         "readable_item": "The research paper discusses the challenges of quantum drive traveling and the potential risks involved. It is stained with an unidentified liquid, hopefully coffee."
     },
-    "broken_chip": {
-        "name": "Broken Chip",
-        "description": "A broken chip that needs repair.",
-        "usable": false,
-        "repairable": true,
-        "repair_item": "screwdriver"
-    },
-    "fixed_chip": {
-        "name": "Fixed Chip",
-        "description": "A fixed chip that was previously broken.",
-        "usable": false
+    "combinations": {
+        "broken_communicator + energy_cells": "repaired_communicator",
+        "screwdriver + fission_relay": "charged_screwdriver"
     }
 }

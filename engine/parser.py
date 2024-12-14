@@ -2,6 +2,21 @@ class Parser:
     def __init__(self):
         self.actions = [
             {
+                "names": ["combine", "merge"],
+                "action": "combine_items",
+                "parameters": ["item1_name", "item2_name"]
+            },
+            {
+                "names": ["repair"],
+                "action": "repair_item",
+                "parameters": ["item_name"]
+            },
+            {
+                "names": ["craft"],
+                "action": "craft_item",
+                "parameters": ["item_name"]
+            },
+            {
                 "names": ["look", "explore", "look around"],
                 "action": "explore_scene",
                 "parameters": []
@@ -68,28 +83,8 @@ class Parser:
             },
             {
                 "names": ["examine", "inspect", "study"],
-                "action": "examine_item",
-                "parameters": ["item_name"]
-            },
-            {
-                "names": ["combine", "merge"],
-                "action": "combine_items",
-                "parameters": ["item1_name", "item2_name"]
-            },
-            {
-                "names": ["craft"],
-                "action": "craft_item",
-                "parameters": ["item_name"]
-            },
-            {
-                "names": ["examine yourself", "look at yourself"],
-                "action": "examine_self",
-                "parameters": []
-            },
-            {
-                "names": ["stats"],
-                "action": "show_stats",
-                "parameters": []
+                "action": "examine",
+                "parameters": ["target_name"]
             },
             {
                 "names": ["use"],
@@ -113,8 +108,8 @@ class Parser:
             },
             {
                 "names": ["look at"],
-                "action": "examine_item",
-                "parameters": ["item_name"]
+                "action": "examine",
+                "parameters": ["target_name"]
             }
         ]
 
@@ -123,6 +118,10 @@ class Parser:
         for action in self.actions:
             for name in action["names"]:
                 if name in command.lower():
+                    if name == "combine":
+                        plus_count = words.count('+')
+                        if plus_count != 1:
+                            return {"action": "invalid", "message": "Invalid combine command. Use 'combine item1 + item2'."}
                     params = {}
                     for param in action["parameters"]:
                         value = self.extract_parameter(words, name, param)
@@ -133,33 +132,39 @@ class Parser:
         return {"action": "invalid", "message": "I don't understand that command. Try to use the exact command."}
 
     def extract_parameter(self, words, action_name, param):
-        if param == "item_name":
-            # Assuming item name follows the verb
-            index = words.index(action_name) + 1
-            if index < len(words):
-                return ' '.join(words[index:])
-            else:
-                return None
-        elif param == "character_name":
-            # Assuming character name follows the verb
-            index = words.index(action_name) + 1
-            if index < len(words):
-                return ' '.join(words[index:])
-            else:
-                return None
-        elif param == "item1_name":
-            # Assuming item1 name follows the verb
-            index = words.index(action_name) + 1
-            if index < len(words):
-                return ' '.join(words[index:])
-            else:
+        if param == "item1_name":
+            try:
+                index = words.index('combine') + 1
+                plus_index = words.index('+')
+                return ' '.join(words[index:plus_index]).strip().replace(' ', '_')
+            except ValueError:
                 return None
         elif param == "item2_name":
-            # Assuming item2 name follows the verb
-            index = words.index(action_name) + 1
-            if index < len(words):
-                return ' '.join(words[index:])
-            else:
+            try:
+                plus_index = words.index('+') + 1
+                return ' '.join(words[plus_index:]).strip().replace(' ', '_')
+            except ValueError:
+                return None
+        elif param == "item_name":
+            try:
+                index = words.index(action_name) + 1
+                return ' '.join(words[index:]).strip().replace(' ', '_')
+            except ValueError:
+                return None
+        elif param == "character_name":
+            try:
+                index = words.index(action_name) + 1
+                return ' '.join(words[index:]).strip().replace(' ', '_')
+            except ValueError:
+                return None
+        elif param == "target_name":
+            try:
+                if action_name == "look at":
+                    look_at_index = words.index('look') + 1
+                    return ' '.join(words[look_at_index:]).strip().replace(' ', '_')
+                else:
+                    return None
+            except ValueError:
                 return None
         # Add more parameter extraction logic if needed
         return None

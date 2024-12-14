@@ -1,0 +1,17 @@
+{
+    "crafting": {
+        "hammer": {
+            "ingredients": ["stick", "stone"]
+        },
+        "torch": {
+            "ingredients": ["stick", "rope"]
+        }
+    },
+    "combining": {
+        "stick+stone": "hammer",
+        "stone+stick": "hammer",
+        "stick+rope": "torch",
+        "hammer+rope": "bolas",
+        "rope+stick": "torch"
+    }
+}

@@ -110,6 +110,11 @@ class Parser:
                 "names": ["help"],
                 "action": "help",
                 "parameters": []
+            },
+            {
+                "names": ["look at"],
+                "action": "examine_item",
+                "parameters": ["item_name"]
             }
         ]
 

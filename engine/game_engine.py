@@ -132,7 +132,6 @@ class GameEngine:
                 if random_text:
                     print(f"  {random_text}")
 
-
     def get_random_character_text(self, character_id):
         character = self.characters[character_id]
         random_events = character.get("random_events", [])
@@ -566,7 +565,7 @@ class GameEngine:
             print("You notice the following characters in the scene:")
             for character_id in self.current_scene["characters"]:
                 character = self.characters[character_id]
-                greeting = character.get("greeting", character["dialogue"]["greeting"])
+                greeting = character.get("greeting", character["dialogue"].get("greeting", "No greeting available."))
                 print(f"- {character['name']}: {greeting}")
 
     def read_item(self, item_name):

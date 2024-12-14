@@ -92,3 +92,18 @@ class Inventory:
             print(item["description"])
         else:
             print("Item not found in the game data.")
+
+    def repair_item(self, item_name, items_data):
+        item = items_data.get(item_name.lower())
+        if item and item.get("repairable", False):
+            repair_item = item.get("repair_item")
+            if repair_item in self.items:
+                self.remove_item(repair_item)
+                new_item_id = item.get("repaired_item_id")
+                new_item = items_data[new_item_id]
+                print(f"You repair the {item['name']} using the {items_data[repair_item]['name']} and create a {new_item['name']}.")
+                self.add_item(new_item_id, items_data)
+            else:
+                print(f"You don't have the {items_data[repair_item]['name']} to repair the {item['name']}.")
+        else:
+            print("Item not found in the game data or cannot be repaired.")

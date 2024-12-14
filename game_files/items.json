@@ -259,5 +259,17 @@
         "description": "A torn research paper with notes on quantum drive traveling and stained from unidentified liquid, hopefully coffee.",
         "usable": false,
         "readable_item": "The research paper discusses the challenges of quantum drive traveling and the potential risks involved. It is stained with an unidentified liquid, hopefully coffee."
+    },
+    "broken_chip": {
+        "name": "Broken Chip",
+        "description": "A broken chip that needs repair.",
+        "usable": false,
+        "repairable": true,
+        "repair_item": "screwdriver"
+    },
+    "fixed_chip": {
+        "name": "Fixed Chip",
+        "description": "A fixed chip that was previously broken.",
+        "usable": false
     }
 }

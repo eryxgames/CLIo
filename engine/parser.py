@@ -17,10 +17,10 @@ class Parser:
             "converse with": self.talk_to,
             "give": self.give,
             "fight": self.fight,
-            "attack": self.fight,  # Adding attack command
-            "hit": self.hit,  # Adding hit command
-            "push": self.push,  # Adding push command
-            "pull": self.pull,  # Adding pull command
+            "attack": self.fight,
+            "hit": self.hit,
+            "push": self.push,
+            "pull": self.pull,
             "exit": self.exit_room,
             "go to": self.exit_room,
             "inventory": self.list_inventory,
@@ -28,15 +28,15 @@ class Parser:
             "inspect": self.examine_item,
             "study": self.examine_item,
             "combine": self.combine_items,
-            "craft": self.craft,  # Adding craft command to create a new item
+            "craft": self.craft,
             "merge": self.combine_items,
-            "examine yourself": self.examine_self,  # Adding exception for examine yourself
-            "look at yourself": self.examine_self,  # Adding exception for look at yourself
+            "examine yourself": self.examine_self,
+            "look at yourself": self.examine_self,
             "stats": self.show_stats,
             "use": self.use,
             "pick lock": self.pick_lock,
             "lockpick": self.pick_lock,
-            "read": self.read,  # Adding read command
+            "read": self.read,
             "help": self.help
         }
 
@@ -209,11 +209,14 @@ class Parser:
             "inventory - Check your inventory.\n"
             "examine [item] - Examine an item closely.\n"
             "combine [item1] with [item2] - Combine two items.\n"
+            "craft [item] - Craft an item.\n"
+            "merge - Combine two items.\n"
             "examine yourself - Examine yourself closely.\n"
             "look at yourself - Examine yourself closely.\n"
             "stats - Show your stats.\n"
             "use [item] - Use an item.\n"
             "pick lock of [item] - Pick the lock of an item.\n"
+            "lockpick - Pick the lock of an item.\n"
             "read [item] - Read an item.\n"
             "help - Show this help message."
         )

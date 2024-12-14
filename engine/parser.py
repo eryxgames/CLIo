@@ -1,222 +1,160 @@
 class Parser:
     def __init__(self):
-        self.keywords = {
-            "explore": self.explore,
-            "look around": self.explore,
-            "look at": self.look_at,
-            "look": self.look,
-            "take": self.take,
-            "pick up": self.take,
-            "grab": self.take,
-            "open": self.open,
-            "close": self.close,
-            "equip": self.equip,
-            "unequip": self.unequip,
-            "talk to": self.talk_to,
-            "speak to": self.talk_to,
-            "converse with": self.talk_to,
-            "give": self.give,
-            "fight": self.fight,
-            "attack": self.fight,
-            "hit": self.hit,
-            "push": self.push,
-            "pull": self.pull,
-            "exit": self.exit_room,
-            "go to": self.exit_room,
-            "inventory": self.list_inventory,
-            "examine": self.examine_item,
-            "inspect": self.examine_item,
-            "study": self.examine_item,
-            "combine": self.combine_items,
-            "craft": self.craft,
-            "merge": self.combine_items,
-            "examine yourself": self.examine_self,
-            "look at yourself": self.examine_self,
-            "stats": self.show_stats,
-            "use": self.use,
-            "pick lock": self.pick_lock,
-            "lockpick": self.pick_lock,
-            "read": self.read,
-            "help": self.help
-        }
+        self.actions = [
+            {
+                "names": ["look", "explore", "look around"],
+                "action": "explore_scene",
+                "parameters": []
+            },
+            {
+                "names": ["take", "pick up", "grab"],
+                "action": "take_item",
+                "parameters": ["item_name"]
+            },
+            {
+                "names": ["open"],
+                "action": "interact_with_item",
+                "parameters": ["item_name"]
+            },
+            {
+                "names": ["close"],
+                "action": "interact_with_item",
+                "parameters": ["item_name"]
+            },
+            {
+                "names": ["equip"],
+                "action": "equip_item",
+                "parameters": ["item_name"]
+            },
+            {
+                "names": ["unequip"],
+                "action": "unequip_item",
+                "parameters": ["item_name"]
+            },
+            {
+                "names": ["talk to", "speak to", "converse with"],
+                "action": "talk_to_character",
+                "parameters": ["character_name"]
+            },
+            {
+                "names": ["give"],
+                "action": "give_item_to_character",
+                "parameters": ["item_name", "character_name"]
+            },
+            {
+                "names": ["fight", "attack", "hit"],
+                "action": "fight_character",
+                "parameters": ["character_name"]
+            },
+            {
+                "names": ["push"],
+                "action": "push",
+                "parameters": ["target_name"]
+            },
+            {
+                "names": ["pull"],
+                "action": "pull",
+                "parameters": ["target_name"]
+            },
+            {
+                "names": ["exit", "go to"],
+                "action": "exit_room",
+                "parameters": []
+            },
+            {
+                "names": ["inventory"],
+                "action": "list_inventory",
+                "parameters": []
+            },
+            {
+                "names": ["examine", "inspect", "study"],
+                "action": "examine_item",
+                "parameters": ["item_name"]
+            },
+            {
+                "names": ["combine", "merge"],
+                "action": "combine_items",
+                "parameters": ["item1_name", "item2_name"]
+            },
+            {
+                "names": ["craft"],
+                "action": "craft_item",
+                "parameters": ["item_name"]
+            },
+            {
+                "names": ["examine yourself", "look at yourself"],
+                "action": "examine_self",
+                "parameters": []
+            },
+            {
+                "names": ["stats"],
+                "action": "show_stats",
+                "parameters": []
+            },
+            {
+                "names": ["use"],
+                "action": "use_item",
+                "parameters": ["item_name"]
+            },
+            {
+                "names": ["pick lock", "lockpick"],
+                "action": "interact_with_item",
+                "parameters": ["item_name"]
+            },
+            {
+                "names": ["read"],
+                "action": "read_item",
+                "parameters": ["item_name"]
+            },
+            {
+                "names": ["help"],
+                "action": "help",
+                "parameters": []
+            }
+        ]
 
     def parse_command(self, command):
-        if not command.strip():
-            return None
-        for keyword, action in self.keywords.items():
-            if keyword in command:
-                return action(command)
-        return "I don't understand that command. Try to use the exact command."
+        words = command.lower().split()
+        for action in self.actions:
+            for name in action["names"]:
+                if name in command.lower():
+                    params = {}
+                    for param in action["parameters"]:
+                        value = self.extract_parameter(words, name, param)
+                        if value is None:
+                            return {"action": "invalid", "message": f"Missing {param} for this action."}
+                        params[param] = value
+                    return {"action": action["action"], "parameters": params}
+        return {"action": "invalid", "message": "I don't understand that command. Try to use the exact command."}
 
-    def explore(self, command):
-        return "You explore the area, taking in every detail."
-
-    def look_at(self, command):
-        item_name = command.split("at")[-1].strip()
-        if not item_name:
-            return "Please specify an item to look at."
-        return f"You carefully examine the {item_name}."
-
-    def look(self, command):
-        return "You look around the area, taking in every detail."
-
-    def take(self, command):
-        item_name = command.split()[-1].strip()
-        if not item_name:
-            return "Please specify an item to take."
-        return f"You reach out and take the {item_name}."
-
-    def open(self, command):
-        item_name = command.split()[-1].strip()
-        if not item_name:
-            return "Please specify an item to open."
-        return f"You cautiously open the {item_name}."
-
-    def close(self, command):
-        item_name = command.split()[-1].strip()
-        if not item_name:
-            return "Please specify an item to close."
-        return f"You firmly close the {item_name}."
-
-    def equip(self, command):
-        item_name = command.split()[-1].strip()
-        if not item_name:
-            return "Please specify an item to equip."
-        return f"You equip the {item_name}, feeling more prepared."
-
-    def unequip(self, command):
-        item_name = command.split()[-1].strip()
-        if not item_name:
-            return "Please specify an item to unequip."
-        return f"You unequip the {item_name}, feeling a bit lighter."
-
-    def talk_to(self, command):
-        character_name = command.split("to")[-1].strip()
-        if not character_name:
-            return "Please specify a character to talk to."
-        return f"You approach {character_name} and start a conversation."
-
-    def give(self, command):
-        parts = command.split()
-        if "give" in parts and "to" in parts:
-            item_name = parts[parts.index("give") + 1]
-            character_name = parts[parts.index("to") + 1]
-            if not item_name or not character_name:
-                return "Please specify an item to give and a character to give it to."
-            return f"You hand the {item_name} to {character_name}."
-        return "Please specify an item to give and a character to give it to."
-
-    def fight(self, command):
-        character_name = command.split()[-1].strip()
-        if not character_name:
-            return "Please specify a character to fight."
-        return f"You prepare to fight {character_name}, your heart racing."
-
-    def hit(self, command):
-        target_name = command.split("hit")[-1].strip()
-        if not target_name:
-            return "Please specify a target to hit."
-        return f"You hit the {target_name}."
-
-    def push(self, command):
-        target_name = command.split("push")[-1].strip()
-        if not target_name:
-            return "Please specify a target to push."
-        return f"You push the {target_name}."
-
-    def pull(self, command):
-        target_name = command.split("pull")[-1].strip()
-        if not target_name:
-            return "Please specify a target to pull."
-        return f"You pull the {target_name}."
-
-    def exit_room(self, command):
-        return "You look for a way out of the room."
-
-    def list_inventory(self, command):
-        return "You check your inventory."
-
-    def examine_item(self, command):
-        item_name = command.split("examine")[-1].strip()
-        if not item_name:
-            return "Please specify an item to examine."
-        return f"You examine the {item_name} closely."
-
-    def craft(self, command):
-        item_name = command.split("craft")[-1].strip().lower()
-        if not item_name:
-            return "Please specify an item to craft."
-        return f"You attempt to craft the {item_name}."
-
-    def combine_items(self, command):
-        parts = command.split()
-        if "combine" in parts and ("with" in parts or "+" in parts):
-            if "with" in parts:
-                item1 = parts[parts.index("combine") + 1]
-                item2 = parts[parts.index("with") + 1]
-            elif "+" in parts:
-                item1 = parts[parts.index("combine") + 1]
-                item2 = parts[parts.index("+") + 1]
-            if not item1 or not item2:
-                return "Please specify two items to combine."
-            return f"You attempt to combine {item1} with {item2}."
-        return "Please specify two items to combine."
-
-    def examine_self(self, command):
-        return "You examine yourself closely."
-
-    def show_stats(self, command):
-        return "Your stats:"
-
-    def use(self, command):
-        item_name = command.split("use")[-1].strip()
-        if not item_name:
-            return "Please specify an item to use."
-        return f"You use the {item_name}."
-
-    def pick_lock(self, command):
-        item_name = command.split("lock of")[-1].strip()
-        if not item_name:
-            return "Please specify an item to pick the lock of."
-        return f"You attempt to pick the lock of the {item_name}."
-
-    def read(self, command):
-        item_name = command.split("read")[-1].strip()
-        if not item_name:
-            return "Please specify an item to read."
-        return f"You start reading the {item_name}."
-
-    def help(self, command):
-        return (
-            "Available commands:\n"
-            "explore - Look around the area.\n"
-            "look at [item] - Examine a specific item.\n"
-            "look - Look around the area.\n"
-            "take [item] - Pick up an item.\n"
-            "open [item] - Open an item.\n"
-            "close [item] - Close an item.\n"
-            "equip [item] - Equip an item.\n"
-            "unequip [item] - Unequip an item.\n"
-            "talk to [character] - Talk to a character.\n"
-            "give [item] to [character] - Give an item to a character.\n"
-            "fight [character] - Fight a character.\n"
-            "attack [character] - Attack a character.\n"
-            "hit [target] - Hit a target.\n"
-            "push [target] - Push a target.\n"
-            "pull [target] - Pull a target.\n"
-            "exit - Look for a way out of the room.\n"
-            "go to [exit] - Go to a specific exit.\n"
-            "inventory - Check your inventory.\n"
-            "examine [item] - Examine an item closely.\n"
-            "combine [item1] with [item2] - Combine two items.\n"
-            "craft [item] - Craft an item.\n"
-            "merge - Combine two items.\n"
-            "examine yourself - Examine yourself closely.\n"
-            "look at yourself - Examine yourself closely.\n"
-            "stats - Show your stats.\n"
-            "use [item] - Use an item.\n"
-            "pick lock of [item] - Pick the lock of an item.\n"
-            "lockpick - Pick the lock of an item.\n"
-            "read [item] - Read an item.\n"
-            "help - Show this help message."
-        )
+    def extract_parameter(self, words, action_name, param):
+        if param == "item_name":
+            # Assuming item name follows the verb
+            index = words.index(action_name) + 1
+            if index < len(words):
+                return ' '.join(words[index:])
+            else:
+                return None
+        elif param == "character_name":
+            # Assuming character name follows the verb
+            index = words.index(action_name) + 1
+            if index < len(words):
+                return ' '.join(words[index:])
+            else:
+                return None
+        elif param == "item1_name":
+            # Assuming item1 name follows the verb
+            index = words.index(action_name) + 1
+            if index < len(words):
+                return ' '.join(words[index:])
+            else:
+                return None
+        elif param == "item2_name":
+            # Assuming item2 name follows the verb
+            index = words.index(action_name) + 1
+            if index < len(words):
+                return ' '.join(words[index:])
+            else:
+                return None
+        # Add more parameter extraction logic if needed
+        return None

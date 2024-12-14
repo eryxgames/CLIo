@@ -1,13 +1,16 @@
 import json
 import os
 import re
+import random
+import time
+from engine.parser import Parser
 from engine.inventory import Inventory
 from engine.battle_system import BattleSystem
 from engine.media_player import MediaPlayer
 from engine.save_load import SaveLoad
 
 class GameEngine:
-    def __init__(self, config_file):
+    def __init__(self, config_file, media_player, parser):
         self.config = self.load_config(config_file)
         self.scenes = self.load_data(self.config["scenes_file"])
         self.items = self.load_data(self.config["items_file"])
@@ -36,6 +39,47 @@ class GameEngine:
             "That command is unclear.",
             "I need more information to proceed."
         ]
+        self.media_player = media_player
+        self.parser = parser  # Initialize the Parser
+
+    def process_command(self, command):
+        if not command.strip():
+            return
+        if command == "quit":
+            confirm = input("Are you sure you want to quit your adventure? (yes/no): ").lower()
+            if confirm == "yes":
+                print("Thank you for playing! Goodbye!")
+                exit()
+            else:
+                print("Continuing the adventure...")
+        elif command == "save":
+            save_game_state = {
+                "current_scene": self.current_scene["id"],
+                "inventory": self.inventory.items,
+                "player_stats": self.player_stats,
+                "story_progress": self.story_progress
+            }
+            SaveLoad.save_game(save_game_state, "savegame.json")
+        elif command == "load":
+            saved_state = SaveLoad.load_game("savegame.json")
+            self.load_game_state(saved_state)
+        else:
+            parsed = self.parser.parse_command(command)
+            action = parsed.get("action")
+            if action == "invalid":
+                print(parsed.get("message"))
+            else:
+                handler = getattr(self, action, None)
+                if handler:
+                    params = parsed.get("parameters", {})
+                    handler(**params)
+                else:
+                    print("Unknown action.")
+
+        if self.check_game_over():
+            return
+
+        self.check_conditions()
 
     def load_config(self, filename):
         with open(filename, 'r') as f:
@@ -51,13 +95,13 @@ class GameEngine:
             self.current_scene = next_scene
             music_file = next_scene.get("music", "")
             if music_file and os.path.exists(music_file):
-                media_player.play_music(music_file)
+                MediaPlayer.play_music(music_file)
             else:
                 print("The sound of silence!")
             if "sound_effects" in next_scene and "enter" in next_scene["sound_effects"]:
                 sound_effect_file = next_scene["sound_effects"]["enter"]
                 if sound_effect_file and os.path.exists(sound_effect_file):
-                    media_player.play_sound_effect(sound_effect_file)
+                    MediaPlayer.play_sound_effect(sound_effect_file)
                 else:
                     print("The sound of silence!")
             print(self.current_scene["description"])
@@ -82,11 +126,12 @@ class GameEngine:
             print("You notice the following characters in the scene:")
             for character_id in self.current_scene["characters"]:
                 character = self.characters[character_id]
-                greeting = character.get("greeting", character["dialogue"]["greeting"])
+                greeting = character.get("greeting", character["dialogue"].get("greeting", "No greeting available."))
                 print(f"- {character['name']}: {greeting}")
                 random_text = self.get_random_character_text(character_id)
                 if random_text:
                     print(f"  {random_text}")
+
 
     def get_random_character_text(self, character_id):
         character = self.characters[character_id]
@@ -504,15 +549,7 @@ class GameEngine:
     def repair_item(self, item_name):
         item = self.find_item_by_name(item_name)
         if item and item.get("repairable", False):
-            repair_item = item.get("repair_item")
-            if repair_item in self.inventory.items:
-                self.inventory.remove_item(repair_item)
-                new_item_id = item.get("repaired_item_id")
-                new_item = self.items[new_item_id]
-                print(f"You repair the {item['name']} using the {self.items[repair_item]['name']} and create a {new_item['name']}.")
-                self.inventory.add_item(new_item_id, self.items)
-            else:
-                print(f"You don't have the {self.items[repair_item]['name']} to repair the {item['name']}.")
+            self.inventory.repair_item(item_name, self.items)
         else:
             print("Item not found in the game data or cannot be repaired.")
 
@@ -561,12 +598,6 @@ class GameEngine:
             print("\n")
             time.sleep(1)  # Pause between paragraphs
 
-    def get_random_event(self):
-        random_events = self.current_scene.get("random_events", [])
-        if random_events:
-            return random.choice(random_events)
-        return ""
-
     def repair_communicator(self):
         if "energy_cells" in self.inventory.items:
             self.inventory.remove_item("energy_cells")
@@ -574,114 +605,9 @@ class GameEngine:
         else:
             print("You don't have energy cells to repair the communicator.")
 
-    def provide_hint(self):
-        if self.hints_used < self.max_hints:
-            hint = self.current_scene.get("hint", "No hint available.")
-            print(hint)
-            self.hints_used += 1
-        else:
-            print("You have used all your hints.")
-
-    def report_characters_in_scene(self):
-        if "characters" in self.current_scene and self.current_scene["characters"]:
-            print("You notice the following characters in the scene:")
-            for character_id in self.current_scene["characters"]:
-                character = self.characters[character_id]
-                greeting = character.get("greeting", character["dialogue"]["greeting"])
-                print(f"- {character['name']}: {greeting}")
-
-    def process_command(self, command):
-        if not command.strip():
-            return
-        if command == "quit":
-            confirm = input("Are you sure you want to quit your adventure? (yes/no): ").lower()
-            if confirm == "yes":
-                print("Thank you for playing! Goodbye!")
-                exit()
-            else:
-                print("Continuing the adventure...")
-        elif command == "save":
-            save_game_state = {
-                "current_scene": self.current_scene["id"],
-                "inventory": self.inventory.items,
-                "player_stats": self.player_stats,
-                "story_progress": self.story_progress
-            }
-            save_load.save_game(save_game_state, "savegame.json")
-        elif command == "load":
-            saved_state = save_load.load_game("savegame.json")
-            self.load_game_state(saved_state)
-        elif command.startswith("use "):
-            item_name = command.split("use")[-1].strip()
-            self.use_item(item_name)
-        elif command.startswith("equip "):
-            item_name = command.split("equip")[-1].strip()
-            self.equip_item(item_name)
-        elif command.startswith("unequip "):
-            item_name = command.split("unequip")[-1].strip()
-            self.unequip_item(item_name)
-        elif command.startswith("open "):
-            item_name = command.split("open")[-1].strip()
-            self.interact_with_item(item_name)
-        elif command.startswith("pick lock of "):
-            item_name = command.split("lock of")[-1].strip()
-            self.interact_with_item(item_name)
-        elif command == "hint":
-            self.provide_hint()
-        elif command.startswith("read "):
-            item_name = command.split("read")[-1].strip()
-            self.read_item(item_name)
-        elif command.startswith("look at "):
-            target_name = command.split("at")[-1].strip()
-            self.look_at(target_name)
-        elif command.startswith("take "):
-            item_name = command.split("take")[-1].strip()
-            self.take_item(item_name)
-        elif command.startswith("talk to "):
-            character_name = command.split("to")[-1].strip()
-            self.talk_to_character(character_name)
-        elif command.startswith("give "):
-            parts = command.split()
-            item_name = parts[parts.index("give") + 1]
-            character_name = parts[parts.index("to") + 1]
-            self.give_item_to_character(item_name, character_name)
-        elif command.startswith("fight ") or command.startswith("attack "):
-            character_name = command.split()[-1].strip()
-            self.fight_character(character_name)
-        elif command.startswith("exit "):
-            self.exit_room()
-        elif command == "inventory":
-            self.list_inventory()
-        elif command.startswith("examine "):
-            item_name = command.split("examine")[-1].strip()
-            self.examine_item(item_name)
-        elif command.startswith("combine "):
-            parts = command.split()
-            if "with" in parts:
-                item1 = parts[parts.index("combine") + 1]
-                item2 = parts[parts.index("with") + 1]
-            elif "+" in parts:
-                item1 = parts[parts.index("combine") + 1]
-                item2 = parts[parts.index("+") + 1]
-            self.combine_items(item1, item2)
-        elif command == "examine yourself":
-            self.examine_self()
-        elif command == "stats":
-            self.show_stats()
-        elif command.startswith("repair "):
-            item_name = command.split("repair")[-1].strip()
-            self.repair_item(item_name)
-        else:
-            print("I don't understand that command. Try to use the exact command.")
-
-        if self.check_game_over():
-            return
-
-        self.check_conditions()
-
     def load_game_state(self, saved_state):
         self.current_scene = next(scene for scene in self.scenes if scene["id"] == saved_state["current_scene"])
         self.inventory.items = saved_state["inventory"]
         self.player_stats = saved_state["player_stats"]
         self.story_progress = saved_state["story_progress"]
-        media_player.print_with_delay(self.current_scene["description"])
+        MediaPlayer.print_with_delay(self.current_scene["description"])

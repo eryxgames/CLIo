@@ -5,6 +5,7 @@ environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 from engine.game_engine import GameEngine
 from engine.save_load import SaveLoad
 from engine.media_player import MediaPlayer
+from engine.parser import Parser
 
 def load_data(filename):
     with open(filename, 'r') as f:
@@ -21,9 +22,10 @@ def main():
     print("================================")
     print("                                ")
 
-    game_engine = GameEngine('game_files/config.json')
     media_player = MediaPlayer()
     save_load = SaveLoad()
+    parser = Parser()  # Initialize the Parser
+    game_engine = GameEngine('game_files/config.json', media_player, parser)  # Pass the parser to GameEngine
 
     media_player.print_with_delay(game_engine.current_scene["description"])
     game_engine.display_story_text("intro")

@@ -75,7 +75,7 @@ class Inventory:
             if combination in items_data.get("combinations", {}):
                 new_item_id = items_data["combinations"][combination]
                 new_item = items_data[new_item_id]
-                print(f"You combine {item1['name']} and {item2['name']} to create {new_item['name']}.")
+                print(f"You combine {items_data[item1_id]['name']} and {items_data[item2_id]['name']} to create {new_item['name']}.")
                 self.items.remove(item1_id)
                 self.items.remove(item2_id)
                 self.add_item(new_item_id, items_data)

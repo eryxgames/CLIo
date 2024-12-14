@@ -115,19 +115,19 @@ class Parser:
     def hit(self, command):
         target_name = command.split("hit")[-1].strip()
         if not target_name:
-            return "Pull (hit, push) what exactly?"
+            return "Please specify a target to hit."
         return f"You hit the {target_name}."
 
     def push(self, command):
         target_name = command.split("push")[-1].strip()
         if not target_name:
-            return "Nothing to push (hit,pull)"
+            return "Please specify a target to push."
         return f"You push the {target_name}."
 
     def pull(self, command):
         target_name = command.split("pull")[-1].strip()
         if not target_name:
-            return "Pull (hit, push) what exactly?"
+            return "Please specify a target to pull."
         return f"You pull the {target_name}."
 
     def exit_room(self, command):

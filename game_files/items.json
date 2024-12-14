@@ -22,12 +22,14 @@
     "energy_cells": {
         "name": "Energy Cells",
         "description": "High-energy cells for powering devices.",
-        "usable": true
+        "usable": false,
+        "equippable": false
     },
     "coolant_canister": {
         "name": "Coolant Canister",
         "description": "A canister of coolant to reduce heat.",
-        "usable": true
+        "usable": false,
+        "equippable": false
     },
     "ship_log": {
         "name": "Ship Log",
@@ -65,7 +67,6 @@
     "metal_suitcase": {
         "name": "Metal Suitcase",
         "description": "A sturdy metal suitcase that seems to be locked.",
-        "type": "container",
         "usable": false,
         "interactive": true,
         "current_state": "locked",
@@ -126,10 +127,8 @@
     "bent_wire": {
         "name": "Bent Wire",
         "description": "A bent wire that might be useful for picking locks.",
-        "usable": true,
-        "effect": {
-            "unlock": true
-        }
+        "usable": false,
+        "equippable": false
     },
     "chx_cargo_hauler_manual": {
         "name": "CHX Cargo Hauler Manual",
@@ -199,7 +198,7 @@
     },
     "red_apple": {
         "name": "Red Apple",
-        "description": "A shiny red apple.",
+        "description": "A vibrant red apple.",
         "usable": true,
         "effect": {
             "health": 10
@@ -254,7 +253,7 @@
             "attack": 15
         },
         "components": ["fission_relay", "screwdriver"]
-    },  
+    },
     "torn_research_paper": {
         "name": "Torn Research Paper",
         "description": "A torn research paper with notes on quantum drive traveling and stained from unidentified liquid, hopefully coffee.",

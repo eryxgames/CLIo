@@ -25,11 +25,17 @@
     },
     "2": {
         "character": "Captain",
-        "text": "Great! We're counting on you. Here's your mission brief.",
+        "text": "Great! We're counting on you. Here's your mission brief. Codename: S.A.M.P.L.E.",
         "responses": [
             {
                 "text": "Thank you, Captain.",
                 "node_id": "4"
+            }
+        ],
+        "events": [
+            {
+                "type": "give_item",
+                "item": "sample"
             }
         ]
     },

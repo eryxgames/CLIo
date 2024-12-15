@@ -5,8 +5,7 @@
         "responses": [
             {
                 "text": "Yes, I need a toolkit.",
-                "node_id": "2",
-                "give_item": "request_toolkit"
+                "node_id": "2"
             },
             {
                 "text": "No, thanks.",

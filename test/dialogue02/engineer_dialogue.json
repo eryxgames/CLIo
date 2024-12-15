@@ -1,0 +1,43 @@
+{
+    "1": {
+        "character": "Engineer",
+        "text": "Hey there! Need any help with your equipment?",
+        "responses": [
+            {
+                "text": "Yes, I need a toolkit.",
+                "node_id": "2",
+                "give_item": "request_toolkit"
+            },
+            {
+                "text": "No, thanks.",
+                "node_id": "5"
+            }
+        ]
+    },
+    "2": {
+        "character": "Engineer",
+        "text": "Sure thing! Here's your toolkit.",
+        "responses": [
+            {
+                "text": "Thanks a lot!",
+                "node_id": "3"
+            }
+        ],
+        "events": [
+            {
+                "type": "give_item",
+                "item": "toolkit"
+            }
+        ]
+    },
+    "3": {
+        "character": "Engineer",
+        "text": "Anytime! Stay safe out there.",
+        "responses": []
+    },
+    "5": {
+        "character": "Engineer",
+        "text": "Alright, let me know if you need anything.",
+        "responses": []
+    }
+}

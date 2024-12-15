@@ -1,0 +1,56 @@
+{
+    "1": {
+        "character": "Captain",
+        "text": "Welcome aboard, Explorer! Ready to embark on a new mission?",
+        "responses": [
+            {
+                "text": "Absolutely, let's do this!",
+                "node_id": "2"
+            },
+            {
+                "text": "I need to prepare first.",
+                "node_id": "3"
+            },
+            {
+                "text": "Actually, I'm not interested in this mission.",
+                "node_id": "8"
+            }
+        ],
+        "events": [
+            {
+                "type": "give_item",
+                "item": "spacesuit"
+            }
+        ]
+    },
+    "2": {
+        "character": "Captain",
+        "text": "Great! We're counting on you. Here's your mission brief.",
+        "responses": [
+            {
+                "text": "Thank you, Captain.",
+                "node_id": "4"
+            }
+        ]
+    },
+    "3": {
+        "character": "Captain",
+        "text": "Take all the time you need. Let me know when you're ready.",
+        "responses": [
+            {
+                "text": "I'm ready now.",
+                "node_id": "2"
+            }
+        ]
+    },
+    "4": {
+        "character": "Captain",
+        "text": "Good luck out there!",
+        "responses": []
+    },
+    "8": {
+        "character": "Captain",
+        "text": "I'm sorry to hear that. Maybe another time.",
+        "responses": []
+    }
+}

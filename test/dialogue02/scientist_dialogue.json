@@ -1,0 +1,43 @@
+{
+    "1": {
+        "character": "Scientist",
+        "text": "Greetings! Have you found any interesting samples yet?",
+        "responses": [
+            {
+                "text": "Not yet, but I'm looking.",
+                "node_id": "2"
+            },
+            {
+                "text": "Yes, I have a sample for you.",
+                "node_id": "3",
+                "give_item": "sample"
+            }
+        ]
+    },
+    "2": {
+        "character": "Scientist",
+        "text": "Keep your eyes open then. There are many surprises out there.",
+        "responses": []
+    },
+    "3": {
+        "character": "Scientist",
+        "text": "Oh, that's fascinating! Thank you so much.",
+        "responses": [
+            {
+                "text": "You're welcome.",
+                "node_id": "4"
+            }
+        ],
+        "events": [
+            {
+                "type": "give_item",
+                "item": "analysis_report"
+            }
+        ]
+    },
+    "4": {
+        "character": "Scientist",
+        "text": "I'll get right to work on this. Safe travels!",
+        "responses": []
+    }
+}

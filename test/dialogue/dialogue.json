@@ -1,0 +1,91 @@
+{
+    "1": {
+      "character": "Captain",
+      "text": "Welcome aboard, Explorer! Ready to embark on a new mission?",
+      "responses": [
+        {
+          "text": "Absolutely, let's do this!",
+          "node_id": "2"
+        },
+        {
+          "text": "I need to prepare first.",
+          "node_id": "3"
+        }
+      ],
+      "events": [
+        {
+          "type": "give_item",
+          "item": "spacesuit"
+        }
+      ]
+    },
+    "2": {
+      "character": "Captain",
+      "text": "Great! Your first task is to check the cargo hold for any damages.",
+      "responses": [
+        {
+          "text": "On my way.",
+          "node_id": "4"
+        }
+      ],
+      "events": [
+        {
+          "type": "set_attribute",
+          "attribute": "mission_started",
+          "value": true
+        }
+      ]
+    },
+    "3": {
+      "character": "Captain",
+      "text": "Take your time. Let me know when you're ready.",
+      "responses": [
+        {
+          "text": "I'm ready now.",
+          "node_id": "2"
+        }
+      ]
+    },
+    "4": {
+      "character": "Explorer",
+      "text": "Cargo hold looks fine from here.",
+      "responses": [
+        {
+          "text": "Anything else I can help with?",
+          "node_id": "5"
+        }
+      ]
+    },
+    "5": {
+      "character": "Captain",
+      "text": "Yes, please head to the bridge and assist with the navigation.",
+      "responses": [
+        {
+          "text": "On my way to the bridge.",
+          "node_id": "6"
+        }
+      ]
+    },
+    "6": {
+      "character": "Explorer",
+      "text": "Navigation systems are all set.",
+      "responses": [
+        {
+          "text": "Great work!",
+          "node_id": "7"
+        }
+      ],
+      "events": [
+        {
+          "type": "set_attribute",
+          "attribute": "mission_complete",
+          "value": true
+        }
+      ]
+    },
+    "7": {
+      "character": "Captain",
+      "text": "Excellent job, Explorer! You've completed the mission successfully.",
+      "responses": []
+    }
+  }

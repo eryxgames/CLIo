@@ -170,14 +170,14 @@ class GameEngine:
                         else:
                             print(f"You open the {passive_item['name']}.")
                             passive_item["current_state"] = state_data.get("next_state", "open")
-                            if "contents" in passive_item:
+                            if "contents" in passive_item and passive_item["current_state"] == "open":
                                 for content_item in passive_item["contents"]:
                                     self.current_scene["items"].append(content_item)
                                     print(f"You find a {self.items[content_item]['name']} inside.")
                     elif action == "unlock":
-                        if passive_item["unlock_required_item"] == "passcode":
+                        if passive_item.get("unlock_required_item") == "passcode":
                             passcode = input("Enter the passcode to unlock the item: ")
-                            if passcode == "321":
+                            if passcode == passive_item.get("passcode"):
                                 print(f"You enter the correct passcode and unlock the {passive_item['name']}.")
                                 passive_item["locked"] = False
                                 passive_item["current_state"] = state_data.get("next_state", "closed")
@@ -428,8 +428,16 @@ class GameEngine:
             else:
                 print(exit["block_text"])
         elif exit.get("locked", False):
-            required_item = exit["required_item"]
-            if required_item in self.inventory.items:
+            required_item = exit.get("required_item")
+            if required_item == "passcode":
+                passcode = input("Enter the passcode to unlock the door: ")
+                if passcode == exit.get("passcode"):
+                    print(exit["unlock_text"])
+                    exit["locked"] = False  # Ensure the door stays unlocked
+                    self.change_scene(exit["scene_id"])
+                else:
+                    print("Incorrect passcode. The door remains locked.")
+            elif required_item in self.inventory.items:
                 print(exit["unlock_text"])
                 if self.items[required_item].get("consumable", False):
                     self.inventory.remove_item(required_item)
@@ -509,7 +517,9 @@ class GameEngine:
                     "description": item.get("description", "No description available."),
                     "usable": item.get("usable", False),
                     "interactive": item.get("interactive", False),
-                    "states": item.get("states", {})
+                    "states": item.get("states", {}),
+                    "readable_item": item.get("readable_item", None),
+                    "read_speed": item.get("read_speed", 0.05)
                 }
         return None
 
@@ -626,12 +636,13 @@ class GameEngine:
 
     def read_item(self, item_name):
         item = self.find_item_by_name(item_name)
-        if item and "readable_item" in item and item["readable_item"]:
+        if item and "readable_item" in item:
             text = item["readable_item"]
             print(f"You start reading the {item['name']}:")
-            self.print_with_delay(text)
+            self.print_with_delay(text, item.get("read_speed", 0.05))
         else:
             print(random.choice(self.item_not_found_messages))
+
 
     def look_at(self, target_name):
         if not target_name:
@@ -660,7 +671,9 @@ class GameEngine:
         for item_id in self.current_scene.get("passive_items", []):
             item = self.items[item_id]
             if target_name in item["name"].lower():
-                print(item["description"])
+                current_state = item.get("current_state", "default")
+                state_data = item["states"].get(current_state, {})
+                print(state_data.get("description", "No description available."))
                 return
 
         # Finally check items in inventory
@@ -681,6 +694,7 @@ class GameEngine:
                 time.sleep(delay)
             print("\n")
             time.sleep(1)  # Pause between paragraphs
+
 
     def repair_communicator(self):
         if "energy_cells" in self.inventory.items:

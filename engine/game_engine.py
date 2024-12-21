@@ -18,6 +18,7 @@ class GameEngine:
         self.story_texts = self.load_data(self.config["story_texts_file"])
         self.current_scene = next(scene for scene in self.scenes if scene["id"] == self.config["initial_scene"])
         self.inventory = Inventory()
+        self.character_crafting_inventories = {}
         self.player_stats = self.config["player_stats"]
         self.story_progress = {}
         self.hints_used = 0
@@ -439,16 +440,15 @@ class GameEngine:
             print("No dialogue options available.")
 
     def give_item_to_character(self, item_name, character_name):
-        print(f"Trying to give {item_name} to {character_name}")
+        """Enhanced give item handler with crafting support."""
         item = self.find_item_by_name(item_name)
-        print(f"Found item: {item}")
         if not item:
             print("Item not found in the game data.")
             return
+            
         if item["id"] not in self.inventory.items:
             print(f"{item['name']} not in your inventory.")
             return
-        print(f"{item['name']} is in your inventory.")
 
         # Find the character in the current scene
         matching_characters = [
@@ -463,43 +463,64 @@ class GameEngine:
         character_id = matching_characters[0]
         character = self.characters[character_id]
 
-        # Handle NPC-specific interactions
-        if "npc_craftable" in item:
-            npc_craft_data = item["npc_craftable"]
-            if npc_craft_data["crafter"] == character_id:
-                required_items = set(npc_craft_data["required_items"])
-                if not hasattr(character, "received_items"):
-                    character.received_items = set()
-                character.received_items.add(item["id"])
-                if required_items.issubset(character.received_items):
-                    print(npc_craft_data["success_message"])
-                    for req_item in required_items:
-                        self.inventory.remove_item(req_item)
-                    self.inventory.add_item(item["id"], self.items)
-                    print(npc_craft_data["dialogue_response"])
-                    del character.received_items  # Reset received items
-                else:
-                    print(f"{character['name']} takes the {item['name']} and waits for other required items.")
-            else:
-                print("This NPC cannot craft with this item.")
-        else:
-            print("Better not give that away yet.")
-            self.inventory.add_item(item["id"], self.items)  # Return the item to player
-            
+        # Initialize crafting inventory if needed
+        if character_id not in self.character_crafting_inventories:
+            self.character_crafting_inventories[character_id] = set()
+
+        # Handle craftable items
+        for craftable_id, craftable_item in self.items.items():
+            if "npc_craftable" in craftable_item:
+                craft_data = craftable_item["npc_craftable"]
+                
+                # Check if this character is the crafter
+                if craft_data["crafter"] == character_id:
+                    # Add the given item to crafting inventory
+                    self.character_crafting_inventories[character_id].add(item["id"])
+                    self.inventory.remove_item(item["id"])
+                    print(f"{character['name']} takes the {item['name']}.")
+
+                    # Check if all required items are provided
+                    required_items = set(craft_data["required_items"])
+                    if required_items.issubset(self.character_crafting_inventories[character_id]):
+                        # Craft the item
+                        print(craft_data["success_message"])
+                        
+                        # Clear the crafting inventory
+                        self.character_crafting_inventories[character_id].clear()
+                        
+                        # Add the crafted item to player's inventory
+                        self.inventory.add_item(craftable_id, self.items)
+                        print(craft_data["dialogue_response"])
+                    else:
+                        # List remaining required items
+                        remaining_items = required_items - self.character_crafting_inventories[character_id]
+                        remaining_names = [self.items[item_id]["name"] for item_id in remaining_items]
+                        print(f"The {character['name']} still needs: {', '.join(remaining_names)}")
+                    return
+
+        print(f"{character['name']} doesn't need this item.")
+        self.inventory.add_item(item["id"], self.items)  # Return the item to player
+        
     def handle_dialogue_option(self, character, option):
-        """Handle dialogue options that might result in giving items to the player."""
+        """Enhanced dialogue handler with crafting support."""
         character_id = character["id"]
+        
+        # Handle dialogue rewards
         if "dialogue_rewards" in character and option in character["dialogue_rewards"]:
             reward_data = character["dialogue_rewards"][option]
             if "required_progress" in reward_data:
                 if not self.story_progress.get(reward_data["required_progress"]):
                     print(reward_data.get("failure_message", "You can't do that yet."))
                     return
-
+            
             # Give the reward item
             item_id = reward_data["item"]
             print(reward_data.get("success_message", f"{character['name']} gives you a {self.items[item_id]['name']}."))
             self.inventory.add_item(item_id, self.items)
+        
+        # Initialize crafting inventory for the character if needed
+        if character_id not in self.character_crafting_inventories:
+            self.character_crafting_inventories[character_id] = set()
 
     def fight_character(self, character_name):
         if not character_name:

@@ -29,7 +29,7 @@
       "defense": 5
     }
   },
-  "friendly_robot": {
+  "tester": {
     "id": "friendly_robot",
     "name": "Friendly Robot",
     "description": "A helpful robot willing to assist.",
@@ -53,9 +53,9 @@
     },
     "greeting": "A friendly robot greets you with a cheerful beep."
   },
-  "friendly_robot2": {
-    "id": "friendly_robot2",
-    "name": "Friendly Robot2",
+  "friendly_robot": {
+    "id": "friendly_robot",
+    "name": "Friendly Robot",
     "description": "A helpful robot willing to assist.",
     "type": "friendly",
     "dialogue": {
@@ -64,9 +64,17 @@
       "thanks": "You're welcome! Safe travels."
     },
     "dialogue_options": {
-      "Ask for help": "What do you need help with?",
-      "Repair communicator": "friendly_robot_repair"
+      "Ask for help": "I can craft you something useful if you bring me the right components.",
+      "Check systems": "Affirmative... All systems nominal. How can I assist you?"
     },
+    "dialogue_rewards": {
+      "Complete mission": {
+        "required_progress": "mission_complete",
+        "item": "passcard",
+        "success_message": "Well done! Here's a maintenance passcard for your help.",
+        "failure_message": "Complete your mission first, and I'll reward you appropriately."
+      }
+    },    
     "interactions": {
       "talk": "friendly_robot_greet",
       "give_energy_cells": "friendly_robot_repair"

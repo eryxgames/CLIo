@@ -660,7 +660,9 @@ class GameEngine:
         for item_id in self.current_scene.get("passive_items", []):
             item = self.items[item_id]
             if target_name in item["name"].lower():
-                print(item["description"])
+                current_state = item.get("current_state", "default")
+                state_data = item["states"].get(current_state, {})
+                print(state_data.get("description", "No description available."))
                 return
 
         # Finally check items in inventory

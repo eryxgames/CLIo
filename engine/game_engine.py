@@ -120,11 +120,35 @@ class GameEngine:
 
             moves_after = char.get("moves_after_commands", 5)
             moves_on_scene_change = char.get("moves_on_scene_change", False)
+            follow_player = char.get("follow_player", False)
 
-            if self.commands_since_last_move >= moves_after:
+            if follow_player:
+                self.move_character_to_player_scene(char_id)
+            elif self.commands_since_last_move >= moves_after:
                 self.move_character(char_id)
             elif moves_on_scene_change:
                 self.move_character(char_id)
+
+    def move_character_to_player_scene(self, char_id):
+        """Move a character to the player's current scene"""
+        character = self.characters[char_id]
+        current_scene = self.current_scene["id"]
+
+        # Find the current scene of the character
+        for scene in self.scenes:
+            if "characters" in scene and char_id in scene["characters"]:
+                scene["characters"].remove(char_id)
+                break
+
+        # Add the character to the player's current scene
+        for scene in self.scenes:
+            if scene["id"] == current_scene:
+                if "characters" not in scene:
+                    scene["characters"] = []
+                if char_id not in scene["characters"]:
+                    scene["characters"].append(char_id)
+                    print(f"\n{character['name']} follows you into the room.")
+                break
 
     def move_character(self, char_id):
         """Move a character to an adjacent scene"""

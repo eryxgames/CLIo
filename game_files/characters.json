@@ -6,16 +6,17 @@
     "movable": true,
     "initial_scene": "scene1",
     "moves_after_commands": 4,
-    "moves_on_scene_change": true,
+    "moves_on_scene_change": false,
+    "follow_player": false,
     "greeting": "The microbot acknowledges your presence with a gentle beep while continuing its cleaning duties.",
     "dialogue": {
-      "greet": "The microbot pauses its cleaning routine momentarily to face you.",
-      "options": {
-        "ask_about_ship": "The microbot projects a small hologram showing the ship's layout.",
-        "ask_about_cleaning": "It demonstrates its cleaning capabilities by quickly polishing a nearby surface.",
-        "ignore": "The microbot returns to its cleaning duties."
-      }
+      "greet": "The microbot pauses its cleaning routine momentarily to face you."
     },
+    "dialogue_options": {
+    "Ask about ship": "The microbot projects a small hologram showing the ship's layout. Unfortunately, the image dissapears too quickly for you to register any details.",
+    "Ask about cleaning": "It demonstrates its cleaning capabilities by quickly polishing a nearby surface.",
+    "Ignore": "The microbot returns to its cleaning duties."
+    },    
     "random_events": [
       "The microbot efficiently sweeps away some debris.",
       "A soft humming sound emanates from the microbot as it works.",
@@ -24,9 +25,9 @@
     "stats": {
       "health": 50,
       "attack": 0,
-      "defense": 5
-    }
-  },
+      "defense": 5    
+  }
+},
   "friendly_robot": {
     "name": "Friendly Robot",
     "description": "A helpful robot willing to assist.",

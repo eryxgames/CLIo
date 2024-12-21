@@ -64,36 +64,6 @@
             "attack": 20
         }
     },
-    "metal_suitcase": {
-        "name": "Metal Suitcase",
-        "description": "A sturdy metal suitcase that seems to be locked.",
-        "usable": false,
-        "interactive": true,
-        "current_state": "locked",
-        "states": {
-            "locked": {
-                "description": "The suitcase is locked.",
-                "action": "unlock",
-                "next_state": "closed"
-            },
-            "closed": {
-                "description": "The suitcase is closed.",
-                "action": "open",
-                "next_state": "open"
-            },
-            "open": {
-                "description": "The suitcase is open, revealing a Blue Apple.",
-                "action": "take",
-                "next_state": "empty"
-            },
-            "empty": {
-                "description": "The suitcase is empty.",
-                "action": null,
-                "next_state": null
-            }
-        },
-        "contents": ["blue_apple"]
-    },
     "rusty_metal_locker": {
         "name": "Rusty Metal Locker",
         "description": "A rusty metal locker that seems to be locked.",
@@ -123,6 +93,36 @@
             }
         },
         "contents": ["red_apple"]
+    },
+    "metal_suitcase": {
+        "name": "Metal Suitcase",
+        "description": "A sturdy metal suitcase that seems to be locked.",
+        "usable": false,
+        "interactive": true,
+        "current_state": "locked",
+        "states": {
+            "locked": {
+                "description": "The suitcase is locked.",
+                "action": "unlock",
+                "next_state": "closed"
+            },
+            "closed": {
+                "description": "The suitcase is closed.",
+                "action": "open",
+                "next_state": "open"
+            },
+            "open": {
+                "description": "The suitcase is open, revealing a Blue Apple.",
+                "action": "take",
+                "next_state": "empty"
+            },
+            "empty": {
+                "description": "The suitcase is empty.",
+                "action": null,
+                "next_state": null
+            }
+        },
+        "contents": ["blue_apple"]
     },
     "bent_wire": {
         "name": "Bent Wire",

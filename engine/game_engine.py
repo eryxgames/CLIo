@@ -517,7 +517,9 @@ class GameEngine:
                     "description": item.get("description", "No description available."),
                     "usable": item.get("usable", False),
                     "interactive": item.get("interactive", False),
-                    "states": item.get("states", {})
+                    "states": item.get("states", {}),
+                    "readable_item": item.get("readable_item", None),
+                    "read_speed": item.get("read_speed", 0.05)
                 }
         return None
 
@@ -634,12 +636,13 @@ class GameEngine:
 
     def read_item(self, item_name):
         item = self.find_item_by_name(item_name)
-        if item and "readable_item" in item and item["readable_item"]:
+        if item and "readable_item" in item:
             text = item["readable_item"]
             print(f"You start reading the {item['name']}:")
-            self.print_with_delay(text)
+            self.print_with_delay(text, item.get("read_speed", 0.05))
         else:
             print(random.choice(self.item_not_found_messages))
+
 
     def look_at(self, target_name):
         if not target_name:
@@ -691,6 +694,7 @@ class GameEngine:
                 time.sleep(delay)
             print("\n")
             time.sleep(1)  # Pause between paragraphs
+
 
     def repair_communicator(self):
         if "energy_cells" in self.inventory.items:

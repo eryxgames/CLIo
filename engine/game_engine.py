@@ -467,19 +467,29 @@ class GameEngine:
         if character_id not in self.character_crafting_inventories:
             self.character_crafting_inventories[character_id] = set()
 
-        # Handle craftable items
+        # First, find all craftable items this character can make
+        required_items_for_character = set()
         for craftable_id, craftable_item in self.items.items():
             if "npc_craftable" in craftable_item:
                 craft_data = craftable_item["npc_craftable"]
-                
-                # Check if this character is the crafter
                 if craft_data["crafter"] == character_id:
-                    # Add the given item to crafting inventory
-                    self.character_crafting_inventories[character_id].add(item["id"])
-                    self.inventory.remove_item(item["id"])
-                    print(f"{character['name']} takes the {item['name']}.")
+                    required_items_for_character.update(craft_data["required_items"])
 
-                    # Check if all required items are provided
+        # Check if the given item is actually needed by this character
+        if item["id"] not in required_items_for_character:
+            print(f"{character['name']} has no use for this item.")
+            return
+
+        # Add the item to crafting inventory and remove from player
+        self.character_crafting_inventories[character_id].add(item["id"])
+        self.inventory.remove_item(item["id"])
+        print(f"{character['name']} takes the {item['name']}.")
+
+        # Check each craftable item to see if we can craft anything
+        for craftable_id, craftable_item in self.items.items():
+            if "npc_craftable" in craftable_item:
+                craft_data = craftable_item["npc_craftable"]
+                if craft_data["crafter"] == character_id:
                     required_items = set(craft_data["required_items"])
                     if required_items.issubset(self.character_crafting_inventories[character_id]):
                         # Craft the item
@@ -495,11 +505,8 @@ class GameEngine:
                         # List remaining required items
                         remaining_items = required_items - self.character_crafting_inventories[character_id]
                         remaining_names = [self.items[item_id]["name"] for item_id in remaining_items]
-                        print(f"The {character['name']} still needs: {', '.join(remaining_names)}")
-                    return
-
-        print(f"{character['name']} doesn't need this item.")
-        self.inventory.add_item(item["id"], self.items)  # Return the item to player
+                        if remaining_names:
+                            print(f"The {character['name']} still needs: {', '.join(remaining_names)}")
         
     def handle_dialogue_option(self, character, option):
         """Enhanced dialogue handler with crafting support."""

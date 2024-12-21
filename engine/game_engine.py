@@ -133,7 +133,7 @@ class GameEngine:
             print("You notice the following characters in the scene:")
             for character_id in self.current_scene["characters"]:
                 character = self.characters[character_id]
-                greeting = character.get("greeting", character["dialogue"].get("greeting", "No greeting available."))
+                greeting = character.get("greeting", character["dialogue"].get("greet", "No greeting available."))
                 print(f"- {character['name']}: {greeting}")
                 random_text = self.get_random_character_text(character_id)
                 if random_text:
@@ -294,7 +294,7 @@ class GameEngine:
                 print(f"- {self.characters[char_id]['name']}")
 
     def start_dialogue(self, character):
-        greeting = character["dialogue"].get("greeting", "The character does not have a greeting.")
+        greeting = character["dialogue"].get("greet", character.get("greeting", "The character does not have a greeting."))
         print(greeting)
         options = character.get("dialogue_options", {})
         if options:
@@ -315,7 +315,6 @@ class GameEngine:
                 print("Invalid choice.")
         else:
             print("No dialogue options available.")
-
 
     def give_item_to_character(self, item_name, character_name):
         item = self.find_item_by_name(item_name)
@@ -622,7 +621,7 @@ class GameEngine:
             print("You notice the following characters in the scene:")
             for character_id in self.current_scene["characters"]:
                 character = self.characters[character_id]
-                greeting = character.get("greeting", character["dialogue"].get("greeting", "No greeting available."))
+                greeting = character.get("greeting", character["dialogue"].get("greet", "No greeting available."))
                 print(f"- {character['name']}: {greeting}")
 
     def read_item(self, item_name):
@@ -657,6 +656,13 @@ class GameEngine:
                 print(item["description"])
                 return
 
+        # Check interactive items in the current scene
+        for item_id in self.current_scene.get("passive_items", []):
+            item = self.items[item_id]
+            if target_name in item["name"].lower():
+                print(item["description"])
+                return
+
         # Finally check items in inventory
         for item_id in self.inventory.items:
             item = self.items[item_id]
@@ -665,6 +671,7 @@ class GameEngine:
                 return
 
         print("You don't see that here.")
+
 
     def print_with_delay(self, text, delay=0.05):
         paragraphs = text.split("\n\n")

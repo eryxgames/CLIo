@@ -51,7 +51,7 @@
         "description": "Log entries detailing the ship's journey.",
         "usable": false,
         "readable_item": "The ship log contains detailed entries of the ship's journey, including encounters with alien species and mysterious phenomena.\n\nThe first entry details the ship's departure from Earth, with the crew excited and hopeful.\n\nThe second entry describes a strange encounter with an unknown alien species, which left the crew baffled and slightly frightened.\n\nThe third entry talks about a mysterious phenomenon that caused the ship's systems to malfunction temporarily.",
-        "read_speed": 0.03  
+        "read_speed": 0.03
     },
     "spacesuit": {
         "name": "Spacesuit",
@@ -328,5 +328,31 @@
             "attack": 15
         },
         "components": ["broken_tool"]
+    },
+    "data_storage": {
+        "name": "Data Storage",
+        "description": "A data storage device containing important information.",
+        "usable": false
+    },
+    "blue_banana": {
+        "name": "Blue Banana",
+        "description": "A vibrant blue banana. It looks like plastic, and probably tastes like it too.",
+        "usable": true,
+        "effect": {
+            "health": 10
+        }
+    },
+    "blob_of_goo": {
+        "name": "Blob of Goo",
+        "description": "A mysterious blob of goo. It's squishy, sticky, and a bit gross.",
+        "usable": false
+    },
+    "red_orange": {
+        "name": "Red Orange",
+        "description": "A vibrant red orange. Looks a bit odd.",
+        "usable": true,
+        "effect": {
+            "health": 15
+        }
     }
 }

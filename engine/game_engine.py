@@ -440,7 +440,7 @@ class GameEngine:
             print("No dialogue options available.")
 
     def give_item_to_character(self, item_name, character_name):
-        """Enhanced give item handler with crafting support."""
+        """Enhanced give item handler with multiple interaction types."""
         item = self.find_item_by_name(item_name)
         if not item:
             print("Item not found in the game data.")
@@ -467,7 +467,7 @@ class GameEngine:
         if character_id not in self.character_crafting_inventories:
             self.character_crafting_inventories[character_id] = set()
 
-        # First, find all craftable items this character can make
+        # Check for crafting requirements first
         required_items_for_character = set()
         for craftable_id, craftable_item in self.items.items():
             if "npc_craftable" in craftable_item:
@@ -475,39 +475,83 @@ class GameEngine:
                 if craft_data["crafter"] == character_id:
                     required_items_for_character.update(craft_data["required_items"])
 
-        # Check if the given item is actually needed by this character
-        if item["id"] not in required_items_for_character:
+        # Check for item interactions defined in character
+        if "item_interactions" in character:
+            if item["id"] in character["item_interactions"]:
+                interaction = character["item_interactions"][item["id"]]
+                
+                # Handle different types of interactions
+                if interaction["type"] == "passage":
+                    # Item required to pass/leave
+                    print(interaction["response"])
+                    if interaction.get("consume_item", False):
+                        self.inventory.remove_item(item["id"])
+                    if "unlock_scene" in interaction:
+                        self.current_scene["exits"][interaction["unlock_scene"]]["blocked"] = False
+                    if "story_flag" in interaction:
+                        self.update_story_progress(interaction["story_flag"], True)
+                    return
+
+                elif interaction["type"] == "information":
+                    # Character provides information about the item
+                    print(interaction["response"])
+                    if "story_flag" in interaction:
+                        self.update_story_progress(interaction["story_flag"], True)
+                    return
+
+                elif interaction["type"] == "trade":
+                    # Trade item for another item
+                    print(interaction["response"])
+                    if interaction.get("consume_item", False):
+                        self.inventory.remove_item(item["id"])
+                    if "reward_item" in interaction:
+                        self.inventory.add_item(interaction["reward_item"], self.items)
+                    return
+
+                elif interaction["type"] == "quest":
+                    # Quest-related item interaction
+                    print(interaction["response"])
+                    if interaction.get("consume_item", False):
+                        self.inventory.remove_item(item["id"])
+                    if "quest_flag" in interaction:
+                        self.update_story_progress(interaction["quest_flag"], True)
+                    if "reward_item" in interaction:
+                        self.inventory.add_item(interaction["reward_item"], self.items)
+                    return
+                
+                elif interaction["type"] == "replicate":
+                    # Replicate item with comical errors
+                    print(interaction["response"])
+                    if "reward_item" in interaction:
+                        self.inventory.add_item(interaction["reward_item"], self.items)
+                    return
+                                
+        # If no special interaction found, check if it's a crafting item
+        if item["id"] in required_items_for_character:
+            # Handle crafting (existing crafting logic)
+            self.character_crafting_inventories[character_id].add(item["id"])
+            self.inventory.remove_item(item["id"])
+            print(f"{character['name']} takes the {item['name']}.")
+
+            # Check if we can craft anything
+            for craftable_id, craftable_item in self.items.items():
+                if "npc_craftable" in craftable_item:
+                    craft_data = craftable_item["npc_craftable"]
+                    if craft_data["crafter"] == character_id:
+                        required_items = set(craft_data["required_items"])
+                        if required_items.issubset(self.character_crafting_inventories[character_id]):
+                            print(craft_data["success_message"])
+                            self.character_crafting_inventories[character_id].clear()
+                            self.inventory.add_item(craftable_id, self.items)
+                            print(craft_data["dialogue_response"])
+                        else:
+                            remaining_items = required_items - self.character_crafting_inventories[character_id]
+                            remaining_names = [self.items[item_id]["name"] for item_id in remaining_items]
+                            if remaining_names:
+                                print(f"The {character['name']} still needs: {', '.join(remaining_names)}")
+        else:
             print(f"{character['name']} has no use for this item.")
-            return
 
-        # Add the item to crafting inventory and remove from player
-        self.character_crafting_inventories[character_id].add(item["id"])
-        self.inventory.remove_item(item["id"])
-        print(f"{character['name']} takes the {item['name']}.")
-
-        # Check each craftable item to see if we can craft anything
-        for craftable_id, craftable_item in self.items.items():
-            if "npc_craftable" in craftable_item:
-                craft_data = craftable_item["npc_craftable"]
-                if craft_data["crafter"] == character_id:
-                    required_items = set(craft_data["required_items"])
-                    if required_items.issubset(self.character_crafting_inventories[character_id]):
-                        # Craft the item
-                        print(craft_data["success_message"])
-                        
-                        # Clear the crafting inventory
-                        self.character_crafting_inventories[character_id].clear()
-                        
-                        # Add the crafted item to player's inventory
-                        self.inventory.add_item(craftable_id, self.items)
-                        print(craft_data["dialogue_response"])
-                    else:
-                        # List remaining required items
-                        remaining_items = required_items - self.character_crafting_inventories[character_id]
-                        remaining_names = [self.items[item_id]["name"] for item_id in remaining_items]
-                        if remaining_names:
-                            print(f"The {character['name']} still needs: {', '.join(remaining_names)}")
-        
     def handle_dialogue_option(self, character, option):
         """Enhanced dialogue handler with crafting support."""
         character_id = character["id"]

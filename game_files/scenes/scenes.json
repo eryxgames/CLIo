@@ -5,7 +5,7 @@
     "description": "You find yourself in the utility room of a decrepit, possibly abandoned spaceship.",
     "items": ["broken_communicator", "space_map", "bent_wire", "storage_room_key", "ship_log", "passcard", "fission_relay", "screwdriver", "broken_chip", "broken_tool", "item_one", "item_two"],
     "passive_items": ["metal_suitcase", "rusty_metal_locker", "glass_container"],
-    "characters": ["mutated_bugrat","friendly_robot"],
+    "characters": ["mutated_bugrat","friendly_robot", "cyber_nexus_terminal", "sentient_replicator"],
     "exits": [
       {
         "door_name": "Storage Room Door",

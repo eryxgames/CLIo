@@ -74,7 +74,7 @@
         "success_message": "Well done! Here's a maintenance passcard for your help.",
         "failure_message": "Complete your mission first, and I'll reward you appropriately."
       }
-    },    
+    },
     "interactions": {
       "talk": "friendly_robot_greet",
       "give_energy_cells": "friendly_robot_repair"
@@ -163,5 +163,88 @@
       "defense": 2
     },
     "greeting": "A small, mutated creature scurries around, hissing and baring its teeth."
+  },
+  "sentient_replicator": {
+    "id": "sentient_replicator",
+    "name": "Sentient Replicator",
+    "description": "A replicator, that accepts and works with items like blue_apple, red_apple, specimen, but with comical errors.",
+    "type": "neutral",
+    "dialogue": {
+      "greet": "Oh, another human. What do you want?",
+      "replicate": "Let me see what I can do with that."
+    },
+    "dialogue_options": {
+      "Ask about replication": "I can replicate items, but don't expect perfection. I can also analyze specimens. I am more of a scientist, you know.",
+      "Give item": "Let's see if I can replicate this item."
+    },
+    "item_interactions": {
+      "blue_apple": {
+        "type": "replicate",
+        "response": "I tried to replicate the blue apple, but it turned out to be a blue banana. Oops!",
+        "consume_item": true,
+        "reward_item": "blue_banana"
+      },
+      "red_apple": {
+        "type": "replicate",
+        "response": "I attempted to replicate the red apple. The result? A red orange. It even smells faintly of citrus. Do you perhaps have something… less… fruity?",
+        "consume_item": true,
+        "reward_item": "red_orange"
+      },
+      "specimen": {
+        "type": "replicate",
+        "response": "I tried to analyze the specimen, but it turned out to be a blob of goo. Oops!",
+        "consume_item": true,
+        "reward_item": "blob_of_goo"
+      }
+    },
+    "greeting": "This energy-matter replicator looks like a coffee machine designed by a committee of overly enthusiastic engineers who also happened to be obsessed with theoretical physics."
+  },
+  "cyber_nexus_terminal": {
+    "id": "cyber_nexus_terminal",
+    "name": "Cyber Nexus Terminal",
+    "description": "A sentient computer console, an apex of late millenium technology. It is equipped with a cracked scanner camera lens and data storage input slot.",
+    "type": "neutral",
+    "dialogue": {
+      "greet": "Ah, a human. What do you need?",
+      "help": "I can assist with technical issues, but don't waste my time."
+    },
+    "dialogue_options": {
+      "Ask for help": "I can assist with technical issues, but don't waste my time.",
+      "Give item": "Let's see if I can analyze this item."
+    },
+    "item_interactions": {
+      "ship_log": {
+        "type": "information",
+        "response": "Analyzing ship log... Log contains valuable information about the ship's journey. Data stored successfully.",
+        "consume_item": true,
+        "story_flag": "ship_log_analyzed"
+      },
+      "chx_cargo_hauler_manual": {
+        "type": "information",
+        "response": "Analyzing cargo manual... This manual is essential for understanding the ship's cargo system. Data stored successfully.",
+        "consume_item": true,
+        "story_flag": "cargo_manual_analyzed"
+      },
+      "torn_research_paper": {
+        "type": "information",
+        "response": "Analyzing research paper... This research paper is crucial for understanding the ship's anomalies. Data stored successfully.",
+        "consume_item": true,
+        "story_flag": "research_paper_analyzed"
+      },
+      "data_storage": {
+        "type": "information",
+        "response": "Accessing data storage... This data storage device probably once contained important information. Data is fragmented beyond recognition.",
+        "consume_item": true,
+        "story_flag": "data_storage_analyzed"
+      }
+    },
+    "greeting": "A sentient computer console blinks in the dark with its dusty, scratched screen.",
+    "random_events": [
+      "'Compiling... Compiling... Compiling...'",
+      "'Error: Segmentation fault (core dumped)'",
+      "'Warning: Deprecated function used. Update your code immediately!'",
+      "'...Access granted. Welcome, user with no admin rights.'",
+      "'...System security updates available. Press cancel to proceed...'"
+    ]
   }
 }

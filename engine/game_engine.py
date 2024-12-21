@@ -18,6 +18,7 @@ class GameEngine:
         self.story_texts = self.load_data(self.config["story_texts_file"])
         self.current_scene = next(scene for scene in self.scenes if scene["id"] == self.config["initial_scene"])
         self.inventory = Inventory()
+        self.character_crafting_inventories = {}
         self.player_stats = self.config["player_stats"]
         self.story_progress = {}
         self.hints_used = 0
@@ -432,37 +433,94 @@ class GameEngine:
                 selected_option = list(options.keys())[choice]
                 print(options[selected_option])
                 # Handle specific interactions based on the selected option
-                if selected_option == "repair_communicator":
-                    self.repair_item("broken_communicator")
-                elif selected_option == "calm_down":
-                    self.update_story_progress("hostile_droid_defeated", True)
-                    character["type"] = "neutral"
+                self.handle_dialogue_option(character, selected_option)
             else:
                 print("Invalid choice.")
         else:
             print("No dialogue options available.")
 
     def give_item_to_character(self, item_name, character_name):
+        """Enhanced give item handler with crafting support."""
         item = self.find_item_by_name(item_name)
-        if item and item["id"] in self.inventory.items:
-            matching_characters = [char for char in self.current_scene["characters"] if character_name.lower() in self.characters[char]["name"].lower()]
-            if len(matching_characters) == 1:
-                character_id = matching_characters[0]
-                character = self.characters[character_id]
-                if f"give_{item['id']}" in character["interactions"]:
-                    interaction = character["interactions"][f"give_{item['id']}"]
-                    print(interaction)
-                    # Logic to handle the interaction
-                    if interaction == "friendly_robot_repair":
-                        self.repair_item("broken_communicator")
-                    elif interaction == "hostile_droid_calm_down":
-                        self.update_story_progress("hostile_droid_defeated", True)
-                else:
-                    print("This character doesn't want that item.")
-            else:
-                print("Character not found in scene or multiple characters match your query.")
-        else:
-            print("Item not in inventory.")
+        if not item:
+            print("Item not found in the game data.")
+            return
+            
+        if item["id"] not in self.inventory.items:
+            print(f"{item['name']} not in your inventory.")
+            return
+
+        # Find the character in the current scene
+        matching_characters = [
+            char_id for char_id in self.current_scene.get("characters", [])
+            if character_name.lower() in self.characters[char_id]["name"].lower()
+        ]
+
+        if not matching_characters:
+            print("That character isn't here.")
+            return
+
+        character_id = matching_characters[0]
+        character = self.characters[character_id]
+
+        # Initialize crafting inventory if needed
+        if character_id not in self.character_crafting_inventories:
+            self.character_crafting_inventories[character_id] = set()
+
+        # Handle craftable items
+        for craftable_id, craftable_item in self.items.items():
+            if "npc_craftable" in craftable_item:
+                craft_data = craftable_item["npc_craftable"]
+                
+                # Check if this character is the crafter
+                if craft_data["crafter"] == character_id:
+                    # Add the given item to crafting inventory
+                    self.character_crafting_inventories[character_id].add(item["id"])
+                    self.inventory.remove_item(item["id"])
+                    print(f"{character['name']} takes the {item['name']}.")
+
+                    # Check if all required items are provided
+                    required_items = set(craft_data["required_items"])
+                    if required_items.issubset(self.character_crafting_inventories[character_id]):
+                        # Craft the item
+                        print(craft_data["success_message"])
+                        
+                        # Clear the crafting inventory
+                        self.character_crafting_inventories[character_id].clear()
+                        
+                        # Add the crafted item to player's inventory
+                        self.inventory.add_item(craftable_id, self.items)
+                        print(craft_data["dialogue_response"])
+                    else:
+                        # List remaining required items
+                        remaining_items = required_items - self.character_crafting_inventories[character_id]
+                        remaining_names = [self.items[item_id]["name"] for item_id in remaining_items]
+                        print(f"The {character['name']} still needs: {', '.join(remaining_names)}")
+                    return
+
+        print(f"{character['name']} doesn't need this item.")
+        self.inventory.add_item(item["id"], self.items)  # Return the item to player
+        
+    def handle_dialogue_option(self, character, option):
+        """Enhanced dialogue handler with crafting support."""
+        character_id = character["id"]
+        
+        # Handle dialogue rewards
+        if "dialogue_rewards" in character and option in character["dialogue_rewards"]:
+            reward_data = character["dialogue_rewards"][option]
+            if "required_progress" in reward_data:
+                if not self.story_progress.get(reward_data["required_progress"]):
+                    print(reward_data.get("failure_message", "You can't do that yet."))
+                    return
+            
+            # Give the reward item
+            item_id = reward_data["item"]
+            print(reward_data.get("success_message", f"{character['name']} gives you a {self.items[item_id]['name']}."))
+            self.inventory.add_item(item_id, self.items)
+        
+        # Initialize crafting inventory for the character if needed
+        if character_id not in self.character_crafting_inventories:
+            self.character_crafting_inventories[character_id] = set()
 
     def fight_character(self, character_name):
         if not character_name:
@@ -474,8 +532,7 @@ class GameEngine:
 
         # First try exact matches, then partial matches
         matching_characters = []
-        for char_id in self.current_scene.get("characters", []):
-            char = self.characters[char_id]
+        for char_id, char in self.characters.items():
             if char["name"].lower() == character_name:
                 matching_characters = [char_id]
                 break

@@ -1,10 +1,31 @@
 {
     "broken_communicator": {
+        "id": "broken_communicator",
         "name": "Broken Communicator",
         "description": "A damaged communicator that needs repair.",
         "usable": false,
         "readable_item": "The communicator is broken and needs repair. It has a label with instructions on how to repair it using energy cells."
-    },
+      },
+      "energy_cells": {
+        "id": "energy_cells",
+        "name": "Energy Cells",
+        "description": "High-energy cells for powering devices.",
+        "usable": false,
+        "equippable": false
+      },
+      "remote_control": {
+        "id": "remote_control",
+        "name": "Remote Control",
+        "description": "A sleek remote control device crafted from salvaged parts.",
+        "usable": true,
+        "equippable": false,
+        "npc_craftable": {
+          "crafter": "friendly_robot",
+          "required_items": ["energy_cells", "broken_communicator"],
+          "dialogue_response": "Here's your remote control, crafted from the parts you provided.",
+          "success_message": "The friendly robot combines the parts into a working remote control."
+        }
+      },
     "space_map": {
         "name": "Space Map",
         "description": "A map of nearby planets and coordinates.",
@@ -18,12 +39,6 @@
         "effect": {
             "health": 50
         }
-    },
-    "energy_cells": {
-        "name": "Energy Cells",
-        "description": "High-energy cells for powering devices.",
-        "usable": false,
-        "equippable": false
     },
     "coolant_canister": {
         "name": "Coolant Canister",
@@ -147,11 +162,6 @@
         "usable": false,
         "key": true,
         "consumable": true
-    },
-    "combinations": {
-        "broken_communicator + energy_cells": "repaired_communicator",
-        "first_aid_kit + coolant_canister": "advanced_medkit",
-        "item_one + item_two": "combined_item01"
     },
     "spaceship_console": {
         "name": "Spaceship Console",

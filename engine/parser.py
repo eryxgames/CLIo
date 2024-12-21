@@ -121,6 +121,23 @@ class Parser:
     def parse_command(self, command):
         command = command.lower().strip()
 
+        # Special case for "give" command
+        if command.startswith("give "):
+            remaining = command[5:].strip()
+            parts = remaining.split(" to ")
+            if len(parts) == 2:
+                item_name = parts[0].strip()
+                character_name = parts[1].strip()
+                return {
+                    "action": "give_item_to_character",
+                    "parameters": {"item_name": item_name, "character_name": character_name}
+                }
+            else:
+                return {
+                    "action": "invalid",
+                    "message": "Invalid give command. Use 'give [item_name] to [character_name]'."
+                }
+
         # Special case for exact matches first
         for action in self.actions:
             if command in action["names"]:

@@ -14,6 +14,15 @@
         "unlock_text": "You use the key to unlock the door.",
         "required_item": "storage_room_key",
         "scene_id": "scene2"
+      },
+      {
+        "door_name": "Pressurized Airlock",
+        "locked": true,
+        "lock_text": "The airlock is locked. You need the passcode to open it.",
+        "unlock_text": "You enter the correct passcode and the airlock opens.",
+        "required_item": "passcode",
+        "passcode": "EXIT",
+        "scene_id": "scene2"
       }
     ],
     "music": "music/cockpit_music.mp3",

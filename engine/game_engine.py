@@ -170,14 +170,14 @@ class GameEngine:
                         else:
                             print(f"You open the {passive_item['name']}.")
                             passive_item["current_state"] = state_data.get("next_state", "open")
-                            if "contents" in passive_item:
+                            if "contents" in passive_item and passive_item["current_state"] == "open":
                                 for content_item in passive_item["contents"]:
                                     self.current_scene["items"].append(content_item)
                                     print(f"You find a {self.items[content_item]['name']} inside.")
                     elif action == "unlock":
-                        if passive_item["unlock_required_item"] == "passcode":
+                        if passive_item.get("unlock_required_item") == "passcode":
                             passcode = input("Enter the passcode to unlock the item: ")
-                            if passcode == "321":
+                            if passcode == passive_item.get("passcode"):
                                 print(f"You enter the correct passcode and unlock the {passive_item['name']}.")
                                 passive_item["locked"] = False
                                 passive_item["current_state"] = state_data.get("next_state", "closed")
@@ -428,8 +428,16 @@ class GameEngine:
             else:
                 print(exit["block_text"])
         elif exit.get("locked", False):
-            required_item = exit["required_item"]
-            if required_item in self.inventory.items:
+            required_item = exit.get("required_item")
+            if required_item == "passcode":
+                passcode = input("Enter the passcode to unlock the door: ")
+                if passcode == exit.get("passcode"):
+                    print(exit["unlock_text"])
+                    exit["locked"] = False  # Ensure the door stays unlocked
+                    self.change_scene(exit["scene_id"])
+                else:
+                    print("Incorrect passcode. The door remains locked.")
+            elif required_item in self.inventory.items:
                 print(exit["unlock_text"])
                 if self.items[required_item].get("consumable", False):
                     self.inventory.remove_item(required_item)

@@ -148,11 +148,6 @@
         "key": true,
         "consumable": true
     },
-    "combinations": {
-        "broken_communicator + energy_cells": "repaired_communicator",
-        "first_aid_kit + coolant_canister": "advanced_medkit",
-        "item_one + item_two": "combined_item01"
-    },
     "spaceship_console": {
         "name": "Spaceship Console",
         "description": "A control console for the spaceship. It requires a valid access code to activate.",

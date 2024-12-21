@@ -15,7 +15,7 @@ class MediaPlayer:
             pygame.mixer.music.load(filename)
             pygame.mixer.music.play(-1)  # Loop the music
         else:
-            print("The sound of silence!")
+            print("The music of silence!")
 
     def play_sound_effect(self, filename):
         if os.path.exists(filename):

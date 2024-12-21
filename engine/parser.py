@@ -7,9 +7,29 @@ class Parser:
                 "parameters": []
             },
             {
+                "names": ["look at", "examine", "inspect", "study"],
+                "action": "look_at",
+                "parameters": ["target_name"]
+            },
+            {
                 "names": ["take", "pick up", "grab"],
                 "action": "take_item",
                 "parameters": ["item_name"]
+            },
+            {
+                "names": ["combine", "merge"],
+                "action": "combine_items",
+                "parameters": ["item1_name", "item2_name"]
+            },
+            {
+                "names": ["repair"],
+                "action": "repair_item",
+                "parameters": ["item_name"]
+            },
+            {
+                "names": ["look at yourself", "examine yourself"],
+                "action": "examine_self",
+                "parameters": []
             },
             {
                 "names": ["open"],
@@ -67,24 +87,9 @@ class Parser:
                 "parameters": []
             },
             {
-                "names": ["examine", "inspect", "study", "look at"],
-                "action": "examine_item",
-                "parameters": ["item_name"]
-            },
-            {
-                "names": ["combine", "merge"],
-                "action": "combine_items",
-                "parameters": ["item1_name", "item2_name"]
-            },
-            {
                 "names": ["craft"],
                 "action": "craft_item",
                 "parameters": ["item_name"]
-            },
-            {
-                "names": ["examine yourself", "look at yourself"],
-                "action": "examine_self",
-                "parameters": []
             },
             {
                 "names": ["stats"],
@@ -114,39 +119,47 @@ class Parser:
         ]
 
     def parse_command(self, command):
-        command = command.lower()
+        command = command.lower().strip()
+
+        # Special case for exact matches first
+        for action in self.actions:
+            if command in action["names"]:
+                return {"action": action["action"], "parameters": {}}
+
+        # Handle more complex commands
         for action in self.actions:
             for name in action["names"]:
-                if command.startswith(name):
+                # Use startswith only for complete words to avoid 'look' matching 'look at'
+                if (name + " ").startswith(command + " "):
+                    return {"action": action["action"], "parameters": {}}
+
+                if command.startswith(name + " "):
                     params = {}
+                    remaining = command[len(name):].strip()
+
+                    # Handle each parameter type
                     for param in action["parameters"]:
-                        value = self.extract_parameter(command, name, param)
-                        if value is None:
-                            return {"action": "invalid", "message": f"Missing {param} for this action."}
-                        params[param] = value
-                    return {"action": action["action"], "parameters": params}
+                        if param in ["target_name", "character_name", "item_name"]:
+                            params[param] = remaining
+                        elif param in ["item1_name", "item2_name"]:
+                            items = self.parse_combination(remaining)
+                            if not items:
+                                return {"action": "invalid", "message": f"Invalid format for combining items."}
+                            params["item1_name"] = items[0]
+                            params["item2_name"] = items[1]
+
+                    # Only return if we have all required parameters
+                    if len(params) == len(action["parameters"]):
+                        return {"action": action["action"], "parameters": params}
+
         return {"action": "invalid", "message": "I don't understand that command. Try to use the exact command."}
 
-    def extract_parameter(self, command, action_name, param):
-        # Remove the action name from the command
-        remaining_command = command[len(action_name):].strip()
-        if param == "item_name":
-            return remaining_command
-        elif param == "character_name":
-            return remaining_command
-        elif param == "item1_name":
-            # Assuming item1 name is the first item mentioned
-            items = remaining_command.split(',')
-            if items:
-                return items[0].strip()
-            else:
-                return None
-        elif param == "item2_name":
-            # Assuming item2 name is the second item mentioned
-            items = remaining_command.split(',')
-            if len(items) > 1:
-                return items[1].strip()
-            else:
-                return None
-        # Add more parameter extraction logic if needed
-        return None
+    def parse_combination(self, command):
+        # Handle various combination formats:
+        # "combine item1 and item2"
+        # "combine item1 with item2"
+        # "combine item1 + item2"
+        command = command.replace(" and ", " + ")
+        command = command.replace(" with ", " + ")
+        items = command.split(" + ")
+        return [item.strip() for item in items] if len(items) == 2 else None

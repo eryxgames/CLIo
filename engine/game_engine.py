@@ -133,7 +133,7 @@ class GameEngine:
             print("You notice the following characters in the scene:")
             for character_id in self.current_scene["characters"]:
                 character = self.characters[character_id]
-                greeting = character.get("greeting", character["dialogue"].get("greeting", "No greeting available."))
+                greeting = character.get("greeting", character["dialogue"].get("greet", "No greeting available."))
                 print(f"- {character['name']}: {greeting}")
                 random_text = self.get_random_character_text(character_id)
                 if random_text:
@@ -265,8 +265,24 @@ class GameEngine:
             print(random.choice(self.item_not_found_messages))
 
     def talk_to_character(self, character_name):
-        matching_characters = [char for char in self.current_scene["characters"] if character_name.lower() in self.characters[char]["name"].lower()]
-        if len(matching_characters) == 0:
+        if not character_name:
+            print("Who do you want to talk to?")
+            return
+
+        # Normalize the character name for comparison
+        character_name = character_name.lower()
+
+        # First try exact matches, then partial matches
+        matching_characters = []
+        for char_id in self.current_scene.get("characters", []):
+            char = self.characters[char_id]
+            if char["name"].lower() == character_name:
+                matching_characters = [char_id]
+                break
+            elif character_name in char["name"].lower():
+                matching_characters.append(char_id)
+
+        if not matching_characters:
             print("Character not found in this scene.")
         elif len(matching_characters) == 1:
             character_id = matching_characters[0]
@@ -274,11 +290,12 @@ class GameEngine:
             self.start_dialogue(character)
         else:
             print("Multiple characters match your query. Please be more specific:")
-            for char in matching_characters:
-                print(f"- {self.characters[char]['name']}")
+            for char_id in matching_characters:
+                print(f"- {self.characters[char_id]['name']}")
 
     def start_dialogue(self, character):
-        print(character["dialogue"]["greeting"])
+        greeting = character["dialogue"].get("greet", character.get("greeting", "The character does not have a greeting."))
+        print(greeting)
         options = character.get("dialogue_options", {})
         if options:
             print("Choose an option:")
@@ -322,8 +339,26 @@ class GameEngine:
             print("Item not in inventory.")
 
     def fight_character(self, character_name):
-        matching_characters = [char for char in self.current_scene["characters"] if character_name.lower() in self.characters[char]["name"].lower()]
-        if len(matching_characters) == 1:
+        if not character_name:
+            print("Who do you want to fight?")
+            return
+
+        # Normalize the character name for comparison
+        character_name = character_name.lower()
+
+        # First try exact matches, then partial matches
+        matching_characters = []
+        for char_id in self.current_scene.get("characters", []):
+            char = self.characters[char_id]
+            if char["name"].lower() == character_name:
+                matching_characters = [char_id]
+                break
+            elif character_name in char["name"].lower():
+                matching_characters.append(char_id)
+
+        if not matching_characters:
+            print("Character not found in this scene.")
+        elif len(matching_characters) == 1:
             character_id = matching_characters[0]
             character = self.characters[character_id]
             if character["type"] in ["hostile", "neutral", "aggressive"]:
@@ -331,13 +366,15 @@ class GameEngine:
                 battle = BattleSystem(self.player_stats, enemy_stats)
                 battle.start_battle()
                 if self.player_stats["health"] > 0:
-                    self.update_story_progress("hostile_droid_defeated", True)
+                    self.update_story_progress(f"{character_id}_defeated", True)
                     self.remove_enemy_from_scene(character_id)
                     self.drop_items_from_character(character_id)
             else:
                 print("This character is not hostile.")
         else:
-            print("Character not found in this scene or multiple characters match your query.")
+            print("Multiple characters match your query. Please be more specific:")
+            for char_id in matching_characters:
+                print(f"- {self.characters[char_id]['name']}")
 
     def remove_enemy_from_scene(self, character_id):
         self.current_scene["characters"].remove(character_id)
@@ -552,12 +589,24 @@ class GameEngine:
             return random.choice(random_events)
         return ""
 
+    # In GameEngine class:
     def repair_item(self, item_name):
+        """
+        Repair an item using the appropriate repair tool.
+
+        Args:
+            item_name (str): Name of the item to repair
+        """
         item = self.find_item_by_name(item_name)
-        if item and item.get("repairable", False):
-            self.inventory.repair_item(item_name, self.items)
-        else:
-            print("Item not found in the game data or cannot be repaired.")
+        if not item:
+            print("Item not found.")
+            return
+
+        if item["id"] not in self.inventory.items:
+            print("Item not found in your inventory.")
+            return
+
+        self.inventory.repair_item(item["id"], self.items)
 
     def provide_hint(self):
         if self.hints_used < self.max_hints:
@@ -572,7 +621,7 @@ class GameEngine:
             print("You notice the following characters in the scene:")
             for character_id in self.current_scene["characters"]:
                 character = self.characters[character_id]
-                greeting = character.get("greeting", character["dialogue"].get("greeting", "No greeting available."))
+                greeting = character.get("greeting", character["dialogue"].get("greet", "No greeting available."))
                 print(f"- {character['name']}: {greeting}")
 
     def read_item(self, item_name):
@@ -585,15 +634,44 @@ class GameEngine:
             print(random.choice(self.item_not_found_messages))
 
     def look_at(self, target_name):
-        item = self.find_item_by_name(target_name)
-        if item:
-            print(item["description"])
-        else:
-            character = next((char for char in self.characters.values() if target_name.lower() in char["name"].lower()), None)
-            if character:
-                print(character["description"])
-            else:
-                print(random.choice(self.item_not_found_messages))
+        if not target_name:
+            print("What do you want to look at?")
+            return
+
+        # Normalize the target name for comparison
+        target_name = target_name.lower()
+
+        # Check characters first
+        if "characters" in self.current_scene:
+            for char_id in self.current_scene["characters"]:
+                char = self.characters[char_id]
+                if target_name in char["name"].lower():
+                    print(char["description"])
+                    return
+
+        # Then check items in the current scene
+        for item_id in self.current_scene.get("items", []):
+            item = self.items[item_id]
+            if target_name in item["name"].lower():
+                print(item["description"])
+                return
+
+        # Check interactive items in the current scene
+        for item_id in self.current_scene.get("passive_items", []):
+            item = self.items[item_id]
+            if target_name in item["name"].lower():
+                print(item["description"])
+                return
+
+        # Finally check items in inventory
+        for item_id in self.inventory.items:
+            item = self.items[item_id]
+            if target_name in item["name"].lower():
+                print(item["description"])
+                return
+
+        print("You don't see that here.")
+
 
     def print_with_delay(self, text, delay=0.05):
         paragraphs = text.split("\n\n")

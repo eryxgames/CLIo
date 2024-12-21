@@ -145,7 +145,8 @@
     },
     "combinations": {
         "broken_communicator + energy_cells": "repaired_communicator",
-        "first_aid_kit + coolant_canister": "advanced_medkit"
+        "first_aid_kit + coolant_canister": "advanced_medkit",
+        "item_one + item_two": "combined_item01"
     },
     "spaceship_console": {
         "name": "Spaceship Console",
@@ -271,5 +272,46 @@
         "name": "Fixed Chip",
         "description": "A fixed chip that was previously broken.",
         "usable": false
+    },
+    "item_one": {
+        "name": "Item One",
+        "description": "An item that can be combined with another item.",
+        "usable": false,
+        "equippable": false
+    },
+    "item_two": {
+        "name": "Item Two",
+        "description": "An item that can be combined with another item.",
+        "usable": false,
+        "equippable": false
+    },
+    "combined_item01": {
+        "name": "Combined Item",
+        "description": "An item, created by combination by two other items.",
+        "usable": true,
+        "equippable": true,
+        "effect": {
+            "repair": 20,
+            "attack": 15
+        },
+        "components": ["item_one", "item_two"]
+    },
+    "broken_tool": {
+        "name": "Broken Tool",
+        "description": "A tool that is broken, repairable using Screwdriver.",
+        "usable": false,
+        "repairable": true,
+        "repair_item": "screwdriver"
+    },
+    "repaired_tool": {
+        "name": "Repaired Tool",
+        "description": "A tool that has been repaired using a Screwdriver.",
+        "usable": true,
+        "equippable": true,
+        "effect": {
+            "repair": 20,
+            "attack": 15
+        },
+        "components": ["broken_tool"]
     }
 }

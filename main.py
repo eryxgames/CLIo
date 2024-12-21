@@ -26,7 +26,6 @@ def main():
     save_load = SaveLoad()
     parser = Parser()  # Initialize the Parser
     game_engine = GameEngine('game_files/config.json', media_player, parser)  # Pass the parser to GameEngine
-
     media_player.print_with_delay(game_engine.current_scene["description"])
     game_engine.display_story_text("intro")
 

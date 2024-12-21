@@ -554,10 +554,19 @@ class GameEngine:
 
     def repair_item(self, item_name):
         item = self.find_item_by_name(item_name)
-        if item and item.get("repairable", False):
-            self.inventory.repair_item(item_name, self.items)
+        if item and item["id"] in self.inventory.items:
+            item_data = self.items[item["id"]]
+            if item_data.get("repairable", False):
+                repair_item = item_data.get("repair_item")
+                if repair_item in self.inventory.items:
+                    self.inventory.repair_item(item["id"], self.items)
+                else:
+                    repair_item_name = self.items[repair_item]["name"]
+                    print(f"You need a {repair_item_name} to repair this item.")
+            else:
+                print("This item cannot be repaired.")
         else:
-            print("Item not found in the game data or cannot be repaired.")
+            print("Item not found in your inventory.")
 
     def provide_hint(self):
         if self.hints_used < self.max_hints:
@@ -585,15 +594,29 @@ class GameEngine:
             print(random.choice(self.item_not_found_messages))
 
     def look_at(self, target_name):
-        item = self.find_item_by_name(target_name)
-        if item:
-            print(item["description"])
-        else:
-            character = next((char for char in self.characters.values() if target_name.lower() in char["name"].lower()), None)
-            if character:
-                print(character["description"])
-            else:
-                print(random.choice(self.item_not_found_messages))
+        # First check items in the current scene
+        for item_id in self.current_scene.get("items", []):
+            item = self.items[item_id]
+            if target_name.lower() in item["name"].lower():
+                print(item["description"])
+                return
+
+        # Then check items in inventory
+        for item_id in self.inventory.items:
+            item = self.items[item_id]
+            if target_name.lower() in item["name"].lower():
+                print(item["description"])
+                return
+
+        # Finally check characters
+        if "characters" in self.current_scene:
+            for char_id in self.current_scene["characters"]:
+                char = self.characters[char_id]
+                if target_name.lower() in char["name"].lower():
+                    print(char["description"])
+                    return
+
+        print(random.choice(self.item_not_found_messages))
 
     def print_with_delay(self, text, delay=0.05):
         paragraphs = text.split("\n\n")

@@ -93,17 +93,48 @@ class Inventory:
         else:
             print("Item not found in the game data.")
 
-    def repair_item(self, item_name, items_data):
-        item = items_data.get(item_name.lower())
-        if item and item.get("repairable", False):
-            repair_item = item.get("repair_item")
-            if repair_item in self.items:
-                self.remove_item(repair_item)
-                new_item_id = item.get("repaired_item_id")
-                new_item = items_data[new_item_id]
-                print(f"You repair the {item['name']} using the {items_data[repair_item]['name']} and create a {new_item['name']}.")
-                self.add_item(new_item_id, items_data)
-            else:
-                print(f"You don't have the {items_data[repair_item]['name']} to repair the {item['name']}.")
-        else:
-            print("Item not found in the game data or cannot be repaired.")
+    # In Inventory class:
+    def repair_item(self, item_id, items_data):
+        """
+        Repair an item using the required repair item.
+        
+        Args:
+            item_id (str): ID of the item to repair
+            items_data (dict): Game items data
+        """
+        if item_id not in self.items:
+            print("Item not found in your inventory.")
+            return
+
+        item = items_data[item_id]
+        if not item.get("repairable", False):
+            print("This item cannot be repaired.")
+            return
+
+        repair_item_id = item.get("repair_item")
+        if not repair_item_id:
+            print("This item doesn't have a specified repair item.")
+            return
+
+        if repair_item_id not in self.items:
+            print(f"You need a {items_data[repair_item_id]['name']} to repair this item.")
+            return
+
+        # Get the repaired version's name from the components list of items
+        repaired_item_id = None
+        for potential_item_id, potential_item in items_data.items():
+            if potential_item.get("components") == [item_id]:
+                repaired_item_id = potential_item_id
+                break
+
+        if not repaired_item_id:
+            print("Cannot find the repaired version of this item.")
+            return
+
+        # Remove both the broken item and the repair tool
+        self.remove_item(item_id)
+        self.remove_item(repair_item_id)
+
+        # Add the repaired item
+        self.add_item(repaired_item_id, items_data)
+        print(f"You successfully repaired the {item['name']} using the {items_data[repair_item_id]['name']}.")

@@ -552,21 +552,24 @@ class GameEngine:
             return random.choice(random_events)
         return ""
 
+    # In GameEngine class:
     def repair_item(self, item_name):
+        """
+        Repair an item using the appropriate repair tool.
+        
+        Args:
+            item_name (str): Name of the item to repair
+        """
         item = self.find_item_by_name(item_name)
-        if item and item["id"] in self.inventory.items:
-            item_data = self.items[item["id"]]
-            if item_data.get("repairable", False):
-                repair_item = item_data.get("repair_item")
-                if repair_item in self.inventory.items:
-                    self.inventory.repair_item(item["id"], self.items)
-                else:
-                    repair_item_name = self.items[repair_item]["name"]
-                    print(f"You need a {repair_item_name} to repair this item.")
-            else:
-                print("This item cannot be repaired.")
-        else:
+        if not item:
+            print("Item not found.")
+            return
+
+        if item["id"] not in self.inventory.items:
             print("Item not found in your inventory.")
+            return
+
+        self.inventory.repair_item(item["id"], self.items)
 
     def provide_hint(self):
         if self.hints_used < self.max_hints:

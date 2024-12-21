@@ -298,19 +298,14 @@
     },
     "broken_tool": {
         "name": "Broken Tool",
-        "description": "A tool is broken, repairable using Screwdriver.",
-        "usable": true,
+        "description": "A tool that is broken, repairable using Screwdriver.",
+        "usable": false,
         "repairable": true,
-        "repair_item": "screwdriver",
-        "equippable": true,
-        "effect": {
-            "repair": 2,
-            "attack": 1
-        }
+        "repair_item": "screwdriver"
     },
     "repaired_tool": {
         "name": "Repaired Tool",
-        "description": "A tool, repaired using Screwdriver.",
+        "description": "A tool that has been repaired using a Screwdriver.",
         "usable": true,
         "equippable": true,
         "effect": {

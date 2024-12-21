@@ -49,6 +49,26 @@ class GameEngine:
                     if stat not in self.player_stats:
                         self.player_stats[stat] = 0
 
+        # Add new attributes for character movement
+        self.commands_since_last_move = 0
+        self.characters_last_move = {}  # Track when each character last moved
+        self.initialize_movable_characters()
+
+    def initialize_movable_characters(self):
+        """Initialize tracking for characters that can move between scenes"""
+        for char_id, char in self.characters.items():
+            if char.get("movable", False):
+                self.characters_last_move[char_id] = 0
+                # Set initial scene for movable characters
+                initial_scene = char.get("initial_scene", "scene1")
+                # Find the scene and add the character if not already there
+                for scene in self.scenes:
+                    if scene["id"] == initial_scene:
+                        if "characters" not in scene:
+                            scene["characters"] = []
+                        if char_id not in scene["characters"]:
+                            scene["characters"].append(char_id)
+
     def process_command(self, command):
         if not command.strip():
             return
@@ -88,13 +108,71 @@ class GameEngine:
 
         self.check_conditions()
 
-    def load_config(self, filename):
-        with open(filename, 'r') as f:
-            return json.load(f)
+        # After processing any command, increment counter and check for character movement
+        self.commands_since_last_move += 1
+        self.check_character_movements()
 
-    def load_data(self, filename):
-        with open(filename, 'r') as f:
-            return json.load(f)
+    def check_character_movements(self):
+        """Check and process any pending character movements"""
+        for char_id, char in self.characters.items():
+            if not char.get("movable", False):
+                continue
+
+            moves_after = char.get("moves_after_commands", 5)
+            moves_on_scene_change = char.get("moves_on_scene_change", False)
+
+            if self.commands_since_last_move >= moves_after:
+                self.move_character(char_id)
+            elif moves_on_scene_change:
+                self.move_character(char_id)
+
+    def move_character(self, char_id):
+        """Move a character to an adjacent scene"""
+        # Find current scene containing the character
+        current_scene = None
+        for scene in self.scenes:
+            if "characters" in scene and char_id in scene["characters"]:
+                current_scene = scene
+                break
+
+        if not current_scene:
+            return
+
+        # Get possible destinations from current scene's exits
+        possible_destinations = []
+        for exit in current_scene.get("exits", []):
+            if not exit.get("locked", False) and not exit.get("blocked", False):
+                possible_destinations.append(exit["scene_id"])
+
+        if possible_destinations:
+            # Choose random destination
+            new_scene_id = random.choice(possible_destinations)
+
+            # Remove character from current scene
+            current_scene["characters"].remove(char_id)
+
+            # Add character to new scene
+            for scene in self.scenes:
+                if scene["id"] == new_scene_id:
+                    if "characters" not in scene:
+                        scene["characters"] = []
+                    scene["characters"].append(char_id)
+                    break
+
+            # Reset movement counter if this was triggered by command count
+            if self.commands_since_last_move >= self.characters[char_id].get("moves_after_commands", 5):
+                self.commands_since_last_move = 0
+
+            # Update last move time
+            self.characters_last_move[char_id] = time.time()
+
+            # Only notify if character moves into or out of current scene
+            if current_scene["id"] == self.current_scene["id"] or new_scene_id == self.current_scene["id"]:
+                char_name = self.characters[char_id]["name"]
+                if new_scene_id == self.current_scene["id"]:
+                    print(f"\n{char_name} enters the room.")
+                else:
+                    print(f"\n{char_name} leaves the room.")
 
     def change_scene(self, scene_id):
         next_scene = next((scene for scene in self.scenes if scene["id"] == scene_id), None)
@@ -115,6 +193,30 @@ class GameEngine:
             self.report_characters_in_scene()
         else:
             print("Invalid scene ID.")
+
+        # After changing scene, check for character movements
+        self.check_character_movements()
+
+    def report_characters_in_scene(self):
+        """Report characters present in the current scene"""
+        if "characters" in self.current_scene and self.current_scene["characters"]:
+            print("\nYou notice the following characters in the scene:")
+            for character_id in self.current_scene["characters"]:
+                character = self.characters[character_id]
+                # For movable characters, add movement-specific greeting
+                if character.get("movable", False):
+                    movement_text = " (moving between rooms)" if character.get("movable") else ""
+                    print(f"- {character['name']}{movement_text}: {character.get('greeting', 'No greeting available.')}")
+                else:
+                    print(f"- {character['name']}: {character.get('greeting', 'No greeting available.')}")
+
+    def load_config(self, filename):
+        with open(filename, 'r') as f:
+            return json.load(f)
+
+    def load_data(self, filename):
+        with open(filename, 'r') as f:
+            return json.load(f)
 
     def explore_scene(self):
         print(self.current_scene["description"])
@@ -628,7 +730,7 @@ class GameEngine:
 
     def report_characters_in_scene(self):
         if "characters" in self.current_scene and self.current_scene["characters"]:
-            print("You notice the following characters in the scene:")
+            print("\nYou notice the following characters in the scene:")
             for character_id in self.current_scene["characters"]:
                 character = self.characters[character_id]
                 greeting = character.get("greeting", character["dialogue"].get("greet", "No greeting available."))
@@ -642,7 +744,6 @@ class GameEngine:
             self.print_with_delay(text, item.get("read_speed", 0.05))
         else:
             print(random.choice(self.item_not_found_messages))
-
 
     def look_at(self, target_name):
         if not target_name:
@@ -685,7 +786,6 @@ class GameEngine:
 
         print("You don't see that here.")
 
-
     def print_with_delay(self, text, delay=0.05):
         paragraphs = text.split("\n\n")
         for paragraph in paragraphs:
@@ -694,7 +794,6 @@ class GameEngine:
                 time.sleep(delay)
             print("\n")
             time.sleep(1)  # Pause between paragraphs
-
 
     def repair_communicator(self):
         if "energy_cells" in self.inventory.items:

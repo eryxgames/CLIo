@@ -432,37 +432,74 @@ class GameEngine:
                 selected_option = list(options.keys())[choice]
                 print(options[selected_option])
                 # Handle specific interactions based on the selected option
-                if selected_option == "repair_communicator":
-                    self.repair_item("broken_communicator")
-                elif selected_option == "calm_down":
-                    self.update_story_progress("hostile_droid_defeated", True)
-                    character["type"] = "neutral"
+                self.handle_dialogue_option(character, selected_option)
             else:
                 print("Invalid choice.")
         else:
             print("No dialogue options available.")
 
     def give_item_to_character(self, item_name, character_name):
+        print(f"Trying to give {item_name} to {character_name}")
         item = self.find_item_by_name(item_name)
-        if item and item["id"] in self.inventory.items:
-            matching_characters = [char for char in self.current_scene["characters"] if character_name.lower() in self.characters[char]["name"].lower()]
-            if len(matching_characters) == 1:
-                character_id = matching_characters[0]
-                character = self.characters[character_id]
-                if f"give_{item['id']}" in character["interactions"]:
-                    interaction = character["interactions"][f"give_{item['id']}"]
-                    print(interaction)
-                    # Logic to handle the interaction
-                    if interaction == "friendly_robot_repair":
-                        self.repair_item("broken_communicator")
-                    elif interaction == "hostile_droid_calm_down":
-                        self.update_story_progress("hostile_droid_defeated", True)
+        print(f"Found item: {item}")
+        if not item:
+            print("Item not found in the game data.")
+            return
+        if item["id"] not in self.inventory.items:
+            print(f"{item['name']} not in your inventory.")
+            return
+        print(f"{item['name']} is in your inventory.")
+
+        # Find the character in the current scene
+        matching_characters = [
+            char_id for char_id in self.current_scene.get("characters", [])
+            if character_name.lower() in self.characters[char_id]["name"].lower()
+        ]
+
+        if not matching_characters:
+            print("That character isn't here.")
+            return
+
+        character_id = matching_characters[0]
+        character = self.characters[character_id]
+
+        # Handle NPC-specific interactions
+        if "npc_craftable" in item:
+            npc_craft_data = item["npc_craftable"]
+            if npc_craft_data["crafter"] == character_id:
+                required_items = set(npc_craft_data["required_items"])
+                if not hasattr(character, "received_items"):
+                    character.received_items = set()
+                character.received_items.add(item["id"])
+                if required_items.issubset(character.received_items):
+                    print(npc_craft_data["success_message"])
+                    for req_item in required_items:
+                        self.inventory.remove_item(req_item)
+                    self.inventory.add_item(item["id"], self.items)
+                    print(npc_craft_data["dialogue_response"])
+                    del character.received_items  # Reset received items
                 else:
-                    print("This character doesn't want that item.")
+                    print(f"{character['name']} takes the {item['name']} and waits for other required items.")
             else:
-                print("Character not found in scene or multiple characters match your query.")
+                print("This NPC cannot craft with this item.")
         else:
-            print("Item not in inventory.")
+            print("Better not give that away yet.")
+            self.inventory.add_item(item["id"], self.items)  # Return the item to player
+            
+    def handle_dialogue_option(self, character, option):
+        """Handle dialogue options that might result in giving items to the player."""
+        character_id = character["id"]
+        if "dialogue_rewards" in character and option in character["dialogue_rewards"]:
+            reward_data = character["dialogue_rewards"][option]
+            if "required_progress" in reward_data:
+                if not self.story_progress.get(reward_data["required_progress"]):
+                    print(reward_data.get("failure_message", "You can't do that yet."))
+                    return
+
+            # Give the reward item
+            item_id = reward_data["item"]
+            print(reward_data.get("success_message", f"{character['name']} gives you a {self.items[item_id]['name']}."))
+            self.inventory.add_item(item_id, self.items)
 
     def fight_character(self, character_name):
         if not character_name:
@@ -474,8 +511,7 @@ class GameEngine:
 
         # First try exact matches, then partial matches
         matching_characters = []
-        for char_id in self.current_scene.get("characters", []):
-            char = self.characters[char_id]
+        for char_id, char in self.characters.items():
             if char["name"].lower() == character_name:
                 matching_characters = [char_id]
                 break

@@ -97,7 +97,7 @@ class Inventory:
     def repair_item(self, item_id, items_data):
         """
         Repair an item using the required repair item.
-        
+
         Args:
             item_id (str): ID of the item to repair
             items_data (dict): Game items data

@@ -5,6 +5,10 @@ import json
 import os
 import re
 from tkinter.scrolledtext import ScrolledText
+from pygments import highlight
+from pygments.lexers import get_lexer_by_name
+from pygments.formatters import HtmlFormatter
+from tkhtmlview import HTMLScrolledText
 
 class GameDataEditor:
     def __init__(self, root):
@@ -16,6 +20,12 @@ class GameDataEditor:
         self.style = ttk.Style()
         self.style.theme_use('clam')
         self.configure_dark_theme()
+
+        # Initialize data attributes
+        self.scenes_data = []
+        self.items_data = {}
+        self.characters_data = {}
+        self.story_texts_data = {}
 
         self.notebook = ttk.Notebook(root)
         self.notebook.pack(expand=1, fill="both", padx=10, pady=10)
@@ -36,8 +46,92 @@ class GameDataEditor:
         self.notebook.add(self.story_texts_tab, text='Story Texts')
         self.notebook.add(self.crafting_tab, text='Crafting')
 
+        # Create tabs and their components
         self.create_tabs()
+
+        # Bind events after the listboxes are created
+        self.scene_details_text.bind("<<Modified>>", lambda event: self.apply_syntax_highlighting(self.scene_details_text))
+
         self.load_data()
+
+        # Initialize syntax highlighting variable
+        self.syntax_highlighting_var = tk.BooleanVar(value=False)
+
+    def create_tabs(self):
+        self.create_scenes_tab()
+        self.create_items_tab()
+        self.create_characters_tab()
+        self.create_dialogues_tab()
+        self.create_story_text_editor()
+        self.create_crafting_editor()
+
+    def create_story_text_editor(self):
+        story_frame = ttk.Frame(self.story_texts_tab)
+        story_frame.pack(padx=20, pady=20, fill=tk.BOTH, expand=True)
+
+        # Left side - Text keys list
+        list_frame = ttk.Frame(story_frame)
+        list_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0,10))
+
+        self.story_texts_listbox = self.create_custom_listbox(list_frame)
+        self.story_texts_listbox.pack(side=tk.LEFT, fill=tk.Y)
+
+        # Bind the selection event after creating the listbox
+        self.story_texts_listbox.bind('<<ListboxSelect>>', self.on_story_text_select)
+
+        # Right side - Text editor
+        editor_frame = ttk.Frame(story_frame)
+        editor_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
+        # Text content
+        self.story_text_editor = self.create_custom_text(editor_frame)
+        self.story_text_editor.pack(fill=tk.BOTH, expand=True)
+
+        # Control buttons
+        button_frame = ttk.Frame(editor_frame)
+        button_frame.pack(fill=tk.X, pady=10)
+
+        ttk.Button(button_frame, text="New Text",
+                   command=self.add_story_text).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Save Text",
+                   command=self.save_story_text).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Delete Text",
+                   command=self.delete_story_text).pack(side=tk.LEFT, padx=5)
+
+        # Search functionality
+        search_var = tk.StringVar()
+        search_entry = ttk.Entry(button_frame, textvariable=search_var)
+        search_entry.pack(side=tk.LEFT, padx=5)
+
+        def on_search():
+            search_term = search_var.get().lower()
+            self.story_texts_listbox.selection_clear(0, tk.END)
+            for i in range(self.story_texts_listbox.size()):
+                item = self.story_texts_listbox.get(i)
+                if search_term in item.lower():
+                    self.story_texts_listbox.selection_set(i)
+                    self.story_texts_listbox.see(i)
+
+        search_button = ttk.Button(button_frame, text="Search", command=on_search)
+        search_button.pack(side=tk.LEFT, padx=5)
+
+    def on_story_text_select(self, event):
+        if not hasattr(self, 'story_texts_listbox') or not hasattr(self, 'story_text_editor'):
+            return
+        selected_index = self.story_texts_listbox.curselection()
+        if not selected_index:
+            return
+        text_key = self.story_texts_listbox.get(selected_index)
+        text_data = self.story_texts_data.get(text_key, {})
+        text_content = text_data.get("text", "")
+        self.story_text_editor.delete(1.0, tk.END)
+        self.story_text_editor.insert(tk.END, text_content)
+
+    def toggle_light_mode(self):
+        if self.light_mode.get():
+            self.style.theme_use('clam')
+        else:
+            self.style.theme_use('equilux')
 
     def configure_dark_theme(self):
         colors = {
@@ -142,19 +236,19 @@ class GameDataEditor:
         return form_window, entries
 
     def create_character_dialogue_editor(self, character_id):
-        dialog_window = tk.Toplevel(self.root)
-        dialog_window.title(f"Edit Dialogues - {character_id}")
-        dialog_window.configure(bg='#1e1e1e')
+        dialogue_window = tk.Toplevel(self.root)
+        dialogue_window.title(f"Edit Dialogues - {character_id}")
+        dialogue_window.configure(bg='#1e1e1e')
 
-        main_frame = ttk.Frame(dialog_window)
+        main_frame = ttk.Frame(dialogue_window)
         main_frame.pack(padx=20, pady=20, fill=tk.BOTH, expand=True)
 
         # Left side - Dialog list
         list_frame = ttk.Frame(main_frame)
         list_frame.pack(side=tk.LEFT, fill=tk.BOTH, padx=(0,10))
 
-        dialog_list = self.create_custom_listbox(list_frame)
-        dialog_list.pack(side=tk.LEFT, fill=tk.BOTH)
+        dialogue_list = self.create_custom_listbox(list_frame)
+        dialogue_list.pack(side=tk.LEFT, fill=tk.BOTH)
 
         # Right side - Dialog editor
         editor_frame = ttk.Frame(main_frame)
@@ -186,35 +280,28 @@ class GameDataEditor:
         responses_list = self.create_custom_listbox(responses_frame, height=5)
         responses_list.pack(fill=tk.X, pady=5)
 
-    def create_story_text_editor(self):
-        story_frame = ttk.Frame(self.story_texts_tab)
-        story_frame.pack(padx=20, pady=20, fill=tk.BOTH, expand=True)
+    def on_story_text_select(self, event):
+        selected_index = self.story_texts_listbox.curselection()
+        if not selected_index:
+            return
+        text_key = self.story_texts_listbox.get(selected_index)
+        text_data = self.story_texts_data.get(text_key, {})
+        text_content = text_data.get("text", "")
+        self.story_text_editor.delete(1.0, tk.END)
+        self.story_text_editor.insert(tk.END, text_content)
 
-        # Left side - Text keys list
-        list_frame = ttk.Frame(story_frame)
-        list_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0,10))
 
-        self.story_texts_listbox = self.create_custom_listbox(list_frame)
-        self.story_texts_listbox.pack(side=tk.LEFT, fill=tk.Y)
+        def on_search():
+            search_term = search_var.get().lower()
+            self.story_texts_listbox.selection_clear(0, tk.END)
+            for i in range(self.story_texts_listbox.size()):
+                item = self.story_texts_listbox.get(i)
+                if search_term in item.lower():
+                    self.story_texts_listbox.selection_set(i)
+                    self.story_texts_listbox.see(i)
 
-        # Right side - Text editor
-        editor_frame = ttk.Frame(story_frame)
-        editor_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
-
-        # Text content
-        self.story_text_editor = self.create_custom_text(editor_frame)
-        self.story_text_editor.pack(fill=tk.BOTH, expand=True)
-
-        # Control buttons
-        button_frame = ttk.Frame(editor_frame)
-        button_frame.pack(fill=tk.X, pady=10)
-
-        ttk.Button(button_frame, text="New Text",
-                  command=self.add_story_text).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Save Text",
-                  command=self.save_story_text).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Delete Text",
-                  command=self.delete_story_text).pack(side=tk.LEFT, padx=5)
+        search_button = ttk.Button(button_frame, text="Search", command=on_search)
+        search_button.pack(side=tk.LEFT, padx=5)
 
     def create_crafting_editor(self):
         crafting_frame = ttk.Frame(self.crafting_tab)
@@ -271,7 +358,7 @@ class GameDataEditor:
         canvas_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         canvas = tk.Canvas(canvas_frame,
-                         bg='#2d2d2d',
+                         bg='#e0e0e0',  # Light grey background for better visibility
                          highlightthickness=0)
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
@@ -294,6 +381,10 @@ class GameDataEditor:
         ttk.Button(control_frame, text="Reset Zoom",
                   command=lambda: self.reset_zoom(canvas)).pack(side=tk.LEFT, padx=5)
 
+        # Add light/dark mode toggle
+        self.light_mode = tk.BooleanVar(value=False)
+        ttk.Checkbutton(control_frame, text="Light Mode", variable=self.light_mode, command=self.toggle_light_mode).pack(side=tk.LEFT, padx=5)
+
         return canvas
 
     def zoom_canvas(self, canvas, factor):
@@ -304,14 +395,6 @@ class GameDataEditor:
         # Reset to original scale
         canvas.scale('all', 0, 0, 1.0, 1.0)
         canvas.configure(scrollregion=canvas.bbox('all'))
-
-    def create_tabs(self):
-        self.create_scenes_tab()
-        self.create_items_tab()
-        self.create_characters_tab()
-        self.create_dialogues_tab()
-        self.create_story_text_editor()
-        self.create_crafting_editor()
 
     def create_scenes_tab(self):
         self.scenes_frame = ttk.Frame(self.scenes_tab)
@@ -356,7 +439,8 @@ class GameDataEditor:
         self.scene_details_label = ttk.Label(self.scene_details_frame, text="Scene Details:")
         self.scene_details_label.pack(anchor=tk.W)
 
-        self.scene_details_text = self.create_custom_text(self.scene_details_frame, height=30, width=80)
+        # Use HTMLScrolledText for syntax highlighting
+        self.scene_details_text = HTMLScrolledText(self.scene_details_frame, height=30, width=80)
         self.scene_details_text.pack(fill=tk.BOTH, expand=1)
 
         self.preview_button = ttk.Button(self.scenes_tab, text="Preview Scene Structure", command=self.preview_scene_structure)
@@ -451,42 +535,49 @@ class GameDataEditor:
         self.character_details_text = self.create_custom_text(self.character_details_frame, height=30, width=80)
         self.character_details_text.pack(fill=tk.BOTH, expand=1)
 
+    def on_character_select(self, event):
+        selected_index = self.characters_listbox.curselection()
+        if not selected_index:
+            return
+        character_id = self.characters_listbox.get(selected_index)
+        character_data = self.characters_data.get(character_id, {})
+        dialogues = character_data.get("dialogue", {})
+        if isinstance(dialogues, str):
+            dialogues = json.loads(dialogues)
+        dialogue_text = ""
+        for key, value in dialogues.items():
+            dialogue_text += f"{key}:\n{value.get('text', '')}\n\n"
+        self.dialogue_details_text.delete(1.0, tk.END)
+        self.dialogue_details_text.insert(tk.END, dialogue_text)
+
     def create_dialogues_tab(self):
         self.dialogues_frame = ttk.Frame(self.dialogues_tab)
         self.dialogues_frame.pack(padx=10, pady=10)
 
-        self.dialogues_listbox = self.create_custom_listbox(self.dialogues_frame, height=20, width=40)
-        self.dialogues_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
-        self.dialogues_scrollbar = ttk.Scrollbar(self.dialogues_frame, orient=tk.VERTICAL, command=self.dialogues_listbox.yview)
-        self.dialogues_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.dialogues_listbox.config(yscrollcommand=self.dialogues_scrollbar.set)
+        # Left side - Characters list
+        list_frame = ttk.Frame(self.dialogues_frame)
+        list_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0,10))
 
-        self.dialogues_listbox.bind("<Double-Button-1>", self.on_dialogue_double_click)
-        self.dialogues_listbox.bind("<Button-3>", self.show_context_menu)
+        self.characters_listbox = self.create_custom_listbox(list_frame)
+        self.characters_listbox.pack(side=tk.LEFT, fill=tk.Y)
 
-        self.dialogues_buttons_frame = ttk.Frame(self.dialogues_tab)
-        self.dialogues_buttons_frame.pack(pady=10)
+        # Populate characters listbox
+        for character_id in self.characters_data:
+            self.characters_listbox.insert(tk.END, character_id)
 
-        self.add_dialogue_button = ttk.Button(self.dialogues_buttons_frame, text="Add Dialogue", command=self.add_dialogue)
-        self.add_dialogue_button.pack(side=tk.LEFT, padx=5)
+        # Right side - Dialogues editor
+        editor_frame = ttk.Frame(self.dialogues_frame)
+        editor_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
-        self.edit_dialogue_button = ttk.Button(self.dialogues_buttons_frame, text="Edit Dialogue", command=self.edit_dialogue)
-        self.edit_dialogue_button.pack(side=tk.LEFT, padx=5)
-
-        self.delete_dialogue_button = ttk.Button(self.dialogues_buttons_frame, text="Delete Dialogue", command=self.delete_dialogue)
-        self.delete_dialogue_button.pack(side=tk.LEFT, padx=5)
-
-        self.save_button = ttk.Button(self.dialogues_buttons_frame, text="Save Changes", command=self.save_data)
-        self.save_button.pack(side=tk.LEFT, padx=5)
-
-        self.dialogue_details_frame = ttk.Frame(self.dialogues_tab)
-        self.dialogue_details_frame.pack(pady=10)
-
-        self.dialogue_details_label = ttk.Label(self.dialogue_details_frame, text="Dialogue Details:")
+        # Dialogues content
+        self.dialogue_details_label = ttk.Label(editor_frame, text="Dialogues:")
         self.dialogue_details_label.pack(anchor=tk.W)
 
-        self.dialogue_details_text = self.create_custom_text(self.dialogue_details_frame, height=30, width=80)
-        self.dialogue_details_text.pack(fill=tk.BOTH, expand=1)
+        self.dialogue_details_text = self.create_custom_text(editor_frame)
+        self.dialogue_details_text.pack(fill=tk.BOTH, expand=True)
+
+        # Bind selection event
+        self.characters_listbox.bind('<<ListboxSelect>>', self.on_character_select)
 
     def load_data(self):
         try:
@@ -495,8 +586,8 @@ class GameDataEditor:
                 for index, scene in enumerate(self.scenes_data):
                     self.scenes_listbox.insert(tk.END, scene['name'])
                     self.scenes_listbox.selection_set(index)
-        except FileNotFoundError:
-            messagebox.showerror("Error", "Scenes file not found.")
+        except (FileNotFoundError, json.JSONDecodeError):
+            messagebox.showerror("Error", "Scenes file not found or invalid JSON.")
 
         try:
             with open('../game_files/items.json', 'r') as f:
@@ -518,11 +609,11 @@ class GameDataEditor:
 
         try:
             with open('../game_files/story_texts.json', 'r') as f:
-                self.dialogues_data = json.load(f)
-                for index, dialogue in enumerate(self.dialogues_data):
-                    self.dialogues_listbox.insert(tk.END, dialogue)
+                self.story_texts_data = json.load(f)
+                for index, story_text in enumerate(self.story_texts_data):
+                    self.story_texts_listbox.insert(tk.END, story_text)
         except FileNotFoundError:
-            messagebox.showerror("Error", "Dialogues file not found.")
+            messagebox.showerror("Error", "Story Texts file not found.")
 
         self.modified_files = set()
 
@@ -548,12 +639,12 @@ class GameDataEditor:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to save characters data: {e}")
 
-        if 'dialogues' in self.modified_files:
+        if 'story_texts' in self.modified_files:
             try:
                 with open('../game_files/story_texts.json', 'w') as f:
-                    json.dump(self.dialogues_data, f, indent=4)
+                    json.dump(self.story_texts_data, f, indent=4)
             except Exception as e:
-                messagebox.showerror("Error", f"Failed to save dialogues data: {e}")
+                messagebox.showerror("Error", f"Failed to save story texts data: {e}")
 
         self.modified_files.clear()
 
@@ -671,14 +762,12 @@ class GameDataEditor:
 
         item1_label = ttk.Label(combine_frame, text="Select first item:")
         item1_label.pack(anchor=tk.W)
-        item1_dropdown = ttk.Combobox(combine_frame, textvariable=item1_var)
-        item1_dropdown['values'] = item_ids
+        item1_dropdown = ttk.Combobox(combine_frame, textvariable=item1_var, values=item_ids)
         item1_dropdown.pack(pady=5)
 
         item2_label = ttk.Label(combine_frame, text="Select second item:")
         item2_label.pack(anchor=tk.W)
-        item2_dropdown = ttk.Combobox(combine_frame, textvariable=item2_var)
-        item2_dropdown['values'] = item_ids
+        item2_dropdown = ttk.Combobox(combine_frame, textvariable=item2_var, values=item_ids)
         item2_dropdown.pack(pady=5)
 
         new_item_name_var = tk.StringVar()
@@ -722,8 +811,8 @@ class GameDataEditor:
         if character_name:
             character_id = self.generate_character_id(character_name)
             self.characters_data[character_id] = {
+                "id": character_id,
                 "name": character_name,
-                "description": "",
                 "type": "Friendly",
                 "dialogue": {},
                 "dialogue_options": {},
@@ -769,29 +858,35 @@ class GameDataEditor:
             self.modified_files.add('characters')
 
     def add_dialogue(self):
-        dialogue_key = simpledialog.askstring("Add Dialogue", "Enter dialogue key:")
-        if dialogue_key:
-            self.dialogues_data[dialogue_key] = {
-                "text": "",
-                "show_once": False
-            }
-            self.dialogues_listbox.insert(tk.END, dialogue_key)
-            self.modified_files.add('dialogues')
+        character_id = simpledialog.askstring("Add Dialogue", "Enter character ID:")
+        if character_id:
+            dialogue_key = simpledialog.askstring("Add Dialogue", "Enter dialogue key:")
+            if dialogue_key:
+                self.characters_data[character_id]["dialogue"][dialogue_key] = {
+                    "text": "",
+                    "show_once": False
+                }
+                self.dialogues_listbox.insert(tk.END, dialogue_key)
+                self.modified_files.add('characters')
 
     def edit_dialogue(self):
         selected_dialogue = self.dialogues_listbox.get(self.dialogues_listbox.curselection())
         if selected_dialogue:
-            dialogue_data = self.dialogues_data[selected_dialogue]
-            dialogue_data["text"] = simpledialog.askstring("Edit Dialogue", f"Enter text for {selected_dialogue}:", initialvalue=dialogue_data["text"])
-            self.display_dialogue_details(dialogue_data)
-            self.modified_files.add('dialogues')
+            character_id = simpledialog.askstring("Edit Dialogue", "Enter character ID:")
+            if character_id:
+                dialogue_data = self.characters_data[character_id]["dialogue"][selected_dialogue]
+                dialogue_data["text"] = simpledialog.askstring("Edit Dialogue", f"Enter text for {selected_dialogue}:", initialvalue=dialogue_data["text"])
+                self.display_dialogue_details(dialogue_data)
+                self.modified_files.add('characters')
 
     def delete_dialogue(self):
         selected_dialogue = self.dialogues_listbox.get(self.dialogues_listbox.curselection())
         if selected_dialogue:
-            del self.dialogues_data[selected_dialogue]
-            self.dialogues_listbox.delete(self.dialogues_listbox.curselection())
-            self.modified_files.add('dialogues')
+            character_id = simpledialog.askstring("Delete Dialogue", "Enter character ID:")
+            if character_id:
+                del self.characters_data[character_id]["dialogue"][selected_dialogue]
+                self.dialogues_listbox.delete(self.dialogues_listbox.curselection())
+                self.modified_files.add('characters')
 
     def add_item_to_scene(self):
         selected_scene = self.scenes_listbox.get(self.scenes_listbox.curselection())
@@ -827,8 +922,7 @@ class GameDataEditor:
         item_label.pack(anchor=tk.W)
 
         item_var = tk.StringVar(value="Create New Item")
-        item_dropdown = ttk.Combobox(item_frame, textvariable=item_var)
-        item_dropdown['values'] = list(self.items_data.keys())
+        item_dropdown = ttk.Combobox(item_frame, textvariable=item_var, values=list(self.items_data.keys()))
         item_dropdown.pack(pady=5)
 
         def on_select():
@@ -884,8 +978,7 @@ class GameDataEditor:
         character_label.pack(anchor=tk.W)
 
         character_var = tk.StringVar(value="Create New Character")
-        character_dropdown = ttk.Combobox(character_frame, textvariable=character_var)
-        character_dropdown['values'] = list(self.characters_data.keys())
+        character_dropdown = ttk.Combobox(character_frame, textvariable=character_var, values=list(self.characters_data.keys()))
         character_dropdown.pack(pady=5)
 
         def on_select():
@@ -896,8 +989,8 @@ class GameDataEditor:
                 if character_name:
                     character_id = self.generate_character_id(character_name)
                     self.characters_data[character_id] = {
+                        "id": character_id,
                         "name": character_name,
-                        "description": "",
                         "type": "Friendly",
                         "dialogue": {},
                         "dialogue_options": {},
@@ -954,8 +1047,7 @@ class GameDataEditor:
         scene_label.pack(anchor=tk.W)
 
         scene_var = tk.StringVar(value="Create New Scene")
-        scene_dropdown = ttk.Combobox(scene_frame, textvariable=scene_var)
-        scene_dropdown['values'] = [scene["name"] for scene in self.scenes_data]
+        scene_dropdown = ttk.Combobox(scene_frame, textvariable=scene_var, values=[scene["name"] for scene in self.scenes_data])
         scene_dropdown.pack(pady=5)
 
         def on_select():
@@ -1025,7 +1117,7 @@ class GameDataEditor:
 
     def draw_scene_structure(self, canvas, scene_structure):
         padding = 50
-        box_size = 200  # Increased box size to fit more text
+        box_size = 300  # Increased box size to fit more text
         arrow_length = 40
 
         positions = {}
@@ -1095,6 +1187,12 @@ class GameDataEditor:
         text_size_entry = ttk.Entry(settings_frame, textvariable=text_size_var)
         text_size_entry.pack(pady=5)
 
+        light_mode_check = ttk.Checkbutton(settings_frame, text="Light Mode", variable=self.light_mode, command=self.toggle_light_mode)
+        light_mode_check.pack(anchor=tk.W, pady=5)
+
+        syntax_highlighting_check = ttk.Checkbutton(settings_frame, text="Syntax Highlighting", variable=self.syntax_highlighting_var, command=self.toggle_syntax_highlighting)
+        syntax_highlighting_check.pack(anchor=tk.W, pady=5)
+
         def apply_settings():
             text_size = text_size_var.get()
             try:
@@ -1112,6 +1210,41 @@ class GameDataEditor:
         apply_button.pack(pady=5)
 
         settings_window.wait_window(settings_window)
+
+    def toggle_light_mode(self):
+        if self.light_mode.get():
+            self.style.theme_use('clam')
+        else:
+            self.style.theme_use('equilux')
+
+    def toggle_syntax_highlighting(self):
+        if self.syntax_highlighting_var.get():
+            # Implement syntax highlighting
+            self.apply_syntax_highlighting()
+        else:
+            # Disable syntax highlighting
+            self.remove_syntax_highlighting()
+
+        # Apply syntax highlighting using pygments
+
+    def apply_syntax_highlighting(self, text_widget):
+        text = text_widget.get(1.0, tk.END)
+        # Simple example: highlight JSON keys
+        import json
+        try:
+            data = json.loads(text)
+            for key in data.keys():
+                start = text.find(f'"{key}":')
+                if start != -1:
+                    end = start + len(key) + 2  # Account for quotes
+                    text_widget.tag_add("key", f"1.{start}", f"1.{end}")
+                    text_widget.tag_config("key", foreground="blue")
+        except json.JSONDecodeError:
+            pass
+
+    def remove_syntax_highlighting(self):
+        # Remove syntax highlighting
+        self.scene_details_text.config(font=("Helvetica", 12))
 
     def on_scene_double_click(self, event):
         selected_scene = self.scenes_listbox.get(self.scenes_listbox.curselection())
@@ -1135,7 +1268,18 @@ class GameDataEditor:
     def on_dialogue_double_click(self, event):
         selected_dialogue = self.dialogues_listbox.get(self.dialogues_listbox.curselection())
         if selected_dialogue:
-            self.display_dialogue_details(self.dialogues_data[selected_dialogue])
+            character_id = simpledialog.askstring("Dialogue Details", "Enter character ID:")
+            if character_id:
+                dialogue_data = self.characters_data[character_id]["dialogue"][selected_dialogue]
+                dialogue_text = f"Greet: {dialogue_data.get('greet', '')}\n"
+                dialogue_text += "Dialogue Options:\n"
+                for option, response in dialogue_data.get("dialogue_options", {}).items():
+                    dialogue_text += f"{option}: {response}\n"
+                dialogue_text += "Dialogue Rewards:\n"
+                for reward, details in dialogue_data.get("dialogue_rewards", {}).items():
+                    dialogue_text += f"{reward}: {details}\n"
+                self.dialogue_details_text.delete(1.0, tk.END)
+                self.dialogue_details_text.insert(tk.END, dialogue_text)
 
     def show_context_menu(self, event):
         context_menu = tk.Menu(self.root, tearoff=0)
@@ -1216,26 +1360,26 @@ class GameDataEditor:
     def add_story_text(self):
         text_key = simpledialog.askstring("Add Story Text", "Enter text key:")
         if text_key:
-            self.dialogues_data[text_key] = {
+            self.story_texts_data[text_key] = {
                 "text": "",
                 "show_once": False
             }
             self.story_texts_listbox.insert(tk.END, text_key)
-            self.modified_files.add('dialogues')
+            self.modified_files.add('story_texts')
 
     def save_story_text(self):
         selected_text = self.story_texts_listbox.get(self.story_texts_listbox.curselection())
         if selected_text:
             text_content = self.story_text_editor.get(1.0, tk.END).strip()
-            self.dialogues_data[selected_text]["text"] = text_content
-            self.modified_files.add('dialogues')
+            self.story_texts_data[selected_text]["text"] = text_content
+            self.modified_files.add('story_texts')
 
     def delete_story_text(self):
         selected_text = self.story_texts_listbox.get(self.story_texts_listbox.curselection())
         if selected_text:
-            del self.dialogues_data[selected_text]
+            del self.story_texts_data[selected_text]
             self.story_texts_listbox.delete(self.story_texts_listbox.curselection())
-            self.modified_files.add('dialogues')
+            self.modified_files.add('story_texts')
 
     def add_ingredient(self):
         ingredient_name = simpledialog.askstring("Add Ingredient", "Enter ingredient name:")

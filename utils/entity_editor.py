@@ -1,49 +1,323 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog, filedialog
+from ttkthemes import ThemedTk
 import json
 import os
 import re
+from tkinter.scrolledtext import ScrolledText
 
 class GameDataEditor:
     def __init__(self, root):
         self.root = root
         self.root.title("CLIo Game Data Editor")
+        self.root.configure(bg='#1e1e1e')
 
         # Apply dark theme
-        self.apply_dark_theme()
+        self.style = ttk.Style()
+        self.style.theme_use('clam')
+        self.configure_dark_theme()
 
         self.notebook = ttk.Notebook(root)
-        self.notebook.pack(expand=1, fill="both")
+        self.notebook.pack(expand=1, fill="both", padx=10, pady=10)
 
+        # Create tabs
         self.scenes_tab = ttk.Frame(self.notebook)
         self.items_tab = ttk.Frame(self.notebook)
         self.characters_tab = ttk.Frame(self.notebook)
         self.dialogues_tab = ttk.Frame(self.notebook)
+        self.story_texts_tab = ttk.Frame(self.notebook)
+        self.crafting_tab = ttk.Frame(self.notebook)
 
+        # Add tabs to notebook
         self.notebook.add(self.scenes_tab, text='Scenes')
         self.notebook.add(self.items_tab, text='Items')
         self.notebook.add(self.characters_tab, text='Characters')
         self.notebook.add(self.dialogues_tab, text='Dialogues')
+        self.notebook.add(self.story_texts_tab, text='Story Texts')
+        self.notebook.add(self.crafting_tab, text='Crafting')
 
+        self.create_tabs()
+        self.load_data()
+
+    def configure_dark_theme(self):
+        colors = {
+            'bg': '#1e1e1e',
+            'fg': '#ffffff',
+            'select_bg': '#404040',
+            'select_fg': '#ffffff',
+            'input_bg': '#2d2d2d',
+            'button_bg': '#3d3d3d',
+            'button_active': '#4d4d4d'
+        }
+
+        self.style.configure('TFrame', background=colors['bg'])
+        self.style.configure('TLabel', background=colors['bg'], foreground=colors['fg'])
+        self.style.configure('TButton',
+                           background=colors['button_bg'],
+                           foreground=colors['fg'],
+                           borderwidth=1,
+                           focusthickness=3,
+                           focuscolor='none')
+        self.style.map('TButton',
+                      background=[('active', colors['button_active'])])
+        self.style.configure('TNotebook',
+                           background=colors['bg'],
+                           borderwidth=0)
+        self.style.configure('TNotebook.Tab',
+                           background=colors['button_bg'],
+                           foreground=colors['fg'],
+                           padding=[10, 2],
+                           borderwidth=1)
+        self.style.map('TNotebook.Tab',
+                      background=[('selected', colors['select_bg'])],
+                      foreground=[('selected', colors['select_fg'])])
+
+        return colors
+
+    def create_custom_listbox(self, parent, height=20, width=40):
+        listbox = tk.Listbox(parent,
+                            height=height,
+                            width=width,
+                            bg='#2d2d2d',
+                            fg='#ffffff',
+                            selectbackground='#404040',
+                            selectforeground='#ffffff',
+                            selectmode=tk.SINGLE,
+                            relief=tk.FLAT,
+                            borderwidth=0,
+                            highlightthickness=1,
+                            highlightbackground='#404040')
+        return listbox
+
+    def create_custom_text(self, parent, height=30, width=80):
+        text = ScrolledText(parent,
+                           height=height,
+                           width=width,
+                           bg='#2d2d2d',
+                           fg='#ffffff',
+                           insertbackground='#ffffff',
+                           relief=tk.FLAT,
+                           borderwidth=0,
+                           highlightthickness=1,
+                           highlightbackground='#404040')
+        return text
+
+    def create_item_form(self):
+        form_window = tk.Toplevel(self.root)
+        form_window.title("Create/Edit Item")
+        form_window.configure(bg='#1e1e1e')
+
+        form_frame = ttk.Frame(form_window)
+        form_frame.pack(padx=20, pady=20)
+
+        # Create form fields
+        fields = [
+            ("Name", "name"),
+            ("Description", "description"),
+            ("Type", "type", ["Story", "Quest", "Usable", "Craftable"]),
+            ("Usable", "usable", ["True", "False"]),
+            ("Readable Text", "readable_item"),
+            ("Use Effect", "use_effect"),
+            ("Crafting Requirements", "crafting_requirements"),
+        ]
+
+        entries = {}
+        for field in fields:
+            label = ttk.Label(form_frame, text=field[0])
+            label.pack(anchor=tk.W, pady=(10,0))
+
+            if len(field) > 2 and isinstance(field[2], list):
+                var = tk.StringVar()
+                entry = ttk.Combobox(form_frame, textvariable=var, values=field[2])
+                entry.set(field[2][0])
+            else:
+                if field[0] == "Description" or field[0] == "Readable Text":
+                    entry = self.create_custom_text(form_frame, height=5, width=40)
+                else:
+                    entry = ttk.Entry(form_frame, width=40)
+
+            entry.pack(fill=tk.X, pady=(0,5))
+            entries[field[1]] = entry
+
+        return form_window, entries
+
+    def create_character_dialogue_editor(self, character_id):
+        dialog_window = tk.Toplevel(self.root)
+        dialog_window.title(f"Edit Dialogues - {character_id}")
+        dialog_window.configure(bg='#1e1e1e')
+
+        main_frame = ttk.Frame(dialog_window)
+        main_frame.pack(padx=20, pady=20, fill=tk.BOTH, expand=True)
+
+        # Left side - Dialog list
+        list_frame = ttk.Frame(main_frame)
+        list_frame.pack(side=tk.LEFT, fill=tk.BOTH, padx=(0,10))
+
+        dialog_list = self.create_custom_listbox(list_frame)
+        dialog_list.pack(side=tk.LEFT, fill=tk.BOTH)
+
+        # Right side - Dialog editor
+        editor_frame = ttk.Frame(main_frame)
+        editor_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
+        # Dialog content
+        content_label = ttk.Label(editor_frame, text="Dialog Content:")
+        content_label.pack(anchor=tk.W)
+
+        content_text = self.create_custom_text(editor_frame)
+        content_text.pack(fill=tk.BOTH, expand=True)
+
+        # Response options
+        responses_frame = ttk.LabelFrame(editor_frame, text="Response Options")
+        responses_frame.pack(fill=tk.X, pady=10)
+
+        def add_response():
+            response_text = response_entry.get()
+            if response_text:
+                responses_list.insert(tk.END, response_text)
+                response_entry.delete(0, tk.END)
+
+        response_entry = ttk.Entry(responses_frame)
+        response_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+
+        add_button = ttk.Button(responses_frame, text="Add Response", command=add_response)
+        add_button.pack(side=tk.RIGHT, padx=5)
+
+        responses_list = self.create_custom_listbox(responses_frame, height=5)
+        responses_list.pack(fill=tk.X, pady=5)
+
+    def create_story_text_editor(self):
+        story_frame = ttk.Frame(self.story_texts_tab)
+        story_frame.pack(padx=20, pady=20, fill=tk.BOTH, expand=True)
+
+        # Left side - Text keys list
+        list_frame = ttk.Frame(story_frame)
+        list_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0,10))
+
+        self.story_texts_listbox = self.create_custom_listbox(list_frame)
+        self.story_texts_listbox.pack(side=tk.LEFT, fill=tk.Y)
+
+        # Right side - Text editor
+        editor_frame = ttk.Frame(story_frame)
+        editor_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
+        # Text content
+        self.story_text_editor = self.create_custom_text(editor_frame)
+        self.story_text_editor.pack(fill=tk.BOTH, expand=True)
+
+        # Control buttons
+        button_frame = ttk.Frame(editor_frame)
+        button_frame.pack(fill=tk.X, pady=10)
+
+        ttk.Button(button_frame, text="New Text",
+                  command=self.add_story_text).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Save Text",
+                  command=self.save_story_text).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Delete Text",
+                  command=self.delete_story_text).pack(side=tk.LEFT, padx=5)
+
+    def create_crafting_editor(self):
+        crafting_frame = ttk.Frame(self.crafting_tab)
+        crafting_frame.pack(padx=20, pady=20, fill=tk.BOTH, expand=True)
+
+        # Left side - Recipes list
+        list_frame = ttk.Frame(crafting_frame)
+        list_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0,10))
+
+        self.recipes_listbox = self.create_custom_listbox(list_frame)
+        self.recipes_listbox.pack(side=tk.LEFT, fill=tk.Y)
+
+        # Right side - Recipe editor
+        editor_frame = ttk.Frame(crafting_frame)
+        editor_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
+        # Recipe details
+        details_frame = ttk.LabelFrame(editor_frame, text="Recipe Details")
+        details_frame.pack(fill=tk.X, pady=10)
+
+        ttk.Label(details_frame, text="Result Item:").grid(row=0, column=0, padx=5, pady=5)
+        self.result_item_entry = ttk.Entry(details_frame)
+        self.result_item_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        # Ingredients list
+        ingredients_frame = ttk.LabelFrame(editor_frame, text="Ingredients")
+        ingredients_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+
+        self.ingredients_list = self.create_custom_listbox(ingredients_frame, height=10)
+        self.ingredients_list.pack(fill=tk.BOTH, expand=True)
+
+        # Control buttons
+        button_frame = ttk.Frame(editor_frame)
+        button_frame.pack(fill=tk.X, pady=10)
+
+        ttk.Button(button_frame, text="Add Ingredient",
+                  command=self.add_ingredient).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Remove Ingredient",
+                  command=self.remove_ingredient).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Save Recipe",
+                  command=self.save_recipe).pack(side=tk.LEFT, padx=5)
+
+    def create_preview_window(self, title="Preview", width=1000, height=800):
+        preview_window = tk.Toplevel(self.root)
+        preview_window.title(title)
+        preview_window.configure(bg='#1e1e1e')
+
+        # Make the window resizable
+        preview_window.geometry(f"{width}x{height}")
+        preview_window.minsize(800, 600)
+
+        # Create canvas with scrollbars
+        canvas_frame = ttk.Frame(preview_window)
+        canvas_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        canvas = tk.Canvas(canvas_frame,
+                         bg='#2d2d2d',
+                         highlightthickness=0)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        v_scrollbar = ttk.Scrollbar(canvas_frame, orient=tk.VERTICAL, command=canvas.yview)
+        v_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        h_scrollbar = ttk.Scrollbar(preview_window, orient=tk.HORIZONTAL, command=canvas.xview)
+        h_scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
+
+        canvas.configure(xscrollcommand=h_scrollbar.set, yscrollcommand=v_scrollbar.set)
+
+        # Add zoom controls
+        control_frame = ttk.Frame(preview_window)
+        control_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=5)
+
+        ttk.Button(control_frame, text="Zoom In",
+                  command=lambda: self.zoom_canvas(canvas, 1.2)).pack(side=tk.LEFT, padx=5)
+        ttk.Button(control_frame, text="Zoom Out",
+                  command=lambda: self.zoom_canvas(canvas, 0.8)).pack(side=tk.LEFT, padx=5)
+        ttk.Button(control_frame, text="Reset Zoom",
+                  command=lambda: self.reset_zoom(canvas)).pack(side=tk.LEFT, padx=5)
+
+        return canvas
+
+    def zoom_canvas(self, canvas, factor):
+        canvas.scale('all', 0, 0, factor, factor)
+        canvas.configure(scrollregion=canvas.bbox('all'))
+
+    def reset_zoom(self, canvas):
+        # Reset to original scale
+        canvas.scale('all', 0, 0, 1.0, 1.0)
+        canvas.configure(scrollregion=canvas.bbox('all'))
+
+    def create_tabs(self):
         self.create_scenes_tab()
         self.create_items_tab()
         self.create_characters_tab()
         self.create_dialogues_tab()
-
-        self.load_data()
-
-    def apply_dark_theme(self):
-        style = ttk.Style()
-        style.theme_use("clam")
-        style.configure(".", background="#2e2e2e", foreground="#ffffff", fieldbackground="#2e2e2e")
-        style.map("TButton", background=[("active", "#4a4a4a")])
-        style.map("TNotebook.Tab", background=[("selected", "#4a4a4a")])
+        self.create_story_text_editor()
+        self.create_crafting_editor()
 
     def create_scenes_tab(self):
         self.scenes_frame = ttk.Frame(self.scenes_tab)
         self.scenes_frame.pack(padx=10, pady=10)
 
-        self.scenes_listbox = tk.Listbox(self.scenes_frame, height=20, width=40)
+        self.scenes_listbox = self.create_custom_listbox(self.scenes_frame, height=20, width=40)
         self.scenes_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
         self.scenes_scrollbar = ttk.Scrollbar(self.scenes_frame, orient=tk.VERTICAL, command=self.scenes_listbox.yview)
         self.scenes_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
@@ -82,7 +356,7 @@ class GameDataEditor:
         self.scene_details_label = ttk.Label(self.scene_details_frame, text="Scene Details:")
         self.scene_details_label.pack(anchor=tk.W)
 
-        self.scene_details_text = tk.Text(self.scene_details_frame, height=30, width=80)
+        self.scene_details_text = self.create_custom_text(self.scene_details_frame, height=30, width=80)
         self.scene_details_text.pack(fill=tk.BOTH, expand=1)
 
         self.preview_button = ttk.Button(self.scenes_tab, text="Preview Scene Structure", command=self.preview_scene_structure)
@@ -98,7 +372,7 @@ class GameDataEditor:
         self.items_frame = ttk.Frame(self.items_tab)
         self.items_frame.pack(padx=10, pady=10)
 
-        self.items_listbox = tk.Listbox(self.items_frame, height=20, width=40)
+        self.items_listbox = self.create_custom_listbox(self.items_frame, height=20, width=40)
         self.items_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
         self.items_scrollbar = ttk.Scrollbar(self.items_frame, orient=tk.VERTICAL, command=self.items_listbox.yview)
         self.items_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
@@ -134,14 +408,14 @@ class GameDataEditor:
         self.item_details_label = ttk.Label(self.item_details_frame, text="Item Details:")
         self.item_details_label.pack(anchor=tk.W)
 
-        self.item_details_text = tk.Text(self.item_details_frame, height=30, width=80)
+        self.item_details_text = self.create_custom_text(self.item_details_frame, height=30, width=80)
         self.item_details_text.pack(fill=tk.BOTH, expand=1)
 
     def create_characters_tab(self):
         self.characters_frame = ttk.Frame(self.characters_tab)
         self.characters_frame.pack(padx=10, pady=10)
 
-        self.characters_listbox = tk.Listbox(self.characters_frame, height=20, width=40)
+        self.characters_listbox = self.create_custom_listbox(self.characters_frame, height=20, width=40)
         self.characters_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
         self.characters_scrollbar = ttk.Scrollbar(self.characters_frame, orient=tk.VERTICAL, command=self.characters_listbox.yview)
         self.characters_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
@@ -174,14 +448,14 @@ class GameDataEditor:
         self.character_details_label = ttk.Label(self.character_details_frame, text="Character Details:")
         self.character_details_label.pack(anchor=tk.W)
 
-        self.character_details_text = tk.Text(self.character_details_frame, height=30, width=80)
+        self.character_details_text = self.create_custom_text(self.character_details_frame, height=30, width=80)
         self.character_details_text.pack(fill=tk.BOTH, expand=1)
 
     def create_dialogues_tab(self):
         self.dialogues_frame = ttk.Frame(self.dialogues_tab)
         self.dialogues_frame.pack(padx=10, pady=10)
 
-        self.dialogues_listbox = tk.Listbox(self.dialogues_frame, height=20, width=40)
+        self.dialogues_listbox = self.create_custom_listbox(self.dialogues_frame, height=20, width=40)
         self.dialogues_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
         self.dialogues_scrollbar = ttk.Scrollbar(self.dialogues_frame, orient=tk.VERTICAL, command=self.dialogues_listbox.yview)
         self.dialogues_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
@@ -211,7 +485,7 @@ class GameDataEditor:
         self.dialogue_details_label = ttk.Label(self.dialogue_details_frame, text="Dialogue Details:")
         self.dialogue_details_label.pack(anchor=tk.W)
 
-        self.dialogue_details_text = tk.Text(self.dialogue_details_frame, height=30, width=80)
+        self.dialogue_details_text = self.create_custom_text(self.dialogue_details_frame, height=30, width=80)
         self.dialogue_details_text.pack(fill=tk.BOTH, expand=1)
 
     def load_data(self):
@@ -733,21 +1007,9 @@ class GameDataEditor:
 
     def preview_scene_structure(self):
         scene_structure = self.generate_scene_structure()
-        preview_window = tk.Toplevel(self.root)
-        preview_window.title("Scene Structure Preview")
-
-        canvas = tk.Canvas(preview_window, width=800, height=600)
-        canvas.pack(fill=tk.BOTH, expand=1)
-
-        scrollbar = ttk.Scrollbar(preview_window, orient=tk.VERTICAL, command=canvas.yview)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        canvas.configure(yscrollcommand=scrollbar.set)
-
+        preview_window = self.create_preview_window(title="Scene Structure Preview", width=1200, height=800)
+        canvas = preview_window
         self.draw_scene_structure(canvas, scene_structure)
-
-        # Add zoom functionality
-        self.zoom_level = 1.0
-        canvas.bind("<MouseWheel>", self.on_mouse_wheel)
 
     def generate_scene_structure(self):
         scene_structure = {}
@@ -903,12 +1165,8 @@ class GameDataEditor:
 
     def preview_scene_map(self):
         scene_map = self.generate_scene_map()
-        preview_window = tk.Toplevel(self.root)
-        preview_window.title("Scene Map Preview")
-
-        canvas = tk.Canvas(preview_window, width=800, height=600)
-        canvas.pack(fill=tk.BOTH, expand=1)
-
+        preview_window = self.create_preview_window(title="Scene Map Preview", width=1200, height=800)
+        canvas = preview_window
         self.draw_scene_map(canvas, scene_map)
 
     def generate_scene_map(self):
@@ -955,7 +1213,55 @@ class GameDataEditor:
 
         canvas.configure(scrollregion=canvas.bbox(tk.ALL))
 
+    def add_story_text(self):
+        text_key = simpledialog.askstring("Add Story Text", "Enter text key:")
+        if text_key:
+            self.dialogues_data[text_key] = {
+                "text": "",
+                "show_once": False
+            }
+            self.story_texts_listbox.insert(tk.END, text_key)
+            self.modified_files.add('dialogues')
+
+    def save_story_text(self):
+        selected_text = self.story_texts_listbox.get(self.story_texts_listbox.curselection())
+        if selected_text:
+            text_content = self.story_text_editor.get(1.0, tk.END).strip()
+            self.dialogues_data[selected_text]["text"] = text_content
+            self.modified_files.add('dialogues')
+
+    def delete_story_text(self):
+        selected_text = self.story_texts_listbox.get(self.story_texts_listbox.curselection())
+        if selected_text:
+            del self.dialogues_data[selected_text]
+            self.story_texts_listbox.delete(self.story_texts_listbox.curselection())
+            self.modified_files.add('dialogues')
+
+    def add_ingredient(self):
+        ingredient_name = simpledialog.askstring("Add Ingredient", "Enter ingredient name:")
+        if ingredient_name:
+            self.ingredients_list.insert(tk.END, ingredient_name)
+
+    def remove_ingredient(self):
+        selected_ingredient = self.ingredients_list.get(self.ingredients_list.curselection())
+        if selected_ingredient:
+            self.ingredients_list.delete(self.ingredients_list.curselection())
+
+    def save_recipe(self):
+        result_item = self.result_item_entry.get()
+        ingredients = list(self.ingredients_list.get(0, tk.END))
+        if result_item and ingredients:
+            recipe_data = {
+                "result_item": result_item,
+                "ingredients": ingredients
+            }
+            # Save the recipe data to the appropriate file or data structure
+            self.modified_files.add('recipes')
+
+    def run(self):
+        self.root.mainloop()
+
 if __name__ == "__main__":
-    root = tk.Tk()
+    root = ThemedTk(theme="equilux")  # Using ThemedTk for better dark theme support
     app = GameDataEditor(root)
-    root.mainloop()
+    app.run()

@@ -1,40 +1,40 @@
 {
   "text_speed": 0.03,
-  "horizontal_padding": 3,
-  "vertical_padding": 1,
+  "horizontal_padding": 1,
+  "vertical_padding": 0,
   "colors": {
     "scene": "38;5;75",
     "dialogue": "38;5;156",
     "item": "38;5;220",
     "combat": "38;5;203",
     "system": "38;5;147",
-    "story": "38;5;183"
+    "story": "38;5;183",
+    "inventory": "38;5;226",
+    "default": "38;5;252"
   },
   "styles": {
     "scene": {
-      "alignment": "left",
-      "padding": 3,
-      "frame": "single",
+      "padding": 1,
+      "frame": "rounded",
       "speed": 0.02,
-      "fade_in": true,
-      "paragraph_delay": 1.0
+      "fade_in": true
     },
     "dialogue": {
-      "alignment": "left",
-      "padding": 2,
-      "frame": "rounded",
-      "speed": 0.05,
-      "animate_frame": true,
-      "character_delay": 0.08
+      "padding": 1,
+      "frame": "single",
+      "character_delay": 0.05
     },
-    "story": {
-      "alignment": "center",
-      "padding": 2,
-      "frame": "rounded",
-      "speed": 0.05,
-      "character_delay": 0.1,
-      "paragraph_delay": 1.5,
-      "gradient": true
+    "inventory": {
+      "padding": 1,
+      "frame": "none"
+    },
+    "system": {
+      "padding": 1,
+      "frame": "none"
+    },
+    "default": {
+      "padding": 1,
+      "frame": "none"
     }
   }
 }

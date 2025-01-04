@@ -12,22 +12,18 @@ class MediaPlayer:
         if os.path.exists(filename):
             if pygame.mixer.music.get_busy():
                 pygame.mixer.music.fadeout(fade_out_time)
-                time.sleep(fade_out_time / 1000)  # Wait for the fade out to complete
+                time.sleep(fade_out_time / 1000)
             pygame.mixer.music.load(filename)
-            pygame.mixer.music.play(-1)  # Loop the music
+            pygame.mixer.music.play(-1)
         else:
-            print("The music of silence!")
+            message_handler.print_message("The music of silence!", "system")
 
     def play_sound_effect(self, filename):
         if os.path.exists(filename):
             sound = pygame.mixer.Sound(filename)
             sound.play()
         else:
-            print("The sound of silence!")
+            message_handler.print_message("The sound of silence!", "system")
 
     def print_with_delay(self, message, delay=0.05):
-        for char in message:
-            sys.stdout.write(char)
-            sys.stdout.flush()
-            time.sleep(delay)
-        print()
+        message_handler.print_message(message, "system")

@@ -45,43 +45,56 @@ class TextConfig:
 
 class TextStyler:
     def __init__(self):
-        self.configs = {
-            "default": TextConfig(),
-            "scene": TextConfig(frame_style=FrameStyle.SINGLE),
-            "dialogue": TextConfig(frame_style=FrameStyle.ROUNDED),
-            "system": TextConfig(frame_style=FrameStyle.ASCII),
-            "combat": TextConfig(frame_style=FrameStyle.DOUBLE),
-            "inventory": TextConfig(frame_style=FrameStyle.SINGLE)
-        }
         self.terminal_size = shutil.get_terminal_size()
         self.configs = {
-            "default": TextConfig(),
-            "scene": TextConfig(
-                frame_style=FrameStyle.NONE,
+            "default": TextConfig(
+                speed=0.05,
+                frame_style=FrameStyle.SINGLE,
                 padding=2,
-                speed=0.02
+                color=None,
+                effects=TextEffect()
+            ),
+            "scene": TextConfig(
+                speed=0.03,
+                frame_style=FrameStyle.SINGLE,
+                padding=2,
+                effects=TextEffect(fade_in=True)
             ),
             "dialogue": TextConfig(
-                frame_style=FrameStyle.NONE,
-                padding=2,
-                speed=0.02
+                speed=0.08,
+                frame_style=FrameStyle.ROUNDED,
+                padding=1,
+                effects=TextEffect(animate_frame=True)
             ),
             "combat": TextConfig(
-                frame_style=FrameStyle.NONE,
-                padding=2,
-                speed=0.02
+                speed=0.02,
+                frame_style=FrameStyle.DOUBLE,
+                padding=1,
+                effects=TextEffect(flash=True)
             ),
             "story": TextConfig(
-                frame_style=FrameStyle.NONE,
+                speed=0.05,
+                frame_style=FrameStyle.SINGLE,
                 padding=2,
-                speed=0.02
+                alignment="center",
+                effects=TextEffect(gradient=True)
+            ),
+            "system": TextConfig(
+                speed=0.05,
+                frame_style=FrameStyle.ASCII,
+                padding=1
+            ),
+            "inventory": TextConfig(
+                speed=0.05,
+                frame_style=FrameStyle.SINGLE,
+                padding=1
             )
         }
 
     def process_config(self, data: StyleConfig):
         if not data.styles:
             return
-
+                
         for style_name, style_data in data.styles.items():
             frame_type = style_data.get("frame", "SINGLE").upper()
             frame_style = FrameStyle[frame_type] if frame_type != "NONE" else FrameStyle.NONE
@@ -93,19 +106,18 @@ class TextStyler:
                 animate_frame=style_data.get("animate_frame", False)
             )
             
-            self.configs[style_name] = TextConfig(
+            config = TextConfig(
                 speed=style_data.get("speed", data.text_speed),
                 frame_style=frame_style,
                 padding=style_data.get("padding", data.horizontal_padding),
                 alignment=style_data.get("alignment", "left"),
                 color=data.colors.get(style_name) if data.colors else None,
-                effects=effects
+                effects=effects,
+                character_delay=style_data.get("character_delay", 0),
+                paragraph_delay=style_data.get("paragraph_delay", 1.0)
             )
-
-    def load_config(self, config_file: str):
-        with open(config_file) as f:
-            data = json.load(f)
-            self.process_config(data)
+            
+            self.configs[style_name] = config
 
     def update_terminal_size(self):
         self.terminal_size = shutil.get_terminal_size()
@@ -139,44 +151,51 @@ class TextStyler:
         width = self.get_wrap_width(style)
         wrapped = textwrap.wrap(text, width - 4)
         
+        color_start = f"\033[{style.color}m" if style.color and style.color.strip() else ""
+        color_end = "\033[0m" if color_start else ""
+        
         frame = [
-            f"{chars[2]}{chars[0] * (width-2)}{chars[3]}",
-            *[f"{chars[1]}{' ' * (width-2)}{chars[1]}" for _ in wrapped],
-            f"{chars[4]}{chars[0] * (width-2)}{chars[5]}"
+            f"{color_start}{chars[2]}{chars[0] * (width-2)}{chars[3]}{color_end}",
+            *[f"{color_start}{chars[1]}{' ' * (width-2)}{chars[1]}{color_end}" for _ in wrapped],
+            f"{color_start}{chars[4]}{chars[0] * (width-2)}{chars[5]}{color_end}"
         ]
         
         for i, line in enumerate(wrapped, 1):
             padding = ' ' * ((width - 2 - len(line)) // 2) if style.alignment == "center" else ' '
-            frame[i] = f"{chars[1]}{padding}{line}{' ' * (width-2-len(line)-len(padding))}{chars[1]}"
-            
+            frame[i] = f"{color_start}{chars[1]}{padding}{line}{' ' * (width-2-len(line)-len(padding))}{chars[1]}{color_end}"
+        
         return frame
 
-    def print_text(self, text: str, style_name: str = "default", delay_override: Optional[float] = None):
+    def print_text(self, text: str, style_name: str = "default"):
         config = self.configs.get(style_name, self.configs["default"])
         self.update_terminal_size()
         
-        frame_lines = self.create_frame(text, config) if config.frame_style else [text]
+        colored_text = f"\033[{config.color}m{text}\033[0m" if config.color and config.color.strip() else text
         
-        if config.effects.gradient:
-            frame_lines = self.apply_gradient('\n'.join(frame_lines))
-        elif config.color:
-            frame_lines = [f"\033[{config.color}m{line}\033[0m" for line in frame_lines]
-
-        if config.effects.animate_frame:
-            self.animate_frame(frame_lines, config.effects.animation_speed)
+        if config.frame_style != FrameStyle.NONE:
+            frame_lines = self.create_frame(text, config)
+            if config.effects.animate_frame:
+                self.animate_frame(frame_lines, config.effects.animation_speed)
+            else:
+                print('\n'.join(frame_lines))
         else:
-            print('\n'.join(frame_lines))
+            wrapped = textwrap.wrap(colored_text, self.get_wrap_width(config))
+            if config.alignment == "center":
+                wrapped = [line.center(self.get_wrap_width(config)) for line in wrapped]
+            print('\n'.join(wrapped))
 
         if config.effects.flash:
-            self.flash_effect('\n'.join(frame_lines))
+            self.flash_effect(text)
+        elif config.effects.fade_in:
+            self.fade_in_text(text)
 
     def flash_effect(self, text: str, flashes: int = 3, speed: float = 0.1):
         for _ in range(flashes):
-            print('\033[?5h')  # Enable reverse video
+            print('\033[?5h')
             time.sleep(speed)
-            print('\033[?5l')  # Disable reverse video
+            print('\033[?5l')
             time.sleep(speed)
-
+            
     def set_default_configs(self):
         self.configs = {
             "default": TextConfig(),

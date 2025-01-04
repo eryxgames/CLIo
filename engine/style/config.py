@@ -15,41 +15,31 @@ class StyleConfig:
     colors: Optional[Dict[str, str]] = None
     styles: Optional[Dict[str, Dict]] = None
     
+    @staticmethod
+    def get_config_dir() -> Path:
+        return Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))) / "engine" / "style" / "configs"
+    
     @classmethod
     def load(cls, style_name: str) -> 'StyleConfig':
-        # Remove .json extension if present
+            # Debug print
+        print(f"Loading style: {style_name}")
         style_name = style_name.replace('.json', '')
-        
-        # Get the base directory of the game
-        base_dir = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-        config_path = base_dir / "engine" / "style" / "configs" / f"{style_name}.json"
+        config_path = cls.get_config_dir() / f"{style_name}.json"
+
+        print(f"Looking for config at: {config_path}")  # Debug path     
         
         try:
             with open(config_path) as f:
                 data = json.load(f)
             return cls(**data)
         except FileNotFoundError:
-            print(f"Style config not found: {config_path}, using defaults")
             return cls()
     
     def save(self, style_name: str):
         style_name = style_name.replace('.json', '')
-        base_dir = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-        config_path = base_dir / "engine" / "style" / "configs" / f"{style_name}.json"
+        config_path = self.get_config_dir() / f"{style_name}.json"
         config_path.parent.mkdir(parents=True, exist_ok=True)
         
-        with open(config_path, 'w') as f:
-            json.dump(self.__dict__, f, indent=2)
-    
-    @classmethod
-    def load(cls, style_name: str) -> 'StyleConfig':
-        config_path = Path(__file__).parent / "configs" / f"{style_name}.json"
-        with open(config_path) as f:
-            data = json.load(f)
-        return cls(**data)
-    
-    def save(self, style_name: str):
-        config_path = Path(__file__).parent / "configs" / f"{style_name}.json"
         with open(config_path, 'w') as f:
             json.dump(self.__dict__, f, indent=2)
             
@@ -60,8 +50,7 @@ class StyleConfig:
                 
     @property
     def available_styles(self) -> list:
-        config_dir = Path(__file__).parent / "configs"
-        return [p.stem for p in config_dir.glob("*.json")]
+        return [p.stem for p in self.get_config_dir().glob("*.json")]
 
     def get_frame_chars(self, style: str) -> str:
         frames = {

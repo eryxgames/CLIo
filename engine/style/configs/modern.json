@@ -1,0 +1,40 @@
+{
+  "text_speed": 0.03,
+  "horizontal_padding": 1,
+  "vertical_padding": 0,
+  "colors": {
+    "scene": "38;5;75",
+    "dialogue": "38;5;156",
+    "item": "38;5;220",
+    "combat": "38;5;203",
+    "system": "38;5;147",
+    "story": "38;5;183",
+    "inventory": "38;5;226",
+    "default": "38;5;252"
+  },
+  "styles": {
+    "scene": {
+      "padding": 1,
+      "frame": "rounded",
+      "speed": 0.02,
+      "fade_in": true
+    },
+    "dialogue": {
+      "padding": 1,
+      "frame": "single",
+      "character_delay": 0.05
+    },
+    "inventory": {
+      "padding": 1,
+      "frame": "SINGLE"
+    },
+    "system": {
+      "padding": 1,
+      "frame": "ROUNDED"
+    },
+    "default": {
+      "padding": 1,
+      "frame": "none"
+    }
+  }
+}

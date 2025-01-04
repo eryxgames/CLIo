@@ -1,5 +1,6 @@
 {
   "cleaning_microbot": {
+    "id": "cleaning_microbot",
     "name": "Cleaning Microbot",
     "type": "neutral",
     "description": "A small, industrious robot that continuously moves through the ship, cleaning and maintaining various areas. Its methodical movements are accompanied by soft whirring sounds.",
@@ -13,10 +14,10 @@
       "greet": "The microbot pauses its cleaning routine momentarily to face you."
     },
     "dialogue_options": {
-    "Ask about ship": "The microbot projects a small hologram showing the ship's layout. Unfortunately, the image dissapears too quickly for you to register any details.",
-    "Ask about cleaning": "It demonstrates its cleaning capabilities by quickly polishing a nearby surface.",
-    "Ignore": "The microbot returns to its cleaning duties."
-    },    
+      "Ask about ship": "The microbot projects a small hologram showing the ship's layout. Unfortunately, the image disappears too quickly for you to register any details.",
+      "Ask about cleaning": "It demonstrates its cleaning capabilities by quickly polishing a nearby surface.",
+      "Ignore": "The microbot returns to its cleaning duties."
+    },
     "random_events": [
       "The microbot efficiently sweeps away some debris.",
       "A soft humming sound emanates from the microbot as it works.",
@@ -25,10 +26,35 @@
     "stats": {
       "health": 50,
       "attack": 0,
-      "defense": 5    
-  }
-},
+      "defense": 5
+    }
+  },
+  "tester": {
+    "id": "friendly_robot",
+    "name": "Friendly Robot",
+    "description": "A helpful robot willing to assist.",
+    "type": "friendly",
+    "dialogue": {
+      "greet": "Greetings! How can I assist you?",
+      "repair": "I can craft you something useful if you bring me the right components.",
+      "thanks": "You're welcome! Safe travels."
+    },
+    "dialogue_options": {
+      "Ask about crafting": "I can create a remote control if you bring me energy cells and a broken communicator.",
+      "Request help": "I'd be happy to help you with any technical problems."
+    },
+    "dialogue_rewards": {
+      "Complete mission": {
+        "required_progress": "mission_complete",
+        "item": "passcard",
+        "success_message": "Well done! Here's a maintenance passcard for your help.",
+        "failure_message": "Complete your mission first, and I'll reward you appropriately."
+      }
+    },
+    "greeting": "A friendly robot greets you with a cheerful beep."
+  },
   "friendly_robot": {
+    "id": "friendly_robot",
     "name": "Friendly Robot",
     "description": "A helpful robot willing to assist.",
     "type": "friendly",
@@ -38,8 +64,16 @@
       "thanks": "You're welcome! Safe travels."
     },
     "dialogue_options": {
-      "Ask for help": "What do you need help with?",
-      "Repair communicator": "friendly_robot_repair"
+      "Ask for help": "I can craft you something useful if you bring me the right components.",
+      "Check systems": "Affirmative... All systems nominal. How can I assist you?"
+    },
+    "dialogue_rewards": {
+      "Complete mission": {
+        "required_progress": "mission_complete",
+        "item": "passcard",
+        "success_message": "Well done! Here's a maintenance passcard for your help.",
+        "failure_message": "Complete your mission first, and I'll reward you appropriately."
+      }
     },
     "interactions": {
       "talk": "friendly_robot_greet",
@@ -59,6 +93,7 @@
     "greeting": "A friendly robot greets you with a cheerful beep."
   },
   "hostile_droid": {
+    "id": "hostile_droid",
     "name": "Hostile Security Droid",
     "description": "A security droid on high alert.",
     "type": "hostile",
@@ -82,6 +117,7 @@
     "greeting": "A hostile security droid scans you with its sensors."
   },
   "neutral_ai": {
+    "id": "neutral_ai",
     "name": "Neutral AI",
     "description": "The ship's AI, observing your actions.",
     "type": "neutral",
@@ -105,6 +141,7 @@
     "greeting": "The ship's AI acknowledges your presence with a neutral tone."
   },
   "mutated_bugrat": {
+    "id": "mutated_bugrat",
     "name": "Mutated Bugrat",
     "description": "A small pest creature with sharp teeth and a nasty temper.",
     "type": "aggressive",
@@ -126,5 +163,88 @@
       "defense": 2
     },
     "greeting": "A small, mutated creature scurries around, hissing and baring its teeth."
+  },
+  "sentient_replicator": {
+    "id": "sentient_replicator",
+    "name": "Sentient Replicator",
+    "description": "A replicator, that accepts and works with items like blue_apple, red_apple, specimen, but with comical errors.",
+    "type": "neutral",
+    "dialogue": {
+      "greet": "Oh, another human. What do you want?",
+      "replicate": "Let me see what I can do with that."
+    },
+    "dialogue_options": {
+      "Ask about replication": "I can replicate items, but don't expect perfection. I can also analyze specimens. I am more of a scientist, you know.",
+      "Give item": "Let's see if I can replicate this item."
+    },
+    "item_interactions": {
+      "blue_apple": {
+        "type": "replicate",
+        "response": "I tried to replicate the blue apple, but it turned out to be a blue banana. Oops!",
+        "consume_item": true,
+        "reward_item": "blue_banana"
+      },
+      "red_apple": {
+        "type": "replicate",
+        "response": "I attempted to replicate the red apple. The result? A red orange. It even smells faintly of citrus. Do you perhaps have something… less… fruity?",
+        "consume_item": true,
+        "reward_item": "red_orange"
+      },
+      "specimen": {
+        "type": "replicate",
+        "response": "I tried to analyze the specimen, but it turned out to be a blob of goo. Oops!",
+        "consume_item": true,
+        "reward_item": "blob_of_goo"
+      }
+    },
+    "greeting": "This energy-matter replicator looks like a coffee machine designed by a committee of overly enthusiastic engineers who also happened to be obsessed with theoretical physics."
+  },
+  "cyber_nexus_terminal": {
+    "id": "cyber_nexus_terminal",
+    "name": "Cyber Nexus Terminal",
+    "description": "A sentient computer console, an apex of late millenium technology. It is equipped with a cracked scanner camera lens and data storage input slot.",
+    "type": "neutral",
+    "dialogue": {
+      "greet": "Ah, a human. What do you need?",
+      "help": "I can assist with technical issues, but don't waste my time."
+    },
+    "dialogue_options": {
+      "Ask for help": "I can assist with technical issues, but don't waste my time.",
+      "Give item": "Let's see if I can analyze this item."
+    },
+    "item_interactions": {
+      "ship_log": {
+        "type": "information",
+        "response": "Analyzing ship log... Log contains valuable information about the ship's journey. Data stored successfully.",
+        "consume_item": true,
+        "story_flag": "ship_log_analyzed"
+      },
+      "chx_cargo_hauler_manual": {
+        "type": "information",
+        "response": "Analyzing cargo manual... This manual is essential for understanding the ship's cargo system. Data stored successfully.",
+        "consume_item": true,
+        "story_flag": "cargo_manual_analyzed"
+      },
+      "torn_research_paper": {
+        "type": "information",
+        "response": "Analyzing research paper... This research paper is crucial for understanding the ship's anomalies. Data stored successfully.",
+        "consume_item": true,
+        "story_flag": "research_paper_analyzed"
+      },
+      "data_storage": {
+        "type": "information",
+        "response": "Accessing data storage... This data storage device probably once contained important information. Data is fragmented beyond recognition.",
+        "consume_item": true,
+        "story_flag": "data_storage_analyzed"
+      }
+    },
+    "greeting": "A sentient computer console blinks in the dark with its dusty, scratched screen.",
+    "random_events": [
+      "'Compiling... Compiling... Compiling...'",
+      "'Error: Segmentation fault (core dumped)'",
+      "'Warning: Deprecated function used. Update your code immediately!'",
+      "'...Access granted. Welcome, user with no admin rights.'",
+      "'...System security updates available. Press cancel to proceed...'"
+    ]
   }
 }

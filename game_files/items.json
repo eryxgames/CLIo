@@ -1,10 +1,31 @@
 {
     "broken_communicator": {
+        "id": "broken_communicator",
         "name": "Broken Communicator",
         "description": "A damaged communicator that needs repair.",
         "usable": false,
         "readable_item": "The communicator is broken and needs repair. It has a label with instructions on how to repair it using energy cells."
-    },
+      },
+      "energy_cells": {
+        "id": "energy_cells",
+        "name": "Energy Cells",
+        "description": "High-energy cells for powering devices.",
+        "usable": false,
+        "equippable": false
+      },
+      "remote_control": {
+        "id": "remote_control",
+        "name": "Remote Control",
+        "description": "A sleek remote control device crafted from salvaged parts.",
+        "usable": true,
+        "equippable": false,
+        "npc_craftable": {
+          "crafter": "friendly_robot",
+          "required_items": ["energy_cells", "broken_communicator"],
+          "dialogue_response": "Here's your remote control, crafted from the parts you provided.",
+          "success_message": "The friendly robot combines the parts into a working remote control."
+        }
+      },
     "space_map": {
         "name": "Space Map",
         "description": "A map of nearby planets and coordinates.",
@@ -19,12 +40,6 @@
             "health": 50
         }
     },
-    "energy_cells": {
-        "name": "Energy Cells",
-        "description": "High-energy cells for powering devices.",
-        "usable": false,
-        "equippable": false
-    },
     "coolant_canister": {
         "name": "Coolant Canister",
         "description": "A canister of coolant to reduce heat.",
@@ -36,7 +51,7 @@
         "description": "Log entries detailing the ship's journey.",
         "usable": false,
         "readable_item": "The ship log contains detailed entries of the ship's journey, including encounters with alien species and mysterious phenomena.\n\nThe first entry details the ship's departure from Earth, with the crew excited and hopeful.\n\nThe second entry describes a strange encounter with an unknown alien species, which left the crew baffled and slightly frightened.\n\nThe third entry talks about a mysterious phenomenon that caused the ship's systems to malfunction temporarily.",
-        "read_speed": 0.03  
+        "read_speed": 0.03
     },
     "spacesuit": {
         "name": "Spacesuit",
@@ -147,11 +162,6 @@
         "usable": false,
         "key": true,
         "consumable": true
-    },
-    "combinations": {
-        "broken_communicator + energy_cells": "repaired_communicator",
-        "first_aid_kit + coolant_canister": "advanced_medkit",
-        "item_one + item_two": "combined_item01"
     },
     "spaceship_console": {
         "name": "Spaceship Console",
@@ -318,5 +328,31 @@
             "attack": 15
         },
         "components": ["broken_tool"]
+    },
+    "data_storage": {
+        "name": "Data Storage",
+        "description": "A data storage device containing important information.",
+        "usable": false
+    },
+    "blue_banana": {
+        "name": "Blue Banana",
+        "description": "A vibrant blue banana. It looks like plastic, and probably tastes like it too.",
+        "usable": true,
+        "effect": {
+            "health": 10
+        }
+    },
+    "blob_of_goo": {
+        "name": "Blob of Goo",
+        "description": "A mysterious blob of goo. It's squishy, sticky, and a bit gross.",
+        "usable": false
+    },
+    "red_orange": {
+        "name": "Red Orange",
+        "description": "A vibrant red orange. Looks a bit odd.",
+        "usable": true,
+        "effect": {
+            "health": 15
+        }
     }
 }

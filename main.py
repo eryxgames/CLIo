@@ -6,6 +6,7 @@ from engine.game_engine import GameEngine
 from engine.save_load import SaveLoad
 from engine.media_player import MediaPlayer
 from engine.parser import Parser
+from engine.message_handler import message_handler
 
 def load_data(filename):
     with open(filename, 'r') as f:

@@ -44,68 +44,49 @@ class TextConfig:
     paragraph_delay: float = 1.0
 
 class TextStyler:
-    def __init__(self):
-        self.terminal_size = shutil.get_terminal_size()
-        self.configs = {
-            "default": TextConfig(
-                speed=0.05,
-                frame_style=FrameStyle.SINGLE,
-                padding=2,
-                color=None,
-                effects=TextEffect()
-            ),
-            "scene": TextConfig(
-                speed=0.03,
-                frame_style=FrameStyle.SINGLE,
-                padding=2,
-                effects=TextEffect(fade_in=True)
-            ),
-            "dialogue": TextConfig(
-                speed=0.08,
-                frame_style=FrameStyle.ROUNDED,
-                padding=1,
-                effects=TextEffect(animate_frame=True)
-            ),
-            "combat": TextConfig(
-                speed=0.02,
-                frame_style=FrameStyle.DOUBLE,
-                padding=1,
-                effects=TextEffect(flash=True)
-            ),
-            "story": TextConfig(
-                speed=0.05,
-                frame_style=FrameStyle.SINGLE,
-                padding=2,
-                alignment="center",
-                effects=TextEffect(gradient=True)
-            ),
-            "system": TextConfig(
-                speed=0.05,
-                frame_style=FrameStyle.ASCII,
-                padding=1
-            ),
-            "inventory": TextConfig(
-                speed=0.05,
-                frame_style=FrameStyle.SINGLE,
-                padding=1
-            )
-        }
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance.terminal_size = shutil.get_terminal_size()
+            cls._instance.configs = {
+                "default": TextConfig(),
+                "dialogue": TextConfig(
+                    speed=0.08,
+                    frame_style=FrameStyle.ROUNDED,
+                    effects=TextEffect(animate_frame=True)
+                ),
+                "scene": TextConfig(
+                    speed=0.03,
+                    padding=2,
+                    effects=TextEffect(fade_in=True)
+                ),
+                "intro": TextConfig(
+                    speed=0.1,
+                    frame_style=FrameStyle.DOUBLE,
+                    effects=TextEffect(gradient=True)
+                ),
+                "combat": TextConfig(
+                    speed=0.02,
+                    frame_style=FrameStyle.DOUBLE,
+                    effects=TextEffect(flash=True)
+                )
+            }
+        return cls._instance
 
     def process_config(self, data: StyleConfig):
         if not data.styles:
             return
-                
         for style_name, style_data in data.styles.items():
             frame_type = style_data.get("frame", "SINGLE").upper()
             frame_style = FrameStyle[frame_type] if frame_type != "NONE" else FrameStyle.NONE
-            
             effects = TextEffect(
                 fade_in=style_data.get("fade_in", False),
                 gradient=style_data.get("gradient", False),
                 flash=style_data.get("flash_effect", False),
                 animate_frame=style_data.get("animate_frame", False)
             )
-            
             config = TextConfig(
                 speed=style_data.get("speed", data.text_speed),
                 frame_style=frame_style,
@@ -116,10 +97,8 @@ class TextStyler:
                 character_delay=style_data.get("character_delay", 0),
                 paragraph_delay=style_data.get("paragraph_delay", 1.0)
             )
-            
             self.configs[style_name] = config
             print(f"Updated config for {style_name}: {config}")  # Debug print
-
 
     def update_terminal_size(self):
         self.terminal_size = shutil.get_terminal_size()
@@ -177,7 +156,8 @@ class TextStyler:
     def print_text(self, text: str, style_name: str = "default"):
         config = self.configs.get(style_name, self.configs["default"])
         self.update_terminal_size()
-        
+        print(f"Style {style_name} color: {config.color}")  # Debug print
+
         colored_text = f"\033[{config.color}m{text}\033[0m" if config.color and config.color.strip() else text
         
         if config.frame_style != FrameStyle.NONE:

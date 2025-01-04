@@ -14,7 +14,7 @@ class MessageHandler:
 
     def print_message(self, message: str, style: str = "default"):
         config = self.text_styler.configs.get(style, self.text_styler.configs["default"])
-        
+        print(f"Using config for {style}: {config}")  # Debug print
         if config.effects.fade_in:
             self.fade_in_text(message, config)
         elif config.character_delay > 0:

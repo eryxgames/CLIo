@@ -16,11 +16,14 @@ class GameEngine:
     def __init__(self, config_file, media_player, parser):
         self.config = self.load_config(config_file)
         self.text_styler = TextStyler()
+
+        # Get the style configuration from the config file
         style_config = self.config.get("style_config", "default")
 
         # Load and update the style configuration only once
         self.style_config = StyleConfig.load(style_config)
         print(f"Loaded style config: {self.style_config}")  # Debug print
+        self.text_styler.process_config(self.style_config)
         self.text_styler.update_config(self.style_config)
         message_handler.text_styler.update_config(self.style_config)
 

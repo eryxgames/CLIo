@@ -15,32 +15,38 @@ from engine.message_handler import message_handler
 class GameEngine:
     def __init__(self, config_file, media_player, parser):
         self.config = self.load_config(config_file)
+        
+        # Initialize text styling singleton
         self.text_styler = TextStyler()
-
-        # Get the style configuration from the config file
-        style_config = self.config.get("style_config", "default")
-
-        # Load and update the style configuration only once
-        self.style_config = StyleConfig.load(style_config)
-        print(f"Loaded style config: {self.style_config}")  # Debug print
-        self.text_styler.process_config(self.style_config)
-        self.text_styler.update_config(self.style_config)
-        message_handler.text_styler.update_config(self.style_config)
-
-        # Use message_handler directly:
-        message_handler.print_message("Game initialized", "system")
-
-        self.scenes = self.load_data(self.config["scenes_file"])
+        self.message_handler = message_handler
+        
+        # Load and apply style config once
+        style_config = StyleConfig.load(self.config.get("style_config", "default"))
+        self.text_styler.process_config(style_config)
+        
+        # Load game data
+        self.scenes = self.load_data(self.config["scenes_file"]) 
         self.items = self.load_data(self.config["items_file"])
         self.characters = self.load_data(self.config["characters_file"])
         self.story_texts = self.load_data(self.config["story_texts_file"])
         self.current_scene = next(scene for scene in self.scenes if scene["id"] == self.config["initial_scene"])
+
+        # Initialize game state
         self.inventory = Inventory()
         self.character_crafting_inventories = {}
-        self.player_stats = self.config["player_stats"]
+        self.player_stats = self.config["player_stats"].copy()
         self.story_progress = {}
         self.hints_used = 0
         self.max_hints = self.config["max_hints"]
+
+        # Add missing stats from items
+        for item_id, item in self.items.items():
+            if "effect" in item:
+                for stat in item["effect"]:
+                    if stat not in self.player_stats:
+                        self.player_stats[stat] = 0
+
+        # Initialize messages
         self.item_not_found_messages = [
             "No such item in sight.",
             "Such item is not within reach.",
@@ -50,28 +56,26 @@ class GameEngine:
             "You can't reach that item.",
             "That item is out of your reach."
         ]
+
         self.unclear_command_messages = [
             "Be more clear than that.",
-            "Be more specific.",
+            "Be more specific.", 
             "I don't understand that command.",
             "Please provide more details.",
             "That command is unclear.",
             "I need more information to proceed."
         ]
+
+        # Setup components
         self.media_player = media_player
-        self.parser = parser  # Initialize the Parser
+        self.parser = parser
 
-        # Ensure that all possible stats are present in player_stats
-        for item_id, item in self.items.items():
-            if "effect" in item:
-                for stat in item["effect"]:
-                    if stat not in self.player_stats:
-                        self.player_stats[stat] = 0
-
-        # Add new attributes for character movement
+        # Initialize character movement
         self.commands_since_last_move = 0
-        self.characters_last_move = {}  # Track when each character last moved
+        self.characters_last_move = {}
         self.initialize_movable_characters()
+
+        message_handler.print_message("Game initialized", "system")
 
     def initialize_movable_characters(self):
         """Initialize tracking for characters that can move between scenes"""

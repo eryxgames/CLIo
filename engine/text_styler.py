@@ -3,7 +3,6 @@ import sys
 import time
 import textwrap
 import shutil
-import json
 from enum import Enum
 from dataclasses import dataclass
 from typing import Optional, Dict, List
@@ -45,60 +44,41 @@ class TextConfig:
 
 class TextStyler:
     _instance = None
+    _config = None
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance.terminal_size = shutil.get_terminal_size()
-            cls._instance.configs = {
-                "default": TextConfig(),
-                "dialogue": TextConfig(
-                    speed=0.08,
-                    frame_style=FrameStyle.ROUNDED,
-                    effects=TextEffect(animate_frame=True)
-                ),
-                "scene": TextConfig(
-                    speed=0.03,
-                    padding=2,
-                    effects=TextEffect(fade_in=True)
-                ),
-                "intro": TextConfig(
-                    speed=0.1,
-                    frame_style=FrameStyle.DOUBLE,
-                    effects=TextEffect(gradient=True)
-                ),
-                "combat": TextConfig(
-                    speed=0.02,
-                    frame_style=FrameStyle.DOUBLE,
-                    effects=TextEffect(flash=True)
-                )
-            }
+            cls._instance.configs = {}
         return cls._instance
 
-    def process_config(self, data: StyleConfig):
-        if not data.styles:
+    def process_config(self, data):
+        if not data or not hasattr(data, 'styles'):
             return
+            
+        TextStyler._config = data
         for style_name, style_data in data.styles.items():
             frame_type = style_data.get("frame", "SINGLE").upper()
             frame_style = FrameStyle[frame_type] if frame_type != "NONE" else FrameStyle.NONE
-            effects = TextEffect(
-                fade_in=style_data.get("fade_in", False),
-                gradient=style_data.get("gradient", False),
-                flash=style_data.get("flash_effect", False),
-                animate_frame=style_data.get("animate_frame", False)
-            )
+            
             config = TextConfig(
                 speed=style_data.get("speed", data.text_speed),
                 frame_style=frame_style,
                 padding=style_data.get("padding", data.horizontal_padding),
                 alignment=style_data.get("alignment", "left"),
-                color=data.colors.get(style_name) if data.colors else None,
-                effects=effects,
+                color=data.colors.get(style_name),
+                effects=TextEffect(**{k: style_data.get(k, False) for k in TextEffect.__annotations__}),
                 character_delay=style_data.get("character_delay", 0),
                 paragraph_delay=style_data.get("paragraph_delay", 1.0)
             )
             self.configs[style_name] = config
-            print(f"Updated config for {style_name}: {config}")  # Debug print
+            
+        if "default" not in self.configs:
+            self.configs["default"] = TextConfig()
+
+    def update_config(self, new_config):
+        self.process_config(new_config)
 
     def update_terminal_size(self):
         self.terminal_size = shutil.get_terminal_size()
@@ -111,7 +91,7 @@ class TextStyler:
     def apply_gradient(self, text: str, start_color: int = 196, end_color: int = 201) -> List[str]:
         lines = text.split('\n')
         gradient_lines = []
-        color_step = (end_color - start_color) / len(lines)
+        color_step = (end_color - start_color) / max(len(lines), 1)
         
         for i, line in enumerate(lines):
             color = int(start_color + (i * color_step))
@@ -156,9 +136,9 @@ class TextStyler:
     def print_text(self, text: str, style_name: str = "default"):
         config = self.configs.get(style_name, self.configs["default"])
         self.update_terminal_size()
-        print(f"Style {style_name} color: {config.color}")  # Debug print
 
-        colored_text = f"\033[{config.color}m{text}\033[0m" if config.color and config.color.strip() else text
+        if config.color and config.color.strip():
+            text = f"\033[{config.color}m{text}\033[0m"
         
         if config.frame_style != FrameStyle.NONE:
             frame_lines = self.create_frame(text, config)
@@ -167,7 +147,7 @@ class TextStyler:
             else:
                 print('\n'.join(frame_lines))
         else:
-            wrapped = textwrap.wrap(colored_text, self.get_wrap_width(config))
+            wrapped = textwrap.wrap(text, self.get_wrap_width(config))
             if config.alignment == "center":
                 wrapped = [line.center(self.get_wrap_width(config)) for line in wrapped]
             print('\n'.join(wrapped))
@@ -183,32 +163,3 @@ class TextStyler:
             time.sleep(speed)
             print('\033[?5l')
             time.sleep(speed)
-
-    def set_default_configs(self):
-        self.configs = {
-            "default": TextConfig(),
-            "dialogue": TextConfig(
-                speed=0.08,
-                frame_style=FrameStyle.ROUNDED,
-                effects=TextEffect(animate_frame=True)
-            ),
-            "scene": TextConfig(
-                speed=0.03,
-                padding=2,
-                effects=TextEffect(fade_in=True)
-            ),
-            "intro": TextConfig(
-                speed=0.1,
-                frame_style=FrameStyle.DOUBLE,
-                effects=TextEffect(gradient=True)
-            ),
-            "combat": TextConfig(
-                speed=0.02,
-                frame_style=FrameStyle.DOUBLE,
-                effects=TextEffect(flash=True)
-            )
-        }
-
-    def update_config(self, new_config: dict):
-        print(f"Updating config with: {new_config}")  # Debug print
-        self.process_config(new_config)

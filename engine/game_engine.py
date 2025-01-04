@@ -103,7 +103,6 @@ class GameEngine:
         os.system('cls' if os.name == 'nt' else 'clear')
 
     def explore_scene(self):
-        self.clear_screen()
         message_handler.print_message(self.current_scene["description"], "scene")
         
         if "items" in self.current_scene and self.current_scene["items"]:
@@ -115,11 +114,9 @@ class GameEngine:
             for char_id in self.current_scene["characters"]:
                 char = self.characters[char_id]
                 message_handler.print_message(f"{char['name']}: {char['greeting']}", "dialogue")
-
-    def display_story_text(self, text_key):
-        text_info = self.story_texts.get(text_key)
-        if text_info:
-            message_handler.print_message(text_info["text"], "scene")
+                random_text = self.get_random_character_text(char_id)
+                if random_text:
+                    message_handler.print_message(random_text, "dialogue")
 
     def display_scene_description(self, scene):
         self.text_styler.print_text(
@@ -146,10 +143,10 @@ class GameEngine:
         if command == "quit":
             confirm = input("Are you sure you want to quit your adventure? (yes/no): ").lower()
             if confirm == "yes":
-                message_handler.print_message("Thank you for playing! Goodbye!")
+                message_handler.print_message("Thank you for playing! Goodbye!", "system")
                 exit()
             else:
-                message_handler.print_message("Continuing the adventure...")
+                message_handler.print_message("Continuing the adventure...", "system")
         elif command == "save":
             save_game_state = {
                 "current_scene": self.current_scene["id"],
@@ -879,7 +876,7 @@ class GameEngine:
                     self.inventory.remove_item(item["id"])
                 # Add more effects as needed
             else:
-                message_handler.print_message("This item cannot be used.")
+                message_handler.print_message("This item cannot be used.", "story")
         else:
             message_handler.print_message("Item not found in inventory or cannot be used.")
 

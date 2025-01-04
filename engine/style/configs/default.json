@@ -1,45 +1,44 @@
 {
   "text_speed": 0.05,
-  "horizontal_padding": 2,
-  "vertical_padding": 1,
+  "horizontal_padding": 1,
+  "vertical_padding": 0,
   "colors": {
     "scene": "94",
     "dialogue": "92",
     "item": "93",
     "combat": "91",
     "system": "96",
-    "story": "95"
+    "story": "95",
+    "intro": "34",
+    "inventory": "93",
+    "default": "97"
   },
   "styles": {
     "scene": {
-      "alignment": "left",
-      "padding": 2,
-      "speed": 0.03,
+      "padding": 1,
       "frame": "single",
-      "character_delay": 0.03,
-      "paragraph_delay": 1.0
+      "character_delay": 0.05
     },
     "dialogue": {
-      "alignment": "left",
       "padding": 1,
-      "frame": "rounded",
-      "speed": 0.08,
-      "character_delay": 0.08
-    },
-    "combat": {
-      "alignment": "center",
-      "padding": 1,
-      "frame": "double",
-      "speed": 0.02,
-      "flash_effect": true
-    },
-    "story": {
-      "alignment": "center",
-      "padding": 2,
       "frame": "single",
-      "speed": 0.05,
-      "character_delay": 0.05,
-      "paragraph_delay": 1.0
+      "character_delay": 0.05
+    },
+    "inventory": {
+      "padding": 1,
+      "frame": "none"
+    },
+    "system": {
+      "padding": 1,
+      "frame": "none"
+    },    
+    "story": {
+      "padding": 2,
+      "frame": "round"
+    },
+    "default": {
+      "padding": 1,
+      "frame": "none"
     }
   }
 }

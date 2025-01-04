@@ -13,7 +13,7 @@ class BattleSystem:
         self.enemy_critical_hit_chance = enemy_stats.get("critical_hit_chance", 0)
 
     def start_battle(self):
-        message_handler.print_message("A battle has started!")
+        message_handler.print_message("A battle has started!", "combat")
         self.engage_battle()
 
     def engage_battle(self):

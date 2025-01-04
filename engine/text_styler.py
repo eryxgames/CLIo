@@ -108,6 +108,9 @@ class TextStyler:
                 print('\033[F' * len(partial_frame))
 
     def create_frame(self, text: str, style: TextConfig) -> List[str]:
+        if not text.strip():
+            return []
+            
         chars = style.frame_style.value
         width = self.get_wrap_width(style)
         wrapped = textwrap.wrap(text, width - 4)

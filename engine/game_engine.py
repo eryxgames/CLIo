@@ -20,9 +20,15 @@ class GameEngine:
         self.text_styler = TextStyler()
         self.message_handler = message_handler
         
-        # Load and apply style config once
-        style_config = StyleConfig.load(self.config.get("style_config", "default"))
+        # Load and apply style config with proper path
+        style_name = self.config.get("style_config", "default")
+        style_config = StyleConfig.load(style_name)
+        
+        # Process the style configuration
         self.text_styler.process_config(style_config)
+        
+        # Apply the style configuration to message handler
+        self.message_handler.text_styler.process_config(style_config)
         
         # Load game data
         self.scenes = self.load_data(self.config["scenes_file"]) 
@@ -30,6 +36,7 @@ class GameEngine:
         self.characters = self.load_data(self.config["characters_file"])
         self.story_texts = self.load_data(self.config["story_texts_file"])
         self.current_scene = next(scene for scene in self.scenes if scene["id"] == self.config["initial_scene"])
+
 
         # Initialize game state
         self.inventory = Inventory()

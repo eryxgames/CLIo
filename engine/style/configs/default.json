@@ -16,21 +16,22 @@
   "styles": {
     "scene": {
       "padding": 1,
-      "frame": "single",
+      "frame": "SINGLE",
       "character_delay": 0.05
     },
     "dialogue": {
       "padding": 1,
-      "frame": "single",
+      "frame": "ROUNDED",
       "character_delay": 0.05
     },
     "inventory": {
-      "padding": 1,
-      "frame": "none"
+      "alignment": "center",
+      "padding": 10,
+      "frame": "ROUNDED"
     },
     "system": {
       "padding": 1,
-      "frame": "none"
+      "frame": "ROUNDED"
     },    
     "story": {
       "padding": 2,

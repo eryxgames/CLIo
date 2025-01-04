@@ -144,7 +144,8 @@ class TextStyler:
             return textwrap.wrap(text, self.get_wrap_width(style))
             
         width = self.get_wrap_width(style)
-        wrapped = textwrap.wrap(text, width - 4)
+        content_width = width - 4  # Account for frame chars and minimum padding
+        wrapped = textwrap.wrap(text, content_width)
         
         if not wrapped:
             return []
@@ -152,16 +153,25 @@ class TextStyler:
         color_start = f"\033[{style.color}m" if style.color and style.color.strip() else ""
         color_end = "\033[0m" if color_start else ""
         
-        # Build frame with color applied to each line
-        frame = [
-            f"{color_start}{chars[2]}{chars[0] * (width-2)}{chars[3]}{color_end}"
-        ]
+        # Top border
+        frame = [f"{color_start}{chars[2]}{chars[0] * (width-2)}{chars[3]}{color_end}"]
         
+        # Content lines with proper padding
         for line in wrapped:
-            padding_left = ' ' * style.padding
-            padding_right = ' ' * (width - 2 - len(line) - style.padding)
-            frame.append(f"{color_start}{chars[1]}{padding_left}{line}{padding_right}{chars[1]}{color_end}")
+            padding = width - len(line) - 4  # Account for frame chars
+            left_padding = padding // 2
+            right_padding = padding - left_padding
+            
+            padded_line = (
+                f"{color_start}{chars[1]}"
+                f"{' ' * (left_padding + 1)}"
+                f"{line}"
+                f"{' ' * (right_padding + 1)}"
+                f"{chars[1]}{color_end}"
+            )
+            frame.append(padded_line)
         
+        # Bottom border
         frame.append(f"{color_start}{chars[4]}{chars[0] * (width-2)}{chars[5]}{color_end}")
         
         return frame
@@ -173,22 +183,19 @@ class TextStyler:
         config = self.configs.get(style_name, self.configs.get("default", TextConfig()))
         self.update_terminal_size()
 
-        # Apply effects in order: color, frame, animation
-        if config.color and config.color.strip():
-            colored_text = f"\033[{config.color}m{text}\033[0m"
-        else:
-            colored_text = text
-
         if config.effects.gradient:
-            lines = self.apply_gradient(colored_text)
+            lines = self.apply_gradient(text)
             print('\n'.join(lines))
-        elif config.frame_style != FrameStyle.NONE:
+            return
+
+        colored_text = f"\033[{config.color}m{text}\033[0m" if config.color and config.color.strip() else text
+
+        if config.frame_style != FrameStyle.NONE:
             frame_lines = self.create_frame(colored_text, config)
-            if frame_lines:
-                if config.effects.animate_frame:
-                    self.animate_frame(frame_lines, config.effects.animation_speed)
-                else:
-                    print('\n'.join(frame_lines))
+            if config.effects.animate_frame:
+                self.animate_frame(frame_lines, config.effects.animation_speed)
+            else:
+                print('\n'.join(frame_lines))
         else:
             wrapped = textwrap.wrap(colored_text, self.get_wrap_width(config))
             if config.alignment == "center":
@@ -197,9 +204,9 @@ class TextStyler:
                 print('\n'.join(wrapped))
 
         if config.effects.flash:
-            self.flash_effect(text)
+            self.flash_effect()
         elif config.effects.fade_in:
-            self.fade_in_text(text)
+            time.sleep(config.character_delay)
 
     def flash_effect(self, text: str, flashes: int = 3, speed: float = 0.1):
         for _ in range(flashes):

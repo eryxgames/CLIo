@@ -17,11 +17,16 @@ class GameEngine:
         self.config = self.load_config(config_file)
         self.text_styler = TextStyler()
         style_config = self.config.get("style_config", "default")
-        message_handler.text_styler.update_config(StyleConfig.load(style_config))
-                # Use message_handler directly:
-        message_handler.print_message("Game initialized", "system")
+
+        # Load and update the style configuration only once
         self.style_config = StyleConfig.load(style_config)
+        print(f"Loaded style config: {self.style_config}")  # Debug print
         self.text_styler.update_config(self.style_config)
+        message_handler.text_styler.update_config(self.style_config)
+
+        # Use message_handler directly:
+        message_handler.print_message("Game initialized", "system")
+
         self.scenes = self.load_data(self.config["scenes_file"])
         self.items = self.load_data(self.config["items_file"])
         self.characters = self.load_data(self.config["characters_file"])

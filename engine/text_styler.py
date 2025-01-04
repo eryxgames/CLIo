@@ -118,6 +118,8 @@ class TextStyler:
             )
             
             self.configs[style_name] = config
+            print(f"Updated config for {style_name}: {config}")  # Debug print
+
 
     def update_terminal_size(self):
         self.terminal_size = shutil.get_terminal_size()
@@ -166,6 +168,12 @@ class TextStyler:
         
         return frame
 
+    def fade_in_text(self, text: str, delay: float = 0.05):
+        lines = text.split('\n')
+        for line in lines:
+            print(line)
+            time.sleep(delay)
+
     def print_text(self, text: str, style_name: str = "default"):
         config = self.configs.get(style_name, self.configs["default"])
         self.update_terminal_size()
@@ -195,7 +203,7 @@ class TextStyler:
             time.sleep(speed)
             print('\033[?5l')
             time.sleep(speed)
-            
+
     def set_default_configs(self):
         self.configs = {
             "default": TextConfig(),
@@ -222,4 +230,5 @@ class TextStyler:
         }
 
     def update_config(self, new_config: dict):
+        print(f"Updating config with: {new_config}")  # Debug print
         self.process_config(new_config)

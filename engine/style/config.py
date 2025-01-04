@@ -33,6 +33,7 @@ class StyleConfig:
                 data = json.load(f)
             return cls(**data)
         except FileNotFoundError:
+            print(f"Style config file not found: {config_path}")  # Debug print
             return cls()
     
     def save(self, style_name: str):

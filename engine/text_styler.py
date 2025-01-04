@@ -4,7 +4,7 @@ import time
 import textwrap
 import shutil
 from enum import Enum
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, Dict, List
 from engine.style.config import StyleConfig
 
@@ -38,7 +38,7 @@ class TextConfig:
     padding: int = 1
     alignment: str = "left"
     color: Optional[str] = None
-    effects: TextEffect = TextEffect()
+    effects: TextEffect = field(default_factory=TextEffect)  # Using field with default_factory
     character_delay: float = 0
     paragraph_delay: float = 1.0
 

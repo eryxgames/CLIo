@@ -10,10 +10,18 @@ from typing import Optional, Dict, List
 from engine.style.config import StyleConfig
 
 class FrameStyle(Enum):
+    NONE = ""
     SINGLE = "─│┌┐└┘"
     DOUBLE = "═║╔╗╚╝" 
     ROUNDED = "─│╭╮╰╯"
     ASCII = "-|++++"
+
+    @classmethod
+    def from_str(cls, style: str) -> 'FrameStyle':
+        try:
+            return cls[style.upper()]
+        except KeyError:
+            return cls.NONE
 
 @dataclass
 class TextEffect:
@@ -32,30 +40,52 @@ class TextConfig:
     alignment: str = "left"
     color: Optional[str] = None
     effects: TextEffect = TextEffect()
+    character_delay: float = 0
+    paragraph_delay: float = 1.0
 
 class TextStyler:
-    def __init__(self, config_file: str = None):
-        self.configs: Dict[str, TextConfig] = {}
+    def __init__(self):
+        self.configs = {
+            "default": TextConfig(),
+            "scene": TextConfig(frame_style=FrameStyle.SINGLE),
+            "dialogue": TextConfig(frame_style=FrameStyle.ROUNDED),
+            "system": TextConfig(frame_style=FrameStyle.ASCII),
+            "combat": TextConfig(frame_style=FrameStyle.DOUBLE),
+            "inventory": TextConfig(frame_style=FrameStyle.SINGLE)
+        }
         self.terminal_size = shutil.get_terminal_size()
-        if config_file:
-            self.load_config(config_file)
-        else:
-            self.set_default_configs()
-
-    def load_config(self, config_file: str):
-        with open(config_file) as f:
-            data = json.load(f)
-            self.process_config(data)
+        self.configs = {
+            "default": TextConfig(),
+            "scene": TextConfig(
+                frame_style=FrameStyle.NONE,
+                padding=2,
+                speed=0.02
+            ),
+            "dialogue": TextConfig(
+                frame_style=FrameStyle.NONE,
+                padding=2,
+                speed=0.02
+            ),
+            "combat": TextConfig(
+                frame_style=FrameStyle.NONE,
+                padding=2,
+                speed=0.02
+            ),
+            "story": TextConfig(
+                frame_style=FrameStyle.NONE,
+                padding=2,
+                speed=0.02
+            )
+        }
 
     def process_config(self, data: StyleConfig):
-        self.configs = {}
-        
         if not data.styles:
-            self.set_default_configs()
             return
-            
+
         for style_name, style_data in data.styles.items():
-            frame_style = FrameStyle[style_data.get("frame", "SINGLE").upper()]
+            frame_type = style_data.get("frame", "SINGLE").upper()
+            frame_style = FrameStyle[frame_type] if frame_type != "NONE" else FrameStyle.NONE
+            
             effects = TextEffect(
                 fade_in=style_data.get("fade_in", False),
                 gradient=style_data.get("gradient", False),
@@ -71,6 +101,11 @@ class TextStyler:
                 color=data.colors.get(style_name) if data.colors else None,
                 effects=effects
             )
+
+    def load_config(self, config_file: str):
+        with open(config_file) as f:
+            data = json.load(f)
+            self.process_config(data)
 
     def update_terminal_size(self):
         self.terminal_size = shutil.get_terminal_size()

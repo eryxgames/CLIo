@@ -1,3 +1,5 @@
+from engine.message_handler import message_handler
+
 class Inventory:
     def __init__(self):
         self.items = []

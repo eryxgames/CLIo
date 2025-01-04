@@ -2,6 +2,7 @@ import time
 import sys
 import pygame
 import os
+from engine.message_handler import message_handler
 
 class MediaPlayer:
     def __init__(self):

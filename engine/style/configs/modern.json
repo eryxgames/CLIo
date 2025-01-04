@@ -1,49 +1,40 @@
 {
-    "text_speed": 0.03,
-    "dialogue_frame": "rounded",
-    "scene_frame": "single",
-    "intro_frame": "double",
-    "horizontal_padding": 3,
-    "vertical_padding": 1,
-    "colors": {
-      "scene": "38;5;75",    
-      "dialogue": "38;5;156", 
-      "item": "38;5;220",    
-      "combat": "38;5;203",  
-      "system": "38;5;147"   
+  "text_speed": 0.03,
+  "horizontal_padding": 3,
+  "vertical_padding": 1,
+  "colors": {
+    "scene": "38;5;75",
+    "dialogue": "38;5;156",
+    "item": "38;5;220",
+    "combat": "38;5;203",
+    "system": "38;5;147",
+    "story": "38;5;183"
+  },
+  "styles": {
+    "scene": {
+      "alignment": "left",
+      "padding": 3,
+      "frame": "single",
+      "speed": 0.02,
+      "fade_in": true,
+      "paragraph_delay": 1.0
     },
-    "styles": {
-      "scene": {
-        "alignment": "left",
-        "padding": 3,
-        "speed": 0.02,
-        "fade_in": true
-      },
-      "dialogue": {
-        "alignment": "left",
-        "padding": 2,
-        "speed": 0.05,
-        "animate_frame": true
-      },
-      "combat": {
-        "alignment": "center",
-        "padding": 2,
-        "frame": "double",
-        "speed": 0.01,
-        "flash_effect": true
-      },
-      "intro": {
-        "alignment": "center",
-        "padding": 3,
-        "frame": "double",
-        "speed": 0.08,
-        "gradient": true
-      },
-      "inventory": {
-        "alignment": "left",
-        "padding": 2,
-        "frame": "rounded",
-        "speed": 0.02
-      }
+    "dialogue": {
+      "alignment": "left",
+      "padding": 2,
+      "frame": "rounded",
+      "speed": 0.05,
+      "animate_frame": true,
+      "character_delay": 0.08
+    },
+    "story": {
+      "alignment": "center",
+      "padding": 2,
+      "frame": "rounded",
+      "speed": 0.05,
+      "character_delay": 0.1,
+      "paragraph_delay": 1.5,
+      "gradient": true
     }
   }
+}

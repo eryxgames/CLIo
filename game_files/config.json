@@ -3,7 +3,7 @@
   "items_file": "game_files/items.json",
   "characters_file": "game_files/characters.json",
   "story_texts_file": "game_files/story_texts.json",
-  "style_config": "modern",
+  "style_config": "default",
   "initial_scene": "scene1",
   "player_stats": {
     "health": 100,

@@ -111,52 +111,46 @@ class TextStyler:
         chars = style.frame_style.value
         width = self.get_wrap_width(style)
         wrapped = textwrap.wrap(text, width - 4)
-
-        color_start = f"\033[{style.color}m" if style.color and style.color.strip() else ""
-        color_end = "\033[0m" if color_start else ""
-
+        
         frame = [
-            f"{color_start}{chars[2]}{chars[0] * (width-2)}{chars[3]}{color_end}",
-            *[f"{color_start}{chars[1]}{' ' * (width-2)}{chars[1]}{color_end}" for _ in wrapped],
-            f"{color_start}{chars[4]}{chars[0] * (width-2)}{chars[5]}{color_end}"
+            f"{chars[2]}{chars[0] * (width-2)}{chars[3]}",
+            *[f"{chars[1]}{' ' * (width-2)}{chars[1]}" for _ in wrapped],
+            f"{chars[4]}{chars[0] * (width-2)}{chars[5]}"
         ]
-
+        
         for i, line in enumerate(wrapped, 1):
             padding = ' ' * ((width - 2 - len(line)) // 2) if style.alignment == "center" else ' '
-            frame[i] = f"{color_start}{chars[1]}{padding}{line}{' ' * (width-2-len(line)-len(padding))}{chars[1]}{color_end}"
-
+            frame[i] = f"{chars[1]}{padding}{line}{' ' * (width-2-len(line)-len(padding))}{chars[1]}"
+            
         return frame
 
+    def print_text(self, text: str, style_name: str = "default", delay_override: Optional[float] = None):
+        config = self.configs.get(style_name, self.configs["default"])
+        self.update_terminal_size()
+        
+        if config.frame_style != FrameStyle.NONE:
+            frame_lines = self.create_frame(text, config)
+        else:
+            frame_lines = [text]
+        
+        if config.effects.gradient:
+            frame_lines = self.apply_gradient('\n'.join(frame_lines))
+        elif config.color:
+            frame_lines = [f"\033[{config.color}m{line}\033[0m" for line in frame_lines]
+
+        if config.effects.animate_frame:
+            self.animate_frame(frame_lines, config.effects.animation_speed)
+        else:
+            print('\n'.join(frame_lines))
+
+        if config.effects.flash:
+            self.flash_effect('\n'.join(frame_lines))
 
     def fade_in_text(self, text: str, delay: float = 0.05):
         lines = text.split('\n')
         for line in lines:
             print(line)
             time.sleep(delay)
-
-    def print_text(self, text: str, style_name: str = "default"):
-        config = self.configs.get(style_name, self.configs["default"])
-        self.update_terminal_size()
-
-        if config.color and config.color.strip():
-            text = f"\033[{config.color}m{text}\033[0m"
-        
-        if config.frame_style != FrameStyle.NONE:
-            frame_lines = self.create_frame(text, config)
-            if config.effects.animate_frame:
-                self.animate_frame(frame_lines, config.effects.animation_speed)
-            else:
-                print('\n'.join(frame_lines))
-        else:
-            wrapped = textwrap.wrap(text, self.get_wrap_width(config))
-            if config.alignment == "center":
-                wrapped = [line.center(self.get_wrap_width(config)) for line in wrapped]
-            print('\n'.join(wrapped))
-
-        if config.effects.flash:
-            self.flash_effect(text)
-        elif config.effects.fade_in:
-            self.fade_in_text(text)
 
     def flash_effect(self, text: str, flashes: int = 3, speed: float = 0.1):
         for _ in range(flashes):

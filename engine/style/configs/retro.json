@@ -14,28 +14,28 @@
     "scene": {
       "alignment": "left",
       "padding": 1,
-      "frame": "ascii",
+      "frame": "ASCII",
       "speed": 0.08,
       "character_delay": 0.1
     },
     "dialogue": {
       "alignment": "left",
       "padding": 1,
-      "frame": "ascii",
+      "frame": "ASCII",
       "speed": 0.12,
       "character_delay": 0.12
     },
     "combat": {
       "alignment": "left",
       "padding": 1,
-      "frame": "ascii",
+      "frame": "ASCII",
       "speed": 0.05,
       "flash_effect": true
     },
     "story": {
       "alignment": "left",
       "padding": 1,
-      "frame": "ascii",
+      "frame": "ASCII",
       "speed": 0.15,
       "character_delay": 0.15,
       "paragraph_delay": 1.5

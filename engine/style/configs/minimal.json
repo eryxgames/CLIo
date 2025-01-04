@@ -14,25 +14,25 @@
       "scene": {
         "alignment": "left",
         "padding": 2,
-        "frame": "none",
+        "frame": "ROUNDED",
         "speed": 0.02
       },
       "dialogue": {
         "alignment": "left",
         "padding": 2,
-        "frame": "none",
+        "frame": "NONE",
         "speed": 0.02
       },
       "combat": {
         "alignment": "left",
         "padding": 2,
-        "frame": "none",
+        "frame": "ROUNDED",
         "speed": 0.02
       },
       "story": {
         "alignment": "left",
         "padding": 2,
-        "frame": "none",
+        "frame": "NONE",
         "speed": 0.02
       }
     }

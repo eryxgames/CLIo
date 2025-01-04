@@ -15,18 +15,20 @@
   },
   "styles": {
     "scene": {
+      "alignment": "center",
       "padding": 1,
       "frame": "SINGLE",
       "character_delay": 0.05
     },
     "dialogue": {
+      "alignment": "center",
       "padding": 1,
       "frame": "ROUNDED",
       "character_delay": 0.05
     },
     "inventory": {
       "alignment": "center",
-      "padding": 10,
+      "padding": 1,
       "frame": "ROUNDED"
     },
     "system": {
@@ -34,12 +36,14 @@
       "frame": "ROUNDED"
     },    
     "story": {
+      "alignment": "center",
       "padding": 2,
-      "frame": "round"
+      "frame": "ROUNDED"
     },
     "default": {
+      "alignment": "center",
       "padding": 1,
-      "frame": "none"
+      "frame": "NONE"
     }
   }
 }

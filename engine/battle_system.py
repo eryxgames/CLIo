@@ -1,5 +1,9 @@
 import random
 import time
+import os
+from engine.text_styler import TextStyler
+from engine.style.config import StyleConfig
+from engine.message_handler import message_handler
 
 class BattleSystem:
     def __init__(self, player_stats, enemy_stats):
@@ -9,7 +13,7 @@ class BattleSystem:
         self.enemy_critical_hit_chance = enemy_stats.get("critical_hit_chance", 0)
 
     def start_battle(self):
-        print("A battle has started!")
+        message_handler.print_message("A battle has started!", "combat")
         self.engage_battle()
 
     def engage_battle(self):
@@ -19,9 +23,9 @@ class BattleSystem:
                 self.enemy_turn()
 
         if self.player_stats["health"] <= 0:
-            print("You have been defeated.")
+            message_handler.print_message("You have been defeated.")
         else:
-            print("You have defeated the enemy!")
+            message_handler.print_message("You have defeated the enemy!")
 
     def player_turn(self):
         action = input("Do you want to attack or defend? ").lower()
@@ -29,23 +33,23 @@ class BattleSystem:
             damage = random.randint(10, 20) + self.player_stats["attack"]
             if random.random() < self.player_critical_hit_chance:
                 damage *= 2
-                print("Critical hit!")
+                message_handler.print_message("Critical hit!")
             self.enemy_stats["health"] -= damage
-            print(f"You attack and deal {damage} damage to the enemy.")
+            message_handler.print_message(f"You attack and deal {damage} damage to the enemy.")
         elif action == "defend":
             self.player_stats["defense"] += 5
-            print("You defend and increase your defense.")
+            message_handler.print_message("You defend and increase your defense.")
         else:
-            print("Invalid action. Try again.")
+            message_handler.print_message("Invalid action. Try again.")
             self.player_turn()
 
     def enemy_turn(self):
         damage = random.randint(5, 15) - self.player_stats["defense"]
         if random.random() < self.enemy_critical_hit_chance:
             damage *= 2
-            print("Enemy critical hit!")
+            message_handler.print_message("Enemy critical hit!")
         if damage > 0:
             self.player_stats["health"] -= damage
-            print(f"The enemy attacks and deals {damage} damage to you.")
+            message_handler.print_message(f"The enemy attacks and deals {damage} damage to you.")
         else:
-            print("Your defense blocks the enemy's attack.")
+            message_handler.print_message("Your defense blocks the enemy's attack.")

@@ -30,7 +30,7 @@
     },
     "system": {
       "padding": 1,
-      "frame": "none"
+      "frame": "ROUNDED"
     },
     "default": {
       "padding": 1,

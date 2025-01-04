@@ -8,10 +8,16 @@ from engine.inventory import Inventory
 from engine.battle_system import BattleSystem
 from engine.media_player import MediaPlayer
 from engine.save_load import SaveLoad
+from engine.text_styler import TextStyler
+from engine.style.config import StyleConfig
 
 class GameEngine:
     def __init__(self, config_file, media_player, parser):
         self.config = self.load_config(config_file)
+        self.text_styler = TextStyler()
+        style_config = self.config.get("style_config", "default")
+        self.style_config = StyleConfig.load(style_config)
+        self.text_styler.update_config(self.style_config)
         self.scenes = self.load_data(self.config["scenes_file"])
         self.items = self.load_data(self.config["items_file"])
         self.characters = self.load_data(self.config["characters_file"])
@@ -69,6 +75,25 @@ class GameEngine:
                             scene["characters"] = []
                         if char_id not in scene["characters"]:
                             scene["characters"].append(char_id)
+
+    def display_scene_description(self, scene):
+        self.text_styler.print_text(
+            scene["description"],
+            style_name="scene"
+        )
+
+    def display_dialogue(self, text, character=None):
+        if character:
+            header = f"{character['name']} says:"
+            self.text_styler.print_text(header, style_name="dialogue_header")
+        self.text_styler.print_text(text, style_name="dialogue")
+
+    def display_combat_message(self, message):
+        self.text_styler.print_text(message, style_name="combat")
+
+    def change_style_config(self, style_name):
+        self.style_config = StyleConfig.load(f"engine/style_configs/{style_name}.json")
+        self.text_styler.update_config(self.style_config)
 
     def process_command(self, command):
         if not command.strip():
@@ -683,7 +708,11 @@ class GameEngine:
             self.change_scene(exit["scene_id"])
 
     def list_inventory(self):
-        self.inventory.list_inventory(self.items)
+        items_text = "Inventory:\n" + "\n".join(
+            f"- {self.items[item_id]['name']}"
+            for item_id in self.inventory.items
+        )
+        self.text_styler.print_text(items_text, style_name="inventory")
 
     def examine_item(self, item_name):
         if not item_name:

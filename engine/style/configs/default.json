@@ -1,0 +1,39 @@
+{
+    "text_speed": 0.05,
+    "dialogue_frame": "rounded",
+    "scene_frame": "single",
+    "intro_frame": "double",
+    "horizontal_padding": 2,
+    "vertical_padding": 1,
+    "colors": {
+      "scene": "94",      
+      "dialogue": "92",   
+      "item": "93",       
+      "combat": "91",     
+      "system": "96"      
+    },
+    "styles": {
+      "scene": {
+        "alignment": "left",
+        "padding": 2,
+        "speed": 0.03
+      },
+      "dialogue": {
+        "alignment": "center",
+        "padding": 1,
+        "speed": 0.08
+      },
+      "combat": {
+        "alignment": "center",
+        "padding": 1,
+        "frame": "double",
+        "speed": 0.02
+      },
+      "intro": {
+        "alignment": "center",
+        "padding": 2,
+        "frame": "double",
+        "speed": 0.1
+      }
+    }
+  }

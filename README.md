@@ -10,7 +10,7 @@
 - [ ] Advanced dialogues
 - [x] Character interaction (items, quests)
 - [x] Character/enemy movement (scenes)
-- [ ] Character/enemy spawning (scenes)
+- [ ] Character/enemy spawning 
 - [ ] Advanced quests
 - [x] Simple RPG features
 - [ ] Advanced RPG features

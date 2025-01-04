@@ -944,7 +944,7 @@ class GameEngine:
         if item and "readable_item" in item:
             text = item["readable_item"]
             message_handler.print_message(f"You start reading the {item['name']}:")
-            self.print_with_delay(text, item.get("read_speed", 0.05))
+            message_handler.print_with_delay(text, item.get("read_speed", 0.05))
         else:
             message_handler.print_message(random.choice(self.item_not_found_messages))
 

@@ -1,0 +1,78 @@
+{
+    "text_speed": 0.03,
+    "horizontal_padding": 1,
+    "vertical_padding": 0,
+    "colors": {
+      "description": "38;5;39",
+      "dialogue": "38;5;45",
+      "greeting": "38;5;51",
+      "system": "38;5;87",
+      "error": "38;5;196",
+      "warning": "38;5;214",
+      "success": "38;5;46",
+      "ambient": "38;5;67",
+      "item": "38;5;81",
+      "menu": "38;5;75",
+      "reading": "38;5;195",
+      "default": "38;5;252"
+    },
+    "styles": {
+      "description": {
+        "padding": 1,
+        "frame": "DOUBLE",
+        "speed": 0.02,
+        "gradient": true
+      },
+      "dialogue": {
+        "padding": 1,
+        "frame": "SINGLE",
+        "speed": 0.03,
+        "character_delay": 0.02
+      },
+      "greeting": {
+        "padding": 1,
+        "frame": "DOUBLE",
+        "fade_in": true
+      },
+      "system": {
+        "padding": 1,
+        "frame": "DOUBLE",
+        "flash": true
+      },
+      "error": {
+        "padding": 1,
+        "frame": "DOUBLE",
+        "flash": true,
+        "speed": 0.01
+      },
+      "warning": {
+        "padding": 1,
+        "frame": "SINGLE",
+        "flash": true
+      },
+      "success": {
+        "padding": 1,
+        "frame": "SINGLE",
+        "fade_in": true
+      },
+      "ambient": {
+        "padding": 1,
+        "frame": "NONE",
+        "fade_in": true
+      },
+      "menu": {
+        "padding": 1,
+        "frame": "SINGLE"
+      },
+      "reading": {
+        "padding": 2,
+        "frame": "SINGLE",
+        "character_delay": 0.03,
+        "paragraph_delay": 1.0
+      },
+      "default": {
+        "padding": 1,
+        "frame": "NONE"
+      }
+    }
+  }

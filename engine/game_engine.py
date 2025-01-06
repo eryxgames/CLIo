@@ -173,15 +173,28 @@ class GameEngine:
                 message_handler.print_message("Continuing the adventure...", "system")
         elif command == "save":
             save_game_state = {
-                "current_scene": self.current_scene["id"],
-                "inventory": self.inventory.items,
+                "current_scene_id": self.current_scene["id"],
+                "inventory_items": self.inventory.items,
+                "equipped_items": self.inventory.equipped_items,
                 "player_stats": self.player_stats,
-                "story_progress": self.story_progress
+                "story_progress": self.story_progress,
+                "hints_used": self.hints_used,
+                "character_crafting_inventories": self.character_crafting_inventories,
+                "commands_since_last_move": self.commands_since_last_move,
+                "characters_last_move": self.characters_last_move
             }
             SaveLoad().save_game(save_game_state, "savegame.json")
+            message_handler.print_message("Game saved successfully!", "success")
         elif command == "load":
-            saved_state = SaveLoad().load_game("savegame.json")
-            self.load_game_state(saved_state)
+            try:
+                saved_state = SaveLoad().load_game("savegame.json")
+                self.load_game_state(saved_state)
+                message_handler.print_message("Game loaded successfully!", "success")
+                self.explore_scene()
+            except FileNotFoundError:
+                message_handler.print_message("No saved game found.", "error")
+            except Exception as e:
+                message_handler.print_message(f"Error loading game: {str(e)}", "error")
         else:
             parsed = self.parser.parse_command(command)
             action = parsed.get("action")
@@ -194,6 +207,8 @@ class GameEngine:
                     handler(**params)
                 else:
                     message_handler.print_message("Unknown action.")
+
+
 
         if self.check_game_over():
             return
@@ -1129,7 +1144,7 @@ class GameEngine:
             text += f"- {wrapped}\n"
         
         self.display_styled_text(text.rstrip(), style)
-        
+
     def help(self, topic=None):
         """Display help information about game commands and features.
         
@@ -1265,8 +1280,26 @@ class GameEngine:
             )
 
     def load_game_state(self, saved_state):
-        self.current_scene = next(scene for scene in self.scenes if scene["id"] == saved_state["current_scene"])
-        self.inventory.items = saved_state["inventory"]
+        """Load a saved game state."""
+        # Load current scene
+        self.current_scene = next(
+            scene for scene in self.scenes 
+            if scene["id"] == saved_state["current_scene_id"]
+        )
+        
+        # Load inventory
+        self.inventory.items = saved_state["inventory_items"]
+        self.inventory.equipped_items = saved_state.get("equipped_items", [])
+        
+        # Load player stats and progress
         self.player_stats = saved_state["player_stats"]
         self.story_progress = saved_state["story_progress"]
-        MediaPlayer.print_with_delay(self.current_scene["description"])
+        self.hints_used = saved_state.get("hints_used", 0)
+        
+        # Load character states
+        self.character_crafting_inventories = saved_state.get("character_crafting_inventories", {})
+        self.commands_since_last_move = saved_state.get("commands_since_last_move", 0)
+        self.characters_last_move = saved_state.get("characters_last_move", {})
+        
+        # Initial scene description
+        message_handler.print_message("\nGame loaded. Current location:", "system")

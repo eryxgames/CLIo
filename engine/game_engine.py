@@ -3,6 +3,8 @@ import os
 import re
 import random
 import time
+import shutil
+import textwrap
 from engine.parser import Parser
 from engine.inventory import Inventory
 from engine.battle_system import BattleSystem
@@ -725,61 +727,90 @@ class GameEngine:
                 message_handler.print_message(f"The {character['name']} drops a {item['name']}.")
 
     def exit_room(self, direction=None):
+        """Handle room exit with proper input validation."""
         exits = self.current_scene.get("exits", [])
         if not exits:
-            message_handler.print_message("There are no exits in this scene.")
+            self.display_styled_text("There are no exits in this scene.", "error")
             return
 
         if len(exits) == 1:
-            message_handler.print_message("There is just one exit from here. Do you want to leave?")
-            choice = input("Enter 'yes' to leave or 'no' to stay: ").lower()
-            if choice == "yes":
-                self.attempt_to_exit(exits[0])
-            else:
-                message_handler.print_message("You decide to stay.")
+            self.display_styled_text("There is just one exit from here. Do you want to leave?", "menu")
+            while True:
+                choice = input("Enter 'yes' to leave or 'no' to stay (or 'exit' to cancel): ").lower().strip()
+                if choice in ['yes', 'y']:
+                    self.attempt_to_exit(exits[0])
+                    break
+                elif choice in ['no', 'n', 'exit', 'cancel']:
+                    self.display_styled_text("You decide to stay.", "dialogue")
+                    break
+                else:
+                    self.display_styled_text("Please enter 'yes' or 'no'.", "error")
         else:
-            message_handler.print_message("There are multiple exits. Where do you want to go?")
+            self.display_styled_text("There are multiple exits. Where do you want to go?", "menu")
             for i, exit in enumerate(exits):
-                message_handler.print_message(f"{i + 1}. {exit['door_name']}")
-            choice = int(input("Enter the number of your choice: ")) - 1
-            if 0 <= choice < len(exits):
-                self.attempt_to_exit(exits[choice])
-            else:
-                message_handler.print_message("Invalid choice.")
+                self.display_styled_text(f"{i + 1}. {exit['door_name']}", "menu")
+            
+            while True:
+                choice = input("Enter the number of your choice (or 'exit' to cancel): ").lower().strip()
+                
+                if choice in ['exit', 'cancel', 'back']:
+                    self.display_styled_text("You decide to stay.", "dialogue")
+                    return
+                    
+                try:
+                    choice_num = int(choice) - 1
+                    if 0 <= choice_num < len(exits):
+                        self.attempt_to_exit(exits[choice_num])
+                        break
+                    else:
+                        self.display_styled_text(f"Please enter a number between 1 and {len(exits)}.", "error")
+                except ValueError:
+                    if not choice:  # Empty input
+                        self.display_styled_text("You decide to stay.", "dialogue")
+                        return
+                    self.display_styled_text("Please enter a valid number or 'exit' to cancel.", "error")
 
     def attempt_to_exit(self, exit):
+        """Handle exit attempt with proper input validation."""
         if exit.get("blocked", False):
             required_condition = exit.get("required_condition")
             required_stat = exit.get("required_stat")
             required_value = exit.get("required_value")
             if required_condition and self.get_story_progress(required_condition):
-                message_handler.print_message(exit["unblock_text"])
-                exit["blocked"] = False  # Ensure the door stays unblocked
+                self.display_styled_text(exit["unblock_text"], "success")
+                exit["blocked"] = False
                 self.change_scene(exit["scene_id"])
             elif required_stat and self.player_stats.get(required_stat, 0) >= required_value:
-                message_handler.print_message(exit["unblock_text"])
-                exit["blocked"] = False  # Ensure the door stays unblocked
+                self.display_styled_text(exit["unblock_text"], "success")
+                exit["blocked"] = False
                 self.change_scene(exit["scene_id"])
             else:
-                message_handler.print_message(exit["block_text"])
+                self.display_styled_text(exit["block_text"], "error")
         elif exit.get("locked", False):
             required_item = exit.get("required_item")
             if required_item == "passcode":
-                passcode = input("Enter the passcode to unlock the door: ")
-                if passcode == exit.get("passcode"):
-                    message_handler.print_message(exit["unlock_text"])
-                    exit["locked"] = False  # Ensure the door stays unlocked
-                    self.change_scene(exit["scene_id"])
-                else:
-                    message_handler.print_message("Incorrect passcode. The door remains locked.")
+                while True:
+                    passcode = input("Enter the passcode to unlock the door (or 'exit' to cancel): ").strip()
+                    if passcode.lower() in ['exit', 'cancel', 'back']:
+                        self.display_styled_text("You decide not to enter a passcode.", "dialogue")
+                        return
+                    if passcode == exit.get("passcode"):
+                        self.display_styled_text(exit["unlock_text"], "success")
+                        exit["locked"] = False
+                        self.change_scene(exit["scene_id"])
+                        break
+                    elif not passcode:  # Empty input
+                        return
+                    else:
+                        self.display_styled_text("Incorrect passcode. The door remains locked.", "error")
             elif required_item in self.inventory.items:
-                message_handler.print_message(exit["unlock_text"])
+                self.display_styled_text(exit["unlock_text"], "success")
                 if self.items[required_item].get("consumable", False):
                     self.inventory.remove_item(required_item)
-                exit["locked"] = False  # Ensure the door stays unlocked
+                exit["locked"] = False
                 self.change_scene(exit["scene_id"])
             else:
-                message_handler.print_message(exit["lock_text"])
+                self.display_styled_text(exit["lock_text"], "error")
         else:
             self.change_scene(exit["scene_id"])
 
@@ -1077,6 +1108,161 @@ class GameEngine:
             message_handler.print_message("Your communicator has been repaired.")
         else:
             message_handler.print_message("You don't have energy cells to repair the communicator.")
+
+    def display_grouped_text(self, title, items, style="list_content"):
+        """Display a group of related text items within a single frame."""
+        if not items:
+            return
+        
+        try:
+            # Get terminal width with fallback
+            term_width = shutil.get_terminal_size().columns - 4  # Account for frame
+        except:
+            term_width = 76  # Fallback width if can't detect terminal size
+        
+        # Format the title
+        text = f"{title}\n\n"
+        
+        # Format each item with proper wrapping
+        for item in items:
+            wrapped = textwrap.fill(str(item), width=term_width, subsequent_indent='  ')
+            text += f"- {wrapped}\n"
+        
+        self.display_styled_text(text.rstrip(), style)
+        
+    def help(self, topic=None):
+        """Display help information about game commands and features.
+        
+        Args:
+            topic: Optional specific topic to get help about
+        """
+        if topic:
+            self.display_topic_help(topic)
+            return
+
+        # General help categories
+        help_categories = {
+            "Basic Commands": {
+                "look/explore": "Look around the current scene",
+                "inventory": "Check your inventory",
+                "stats": "Show your character stats",
+                "exit": "Exit current room (if possible)",
+                "style": "Change game visual style",
+                "save/load": "Save or load game progress",
+                "quit": "Exit the game"
+            },
+            "Interaction Commands": {
+                "look at [item/character]": "Examine something specific",
+                "take [item]": "Pick up an item",
+                "use [item]": "Use an item from your inventory",
+                "read [item]": "Read a readable item",
+                "combine [item1] with [item2]": "Combine two items",
+                "equip/unequip [item]": "Equip or unequip items"
+            },
+            "Character Interaction": {
+                "talk to [character]": "Start a conversation",
+                "give [item] to [character]": "Give an item to a character",
+                "fight [character]": "Engage in combat (careful!)"
+            },
+            "Special Commands": {
+                "repair [item]": "Repair a broken item",
+                "hint": f"Get a hint ({self.max_hints - self.hints_used} remaining)"
+            }
+        }
+
+        # Display title
+        self.display_styled_text("GAME HELP", "list_title")
+
+        # Display scene-specific help if available
+        scene_specific = []
+        current_scene = self.current_scene
+        
+        if current_scene.get("items"):
+            scene_specific.append("There are items you can interact with here")
+        if current_scene.get("characters"):
+            scene_specific.append("There are characters you can talk to here")
+        if current_scene.get("exits"):
+            scene_specific.append("There are exits you can use here")
+        if current_scene.get("passive_items"):
+            scene_specific.append("There are interactive objects in this scene")
+
+        if scene_specific:
+            self.display_grouped_text("In This Scene", scene_specific, "list_category")
+
+        # Display command categories
+        for category, commands in help_categories.items():
+            formatted_commands = [f"{cmd}: {desc}" for cmd, desc in commands.items()]
+            self.display_grouped_text(category, formatted_commands, "list_category")
+
+        # Display tips
+        tips = [
+            "Type 'help [command]' for more details about a specific command",
+            "Most commands support multiple variations (e.g., 'look' or 'explore')",
+            "You can exit most interactions by typing 'exit' or pressing Enter",
+            f"You have {self.max_hints - self.hints_used} hints remaining"
+        ]
+        self.display_grouped_text("Tips", tips, "list_content")
+
+    def display_topic_help(self, topic):
+        """Display help for a specific topic or command."""
+        detailed_help = {
+            "look": {
+                "title": "Looking Around",
+                "description": "Examine your surroundings or specific things",
+                "usage": [
+                    "look - View current scene",
+                    "look at [item/character] - Examine something specific",
+                    "explore - Same as 'look'"
+                ],
+                "tips": [
+                    "Use 'look' whenever you enter a new area",
+                    "Examining specific items might reveal important details"
+                ]
+            },
+            "inventory": {
+                "title": "Inventory Management",
+                "description": "Check and manage your items",
+                "usage": [
+                    "inventory - Show all items",
+                    "equip [item] - Equip an item",
+                    "unequip [item] - Unequip an item"
+                ],
+                "tips": [
+                    "Equipped items may affect your stats",
+                    "Some items can be combined or repaired"
+                ]
+            },
+            "combine": {
+                "title": "Combining Items",
+                "description": "Create new items by combining others",
+                "usage": [
+                    "combine [item1] with [item2]",
+                    "combine [item1] and [item2]"
+                ],
+                "tips": [
+                    "Not all items can be combined",
+                    "Try combining related items",
+                    "Some characters might give hints about combinations"
+                ]
+            }
+            # Add more detailed help topics as needed
+        }
+
+        topic_lower = topic.lower()
+        found_topic = next((v for k, v in detailed_help.items() 
+                        if topic_lower in k.lower()), None)
+
+        if found_topic:
+            self.display_styled_text(found_topic['title'], "list_title")
+            self.display_styled_text(found_topic['description'], "list_content")
+            
+            self.display_grouped_text("Usage", found_topic['usage'], "list_category")
+            self.display_grouped_text("Tips", found_topic['tips'], "list_content")
+        else:
+            self.display_styled_text(
+                f"No detailed help available for '{topic}'. Try 'help' for general commands.", 
+                "error"
+            )
 
     def load_game_state(self, saved_state):
         self.current_scene = next(scene for scene in self.scenes if scene["id"] == saved_state["current_scene"])

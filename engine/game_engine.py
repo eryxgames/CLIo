@@ -1009,6 +1009,53 @@ class GameEngine:
 
         message_handler.print_message("You don't see that here.")
 
+    def get_available_styles(self):
+        """Get list of available style configurations."""
+        style_dir = os.path.join("engine", "style", "configs")
+        style_files = [f for f in os.listdir(style_dir) if f.endswith('.json')]
+        return [os.path.splitext(f)[0] for f in style_files]
+
+    def change_style(self, style_name=None):
+        """Change the game's style configuration.
+        
+        Args:
+            style_name: Name of style to change to, or None to rotate to next style
+        """
+        available_styles = self.get_available_styles()
+        
+        if not available_styles:
+            message_handler.print_message("No style configurations found.", "error")
+            return
+            
+        if style_name is None:
+            # Rotate to next style
+            current_style = self.config.get("style_config", "default")
+            try:
+                current_index = available_styles.index(current_style)
+                next_index = (current_index + 1) % len(available_styles)
+                style_name = available_styles[next_index]
+            except ValueError:
+                style_name = available_styles[0]
+        elif style_name not in available_styles:
+            message_handler.print_message(f"Style '{style_name}' not found. Available styles:", "error")
+            for style in available_styles:
+                message_handler.print_message(f"- {style}", "system")
+            return
+        
+        try:
+            # Load and apply the new style
+            style_config = StyleConfig.load(style_name)
+            self.text_styler.process_config(style_config)
+            self.message_handler.text_styler.process_config(style_config)
+            self.config["style_config"] = style_name
+            
+            # Announce the style change
+            message_handler.print_message(f"Style changed to: {style_name}", "success")
+            
+        except Exception as e:
+            message_handler.print_message(f"Error loading style '{style_name}': {str(e)}", "error")
+
+
     def repair_communicator(self):
         if "energy_cells" in self.inventory.items:
             self.inventory.remove_item("energy_cells")

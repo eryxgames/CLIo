@@ -115,6 +115,11 @@ class Parser:
                 "names": ["help"],
                 "action": "help",
                 "parameters": []
+            },
+            {
+                "names": ["style"],
+                "action": "change_style",
+                "parameters": ["style_name"]
             }
         ]
 
@@ -137,6 +142,15 @@ class Parser:
                     "action": "invalid",
                     "message": "Invalid give command. Use 'give [item_name] to [character_name]'."
                 }
+            
+        # Special case for style command
+        if command.startswith("style"):
+            parts = command.split(None, 1)
+            style_name = parts[1] if len(parts) > 1 else None
+            return {
+                "action": "change_style",
+                "parameters": {"style_name": style_name}
+            }            
 
         # Special case for exact matches first
         for action in self.actions:

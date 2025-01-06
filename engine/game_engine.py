@@ -725,61 +725,90 @@ class GameEngine:
                 message_handler.print_message(f"The {character['name']} drops a {item['name']}.")
 
     def exit_room(self, direction=None):
+        """Handle room exit with proper input validation."""
         exits = self.current_scene.get("exits", [])
         if not exits:
-            message_handler.print_message("There are no exits in this scene.")
+            self.display_styled_text("There are no exits in this scene.", "error")
             return
 
         if len(exits) == 1:
-            message_handler.print_message("There is just one exit from here. Do you want to leave?")
-            choice = input("Enter 'yes' to leave or 'no' to stay: ").lower()
-            if choice == "yes":
-                self.attempt_to_exit(exits[0])
-            else:
-                message_handler.print_message("You decide to stay.")
+            self.display_styled_text("There is just one exit from here. Do you want to leave?", "menu")
+            while True:
+                choice = input("Enter 'yes' to leave or 'no' to stay (or 'exit' to cancel): ").lower().strip()
+                if choice in ['yes', 'y']:
+                    self.attempt_to_exit(exits[0])
+                    break
+                elif choice in ['no', 'n', 'exit', 'cancel']:
+                    self.display_styled_text("You decide to stay.", "dialogue")
+                    break
+                else:
+                    self.display_styled_text("Please enter 'yes' or 'no'.", "error")
         else:
-            message_handler.print_message("There are multiple exits. Where do you want to go?")
+            self.display_styled_text("There are multiple exits. Where do you want to go?", "menu")
             for i, exit in enumerate(exits):
-                message_handler.print_message(f"{i + 1}. {exit['door_name']}")
-            choice = int(input("Enter the number of your choice: ")) - 1
-            if 0 <= choice < len(exits):
-                self.attempt_to_exit(exits[choice])
-            else:
-                message_handler.print_message("Invalid choice.")
+                self.display_styled_text(f"{i + 1}. {exit['door_name']}", "menu")
+            
+            while True:
+                choice = input("Enter the number of your choice (or 'exit' to cancel): ").lower().strip()
+                
+                if choice in ['exit', 'cancel', 'back']:
+                    self.display_styled_text("You decide to stay.", "dialogue")
+                    return
+                    
+                try:
+                    choice_num = int(choice) - 1
+                    if 0 <= choice_num < len(exits):
+                        self.attempt_to_exit(exits[choice_num])
+                        break
+                    else:
+                        self.display_styled_text(f"Please enter a number between 1 and {len(exits)}.", "error")
+                except ValueError:
+                    if not choice:  # Empty input
+                        self.display_styled_text("You decide to stay.", "dialogue")
+                        return
+                    self.display_styled_text("Please enter a valid number or 'exit' to cancel.", "error")
 
     def attempt_to_exit(self, exit):
+        """Handle exit attempt with proper input validation."""
         if exit.get("blocked", False):
             required_condition = exit.get("required_condition")
             required_stat = exit.get("required_stat")
             required_value = exit.get("required_value")
             if required_condition and self.get_story_progress(required_condition):
-                message_handler.print_message(exit["unblock_text"])
-                exit["blocked"] = False  # Ensure the door stays unblocked
+                self.display_styled_text(exit["unblock_text"], "success")
+                exit["blocked"] = False
                 self.change_scene(exit["scene_id"])
             elif required_stat and self.player_stats.get(required_stat, 0) >= required_value:
-                message_handler.print_message(exit["unblock_text"])
-                exit["blocked"] = False  # Ensure the door stays unblocked
+                self.display_styled_text(exit["unblock_text"], "success")
+                exit["blocked"] = False
                 self.change_scene(exit["scene_id"])
             else:
-                message_handler.print_message(exit["block_text"])
+                self.display_styled_text(exit["block_text"], "error")
         elif exit.get("locked", False):
             required_item = exit.get("required_item")
             if required_item == "passcode":
-                passcode = input("Enter the passcode to unlock the door: ")
-                if passcode == exit.get("passcode"):
-                    message_handler.print_message(exit["unlock_text"])
-                    exit["locked"] = False  # Ensure the door stays unlocked
-                    self.change_scene(exit["scene_id"])
-                else:
-                    message_handler.print_message("Incorrect passcode. The door remains locked.")
+                while True:
+                    passcode = input("Enter the passcode to unlock the door (or 'exit' to cancel): ").strip()
+                    if passcode.lower() in ['exit', 'cancel', 'back']:
+                        self.display_styled_text("You decide not to enter a passcode.", "dialogue")
+                        return
+                    if passcode == exit.get("passcode"):
+                        self.display_styled_text(exit["unlock_text"], "success")
+                        exit["locked"] = False
+                        self.change_scene(exit["scene_id"])
+                        break
+                    elif not passcode:  # Empty input
+                        return
+                    else:
+                        self.display_styled_text("Incorrect passcode. The door remains locked.", "error")
             elif required_item in self.inventory.items:
-                message_handler.print_message(exit["unlock_text"])
+                self.display_styled_text(exit["unlock_text"], "success")
                 if self.items[required_item].get("consumable", False):
                     self.inventory.remove_item(required_item)
-                exit["locked"] = False  # Ensure the door stays unlocked
+                exit["locked"] = False
                 self.change_scene(exit["scene_id"])
             else:
-                message_handler.print_message(exit["lock_text"])
+                self.display_styled_text(exit["lock_text"], "error")
         else:
             self.change_scene(exit["scene_id"])
 

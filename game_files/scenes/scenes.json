@@ -21,7 +21,7 @@
         "lock_text": "The airlock is locked. You need the passcode to open it.",
         "unlock_text": "You enter the correct passcode and the airlock opens.",
         "required_item": "passcode",
-        "passcode": "EXIT",
+        "passcode": "PASS",
         "scene_id": "scene2"
       }
     ],

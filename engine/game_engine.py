@@ -3,6 +3,8 @@ import os
 import re
 import random
 import time
+import shutil
+import textwrap
 from engine.parser import Parser
 from engine.inventory import Inventory
 from engine.battle_system import BattleSystem
@@ -1106,6 +1108,161 @@ class GameEngine:
             message_handler.print_message("Your communicator has been repaired.")
         else:
             message_handler.print_message("You don't have energy cells to repair the communicator.")
+
+    def display_grouped_text(self, title, items, style="list_content"):
+        """Display a group of related text items within a single frame."""
+        if not items:
+            return
+        
+        try:
+            # Get terminal width with fallback
+            term_width = shutil.get_terminal_size().columns - 4  # Account for frame
+        except:
+            term_width = 76  # Fallback width if can't detect terminal size
+        
+        # Format the title
+        text = f"{title}\n\n"
+        
+        # Format each item with proper wrapping
+        for item in items:
+            wrapped = textwrap.fill(str(item), width=term_width, subsequent_indent='  ')
+            text += f"- {wrapped}\n"
+        
+        self.display_styled_text(text.rstrip(), style)
+        
+    def help(self, topic=None):
+        """Display help information about game commands and features.
+        
+        Args:
+            topic: Optional specific topic to get help about
+        """
+        if topic:
+            self.display_topic_help(topic)
+            return
+
+        # General help categories
+        help_categories = {
+            "Basic Commands": {
+                "look/explore": "Look around the current scene",
+                "inventory": "Check your inventory",
+                "stats": "Show your character stats",
+                "exit": "Exit current room (if possible)",
+                "style": "Change game visual style",
+                "save/load": "Save or load game progress",
+                "quit": "Exit the game"
+            },
+            "Interaction Commands": {
+                "look at [item/character]": "Examine something specific",
+                "take [item]": "Pick up an item",
+                "use [item]": "Use an item from your inventory",
+                "read [item]": "Read a readable item",
+                "combine [item1] with [item2]": "Combine two items",
+                "equip/unequip [item]": "Equip or unequip items"
+            },
+            "Character Interaction": {
+                "talk to [character]": "Start a conversation",
+                "give [item] to [character]": "Give an item to a character",
+                "fight [character]": "Engage in combat (careful!)"
+            },
+            "Special Commands": {
+                "repair [item]": "Repair a broken item",
+                "hint": f"Get a hint ({self.max_hints - self.hints_used} remaining)"
+            }
+        }
+
+        # Display title
+        self.display_styled_text("GAME HELP", "list_title")
+
+        # Display scene-specific help if available
+        scene_specific = []
+        current_scene = self.current_scene
+        
+        if current_scene.get("items"):
+            scene_specific.append("There are items you can interact with here")
+        if current_scene.get("characters"):
+            scene_specific.append("There are characters you can talk to here")
+        if current_scene.get("exits"):
+            scene_specific.append("There are exits you can use here")
+        if current_scene.get("passive_items"):
+            scene_specific.append("There are interactive objects in this scene")
+
+        if scene_specific:
+            self.display_grouped_text("In This Scene", scene_specific, "list_category")
+
+        # Display command categories
+        for category, commands in help_categories.items():
+            formatted_commands = [f"{cmd}: {desc}" for cmd, desc in commands.items()]
+            self.display_grouped_text(category, formatted_commands, "list_category")
+
+        # Display tips
+        tips = [
+            "Type 'help [command]' for more details about a specific command",
+            "Most commands support multiple variations (e.g., 'look' or 'explore')",
+            "You can exit most interactions by typing 'exit' or pressing Enter",
+            f"You have {self.max_hints - self.hints_used} hints remaining"
+        ]
+        self.display_grouped_text("Tips", tips, "list_content")
+
+    def display_topic_help(self, topic):
+        """Display help for a specific topic or command."""
+        detailed_help = {
+            "look": {
+                "title": "Looking Around",
+                "description": "Examine your surroundings or specific things",
+                "usage": [
+                    "look - View current scene",
+                    "look at [item/character] - Examine something specific",
+                    "explore - Same as 'look'"
+                ],
+                "tips": [
+                    "Use 'look' whenever you enter a new area",
+                    "Examining specific items might reveal important details"
+                ]
+            },
+            "inventory": {
+                "title": "Inventory Management",
+                "description": "Check and manage your items",
+                "usage": [
+                    "inventory - Show all items",
+                    "equip [item] - Equip an item",
+                    "unequip [item] - Unequip an item"
+                ],
+                "tips": [
+                    "Equipped items may affect your stats",
+                    "Some items can be combined or repaired"
+                ]
+            },
+            "combine": {
+                "title": "Combining Items",
+                "description": "Create new items by combining others",
+                "usage": [
+                    "combine [item1] with [item2]",
+                    "combine [item1] and [item2]"
+                ],
+                "tips": [
+                    "Not all items can be combined",
+                    "Try combining related items",
+                    "Some characters might give hints about combinations"
+                ]
+            }
+            # Add more detailed help topics as needed
+        }
+
+        topic_lower = topic.lower()
+        found_topic = next((v for k, v in detailed_help.items() 
+                        if topic_lower in k.lower()), None)
+
+        if found_topic:
+            self.display_styled_text(found_topic['title'], "list_title")
+            self.display_styled_text(found_topic['description'], "list_content")
+            
+            self.display_grouped_text("Usage", found_topic['usage'], "list_category")
+            self.display_grouped_text("Tips", found_topic['tips'], "list_content")
+        else:
+            self.display_styled_text(
+                f"No detailed help available for '{topic}'. Try 'help' for general commands.", 
+                "error"
+            )
 
     def load_game_state(self, saved_state):
         self.current_scene = next(scene for scene in self.scenes if scene["id"] == saved_state["current_scene"])

@@ -112,9 +112,9 @@ class Parser:
                 "parameters": ["item_name"]
             },
             {
-                "names": ["help"],
+                "names": ["help", "?"],
                 "action": "help",
-                "parameters": []
+                "parameters": ["topic"]
             },
             {
                 "names": ["hint"],
@@ -147,7 +147,22 @@ class Parser:
                     "action": "invalid",
                     "message": "Invalid give command. Use 'give [item_name] to [character_name]'."
                 }
-            
+
+        # Special case for help command
+        if command.startswith("help "):
+            parts = command.split(None, 1)  # Split into max 2 parts
+            if len(parts) > 1:
+                return {
+                    "action": "help",
+                    "parameters": {"topic": parts[1].strip()}  # Changed from topic_name to topic
+                }
+        elif command == "help":
+            return {
+                "action": "help",
+                "parameters": {"topic": None}  # Changed from topic_name to topic
+            }
+        
+
         # Special case for style command
         if command.startswith("style"):
             parts = command.split(None, 1)

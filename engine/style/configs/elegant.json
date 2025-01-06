@@ -3,6 +3,9 @@
     "horizontal_padding": 2,
     "vertical_padding": 1,
     "colors": {
+      "list_title": "38;5;75",
+      "list_content": "38;5;252",
+      "list_category": "38;5;147",  
       "description": "38;5;146",
       "dialogue": "38;5;180",
       "greeting": "38;5;175",
@@ -17,6 +20,21 @@
       "default": "38;5;252"
     },
     "styles": {
+        "list_title": {
+            "padding": 1,
+            "frame": "DOUBLE",
+            "alignment": "center"
+          },
+          "list_content": {
+            "padding": 1,
+            "frame": "SINGLE",
+            "group_items": true
+          },
+          "list_category": {
+            "padding": 1,
+            "frame": "ROUNDED",
+            "group_items": true
+          },  
       "description": {
         "padding": 2,
         "frame": "ROUNDED",

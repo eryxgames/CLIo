@@ -128,6 +128,16 @@ class Parser:
             }
         ]
 
+    def parse_combination(self, command):
+        """Parse combination command formats."""
+        # Handle various combination formats:
+        # "item1 with item2"
+        # "item1 and item2"
+        command = command.replace(" with ", " + ")
+        command = command.replace(" and ", " + ")
+        items = command.split(" + ")
+        return [item.strip() for item in items] if len(items) == 2 else None
+
     def parse_command(self, command):
         command = command.lower().strip()
 
@@ -172,33 +182,63 @@ class Parser:
                 "parameters": {"style_name": style_name}
             }            
 
-        # Process multi-word commands first
+        # Handle combine command specially
+        if command.startswith("combine "):
+            remaining = command[8:].strip()  # Length of "combine " is 8
+            items = self.parse_combination(remaining)
+            if items:
+                return {
+                    "action": "combine_items",
+                    "parameters": {
+                        "item1_name": items[0],
+                        "item2_name": items[1]
+                    }
+                }
+            else:
+                return {
+                    "action": "invalid",
+                    "message": "Invalid combination format. Use 'combine [item1] with [item2]' or 'combine [item1] and [item2]'."
+                }
+
+        # Process multi-word commands
         for action in self.actions:
             for name in action["names"]:
                 if " " in name:  # Multi-word command
-                    if command.startswith(name + " "):  # Command with parameter
+                    if command.startswith(name + " "):
                         remaining = command[len(name):].strip()
-                        if remaining:  # Has parameter
-                            return {
-                                "action": action["action"],
-                                "parameters": {action["parameters"][0]: remaining}
-                            }
-                    elif command == name:  # Exact match
-                        if not action["parameters"]:  # Command doesn't need parameters
+                        if remaining:
+                            # Check if this is a combination command
+                            if action["action"] == "combine_items":
+                                items = self.parse_combination(remaining)
+                                if items:
+                                    return {
+                                        "action": action["action"],
+                                        "parameters": {
+                                            "item1_name": items[0],
+                                            "item2_name": items[1]
+                                        }
+                                    }
+                            else:
+                                return {
+                                    "action": action["action"],
+                                    "parameters": {action["parameters"][0]: remaining}
+                                }
+                    elif command == name:
+                        if not action["parameters"]:
                             return {"action": action["action"], "parameters": {}}
-                        else:  # Command needs parameters but none provided
+                        else:
                             return {
                                 "action": "invalid",
                                 "message": f"The command '{name}' needs a target. Try '{name} [target]'."
                             }
 
-        # Then process single-word commands
+        # Process single-word commands
         for action in self.actions:
             for name in action["names"]:
-                if not " " in name:  # Single-word command
-                    if command == name:  # Exact match
+                if not " " in name:
+                    if command == name:
                         return {"action": action["action"], "parameters": {}}
-                    elif command.startswith(name + " "):  # Command with potential parameter
+                    elif command.startswith(name + " "):
                         remaining = command[len(name):].strip()
                         if remaining and action["parameters"]:
                             return {
@@ -207,13 +247,3 @@ class Parser:
                             }
 
         return {"action": "invalid", "message": "I don't understand that command. Try 'help' for a list of commands."}
-
-    def parse_combination(self, command):
-        # Handle various combination formats:
-        # "combine item1 and item2"
-        # "combine item1 with item2"
-        # "combine item1 + item2"
-        command = command.replace(" and ", " + ")
-        command = command.replace(" with ", " + ")
-        items = command.split(" + ")
-        return [item.strip() for item in items] if len(items) == 2 else None

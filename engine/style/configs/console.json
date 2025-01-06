@@ -1,0 +1,79 @@
+{
+    "text_speed": 0.02,
+    "horizontal_padding": 0,
+    "vertical_padding": 0,
+    "colors": {
+      "description": "38;5;242",
+      "dialogue": "38;5;47",
+      "greeting": "38;5;48",
+      "system": "38;5;244",
+      "error": "38;5;196",
+      "warning": "38;5;208",
+      "success": "38;5;46",
+      "ambient": "38;5;240",
+      "item": "38;5;249",
+      "menu": "38;5;244",
+      "reading": "38;5;250",
+      "default": "38;5;252"
+    },
+    "styles": {
+      "description": {
+        "padding": 0,
+        "frame": "NONE",
+        "speed": 0.01,
+        "character_delay": 0.01
+      },
+      "dialogue": {
+        "padding": 0,
+        "frame": "NONE",
+        "speed": 0.02,
+        "character_delay": 0.01
+      },
+      "greeting": {
+        "padding": 0,
+        "frame": "NONE",
+        "speed": 0.02
+      },
+      "system": {
+        "padding": 0,
+        "frame": "NONE",
+        "prefix": "> "
+      },
+      "error": {
+        "padding": 0,
+        "frame": "NONE",
+        "prefix": "ERROR: ",
+        "flash": true
+      },
+      "warning": {
+        "padding": 0,
+        "frame": "NONE",
+        "prefix": "WARNING: "
+      },
+      "success": {
+        "padding": 0,
+        "frame": "NONE",
+        "prefix": "SUCCESS: "
+      },
+      "ambient": {
+        "padding": 0,
+        "frame": "NONE",
+        "character_delay": 0.02
+      },
+      "menu": {
+        "padding": 0,
+        "frame": "NONE",
+        "prefix": "$ "
+      },
+      "reading": {
+        "padding": 0,
+        "frame": "NONE",
+        "character_delay": 0.02,
+        "paragraph_delay": 0.8
+      },
+      "default": {
+        "padding": 0,
+        "frame": "NONE"
+      }
+    }
+  }

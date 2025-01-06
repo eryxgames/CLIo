@@ -12,15 +12,18 @@ class MessageHandler:
         return cls._instance
 
     def print_message(self, message: str, style: str = "default"):
-        if not message.strip():
+        """Print a message with the specified style."""
+        if not message or not message.strip():
             return
             
         self.text_styler.print_text(message, style)
 
-    def print_with_delay(self, text: str, char_delay: float = 0.05):
-        if not text.strip():
+    def print_with_delay(self, text: str, char_delay: float = 0.05, style: str = "default"):
+        """Print text character by character with delay and style."""
+        if not text or not text.strip():
             return
 
+        # Split into paragraphs and print with style
         paragraphs = text.split("\n\n")
         for i, paragraph in enumerate(paragraphs):
             for char in paragraph:

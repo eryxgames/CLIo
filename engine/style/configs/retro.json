@@ -8,7 +8,16 @@
     "item": "33",
     "combat": "31",
     "system": "36",
-    "story": "35"
+    "story": "35",
+    "description": "37",
+    "greeting": "33",
+    "error": "31",
+    "warning": "33",
+    "success": "32",
+    "ambient": "36",
+    "menu": "35",
+    "reading": "37",
+    "default": "37"
   },
   "styles": {
     "scene": {
@@ -39,6 +48,68 @@
       "speed": 0.15,
       "character_delay": 0.15,
       "paragraph_delay": 1.5
+    },
+    "description": {
+      "alignment": "left",
+      "padding": 1,
+      "frame": "ASCII",
+      "speed": 0.08,
+      "character_delay": 0.1
+    },
+    "greeting": {
+      "alignment": "left",
+      "padding": 1,
+      "frame": "ASCII",
+      "speed": 0.12,
+      "character_delay": 0.12
+    },
+    "error": {
+      "alignment": "left",
+      "padding": 1,
+      "frame": "ASCII",
+      "speed": 0.05,
+      "flash_effect": true
+    },
+    "warning": {
+      "alignment": "left",
+      "padding": 1,
+      "frame": "ASCII",
+      "speed": 0.08,
+      "flash_effect": true
+    },
+    "success": {
+      "alignment": "left",
+      "padding": 1,
+      "frame": "ASCII",
+      "speed": 0.08,
+      "character_delay": 0.1
+    },
+    "ambient": {
+      "alignment": "left",
+      "padding": 1,
+      "frame": "ASCII",
+      "speed": 0.15,
+      "character_delay": 0.15
+    },
+    "menu": {
+      "alignment": "left",
+      "padding": 1,
+      "frame": "ASCII",
+      "speed": 0.08
+    },
+    "reading": {
+      "alignment": "left",
+      "padding": 2,
+      "frame": "ASCII",
+      "speed": 0.15,
+      "character_delay": 0.15,
+      "paragraph_delay": 1.5
+    },
+    "default": {
+      "alignment": "left",
+      "padding": 1,
+      "frame": "ASCII",
+      "speed": 0.08
     }
   }
 }

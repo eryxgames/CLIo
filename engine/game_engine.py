@@ -102,21 +102,43 @@ class GameEngine:
     def clear_screen(self):
         os.system('cls' if os.name == 'nt' else 'clear')
 
+    def display_styled_text(self, text_obj, default_style="default"):
+        """Display text with implicit or explicit styling."""
+        if isinstance(text_obj, dict):
+            text = text_obj.get("text", "")
+            style = text_obj.get("style", default_style)
+        else:
+            text = str(text_obj)
+            style = default_style
+            
+        message_handler.print_message(text, style)
+
     def explore_scene(self):
-        message_handler.print_message(self.current_scene["description"], "scene")
+        """Explore the current scene with implicit styling."""
+        self.display_styled_text(self.current_scene["description"], "description")
+        
+        random_event = self.get_random_event()
+        if random_event:
+            self.display_styled_text(random_event, "ambient")
         
         if "items" in self.current_scene and self.current_scene["items"]:
-            items_text = "You see:\n" + "\n".join(f"- {self.items[item]['name']}" 
-                for item in self.current_scene["items"])
-            message_handler.print_message(items_text, "inventory")
-
+            self.display_styled_text("You see:", "default")
+            for item in self.current_scene["items"]:
+                self.display_styled_text(f"- {self.items[item]['name']}", "item")
+        
+        if "passive_items" in self.current_scene and self.current_scene["passive_items"]:
+            self.display_styled_text("You notice:", "default")
+            for item in self.current_scene["passive_items"]:
+                self.display_styled_text(f"- {self.items[item]['name']}", "item")
+        
         if "characters" in self.current_scene:
             for char_id in self.current_scene["characters"]:
-                char = self.characters[char_id]
-                message_handler.print_message(f"{char['name']}: {char['greeting']}", "dialogue")
+                character = self.characters[char_id]
+                self.display_styled_text(character.get("greeting"), "greeting")
+                
                 random_text = self.get_random_character_text(char_id)
                 if random_text:
-                    message_handler.print_message(random_text, "dialogue")
+                    self.display_styled_text(random_text, "ambient")
 
     def display_scene_description(self, scene):
         self.text_styler.print_text(
@@ -488,33 +510,49 @@ class GameEngine:
                 message_handler.print_message(f"- {self.characters[char_id]['name']}")
 
     def start_dialogue(self, character):
-        greeting = character["dialogue"].get("greet", character.get("greeting", "The character does not have a greeting."))
-        message_handler.print_message(greeting)
+        """Start a dialogue with a character using implicit styling."""
+        greeting = character.get("dialogue", {}).get("greet", character.get("greeting"))
+        self.display_styled_text(greeting, "dialogue")
+        
         options = character.get("dialogue_options", {})
         if options:
-            message_handler.print_message("Choose an option:")
+            self.display_styled_text("Choose an option:", "menu")
             for i, (option, response) in enumerate(options.items(), start=1):
-                message_handler.print_message(f"{i}. {option}")
-            choice = int(input("Enter the number of your choice: ")) - 1
-            if 0 <= choice < len(options):
-                selected_option = list(options.keys())[choice]
-                message_handler.print_message(options[selected_option])
-                # Handle specific interactions based on the selected option
-                self.handle_dialogue_option(character, selected_option)
-            else:
-                message_handler.print_message("Invalid choice.")
+                self.display_styled_text(f"{i}. {option}", "menu")
+                
+            while True:
+                choice = input("Enter the number of your choice (or 'exit' to leave): ").lower().strip()
+                
+                # Check for exit command
+                if choice in ['exit', 'quit', 'leave', 'back']:
+                    self.display_styled_text("You end the conversation.", "dialogue")
+                    return
+                    
+                # Try to convert input to number
+                try:
+                    choice_num = int(choice) - 1
+                    if 0 <= choice_num < len(options):
+                        selected_option = list(options.keys())[choice_num]
+                        response = options[selected_option]
+                        self.display_styled_text(response, "dialogue")
+                        self.handle_dialogue_option(character, selected_option)
+                        return
+                    else:
+                        self.display_styled_text(f"Please enter a number between 1 and {len(options)}.", "error")
+                except ValueError:
+                    self.display_styled_text("Please enter a valid number or 'exit' to leave the conversation.", "error")
         else:
-            message_handler.print_message("No dialogue options available.")
+            self.display_styled_text("No dialogue options available.", "dialogue")
 
     def give_item_to_character(self, item_name, character_name):
         """Enhanced give item handler with multiple interaction types."""
         item = self.find_item_by_name(item_name)
         if not item:
-            message_handler.print_message("Item not found in the game data.")
+            self.display_styled_text("Item not found in the game data.", "error")
             return
             
         if item["id"] not in self.inventory.items:
-            message_handler.print_message(f"{item['name']} not in your inventory.")
+            self.display_styled_text(f"{item['name']} not in your inventory.", "error")
             return
 
         # Find the character in the current scene
@@ -620,7 +658,7 @@ class GameEngine:
             message_handler.print_message(f"{character['name']} has no use for this item.")
 
     def handle_dialogue_option(self, character, option):
-        """Enhanced dialogue handler with crafting support."""
+        """Handle dialogue options with proper styling."""
         character_id = character["id"]
         
         # Handle dialogue rewards
@@ -628,18 +666,14 @@ class GameEngine:
             reward_data = character["dialogue_rewards"][option]
             if "required_progress" in reward_data:
                 if not self.story_progress.get(reward_data["required_progress"]):
-                    message_handler.print_message(reward_data.get("failure_message", "You can't do that yet."))
+                    self.display_styled_text(reward_data.get("failure_message"), "error")
                     return
-            
-            # Give the reward item
-            item_id = reward_data["item"]
-            message_handler.print_message(reward_data.get("success_message", f"{character['name']} gives you a {self.items[item_id]['name']}."))
-            self.inventory.add_item(item_id, self.items)
-        
-        # Initialize crafting inventory for the character if needed
-        if character_id not in self.character_crafting_inventories:
-            self.character_crafting_inventories[character_id] = set()
-
+                
+                # Give the reward item
+                item_id = reward_data["item"]
+                self.display_styled_text(reward_data.get("success_message"), "success")
+                self.inventory.add_item(item_id, self.items)
+                
     def fight_character(self, character_name):
         if not character_name:
             message_handler.print_message("Who do you want to fight?")
@@ -940,13 +974,14 @@ class GameEngine:
                 message_handler.print_message(f"- {character['name']}: {greeting}")
 
     def read_item(self, item_name):
+        """Read a readable item with proper delay and styling."""
         item = self.find_item_by_name(item_name)
         if item and "readable_item" in item:
             text = item["readable_item"]
-            message_handler.print_message(f"You start reading the {item['name']}:")
-            message_handler.print_with_delay(text, item.get("read_speed", 0.05))
+            self.display_styled_text(f"You start reading the {item['name']}:", "default")
+            message_handler.print_with_delay(text, item.get("read_speed", 0.05), "reading")
         else:
-            message_handler.print_message(random.choice(self.item_not_found_messages))
+            self.display_styled_text(random.choice(self.item_not_found_messages), "error")
 
     def look_at(self, target_name):
         if not target_name:
@@ -988,6 +1023,53 @@ class GameEngine:
                 return
 
         message_handler.print_message("You don't see that here.")
+
+    def get_available_styles(self):
+        """Get list of available style configurations."""
+        style_dir = os.path.join("engine", "style", "configs")
+        style_files = [f for f in os.listdir(style_dir) if f.endswith('.json')]
+        return [os.path.splitext(f)[0] for f in style_files]
+
+    def change_style(self, style_name=None):
+        """Change the game's style configuration.
+        
+        Args:
+            style_name: Name of style to change to, or None to rotate to next style
+        """
+        available_styles = self.get_available_styles()
+        
+        if not available_styles:
+            message_handler.print_message("No style configurations found.", "error")
+            return
+            
+        if style_name is None:
+            # Rotate to next style
+            current_style = self.config.get("style_config", "default")
+            try:
+                current_index = available_styles.index(current_style)
+                next_index = (current_index + 1) % len(available_styles)
+                style_name = available_styles[next_index]
+            except ValueError:
+                style_name = available_styles[0]
+        elif style_name not in available_styles:
+            message_handler.print_message(f"Style '{style_name}' not found. Available styles:", "error")
+            for style in available_styles:
+                message_handler.print_message(f"- {style}", "system")
+            return
+        
+        try:
+            # Load and apply the new style
+            style_config = StyleConfig.load(style_name)
+            self.text_styler.process_config(style_config)
+            self.message_handler.text_styler.process_config(style_config)
+            self.config["style_config"] = style_name
+            
+            # Announce the style change
+            message_handler.print_message(f"Style changed to: {style_name}", "success")
+            
+        except Exception as e:
+            message_handler.print_message(f"Error loading style '{style_name}': {str(e)}", "error")
+
 
     def repair_communicator(self):
         if "energy_cells" in self.inventory.items:

@@ -520,14 +520,29 @@ class GameEngine:
             for i, (option, response) in enumerate(options.items(), start=1):
                 self.display_styled_text(f"{i}. {option}", "menu")
                 
-            choice = int(input("Enter the number of your choice: ")) - 1
-            if 0 <= choice < len(options):
-                selected_option = list(options.keys())[choice]
-                response = options[selected_option]
-                self.display_styled_text(response, "dialogue")
-                self.handle_dialogue_option(character, selected_option)
-            else:
-                self.display_styled_text("Invalid choice.", "error")
+            while True:
+                choice = input("Enter the number of your choice (or 'exit' to leave): ").lower().strip()
+                
+                # Check for exit command
+                if choice in ['exit', 'quit', 'leave', 'back']:
+                    self.display_styled_text("You end the conversation.", "dialogue")
+                    return
+                    
+                # Try to convert input to number
+                try:
+                    choice_num = int(choice) - 1
+                    if 0 <= choice_num < len(options):
+                        selected_option = list(options.keys())[choice_num]
+                        response = options[selected_option]
+                        self.display_styled_text(response, "dialogue")
+                        self.handle_dialogue_option(character, selected_option)
+                        return
+                    else:
+                        self.display_styled_text(f"Please enter a number between 1 and {len(options)}.", "error")
+                except ValueError:
+                    self.display_styled_text("Please enter a valid number or 'exit' to leave the conversation.", "error")
+        else:
+            self.display_styled_text("No dialogue options available.", "dialogue")
 
     def give_item_to_character(self, item_name, character_name):
         """Enhanced give item handler with multiple interaction types."""

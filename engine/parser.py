@@ -117,6 +117,11 @@ class Parser:
                 "parameters": []
             },
             {
+                "names": ["hint"],
+                "action": "provide_hint",
+                "parameters": []
+            },            
+            {
                 "names": ["style"],
                 "action": "change_style",
                 "parameters": ["style_name"]

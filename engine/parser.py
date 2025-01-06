@@ -172,38 +172,41 @@ class Parser:
                 "parameters": {"style_name": style_name}
             }            
 
-        # Special case for exact matches first
-        for action in self.actions:
-            if command in action["names"]:
-                return {"action": action["action"], "parameters": {}}
-
-        # Handle more complex commands
+        # Process multi-word commands first
         for action in self.actions:
             for name in action["names"]:
-                # Use startswith only for complete words to avoid 'look' matching 'look at'
-                if (name + " ").startswith(command + " "):
-                    return {"action": action["action"], "parameters": {}}
+                if " " in name:  # Multi-word command
+                    if command.startswith(name + " "):  # Command with parameter
+                        remaining = command[len(name):].strip()
+                        if remaining:  # Has parameter
+                            return {
+                                "action": action["action"],
+                                "parameters": {action["parameters"][0]: remaining}
+                            }
+                    elif command == name:  # Exact match
+                        if not action["parameters"]:  # Command doesn't need parameters
+                            return {"action": action["action"], "parameters": {}}
+                        else:  # Command needs parameters but none provided
+                            return {
+                                "action": "invalid",
+                                "message": f"The command '{name}' needs a target. Try '{name} [target]'."
+                            }
 
-                if command.startswith(name + " "):
-                    params = {}
-                    remaining = command[len(name):].strip()
+        # Then process single-word commands
+        for action in self.actions:
+            for name in action["names"]:
+                if not " " in name:  # Single-word command
+                    if command == name:  # Exact match
+                        return {"action": action["action"], "parameters": {}}
+                    elif command.startswith(name + " "):  # Command with potential parameter
+                        remaining = command[len(name):].strip()
+                        if remaining and action["parameters"]:
+                            return {
+                                "action": action["action"],
+                                "parameters": {action["parameters"][0]: remaining}
+                            }
 
-                    # Handle each parameter type
-                    for param in action["parameters"]:
-                        if param in ["target_name", "character_name", "item_name"]:
-                            params[param] = remaining
-                        elif param in ["item1_name", "item2_name"]:
-                            items = self.parse_combination(remaining)
-                            if not items:
-                                return {"action": "invalid", "message": f"Invalid format for combining items."}
-                            params["item1_name"] = items[0]
-                            params["item2_name"] = items[1]
-
-                    # Only return if we have all required parameters
-                    if len(params) == len(action["parameters"]):
-                        return {"action": action["action"], "parameters": params}
-
-        return {"action": "invalid", "message": "I don't understand that command. Try to use the exact command."}
+        return {"action": "invalid", "message": "I don't understand that command. Try 'help' for a list of commands."}
 
     def parse_combination(self, command):
         # Handle various combination formats:

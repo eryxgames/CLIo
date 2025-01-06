@@ -72,8 +72,8 @@ class Inventory:
     def find_item_by_partial_name(self, partial_name, items_data):
         """Find an item in inventory by partial name match."""
         partial_name = partial_name.lower()
-        print(f"DEBUG: Looking for item with partial name: '{partial_name}'")
-        print(f"DEBUG: Current inventory: {self.items}")
+#        print(f"DEBUG: Looking for item with partial name: '{partial_name}'")
+#        print(f"DEBUG: Current inventory: {self.items}")
         
         # First check if it's a direct ID match
         if partial_name in self.items:
@@ -83,60 +83,60 @@ class Inventory:
         for item_id in self.items:
             item = items_data[item_id]
             item_name = item['name'].lower()
-            print(f"DEBUG: Checking against item: {item_id} ({item_name})")
+#            print(f"DEBUG: Checking against item: {item_id} ({item_name})")
             
             # Check exact match
             if partial_name == item_name:
-                print(f"DEBUG: Found exact match: {item_id}")
+ #               print(f"DEBUG: Found exact match: {item_id}")
                 return item_id
                 
             # Check last word match
             last_word = item_name.split()[-1]
             if partial_name == last_word:
-                print(f"DEBUG: Found last word match: {item_id}")
+#                print(f"DEBUG: Found last word match: {item_id}")
                 matches.append(item_id)
                 
             # Check partial match
             elif partial_name in item_name:
-                print(f"DEBUG: Found partial match: {item_id}")
+#                print(f"DEBUG: Found partial match: {item_id}")
                 matches.append(item_id)
                 
         # Handle matches
         if len(matches) == 1:
-            print(f"DEBUG: Returning single match: {matches[0]}")
+#            print(f"DEBUG: Returning single match: {matches[0]}")
             return matches[0]
         elif matches:
             # Prefer last word matches
             for item_id in matches:
                 if partial_name == items_data[item_id]['name'].lower().split()[-1]:
-                    print(f"DEBUG: Returning preferred last word match: {item_id}")
+#                    print(f"DEBUG: Returning preferred last word match: {item_id}")
                     return item_id
-            print(f"DEBUG: Returning first match: {matches[0]}")
+#            print(f"DEBUG: Returning first match: {matches[0]}")
             return matches[0]
             
-        print(f"DEBUG: No matches found for {partial_name}")
+#        print(f"DEBUG: No matches found for {partial_name}")
         return None
 
     def combine_items(self, item1_name, item2_name, items_data):
         """Combine two items."""
-        print(f"DEBUG: Attempting to combine '{item1_name}' with '{item2_name}'")
+#        print(f"DEBUG: Attempting to combine '{item1_name}' with '{item2_name}'")
         
         # Try to find items by partial name
         item1_id = self.find_item_by_partial_name(item1_name, items_data)
         item2_id = self.find_item_by_partial_name(item2_name, items_data)
         
-        print(f"DEBUG: Found item1_id: {item1_id}, item2_id: {item2_id}")
+#        print(f"DEBUG: Found item1_id: {item1_id}, item2_id: {item2_id}")
 
         if not item1_id or not item2_id:
             print("One or both items not found in your inventory.")
             return None
 
         # Check all items for a valid combination
-        print(f"DEBUG: Looking for combination with components: {item1_id}, {item2_id}")
+#        print(f"DEBUG: Looking for combination with components: {item1_id}, {item2_id}")
         for result_id, result_item in items_data.items():
             if 'components' in result_item:
                 components = set(result_item['components'])
-                print(f"DEBUG: Checking result item {result_id} with components {components}")
+#                print(f"DEBUG: Checking result item {result_id} with components {components}")
                 if {item1_id, item2_id} == components:
                     print(f"You combine {items_data[item1_id]['name']} and {items_data[item2_id]['name']} to create {result_item['name']}.")
                     self.items.remove(item1_id)

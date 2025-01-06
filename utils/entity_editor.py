@@ -2,136 +2,123 @@ import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog, filedialog
 from ttkthemes import ThemedTk
 import json
+import shutil
 import os
 import re
+import sys
+import copy
+import time
+import logging
+import traceback
+import functools
+from datetime import datetime
+from contextlib import contextmanager
 from tkinter.scrolledtext import ScrolledText
 from pygments import highlight
 from pygments.lexers import get_lexer_by_name
 from pygments.formatters import HtmlFormatter
 from tkhtmlview import HTMLScrolledText
 
+# Decorator definition
+def safe_operation(func):
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        try:
+            return func(self, *args, **kwargs)
+        except Exception as e:
+            self.handle_operation_error(e, func.__name__)
+            return None
+    return wrapper
+
+class EditorError(Exception):
+    """Base class for editor errors"""
+    pass
+
+class FileOperationError(EditorError):
+    """Error during file operations"""
+    pass
+
+class ValidationError(EditorError):
+    """Error during data validation"""
+    pass
+
+class PlaceholderEntry(ttk.Entry):
+    def __init__(self, master=None, placeholder="PLACEHOLDER", color='grey', *args, **kwargs):
+        super().__init__(master, *args, **kwargs)
+        self.placeholder = placeholder
+        self.placeholder_color = color
+        self.default_fg_color = self['foreground']
+        self.bind("<FocusIn>", self._clear_placeholder)
+        self.bind("<FocusOut>", self._add_placeholder)
+        self._add_placeholder()
+
+    def _add_placeholder(self, *args):
+        if not self.get():
+            self.insert(0, self.placeholder)
+            self['foreground'] = self.placeholder_color
+
+    def _clear_placeholder(self, *args):
+        if self.get() == self.placeholder:
+            self.delete(0, tk.END)
+            self['foreground'] = self.default_fg_color
+
 class GameDataEditor:
     def __init__(self, root):
         self.root = root
-        self.root.title("CLIo Game Data Editor")
-        self.root.configure(bg='#1e1e1e')
+        self.setup_window()
+        self.initialize_data()
+        self.setup_ui()
+        self.setup_error_handlers()
+        self.setup_event_bindings()
+        self.load_data()
 
-        # Apply dark theme
+    def setup_window(self):
+        self.root.title("CLIo Game Data Editor")
+        self.root.geometry("1400x900")
+        self.root.configure(bg='#1e1e1e')
         self.style = ttk.Style()
         self.style.theme_use('clam')
         self.configure_dark_theme()
 
-        # Initialize data attributes
+    def initialize_data(self):
+        self.undo_stack = []
+        self.redo_stack = []
+        self.modified = set()
         self.scenes_data = []
         self.items_data = {}
         self.characters_data = {}
         self.story_texts_data = {}
+        
+        self.search_vars = {
+            'scene': tk.StringVar(),
+            'item': tk.StringVar(),
+            'character': tk.StringVar()
+        }
 
-        self.notebook = ttk.Notebook(root)
+    def setup_ui(self):
+        self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(expand=1, fill="both", padx=10, pady=10)
 
-        # Create tabs
-        self.scenes_tab = ttk.Frame(self.notebook)
-        self.items_tab = ttk.Frame(self.notebook)
-        self.characters_tab = ttk.Frame(self.notebook)
-        self.dialogues_tab = ttk.Frame(self.notebook)
-        self.story_texts_tab = ttk.Frame(self.notebook)
-        self.crafting_tab = ttk.Frame(self.notebook)
+        self.tabs = {
+            'scenes': ttk.Frame(self.notebook),
+            'items': ttk.Frame(self.notebook),
+            'characters': ttk.Frame(self.notebook),
+            'dialogues': ttk.Frame(self.notebook),
+            'story_texts': ttk.Frame(self.notebook),
+            'crafting': ttk.Frame(self.notebook)
+        }
 
-        # Add tabs to notebook
-        self.notebook.add(self.scenes_tab, text='Scenes')
-        self.notebook.add(self.items_tab, text='Items')
-        self.notebook.add(self.characters_tab, text='Characters')
-        self.notebook.add(self.dialogues_tab, text='Dialogues')
-        self.notebook.add(self.story_texts_tab, text='Story Texts')
-        self.notebook.add(self.crafting_tab, text='Crafting')
+        for name, frame in self.tabs.items():
+            self.notebook.add(frame, text=name.title())
 
-        # Create tabs and their components
-        self.create_tabs()
-
-        # Bind events after the listboxes are created
-        self.scene_details_text.bind("<<Modified>>", lambda event: self.apply_syntax_highlighting(self.scene_details_text))
-
-        self.load_data()
-
-        # Initialize syntax highlighting variable
-        self.syntax_highlighting_var = tk.BooleanVar(value=False)
-
-    def create_tabs(self):
+        self.create_toolbar()
+        self.create_status_bar()
         self.create_scenes_tab()
         self.create_items_tab()
         self.create_characters_tab()
         self.create_dialogues_tab()
         self.create_story_text_editor()
         self.create_crafting_editor()
-
-    def create_story_text_editor(self):
-        story_frame = ttk.Frame(self.story_texts_tab)
-        story_frame.pack(padx=20, pady=20, fill=tk.BOTH, expand=True)
-
-        # Left side - Text keys list
-        list_frame = ttk.Frame(story_frame)
-        list_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0,10))
-
-        self.story_texts_listbox = self.create_custom_listbox(list_frame)
-        self.story_texts_listbox.pack(side=tk.LEFT, fill=tk.Y)
-
-        # Bind the selection event after creating the listbox
-        self.story_texts_listbox.bind('<<ListboxSelect>>', self.on_story_text_select)
-
-        # Right side - Text editor
-        editor_frame = ttk.Frame(story_frame)
-        editor_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
-
-        # Text content
-        self.story_text_editor = self.create_custom_text(editor_frame)
-        self.story_text_editor.pack(fill=tk.BOTH, expand=True)
-
-        # Control buttons
-        button_frame = ttk.Frame(editor_frame)
-        button_frame.pack(fill=tk.X, pady=10)
-
-        ttk.Button(button_frame, text="New Text",
-                   command=self.add_story_text).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Save Text",
-                   command=self.save_story_text).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Delete Text",
-                   command=self.delete_story_text).pack(side=tk.LEFT, padx=5)
-
-        # Search functionality
-        search_var = tk.StringVar()
-        search_entry = ttk.Entry(button_frame, textvariable=search_var)
-        search_entry.pack(side=tk.LEFT, padx=5)
-
-        def on_search():
-            search_term = search_var.get().lower()
-            self.story_texts_listbox.selection_clear(0, tk.END)
-            for i in range(self.story_texts_listbox.size()):
-                item = self.story_texts_listbox.get(i)
-                if search_term in item.lower():
-                    self.story_texts_listbox.selection_set(i)
-                    self.story_texts_listbox.see(i)
-
-        search_button = ttk.Button(button_frame, text="Search", command=on_search)
-        search_button.pack(side=tk.LEFT, padx=5)
-
-    def on_story_text_select(self, event):
-        if not hasattr(self, 'story_texts_listbox') or not hasattr(self, 'story_text_editor'):
-            return
-        selected_index = self.story_texts_listbox.curselection()
-        if not selected_index:
-            return
-        text_key = self.story_texts_listbox.get(selected_index)
-        text_data = self.story_texts_data.get(text_key, {})
-        text_content = text_data.get("text", "")
-        self.story_text_editor.delete(1.0, tk.END)
-        self.story_text_editor.insert(tk.END, text_content)
-
-    def toggle_light_mode(self):
-        if self.light_mode.get():
-            self.style.theme_use('clam')
-        else:
-            self.style.theme_use('equilux')
 
     def configure_dark_theme(self):
         colors = {
@@ -144,24 +131,29 @@ class GameDataEditor:
             'button_active': '#4d4d4d'
         }
 
-        self.style.configure('TFrame', background=colors['bg'])
-        self.style.configure('TLabel', background=colors['bg'], foreground=colors['fg'])
-        self.style.configure('TButton',
-                           background=colors['button_bg'],
-                           foreground=colors['fg'],
-                           borderwidth=1,
-                           focusthickness=3,
-                           focuscolor='none')
-        self.style.map('TButton',
-                      background=[('active', colors['button_active'])])
-        self.style.configure('TNotebook',
-                           background=colors['bg'],
-                           borderwidth=0)
-        self.style.configure('TNotebook.Tab',
-                           background=colors['button_bg'],
-                           foreground=colors['fg'],
-                           padding=[10, 2],
-                           borderwidth=1)
+        style_configs = {
+            'TFrame': {'background': colors['bg']},
+            'TLabel': {'background': colors['bg'], 'foreground': colors['fg']},
+            'TButton': {
+                'background': colors['button_bg'],
+                'foreground': colors['fg'],
+                'borderwidth': 1,
+                'focusthickness': 3,
+                'focuscolor': 'none'
+            },
+            'TNotebook': {'background': colors['bg'], 'borderwidth': 0},
+            'TNotebook.Tab': {
+                'background': colors['button_bg'],
+                'foreground': colors['fg'],
+                'padding': [10, 2],
+                'borderwidth': 1
+            }
+        }
+
+        for style, config in style_configs.items():
+            self.style.configure(style, **config)
+
+        self.style.map('TButton', background=[('active', colors['button_active'])])
         self.style.map('TNotebook.Tab',
                       background=[('selected', colors['select_bg'])],
                       foreground=[('selected', colors['select_fg'])])
@@ -169,1243 +161,1846 @@ class GameDataEditor:
         return colors
 
     def create_custom_listbox(self, parent, height=20, width=40):
-        listbox = tk.Listbox(parent,
-                            height=height,
-                            width=width,
-                            bg='#2d2d2d',
-                            fg='#ffffff',
-                            selectbackground='#404040',
-                            selectforeground='#ffffff',
-                            selectmode=tk.SINGLE,
-                            relief=tk.FLAT,
-                            borderwidth=0,
-                            highlightthickness=1,
-                            highlightbackground='#404040')
+        frame = ttk.Frame(parent)
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        listbox = tk.Listbox(frame,
+                          height=height,
+                          width=width,
+                          bg='#2d2d2d',
+                          fg='#ffffff',
+                          selectbackground='#404040',
+                          selectforeground='#ffffff',
+                          selectmode=tk.SINGLE,
+                          relief=tk.FLAT,
+                          borderwidth=0,
+                          highlightthickness=1,
+                          highlightbackground='#404040')
+        
+        scrollbar = ttk.Scrollbar(frame, orient=tk.VERTICAL)
+        listbox.config(yscrollcommand=scrollbar.set)
+        scrollbar.config(command=listbox.yview)
+        
+        listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
         return listbox
 
     def create_custom_text(self, parent, height=30, width=80):
         text = ScrolledText(parent,
-                           height=height,
-                           width=width,
-                           bg='#2d2d2d',
-                           fg='#ffffff',
-                           insertbackground='#ffffff',
-                           relief=tk.FLAT,
-                           borderwidth=0,
-                           highlightthickness=1,
-                           highlightbackground='#404040')
+                         height=height,
+                         width=width,
+                         bg='#2d2d2d',
+                         fg='#ffffff',
+                         insertbackground='#ffffff',
+                         relief=tk.FLAT,
+                         borderwidth=0,
+                         highlightthickness=1,
+                         highlightbackground='#404040')
         return text
 
-    def create_item_form(self):
-        form_window = tk.Toplevel(self.root)
-        form_window.title("Create/Edit Item")
-        form_window.configure(bg='#1e1e1e')
+    def create_search_frame(self, parent, search_var, placeholder):
+        search_frame = ttk.Frame(parent)
+        search_frame.pack(fill=tk.X, pady=(0,5))
+        
+        PlaceholderEntry(search_frame, 
+                        textvariable=search_var,
+                        placeholder=placeholder).pack(fill=tk.X, padx=5)
+        
+        return search_frame
 
-        form_frame = ttk.Frame(form_window)
-        form_frame.pack(padx=20, pady=20)
+    def create_tab_layout(self, tab_frame, search_var, placeholder):
+        paned = ttk.PanedWindow(tab_frame, orient=tk.HORIZONTAL)
+        paned.pack(fill=tk.BOTH, expand=True)
 
-        # Create form fields
-        fields = [
-            ("Name", "name"),
-            ("Description", "description"),
-            ("Type", "type", ["Story", "Quest", "Usable", "Craftable"]),
-            ("Usable", "usable", ["True", "False"]),
-            ("Readable Text", "readable_item"),
-            ("Use Effect", "use_effect"),
-            ("Crafting Requirements", "crafting_requirements"),
+        list_frame = ttk.Frame(paned)
+        paned.add(list_frame, weight=1)
+
+        self.create_search_frame(list_frame, search_var, placeholder)
+        listbox = self.create_custom_listbox(list_frame)
+        
+        editor_frame = ttk.Frame(paned)
+        paned.add(editor_frame, weight=2)
+        
+        return listbox, editor_frame
+
+    def create_toolbar(self):
+        toolbar = ttk.Frame(self.root)
+        toolbar.pack(fill=tk.X, padx=5, pady=2)
+
+        buttons = [
+            ("Save All", self.save_all),
+            ("Reload", self.reload_data),
+            ("Undo", self.undo),
+            ("Redo", self.redo),
+            ("Validate", self.validate_all_data),
+            ("Find References", self.find_references)
         ]
 
-        entries = {}
-        for field in fields:
-            label = ttk.Label(form_frame, text=field[0])
-            label.pack(anchor=tk.W, pady=(10,0))
+        for text, command in buttons:
+            ttk.Button(toolbar, text=text, command=command).pack(side=tk.LEFT, padx=2)
 
-            if len(field) > 2 and isinstance(field[2], list):
-                var = tk.StringVar()
-                entry = ttk.Combobox(form_frame, textvariable=var, values=field[2])
-                entry.set(field[2][0])
+    def create_status_bar(self):
+        self.status_var = tk.StringVar()
+        status_bar = ttk.Label(self.root, textvariable=self.status_var,
+                             relief=tk.SUNKEN, anchor=tk.W)
+        status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+        self.update_status()
+
+    def update_status(self, message=None):
+        if message:
+            self.status_var.set(message)
+        else:
+            modified = len(self.modified)
+            self.status_var.set(f"Modified files: {', '.join(self.modified)}" if modified else "No modifications")
+
+    # Include all previously defined methods for:
+    # - Tab creation (create_scenes_tab, create_items_tab, etc.)
+    # - Event handling (setup_event_bindings)
+    # - Error handling (setup_error_handlers)
+    # - Data validation (validate_all_data, etc.)
+    # - File operations (load_data, save_all, etc.)
+
+    def setup_error_handlers(self):
+        """Initialize error handling"""
+        self.root.report_callback_exception = self.handle_callback_error
+        self.setup_logging()
+
+    def setup_logging(self):
+        """Configure error logging"""
+        os.makedirs('logs', exist_ok=True)
+        logging.basicConfig(
+            filename='logs/editor.log',
+            level=logging.ERROR,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        self.logger = logging.getLogger('GameEditor')
+
+    def handle_callback_error(self, exc_type, exc_value, exc_traceback):
+        """Handle Tkinter callback errors"""
+        error_msg = self.format_error_message(exc_type, exc_value)
+        self.log_error(exc_type, exc_value, exc_traceback)
+        self.show_error_dialog(error_msg)
+
+    def format_error_message(self, exc_type, exc_value):
+        """Format error message for display"""
+        if isinstance(exc_value, FileOperationError):
+            return f"File Operation Error: {str(exc_value)}"
+        elif isinstance(exc_value, ValidationError):
+            return f"Validation Error: {str(exc_value)}"
+        else:
+            return f"Error: {str(exc_value)}"
+
+    def log_error(self, exc_type, exc_value, exc_traceback):
+        """Log error with full traceback"""
+        self.logger.error(
+            "Exception occurred",
+            exc_info=(exc_type, exc_value, exc_traceback)
+        )
+
+    def show_error_dialog(self, message, title="Error"):
+        """Display error dialog to user"""
+        messagebox.showerror(title, message)
+        if self.in_transaction:
+            self.rollback_transaction()
+
+    @contextmanager
+    def error_handling(self, operation_name):
+        """Context manager for error handling"""
+        try:
+            yield
+        except Exception as e:
+            self.handle_operation_error(e, operation_name)
+
+    def handle_operation_error(self, error, operation_name):
+        """Handle operation-specific errors"""
+        error_msg = f"Error in {operation_name}: {str(error)}"
+        self.logger.error(error_msg, exc_info=True)
+        self.show_error_dialog(error_msg)
+
+    def handle_file_error(self, error, filepath):
+        """Handle file operation errors"""
+        if isinstance(error, FileNotFoundError):
+            return self.handle_missing_file(filepath)
+        elif isinstance(error, json.JSONDecodeError):
+            return self.handle_invalid_json(filepath)
+        else:
+            raise FileOperationError(f"Error accessing {filepath}: {str(error)}")
+
+    def handle_missing_file(self, filepath):
+        """Handle missing file"""
+        try:
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            return self.create_default_data(filepath)
+        except Exception as e:
+            raise FileOperationError(f"Could not create default data for {filepath}: {str(e)}")
+
+    def handle_invalid_json(self, filepath):
+        """Handle corrupted JSON files"""
+        backup_path = f"{filepath}.bak.{int(time.time())}"
+        try:
+            if os.path.exists(filepath):
+                shutil.copy2(filepath, backup_path)
+                self.logger.warning(f"Backed up corrupt file to {backup_path}")
+            return self.create_default_data(filepath)
+        except Exception as e:
+            raise FileOperationError(f"Could not handle corrupt file {filepath}: {str(e)}")
+
+    @contextmanager
+    def transaction(self):
+        """Transaction context for multi-step operations"""
+        self.begin_transaction()
+        try:
+            yield
+            self.commit_transaction()
+        except Exception as e:
+            self.rollback_transaction()
+            raise e
+
+    def begin_transaction(self):
+        """Start a new transaction"""
+        self.transaction_backup = {
+            'scenes': copy.deepcopy(self.scenes_data),
+            'items': copy.deepcopy(self.items_data),
+            'characters': copy.deepcopy(self.characters_data)
+        }
+        self.in_transaction = True
+
+    def commit_transaction(self):
+        """Commit current transaction"""
+        self.transaction_backup = None
+        self.in_transaction = False
+
+    def rollback_transaction(self):
+        """Rollback current transaction"""
+        if self.transaction_backup:
+            self.scenes_data = self.transaction_backup['scenes']
+            self.items_data = self.transaction_backup['items']
+            self.characters_data = self.transaction_backup['characters']
+            self.refresh_all_lists()
+        self.in_transaction = False
+
+    def create_default_data(self, filepath):
+        """Create default data based on file type"""
+        defaults = {
+            'scenes.json': [{'id': 'start', 'name': 'Start', 'description': 'Starting area'}],
+            'items.json': {},
+            'characters.json': {},
+            'story_texts.json': {}
+        }
+        filename = os.path.basename(filepath)
+        return defaults.get(filename, {})
+
+    def safe_save(self, filepath, data):
+        """Safely save file with backup"""
+        backup_path = f"{filepath}.bak"
+        try:
+            if os.path.exists(filepath):
+                shutil.copy2(filepath, backup_path)
+            with open(filepath, 'w') as f:
+                json.dump(data, f, indent=4)
+        except Exception as e:
+            if os.path.exists(backup_path):
+                shutil.copy2(backup_path, filepath)
+            raise FileOperationError(f"Failed to save {filepath}: {str(e)}")
+
+    def setup_event_bindings(self):
+        self.root.bind('<Control-s>', lambda e: self.save_all())
+        self.root.bind('<Control-z>', lambda e: self.undo())
+        self.root.bind('<Control-y>', lambda e: self.redo())
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+        self.notebook.bind('<<NotebookTabChanged>>', self.on_tab_change)
+
+    def on_close(self):
+        if self.modified and messagebox.askyesno("Save Changes", "Save changes before closing?"):
+            self.save_all()
+        self.root.destroy()
+
+    def on_tab_change(self, event=None):
+        current = self.notebook.select()
+        tab_name = self.notebook.tab(current)["text"].lower()
+        self.refresh_tab(tab_name)
+
+    def refresh_tab(self, tab_name):
+        refresh_methods = {
+            'scenes': self.refresh_scenes_list,
+            'items': self.refresh_items_list,
+            'characters': self.refresh_characters_list,
+            'story_texts': self.refresh_story_texts_list
+        }
+        if method := refresh_methods.get(tab_name):
+            method()
+
+    def on_scene_select(self, event=None):
+        if not (selection := self.scenes_listbox.curselection()):
+            return
+            
+        scene = self.scenes_data[selection[0]]
+        self.scene_id_var.set(scene['id'])
+        self.scene_name_var.set(scene['name'])
+        self.scene_desc_text.delete('1.0', tk.END)
+        self.scene_desc_text.insert('1.0', scene.get('description', ''))
+        self.update_scene_contents(scene)
+
+    def on_item_select(self, event=None):
+        if not (selection := self.items_listbox.curselection()):
+            return
+            
+        item_id = list(self.items_data.keys())[selection[0]]
+        item = self.items_data[item_id]
+        self.update_item_editor(item_id, item)
+
+    def on_character_select(self, event=None):
+        if not (selection := self.chars_listbox.curselection()):
+            return
+            
+        char_id = list(self.characters_data.keys())[selection[0]]
+        character = self.characters_data[char_id]
+        self.update_character_editor(char_id, character)
+
+    @safe_operation
+    def undo(self):
+        if not self.undo_stack:
+            return
+            
+        action = self.undo_stack.pop()
+        self.redo_stack.append(action)
+        self._apply_action(action, reverse=True)
+        self.update_status(f"Undo: {action['description']}")
+
+    @safe_operation
+    def redo(self):
+        if not self.redo_stack:
+            return
+            
+        action = self.redo_stack.pop()
+        self.undo_stack.append(action)
+        self._apply_action(action)
+        self.update_status(f"Redo: {action['description']}")
+
+    def _apply_action(self, action, reverse=False):
+        data = action['undo_data'] if reverse else action['redo_data']
+        target = action['target']
+        
+        data_map = {
+            'scenes': self.scenes_data,
+            'items': self.items_data,
+            'characters': self.characters_data
+        }
+        
+        if target_data := data_map.get(target):
+            if isinstance(target_data, list):
+                self._apply_list_action(target_data, data)
             else:
-                if field[0] == "Description" or field[0] == "Readable Text":
-                    entry = self.create_custom_text(form_frame, height=5, width=40)
-                else:
-                    entry = ttk.Entry(form_frame, width=40)
+                self._apply_dict_action(target_data, data)
+                
+        self.refresh_tab(target)
 
-            entry.pack(fill=tk.X, pady=(0,5))
-            entries[field[1]] = entry
+    def _apply_list_action(self, target_data, data):
+        for idx, item in enumerate(target_data):
+            if item['id'] == data['id']:
+                target_data[idx] = data
+                break
 
-        return form_window, entries
+    def _apply_dict_action(self, target_data, data):
+        target_data[data['id']] = data
 
-    def create_character_dialogue_editor(self, character_id):
-        dialogue_window = tk.Toplevel(self.root)
-        dialogue_window.title(f"Edit Dialogues - {character_id}")
-        dialogue_window.configure(bg='#1e1e1e')
+    def add_undo_action(self, action_type, target, undo_data, redo_data, description):
+        self.undo_stack.append({
+            'type': action_type,
+            'target': target,
+            'undo_data': undo_data,
+            'redo_data': redo_data,
+            'description': description
+        })
+        self.redo_stack.clear()
+        self.modified.add(target)
 
-        main_frame = ttk.Frame(dialogue_window)
-        main_frame.pack(padx=20, pady=20, fill=tk.BOTH, expand=True)
+    def validate_all_data(self):
+        """Validate all game data"""
+        errors = []
+        validators = [
+            self.validate_scenes,
+            self.validate_items,
+            self.validate_characters,
+            self.validate_references
+        ]
+        
+        for validator in validators:
+            errors.extend(validator())
+        
+        self.show_validation_results(errors)
+        return not errors
 
-        # Left side - Dialog list
-        list_frame = ttk.Frame(main_frame)
-        list_frame.pack(side=tk.LEFT, fill=tk.BOTH, padx=(0,10))
+    def validate_scenes(self):
+        """Validate scenes data"""
+        errors = []
+        scene_ids = set()
+        
+        for scene in self.scenes_data:
+            # Check required fields
+            if not scene.get('id'):
+                errors.append("Scene missing ID")
+                continue
+                
+            if scene['id'] in scene_ids:
+                errors.append(f"Duplicate scene ID: {scene['id']}")
+            scene_ids.add(scene['id'])
+            
+            if not scene.get('name'):
+                errors.append(f"Scene {scene['id']} missing name")
+            
+            # Validate exits
+            for exit in scene.get('exits', []):
+                if not exit.get('scene_id'):
+                    errors.append(f"Scene {scene['id']} has exit without target")
+                elif exit['scene_id'] not in scene_ids:
+                    errors.append(f"Scene {scene['id']} has invalid exit to {exit['scene_id']}")
+                
+                if not exit.get('door_name'):
+                    errors.append(f"Scene {scene['id']} has exit without name")
+            
+            # Validate items and characters
+            for item_id in scene.get('items', []):
+                if item_id not in self.items_data:
+                    errors.append(f"Scene {scene['id']} references invalid item: {item_id}")
+                    
+            for char_id in scene.get('characters', []):
+                if char_id not in self.characters_data:
+                    errors.append(f"Scene {scene['id']} references invalid character: {char_id}")
+        
+        return errors
 
-        dialogue_list = self.create_custom_listbox(list_frame)
-        dialogue_list.pack(side=tk.LEFT, fill=tk.BOTH)
+    def validate_items(self):
+        """Validate items data"""
+        errors = []
+        valid_types = {"Regular", "Quest", "Key", "Tool", "Weapon", "Consumable"}
+        
+        for item_id, item in self.items_data.items():
+            if not item.get('name'):
+                errors.append(f"Item {item_id} missing name")
+                
+            if item_type := item.get('type'):
+                if item_type not in valid_types:
+                    errors.append(f"Item {item_id} has invalid type: {item_type}")
+            else:
+                errors.append(f"Item {item_id} missing type")
+                
+            if item.get('usable') and not item.get('effects'):
+                errors.append(f"Usable item {item_id} has no effects")
+                
+            if item.get('equippable'):
+                effects = item.get('effects', {})
+                if not any(e in effects for e in ['attack', 'defense', 'speed']):
+                    errors.append(f"Equippable item {item_id} missing combat effects")
+                    
+            # Validate effects structure
+            for effect_type, effect in item.get('effects', {}).items():
+                if not isinstance(effect, dict):
+                    errors.append(f"Item {item_id} has invalid effect structure for {effect_type}")
+                    continue
+                    
+                if 'value' not in effect:
+                    errors.append(f"Item {item_id} effect {effect_type} missing value")
+                    
+                if 'duration' not in effect:
+                    errors.append(f"Item {item_id} effect {effect_type} missing duration")
+        
+        return errors
 
-        # Right side - Dialog editor
-        editor_frame = ttk.Frame(main_frame)
-        editor_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+    def validate_characters(self):
+        """Validate characters data"""
+        errors = []
+        valid_types = {"friendly", "hostile", "neutral", "merchant"}
+        
+        for char_id, char in self.characters_data.items():
+            if not char.get('name'):
+                errors.append(f"Character {char_id} missing name")
+                
+            if char_type := char.get('type'):
+                if char_type not in valid_types:
+                    errors.append(f"Character {char_id} has invalid type: {char_type}")
+            else:
+                errors.append(f"Character {char_id} missing type")
+                
+            # Validate movement rules
+            if char.get('movable'):
+                if not char.get('initial_scene'):
+                    errors.append(f"Movable character {char_id} missing initial scene")
+                if char.get('follows_player') and char.get('allowed_scenes'):
+                    errors.append(f"Character {char_id} cannot both follow player and have restricted scenes")
+                    
+            # Validate inventory
+            for item_id in char.get('inventory', []):
+                if item_id not in self.items_data:
+                    errors.append(f"Character {char_id} has invalid item: {item_id}")
+                    
+            # Validate dialogue
+            for dialogue_id, dialogue in char.get('dialogue_options', {}).items():
+                if not dialogue.get('response'):
+                    errors.append(f"Character {char_id} dialogue {dialogue_id} missing response")
+                if dialogue.get('requires_item') and dialogue['requires_item'] not in self.items_data:
+                    errors.append(f"Character {char_id} dialogue {dialogue_id} requires invalid item")
+        
+        return errors
 
-        # Dialog content
-        content_label = ttk.Label(editor_frame, text="Dialog Content:")
-        content_label.pack(anchor=tk.W)
+    def validate_references(self):
+        """Validate cross-references between data types"""
+        errors = []
+        
+        # Validate scene references in characters
+        for char_id, char in self.characters_data.items():
+            if initial_scene := char.get('initial_scene'):
+                if not any(s['id'] == initial_scene for s in self.scenes_data):
+                    errors.append(f"Character {char_id} has invalid initial scene: {initial_scene}")
+                    
+            for scene_id in char.get('allowed_scenes', []):
+                if not any(s['id'] == scene_id for s in self.scenes_data):
+                    errors.append(f"Character {char_id} has invalid allowed scene: {scene_id}")
+        
+        # Validate item references in crafting recipes
+        for recipe in self.get_all_recipes():
+            if result := recipe.get('result'):
+                if result not in self.items_data:
+                    errors.append(f"Recipe has invalid result item: {result}")
+                    
+            for ingredient in recipe.get('ingredients', []):
+                if ingredient not in self.items_data:
+                    errors.append(f"Recipe has invalid ingredient: {ingredient}")
+        
+        return errors
 
-        content_text = self.create_custom_text(editor_frame)
-        content_text.pack(fill=tk.BOTH, expand=True)
+    def show_validation_results(self, errors):
+        """Display validation results dialog"""
+        if not errors:
+            messagebox.showinfo("Validation", "No errors found in game data")
+            return
+            
+        error_window = tk.Toplevel(self.root)
+        error_window.title("Validation Errors")
+        error_window.geometry("600x400")
+        
+        text = self.create_custom_text(error_window)
+        text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        for error in errors:
+            text.insert(tk.END, f"• {error}\n")
+        text.config(state=tk.DISABLED)
+        
+        ttk.Button(error_window, text="Close", 
+                  command=error_window.destroy).pack(pady=5)
+
+    def get_all_recipes(self):
+        """Helper to collect all crafting recipes from characters"""
+        recipes = []
+        for char in self.characters_data.values():
+            recipes.extend(char.get('crafting_recipes', []))
+        return recipes
+
+    def load_data(self):
+        """Load all game data files"""
+        try:
+            self.load_scenes()
+            self.load_items()
+            self.load_characters()
+            self.load_story_texts()
+            self.refresh_all_lists()
+        except Exception as e:
+            self.show_error_dialog(f"Error loading data: {str(e)}")
+
+    def load_scenes(self):
+        try:
+            with open('game_files/scenes/scenes.json', 'r') as f:
+                self.scenes_data = json.load(f)
+        except FileNotFoundError:
+            self.scenes_data = []
+            self.create_default_scenes()
+
+    def load_items(self):
+        try:
+            with open('game_files/items.json', 'r') as f:
+                self.items_data = json.load(f)
+        except FileNotFoundError:
+            self.items_data = {}
+            self.create_default_items()
+
+    def load_characters(self):
+        try:
+            with open('game_files/characters.json', 'r') as f:
+                self.characters_data = json.load(f)
+        except FileNotFoundError:
+            self.characters_data = {}
+            self.create_default_characters()
+
+    def load_story_texts(self):
+        try:
+            with open('game_files/story_texts.json', 'r') as f:
+                self.story_texts_data = json.load(f)
+        except FileNotFoundError:
+            self.story_texts_data = {}
+
+    def save_all(self):
+        """Save all modified data files"""
+        if not self.modified:
+            return
+
+        try:
+            self.create_backup()
+            
+            if 'scenes' in self.modified:
+                self.save_scenes()
+            if 'items' in self.modified:
+                self.save_items()
+            if 'characters' in self.modified:
+                self.save_characters()
+            if 'story_texts' in self.modified:
+                self.save_story_texts()
+
+            self.modified.clear()
+            self.update_status("All changes saved successfully")
+        except Exception as e:
+            self.show_error_dialog(f"Error saving data: {str(e)}")
+
+    def save_scenes(self):
+        os.makedirs('game_files/scenes', exist_ok=True)
+        with open('game_files/scenes/scenes.json', 'w') as f:
+            json.dump(self.scenes_data, f, indent=4)
+
+    def save_items(self):
+        with open('game_files/items.json', 'w') as f:
+            json.dump(self.items_data, f, indent=4)
+
+    def save_characters(self):
+        with open('game_files/characters.json', 'w') as f:
+            json.dump(self.characters_data, f, indent=4)
+
+    def save_story_texts(self):
+        with open('game_files/story_texts.json', 'w') as f:
+            json.dump(self.story_texts_data, f, indent=4)
+
+    def create_backup(self):
+        """Create backup of current data files"""
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_dir = os.path.join('backups', timestamp)
+        os.makedirs(backup_dir, exist_ok=True)
+
+        files_to_backup = {
+            'scenes': 'game_files/scenes/scenes.json',
+            'items': 'game_files/items.json',
+            'characters': 'game_files/characters.json',
+            'story_texts': 'game_files/story_texts.json'
+        }
+
+        for data_type, filepath in files_to_backup.items():
+            if data_type in self.modified and os.path.exists(filepath):
+                backup_path = os.path.join(backup_dir, os.path.basename(filepath))
+                shutil.copy2(filepath, backup_path)
+
+    def reload_data(self):
+        """Reload all data from disk"""
+        if self.modified:
+            if not messagebox.askyesno("Confirm Reload", 
+                "You have unsaved changes. Are you sure you want to reload?"):
+                return
+
+        self.load_data()
+        self.modified.clear()
+        self.update_status("Data reloaded from disk")
+
+    def create_default_scenes(self):
+        """Create default scene if none exists"""
+        self.scenes_data = [{
+            'id': 'start',
+            'name': 'Starting Area',
+            'description': 'The beginning of your journey.',
+            'exits': [],
+            'items': [],
+            'characters': []
+        }]
+
+    def create_default_items(self):
+        """Create default item if none exists"""
+        self.items_data = {
+            'basic_sword': {
+                'name': 'Basic Sword',
+                'type': 'Weapon',
+                'description': 'A simple sword.',
+                'equippable': True,
+                'effects': {'attack': {'value': 5, 'duration': 'permanent'}}
+            }
+        }
+
+    def create_default_characters(self):
+        """Create default character if none exists"""
+        self.characters_data = {
+            'guide': {
+                'name': 'Guide',
+                'type': 'friendly',
+                'description': 'A helpful guide.',
+                'greeting': 'Welcome, traveler!'
+            }
+        }
+
+    def export_data(self, data_type):
+        """Export specific data type to file"""
+        file_types = [('JSON files', '*.json'), ('All files', '*.*')]
+        filename = filedialog.asksaveasfilename(
+            defaultextension='.json',
+            filetypes=file_types,
+            title=f'Export {data_type}'
+        )
+        
+        if filename:
+            try:
+                data = getattr(self, f'{data_type}_data')
+                with open(filename, 'w') as f:
+                    json.dump(data, f, indent=4)
+                messagebox.showinfo('Success', f'{data_type} exported successfully')
+            except Exception as e:
+                self.show_error_dialog(f'Error exporting {data_type}: {str(e)}')
+
+    def import_data(self, data_type):
+        """Import specific data type from file"""
+        file_types = [('JSON files', '*.json'), ('All files', '*.*')]
+        filename = filedialog.askopenfilename(
+            filetypes=file_types,
+            title=f'Import {data_type}'
+        )
+        
+        if filename:
+            try:
+                with open(filename, 'r') as f:
+                    data = json.load(f)
+                setattr(self, f'{data_type}_data', data)
+                self.modified.add(data_type)
+                self.refresh_all_lists()
+                messagebox.showinfo('Success', f'{data_type} imported successfully')
+            except Exception as e:
+                self.show_error_dialog(f'Error importing {data_type}: {str(e)}')    
+
+    def create_scenes_tab(self):
+        self.scenes_listbox, editor_frame = self.create_tab_layout(
+            self.tabs['scenes'], 
+            self.search_vars['scene'],
+            "Search scenes..."
+        )
+
+        # Properties Frame
+        props_frame = ttk.LabelFrame(editor_frame, text="Scene Properties")
+        props_frame.pack(fill=tk.X, padx=5, pady=5)
+
+        self.scene_id_var = tk.StringVar()
+        self.scene_name_var = tk.StringVar()
+        
+        ttk.Label(props_frame, text="ID:").grid(row=0, column=0, padx=5, pady=2)
+        ttk.Entry(props_frame, textvariable=self.scene_id_var, state='readonly').grid(
+            row=0, column=1, padx=5, pady=2, sticky='ew')
+            
+        ttk.Label(props_frame, text="Name:").grid(row=1, column=0, padx=5, pady=2)
+        ttk.Entry(props_frame, textvariable=self.scene_name_var).grid(
+            row=1, column=1, padx=5, pady=2, sticky='ew')
+
+        # Description Frame
+        desc_frame = ttk.LabelFrame(editor_frame, text="Description")
+        desc_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.scene_desc_text = self.create_custom_text(desc_frame)
+        self.scene_desc_text.pack(fill=tk.BOTH, expand=True)
+
+        # Contents Frame
+        contents_frame = ttk.LabelFrame(editor_frame, text="Scene Contents")
+        contents_frame.pack(fill=tk.X, padx=5, pady=5)
+
+        # Items List
+        items_frame = ttk.Frame(contents_frame)
+        items_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(items_frame, text="Items:").pack(anchor=tk.W)
+        self.scene_items_list = self.create_custom_listbox(items_frame, height=5)
+        self.scene_items_list.pack(fill=tk.X)
+
+        item_buttons = ttk.Frame(items_frame)
+        item_buttons.pack(fill=tk.X)
+        ttk.Button(item_buttons, text="Add Item", command=self.add_item_to_scene).pack(side=tk.LEFT, padx=2)
+        ttk.Button(item_buttons, text="Remove Item", command=self.remove_item_from_scene).pack(side=tk.LEFT, padx=2)
+
+        # Characters List
+        chars_frame = ttk.Frame(contents_frame)
+        chars_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(chars_frame, text="Characters:").pack(anchor=tk.W)
+        self.scene_chars_list = self.create_custom_listbox(chars_frame, height=5)
+        self.scene_chars_list.pack(fill=tk.X)
+
+        char_buttons = ttk.Frame(chars_frame)
+        char_buttons.pack(fill=tk.X)
+        ttk.Button(char_buttons, text="Add Character", command=self.add_character_to_scene).pack(side=tk.LEFT, padx=2)
+        ttk.Button(char_buttons, text="Remove Character", command=self.remove_character_from_scene).pack(side=tk.LEFT, padx=2)
+
+        # Exits Frame
+        exits_frame = ttk.LabelFrame(editor_frame, text="Exits")
+        exits_frame.pack(fill=tk.X, padx=5, pady=5)
+        self.scene_exits_list = self.create_custom_listbox(exits_frame, height=5)
+        self.scene_exits_list.pack(fill=tk.X)
+
+        exit_buttons = ttk.Frame(exits_frame)
+        exit_buttons.pack(fill=tk.X)
+        ttk.Button(exit_buttons, text="Add Exit", command=self.add_exit).pack(side=tk.LEFT, padx=2)
+        ttk.Button(exit_buttons, text="Edit Exit", command=self.edit_exit).pack(side=tk.LEFT, padx=2)
+        ttk.Button(exit_buttons, text="Remove Exit", command=self.remove_exit).pack(side=tk.LEFT, padx=2)
+
+        # Bindings
+        self.scenes_listbox.bind('<<ListboxSelect>>', self.on_scene_select)
+        self.scene_exits_list.bind('<Double-Button-1>', lambda e: self.edit_exit())
+
+    def create_items_tab(self):
+        self.items_listbox, editor_frame = self.create_tab_layout(
+            self.tabs['items'],
+            self.search_vars['item'],
+            "Search items..."
+        )
+
+        # Properties Frame
+        props_frame = ttk.LabelFrame(editor_frame, text="Item Properties")
+        props_frame.pack(fill=tk.X, padx=5, pady=5)
+
+        self.item_id_var = tk.StringVar()
+        self.item_name_var = tk.StringVar()
+        self.item_type_var = tk.StringVar()
+
+        grid_items = [
+            ("ID:", self.item_id_var, 'readonly'),
+            ("Name:", self.item_name_var, 'normal'),
+            ("Type:", self.item_type_var, 'normal')
+        ]
+
+        for i, (label, var, state) in enumerate(grid_items):
+            ttk.Label(props_frame, text=label).grid(row=i, column=0, padx=5, pady=2)
+            if label == "Type:":
+                ttk.Combobox(props_frame, textvariable=var,
+                            values=["Regular", "Quest", "Key", "Tool", "Weapon", "Consumable"]).grid(
+                    row=i, column=1, padx=5, pady=2, sticky='ew')
+            else:
+                ttk.Entry(props_frame, textvariable=var, state=state).grid(
+                    row=i, column=1, padx=5, pady=2, sticky='ew')
+
+        # Checkboxes Frame
+        checks_frame = ttk.Frame(props_frame)
+        checks_frame.grid(row=len(grid_items), column=0, columnspan=2, padx=5, pady=2)
+
+        self.item_usable_var = tk.BooleanVar()
+        self.item_equippable_var = tk.BooleanVar()
+        self.item_consumable_var = tk.BooleanVar()
+
+        check_items = [
+            ("Usable", self.item_usable_var),
+            ("Equippable", self.item_equippable_var),
+            ("Consumable", self.item_consumable_var)
+        ]
+
+        for text, var in check_items:
+            ttk.Checkbutton(checks_frame, text=text, variable=var).pack(side=tk.LEFT, padx=5)
+
+        # Description Frame
+        desc_frame = ttk.LabelFrame(editor_frame, text="Description")
+        desc_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.item_desc_text = self.create_custom_text(desc_frame)
+        self.item_desc_text.pack(fill=tk.BOTH, expand=True)
+
+        # Effects Frame
+        effects_frame = ttk.LabelFrame(editor_frame, text="Effects")
+        effects_frame.pack(fill=tk.X, padx=5, pady=5)
+        self.effects_list = self.create_custom_listbox(effects_frame, height=5)
+        self.effects_list.pack(fill=tk.X)
+
+        effect_buttons = ttk.Frame(effects_frame)
+        effect_buttons.pack(fill=tk.X)
+        ttk.Button(effect_buttons, text="Add Effect", command=self.add_item_effect).pack(side=tk.LEFT, padx=2)
+        ttk.Button(effect_buttons, text="Edit Effect", command=self.edit_item_effect).pack(side=tk.LEFT, padx=2)
+        ttk.Button(effect_buttons, text="Remove Effect", command=self.remove_item_effect).pack(side=tk.LEFT, padx=2)
+
+        # Bindings
+        self.items_listbox.bind('<<ListboxSelect>>', self.on_item_select)
+        self.effects_list.bind('<Double-Button-1>', lambda e: self.edit_item_effect())
+
+    def create_characters_tab(self):
+        self.chars_listbox, editor_frame = self.create_tab_layout(
+            self.tabs['characters'],
+            self.search_vars['character'],
+            "Search characters..."
+        )
+
+        notebook = ttk.Notebook(editor_frame)
+        notebook.pack(fill=tk.BOTH, expand=True)
+
+        self.create_character_basic_info(notebook)
+        self.create_character_dialogue(notebook)
+        self.create_character_stats(notebook)
+
+        # Main buttons
+        button_frame = ttk.Frame(editor_frame)
+        button_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Button(button_frame, text="Save Character", command=self.save_current_character).pack(side=tk.LEFT, padx=2)
+        ttk.Button(button_frame, text="Delete Character", command=self.delete_current_character).pack(side=tk.LEFT, padx=2)
+        ttk.Button(button_frame, text="Duplicate Character", command=self.duplicate_current_character).pack(side=tk.LEFT, padx=2)
+
+        # Bindings
+        self.chars_listbox.bind('<<ListboxSelect>>', self.on_character_select)
+
+    def create_character_basic_info(self, notebook):
+        basic_frame = ttk.Frame(notebook)
+        notebook.add(basic_frame, text="Basic Info")
+
+        props_frame = ttk.LabelFrame(basic_frame, text="Character Properties")
+        props_frame.pack(fill=tk.X, padx=5, pady=5)
+
+        self.char_id_var = tk.StringVar()
+        self.char_name_var = tk.StringVar()
+        self.char_type_var = tk.StringVar()
+
+        grid_items = [
+            ("ID:", self.char_id_var, 'readonly'),
+            ("Name:", self.char_name_var, 'normal'),
+            ("Type:", self.char_type_var, ['friendly', 'hostile', 'neutral', 'merchant'])
+        ]
+
+        for i, (label, var, state_or_values) in enumerate(grid_items):
+            ttk.Label(props_frame, text=label).grid(row=i, column=0, padx=5, pady=2)
+            if isinstance(state_or_values, list):
+                ttk.Combobox(props_frame, textvariable=var, values=state_or_values).grid(
+                    row=i, column=1, padx=5, pady=2, sticky='ew')
+            else:
+                ttk.Entry(props_frame, textvariable=var, state=state_or_values).grid(
+                    row=i, column=1, padx=5, pady=2, sticky='ew')
+
+        # Movement Options
+        movement_frame = ttk.LabelFrame(basic_frame, text="Movement Options")
+        movement_frame.pack(fill=tk.X, padx=5, pady=5)
+
+        self.char_movable_var = tk.BooleanVar()
+        self.char_follows_var = tk.BooleanVar()
+
+        ttk.Checkbutton(movement_frame, text="Movable", variable=self.char_movable_var).pack(anchor=tk.W, padx=5)
+        ttk.Checkbutton(movement_frame, text="Follows Player", variable=self.char_follows_var).pack(anchor=tk.W, padx=5)
+
+        # Description
+        desc_frame = ttk.LabelFrame(basic_frame, text="Description")
+        desc_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.char_desc_text = self.create_custom_text(desc_frame)
+        self.char_desc_text.pack(fill=tk.BOTH, expand=True)
+
+    def create_character_dialogue(self, notebook):
+        dialogue_frame = ttk.Frame(notebook)
+        notebook.add(dialogue_frame, text="Dialogue")
+
+        # Greeting
+        greet_frame = ttk.LabelFrame(dialogue_frame, text="Greeting")
+        greet_frame.pack(fill=tk.X, padx=5, pady=5)
+        self.char_greeting_text = self.create_custom_text(greet_frame, height=3)
+        self.char_greeting_text.pack(fill=tk.X)
+
+        # Dialogue Options
+        options_frame = ttk.LabelFrame(dialogue_frame, text="Dialogue Options")
+        options_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        self.dialogue_options_list = self.create_custom_listbox(options_frame)
+        self.dialogue_options_list.pack(fill=tk.BOTH, expand=True)
+
+        button_frame = ttk.Frame(options_frame)
+        button_frame.pack(fill=tk.X, pady=5)
+        
+        buttons = [
+            ("Add Option", self.add_dialogue_option),
+            ("Edit Option", self.edit_dialogue_option),
+            ("Remove Option", self.remove_dialogue_option)
+        ]
+        
+        for text, command in buttons:
+            ttk.Button(button_frame, text=text, command=command).pack(side=tk.LEFT, padx=2)
+
+        self.dialogue_options_list.bind('<Double-Button-1>', lambda e: self.edit_dialogue_option())
+
+    def create_character_stats(self, notebook):
+        stats_frame = ttk.Frame(notebook)
+        notebook.add(stats_frame, text="Stats")
+
+        # Stats Treeview
+        self.stats_tree = ttk.Treeview(stats_frame, columns=("value"), show="headings")
+        self.stats_tree.heading("value", text="Value")
+        self.stats_tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        scrollbar = ttk.Scrollbar(stats_frame, orient=tk.VERTICAL, command=self.stats_tree.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.stats_tree.configure(yscrollcommand=scrollbar.set)
+
+        # Buttons for stat management
+        button_frame = ttk.Frame(stats_frame)
+        button_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        buttons = [
+            ("Add Stat", self.add_character_stat),
+            ("Edit Stat", self.edit_character_stat),
+            ("Remove Stat", self.remove_character_stat)
+        ]
+        
+        for text, command in buttons:
+            ttk.Button(button_frame, text=text, command=command).pack(side=tk.LEFT, padx=2)
+
+        self.stats_tree.bind('<Double-Button-1>', lambda e: self.edit_character_stat())
+
+    def create_dialogues_tab(self):
+        dialogue_frame = ttk.Frame(self.tabs['dialogues'])
+        paned = ttk.PanedWindow(dialogue_frame, orient=tk.HORIZONTAL)
+        paned.pack(fill=tk.BOTH, expand=True)
+
+        # Tree structure
+        self.dialogue_tree = ttk.Treeview(paned, selectmode='browse')
+        self.dialogue_tree.heading('#0', text='Dialogue Tree')
+        paned.add(self.dialogue_tree, weight=1)
+
+        # Editor frame
+        editor_frame = ttk.Frame(paned)
+        paned.add(editor_frame, weight=2)
+
+        # Content editor
+        content_frame = ttk.LabelFrame(editor_frame, text="Dialogue Content")
+        content_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.dialogue_content = self.create_custom_text(content_frame)
+        self.dialogue_content.pack(fill=tk.BOTH, expand=True)
 
         # Response options
-        responses_frame = ttk.LabelFrame(editor_frame, text="Response Options")
-        responses_frame.pack(fill=tk.X, pady=10)
+        options_frame = ttk.LabelFrame(editor_frame, text="Response Options")
+        options_frame.pack(fill=tk.X, padx=5, pady=5)
+        self.response_list = self.create_custom_listbox(options_frame, height=5)
+        self.response_list.pack(fill=tk.X)
 
-        def add_response():
-            response_text = response_entry.get()
-            if response_text:
-                responses_list.insert(tk.END, response_text)
-                response_entry.delete(0, tk.END)
+        # Response buttons
+        button_frame = ttk.Frame(options_frame)
+        button_frame.pack(fill=tk.X, pady=5)
+        for text, command in [
+            ("Add Response", self.add_dialogue_response),
+            ("Edit Response", self.edit_dialogue_response),
+            ("Remove Response", self.remove_dialogue_response)
+        ]:
+            ttk.Button(button_frame, text=text, command=command).pack(side=tk.LEFT, padx=2)
 
-        response_entry = ttk.Entry(responses_frame)
-        response_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        self.dialogue_tree.bind('<<TreeviewSelect>>', self.on_dialogue_select)
 
-        add_button = ttk.Button(responses_frame, text="Add Response", command=add_response)
-        add_button.pack(side=tk.RIGHT, padx=5)
+    def create_story_text_editor(self):
+        story_frame = ttk.Frame(self.tabs['story_texts'])
+        paned = ttk.PanedWindow(story_frame, orient=tk.HORIZONTAL)
+        paned.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        responses_list = self.create_custom_listbox(responses_frame, height=5)
-        responses_list.pack(fill=tk.X, pady=5)
+        # Text list panel
+        list_frame = ttk.Frame(paned)
+        paned.add(list_frame, weight=1)
 
-    def on_story_text_select(self, event):
-        selected_index = self.story_texts_listbox.curselection()
-        if not selected_index:
-            return
-        text_key = self.story_texts_listbox.get(selected_index)
-        text_data = self.story_texts_data.get(text_key, {})
-        text_content = text_data.get("text", "")
-        self.story_text_editor.delete(1.0, tk.END)
-        self.story_text_editor.insert(tk.END, text_content)
+        # Search
+        search_frame = self.create_search_frame(list_frame, tk.StringVar(), "Search texts...")
+        self.story_texts_listbox = self.create_custom_listbox(list_frame)
 
+        # Editor panel
+        editor_frame = ttk.Frame(paned)
+        paned.add(editor_frame, weight=2)
 
-        def on_search():
-            search_term = search_var.get().lower()
-            self.story_texts_listbox.selection_clear(0, tk.END)
-            for i in range(self.story_texts_listbox.size()):
-                item = self.story_texts_listbox.get(i)
-                if search_term in item.lower():
-                    self.story_texts_listbox.selection_set(i)
-                    self.story_texts_listbox.see(i)
+        # Properties
+        props_frame = ttk.LabelFrame(editor_frame, text="Properties")
+        props_frame.pack(fill=tk.X, pady=5)
+        
+        self.text_key_var = tk.StringVar()
+        ttk.Label(props_frame, text="Key:").grid(row=0, column=0, padx=5, pady=2)
+        ttk.Entry(props_frame, textvariable=self.text_key_var).grid(row=0, column=1, sticky='ew')
+        
+        self.show_once_var = tk.BooleanVar()
+        ttk.Checkbutton(props_frame, text="Show Once", variable=self.show_once_var).grid(
+            row=1, column=0, columnspan=2, pady=2)
 
-        search_button = ttk.Button(button_frame, text="Search", command=on_search)
-        search_button.pack(side=tk.LEFT, padx=5)
+        # Text editor
+        self.story_text_editor = self.create_custom_text(editor_frame)
+        self.story_text_editor.pack(fill=tk.BOTH, expand=True, pady=5)
+
+        # Control buttons
+        controls = ttk.Frame(editor_frame)
+        controls.pack(fill=tk.X)
+        for text, command in [
+            ("New Text", self.add_story_text),
+            ("Save Text", self.save_story_text),
+            ("Delete Text", self.delete_story_text)
+        ]:
+            ttk.Button(controls, text=text, command=command).pack(side=tk.LEFT, padx=2)
+
+        self.story_texts_listbox.bind('<<ListboxSelect>>', self.on_story_text_select)
 
     def create_crafting_editor(self):
-        crafting_frame = ttk.Frame(self.crafting_tab)
-        crafting_frame.pack(padx=20, pady=20, fill=tk.BOTH, expand=True)
+        crafting_frame = ttk.Frame(self.tabs['crafting'])
+        paned = ttk.PanedWindow(crafting_frame, orient=tk.HORIZONTAL)
+        paned.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        # Left side - Recipes list
-        list_frame = ttk.Frame(crafting_frame)
-        list_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0,10))
+        # Recipe list panel
+        list_frame = ttk.Frame(paned)
+        paned.add(list_frame, weight=1)
 
+        search_frame = self.create_search_frame(list_frame, tk.StringVar(), "Search recipes...")
         self.recipes_listbox = self.create_custom_listbox(list_frame)
-        self.recipes_listbox.pack(side=tk.LEFT, fill=tk.Y)
 
-        # Right side - Recipe editor
-        editor_frame = ttk.Frame(crafting_frame)
-        editor_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+        # Editor panel
+        editor_frame = ttk.Frame(paned)
+        paned.add(editor_frame, weight=2)
 
         # Recipe details
         details_frame = ttk.LabelFrame(editor_frame, text="Recipe Details")
-        details_frame.pack(fill=tk.X, pady=10)
+        details_frame.pack(fill=tk.X, pady=5)
 
-        ttk.Label(details_frame, text="Result Item:").grid(row=0, column=0, padx=5, pady=5)
-        self.result_item_entry = ttk.Entry(details_frame)
-        self.result_item_entry.grid(row=0, column=1, padx=5, pady=5)
+        ttk.Label(details_frame, text="Result:").grid(row=0, column=0, padx=5, pady=2)
+        self.result_item_var = tk.StringVar()
+        self.result_combo = ttk.Combobox(details_frame, textvariable=self.result_item_var)
+        self.result_combo.grid(row=0, column=1, sticky='ew', padx=5, pady=2)
 
-        # Ingredients list
+        # Ingredients
         ingredients_frame = ttk.LabelFrame(editor_frame, text="Ingredients")
-        ingredients_frame.pack(fill=tk.BOTH, expand=True, pady=10)
-
+        ingredients_frame.pack(fill=tk.BOTH, expand=True, pady=5)
         self.ingredients_list = self.create_custom_listbox(ingredients_frame, height=10)
         self.ingredients_list.pack(fill=tk.BOTH, expand=True)
 
-        # Control buttons
-        button_frame = ttk.Frame(editor_frame)
-        button_frame.pack(fill=tk.X, pady=10)
-
-        ttk.Button(button_frame, text="Add Ingredient",
-                  command=self.add_ingredient).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Remove Ingredient",
-                  command=self.remove_ingredient).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Save Recipe",
-                  command=self.save_recipe).pack(side=tk.LEFT, padx=5)
-
-    def create_preview_window(self, title="Preview", width=1000, height=800):
-        preview_window = tk.Toplevel(self.root)
-        preview_window.title(title)
-        preview_window.configure(bg='#1e1e1e')
-
-        # Make the window resizable
-        preview_window.geometry(f"{width}x{height}")
-        preview_window.minsize(800, 600)
-
-        # Create canvas with scrollbars
-        canvas_frame = ttk.Frame(preview_window)
-        canvas_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-
-        canvas = tk.Canvas(canvas_frame,
-                         bg='#e0e0e0',  # Light grey background for better visibility
-                         highlightthickness=0)
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        v_scrollbar = ttk.Scrollbar(canvas_frame, orient=tk.VERTICAL, command=canvas.yview)
-        v_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        h_scrollbar = ttk.Scrollbar(preview_window, orient=tk.HORIZONTAL, command=canvas.xview)
-        h_scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
-
-        canvas.configure(xscrollcommand=h_scrollbar.set, yscrollcommand=v_scrollbar.set)
-
-        # Add zoom controls
-        control_frame = ttk.Frame(preview_window)
-        control_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=5)
-
-        ttk.Button(control_frame, text="Zoom In",
-                  command=lambda: self.zoom_canvas(canvas, 1.2)).pack(side=tk.LEFT, padx=5)
-        ttk.Button(control_frame, text="Zoom Out",
-                  command=lambda: self.zoom_canvas(canvas, 0.8)).pack(side=tk.LEFT, padx=5)
-        ttk.Button(control_frame, text="Reset Zoom",
-                  command=lambda: self.reset_zoom(canvas)).pack(side=tk.LEFT, padx=5)
-
-        # Add light/dark mode toggle
-        self.light_mode = tk.BooleanVar(value=False)
-        ttk.Checkbutton(control_frame, text="Light Mode", variable=self.light_mode, command=self.toggle_light_mode).pack(side=tk.LEFT, padx=5)
-
-        return canvas
-
-    def zoom_canvas(self, canvas, factor):
-        canvas.scale('all', 0, 0, factor, factor)
-        canvas.configure(scrollregion=canvas.bbox('all'))
-
-    def reset_zoom(self, canvas):
-        # Reset to original scale
-        canvas.scale('all', 0, 0, 1.0, 1.0)
-        canvas.configure(scrollregion=canvas.bbox('all'))
-
-    def create_scenes_tab(self):
-        self.scenes_frame = ttk.Frame(self.scenes_tab)
-        self.scenes_frame.pack(padx=10, pady=10)
-
-        self.scenes_listbox = self.create_custom_listbox(self.scenes_frame, height=20, width=40)
-        self.scenes_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
-        self.scenes_scrollbar = ttk.Scrollbar(self.scenes_frame, orient=tk.VERTICAL, command=self.scenes_listbox.yview)
-        self.scenes_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.scenes_listbox.config(yscrollcommand=self.scenes_scrollbar.set)
-
-        self.scenes_listbox.bind("<Double-Button-1>", self.on_scene_double_click)
-        self.scenes_listbox.bind("<Button-3>", self.show_context_menu)
-
-        self.scenes_buttons_frame = ttk.Frame(self.scenes_tab)
-        self.scenes_buttons_frame.pack(pady=10)
-
-        self.add_scene_button = ttk.Button(self.scenes_buttons_frame, text="Add Scene", command=self.add_scene)
-        self.add_scene_button.pack(side=tk.LEFT, padx=5)
-
-        self.edit_scene_button = ttk.Button(self.scenes_buttons_frame, text="Edit Scene", command=self.edit_scene)
-        self.edit_scene_button.pack(side=tk.LEFT, padx=5)
-
-        self.delete_scene_button = ttk.Button(self.scenes_buttons_frame, text="Delete Scene", command=self.delete_scene)
-        self.delete_scene_button.pack(side=tk.LEFT, padx=5)
-
-        self.add_item_to_scene_button = ttk.Button(self.scenes_buttons_frame, text="Add Item to Scene", command=self.add_item_to_scene)
-        self.add_item_to_scene_button.pack(side=tk.LEFT, padx=5)
-
-        self.add_character_to_scene_button = ttk.Button(self.scenes_buttons_frame, text="Add Character to Scene", command=self.add_character_to_scene)
-        self.add_character_to_scene_button.pack(side=tk.LEFT, padx=5)
-
-        self.add_exit_to_scene_button = ttk.Button(self.scenes_buttons_frame, text="Add Exit to Scene", command=self.add_exit_to_scene)
-        self.add_exit_to_scene_button.pack(side=tk.LEFT, padx=5)
-
-        self.save_button = ttk.Button(self.scenes_buttons_frame, text="Save Changes", command=self.save_data)
-        self.save_button.pack(side=tk.LEFT, padx=5)
-
-        self.scene_details_frame = ttk.Frame(self.scenes_tab)
-        self.scene_details_frame.pack(pady=10)
-
-        self.scene_details_label = ttk.Label(self.scene_details_frame, text="Scene Details:")
-        self.scene_details_label.pack(anchor=tk.W)
-
-        # Use HTMLScrolledText for syntax highlighting
-        self.scene_details_text = HTMLScrolledText(self.scene_details_frame, height=30, width=80)
-        self.scene_details_text.pack(fill=tk.BOTH, expand=1)
-
-        self.preview_button = ttk.Button(self.scenes_tab, text="Preview Scene Structure", command=self.preview_scene_structure)
-        self.preview_button.pack(pady=10)
-
-        self.preview_map_button = ttk.Button(self.scenes_tab, text="Preview Scene Map", command=self.preview_scene_map)
-        self.preview_map_button.pack(pady=10)
-
-        self.settings_button = ttk.Button(self.scenes_buttons_frame, text="Settings", command=self.create_settings_menu)
-        self.settings_button.pack(side=tk.LEFT, padx=5)
-
-    def create_items_tab(self):
-        self.items_frame = ttk.Frame(self.items_tab)
-        self.items_frame.pack(padx=10, pady=10)
-
-        self.items_listbox = self.create_custom_listbox(self.items_frame, height=20, width=40)
-        self.items_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
-        self.items_scrollbar = ttk.Scrollbar(self.items_frame, orient=tk.VERTICAL, command=self.items_listbox.yview)
-        self.items_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.items_listbox.config(yscrollcommand=self.items_scrollbar.set)
-
-        self.items_listbox.bind("<Double-Button-1>", self.on_item_double_click)
-        self.items_listbox.bind("<Button-3>", self.show_context_menu)
-
-        self.items_buttons_frame = ttk.Frame(self.items_tab)
-        self.items_buttons_frame.pack(pady=10)
-
-        self.add_item_button = ttk.Button(self.items_buttons_frame, text="Add Item", command=self.add_item)
-        self.add_item_button.pack(side=tk.LEFT, padx=5)
-
-        self.edit_item_button = ttk.Button(self.items_buttons_frame, text="Edit Item", command=self.edit_item)
-        self.edit_item_button.pack(side=tk.LEFT, padx=5)
-
-        self.delete_item_button = ttk.Button(self.items_buttons_frame, text="Delete Item", command=self.delete_item)
-        self.delete_item_button.pack(side=tk.LEFT, padx=5)
-
-        self.duplicate_item_button = ttk.Button(self.items_buttons_frame, text="Duplicate Item", command=self.duplicate_item)
-        self.duplicate_item_button.pack(side=tk.LEFT, padx=5)
-
-        self.combine_items_button = ttk.Button(self.items_buttons_frame, text="Combine Items", command=self.combine_items)
-        self.combine_items_button.pack(side=tk.LEFT, padx=5)
-
-        self.save_button = ttk.Button(self.items_buttons_frame, text="Save Changes", command=self.save_data)
-        self.save_button.pack(side=tk.LEFT, padx=5)
-
-        self.item_details_frame = ttk.Frame(self.items_tab)
-        self.item_details_frame.pack(pady=10)
-
-        self.item_details_label = ttk.Label(self.item_details_frame, text="Item Details:")
-        self.item_details_label.pack(anchor=tk.W)
-
-        self.item_details_text = self.create_custom_text(self.item_details_frame, height=30, width=80)
-        self.item_details_text.pack(fill=tk.BOTH, expand=1)
-
-    def create_characters_tab(self):
-        self.characters_frame = ttk.Frame(self.characters_tab)
-        self.characters_frame.pack(padx=10, pady=10)
-
-        self.characters_listbox = self.create_custom_listbox(self.characters_frame, height=20, width=40)
-        self.characters_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
-        self.characters_scrollbar = ttk.Scrollbar(self.characters_frame, orient=tk.VERTICAL, command=self.characters_listbox.yview)
-        self.characters_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.characters_listbox.config(yscrollcommand=self.characters_scrollbar.set)
-
-        self.characters_listbox.bind("<Double-Button-1>", self.on_character_double_click)
-        self.characters_listbox.bind("<Button-3>", self.show_context_menu)
-
-        self.characters_buttons_frame = ttk.Frame(self.characters_tab)
-        self.characters_buttons_frame.pack(pady=10)
-
-        self.add_character_button = ttk.Button(self.characters_buttons_frame, text="Add Character", command=self.add_character)
-        self.add_character_button.pack(side=tk.LEFT, padx=5)
-
-        self.edit_character_button = ttk.Button(self.characters_buttons_frame, text="Edit Character", command=self.edit_character)
-        self.edit_character_button.pack(side=tk.LEFT, padx=5)
-
-        self.delete_character_button = ttk.Button(self.characters_buttons_frame, text="Delete Character", command=self.delete_character)
-        self.delete_character_button.pack(side=tk.LEFT, padx=5)
-
-        self.duplicate_character_button = ttk.Button(self.characters_buttons_frame, text="Duplicate Character", command=self.duplicate_character)
-        self.duplicate_character_button.pack(side=tk.LEFT, padx=5)
-
-        self.save_button = ttk.Button(self.characters_buttons_frame, text="Save Changes", command=self.save_data)
-        self.save_button.pack(side=tk.LEFT, padx=5)
-
-        self.character_details_frame = ttk.Frame(self.characters_tab)
-        self.character_details_frame.pack(pady=10)
-
-        self.character_details_label = ttk.Label(self.character_details_frame, text="Character Details:")
-        self.character_details_label.pack(anchor=tk.W)
-
-        self.character_details_text = self.create_custom_text(self.character_details_frame, height=30, width=80)
-        self.character_details_text.pack(fill=tk.BOTH, expand=1)
-
-    def on_character_select(self, event):
-        selected_index = self.characters_listbox.curselection()
-        if not selected_index:
-            return
-        character_id = self.characters_listbox.get(selected_index)
-        character_data = self.characters_data.get(character_id, {})
-        dialogues = character_data.get("dialogue", {})
-        if isinstance(dialogues, str):
-            dialogues = json.loads(dialogues)
-        dialogue_text = ""
-        for key, value in dialogues.items():
-            dialogue_text += f"{key}:\n{value.get('text', '')}\n\n"
-        self.dialogue_details_text.delete(1.0, tk.END)
-        self.dialogue_details_text.insert(tk.END, dialogue_text)
-
-    def create_dialogues_tab(self):
-        self.dialogues_frame = ttk.Frame(self.dialogues_tab)
-        self.dialogues_frame.pack(padx=10, pady=10)
-
-        # Left side - Characters list
-        list_frame = ttk.Frame(self.dialogues_frame)
-        list_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0,10))
-
-        self.characters_listbox = self.create_custom_listbox(list_frame)
-        self.characters_listbox.pack(side=tk.LEFT, fill=tk.Y)
-
-        # Populate characters listbox
-        for character_id in self.characters_data:
-            self.characters_listbox.insert(tk.END, character_id)
-
-        # Right side - Dialogues editor
-        editor_frame = ttk.Frame(self.dialogues_frame)
-        editor_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
-
-        # Dialogues content
-        self.dialogue_details_label = ttk.Label(editor_frame, text="Dialogues:")
-        self.dialogue_details_label.pack(anchor=tk.W)
-
-        self.dialogue_details_text = self.create_custom_text(editor_frame)
-        self.dialogue_details_text.pack(fill=tk.BOTH, expand=True)
-
-        # Bind selection event
-        self.characters_listbox.bind('<<ListboxSelect>>', self.on_character_select)
-
-    def load_data(self):
-        try:
-            with open('../game_files/scenes/scenes.json', 'r') as f:
-                self.scenes_data = json.load(f)
-                for index, scene in enumerate(self.scenes_data):
-                    self.scenes_listbox.insert(tk.END, scene['name'])
-                    self.scenes_listbox.selection_set(index)
-        except (FileNotFoundError, json.JSONDecodeError):
-            messagebox.showerror("Error", "Scenes file not found or invalid JSON.")
-
-        try:
-            with open('../game_files/items.json', 'r') as f:
-                self.items_data = json.load(f)
-                for index, item in enumerate(self.items_data):
-                    self.items_listbox.insert(tk.END, item)
-                    self.items_listbox.selection_set(index)
-        except FileNotFoundError:
-            messagebox.showerror("Error", "Items file not found.")
-
-        try:
-            with open('../game_files/characters.json', 'r') as f:
-                self.characters_data = json.load(f)
-                for index, character in enumerate(self.characters_data):
-                    self.characters_listbox.insert(tk.END, character)
-                    self.characters_listbox.selection_set(index)
-        except FileNotFoundError:
-            messagebox.showerror("Error", "Characters file not found.")
-
-        try:
-            with open('../game_files/story_texts.json', 'r') as f:
-                self.story_texts_data = json.load(f)
-                for index, story_text in enumerate(self.story_texts_data):
-                    self.story_texts_listbox.insert(tk.END, story_text)
-        except FileNotFoundError:
-            messagebox.showerror("Error", "Story Texts file not found.")
-
-        self.modified_files = set()
-
-    def save_data(self):
-        if 'scenes' in self.modified_files:
-            try:
-                with open('../game_files/scenes/scenes.json', 'w') as f:
-                    json.dump(self.scenes_data, f, indent=4)
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to save scenes data: {e}")
-
-        if 'items' in self.modified_files:
-            try:
-                with open('../game_files/items.json', 'w') as f:
-                    json.dump(self.items_data, f, indent=4)
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to save items data: {e}")
-
-        if 'characters' in self.modified_files:
-            try:
-                with open('../game_files/characters.json', 'w') as f:
-                    json.dump(self.characters_data, f, indent=4)
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to save characters data: {e}")
-
-        if 'story_texts' in self.modified_files:
-            try:
-                with open('../game_files/story_texts.json', 'w') as f:
-                    json.dump(self.story_texts_data, f, indent=4)
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to save story texts data: {e}")
-
-        self.modified_files.clear()
-
-    def add_scene(self):
-        scene_name = simpledialog.askstring("Add Scene", "Enter scene name:")
-        if scene_name:
-            scene_id = self.generate_scene_id(scene_name)
-            scene_data = {
-                "id": scene_id,
-                "name": scene_name,
-                "description": "",
-                "items": [],
-                "characters": [],
-                "exits": [],
-                "music": "",
-                "sound_effects": {},
-                "random_events": [],
-                "hint": ""
-            }
-            self.scenes_data.append(scene_data)
-            self.scenes_listbox.insert(tk.END, scene_name)
-            self.scenes_listbox.selection_set(tk.END)
-            self.modified_files.add('scenes')
-
-    def generate_scene_id(self, scene_name):
-        base_id = re.sub(r'\s+', '_', scene_name.lower())
-        scene_id = base_id
-        counter = 1
-        while any(scene["id"] == scene_id for scene in self.scenes_data):
-            scene_id = f"{base_id}{counter:02}"
-            counter += 1
-        return scene_id
-
-    def edit_scene(self):
-        selected_scene = self.scenes_listbox.get(self.scenes_listbox.curselection())
-        if selected_scene:
-            try:
-                scene_data = next(scene for scene in self.scenes_data if scene["name"] == selected_scene)
-                scene_data["description"] = simpledialog.askstring("Edit Scene", f"Enter description for {selected_scene}:", initialvalue=scene_data["description"])
-                self.display_scene_details(scene_data)
-                self.modified_files.add('scenes')
-            except StopIteration:
-                messagebox.showerror("Error", f"Scene with name {selected_scene} not found.")
-
-    def delete_scene(self):
-        selected_scene = self.scenes_listbox.get(self.scenes_listbox.curselection())
-        if selected_scene:
-            self.scenes_data = [scene for scene in self.scenes_data if scene["name"] != selected_scene]
-            self.scenes_listbox.delete(self.scenes_listbox.curselection())
-            self.modified_files.add('scenes')
-
-    def add_item(self):
-        item_name = simpledialog.askstring("Add Item", "Enter item name:")
-        if item_name:
-            item_id = self.generate_item_id(item_name)
-            self.items_data[item_id] = {
-                "name": item_name,
-                "description": "",
-                "usable": False,
-                "readable_item": "",
-                "type": "Story"
-            }
-            self.items_listbox.insert(tk.END, item_id)
-            self.items_listbox.selection_set(tk.END)
-            self.modified_files.add('items')
-
-    def generate_item_id(self, item_name):
-        base_id = re.sub(r'\s+', '_', item_name.lower())
-        item_id = base_id
-        counter = 1
-        while item_id in self.items_data:
-            item_id = f"{base_id}{counter:02}"
-            counter += 1
-        return item_id
-
-    def edit_item(self):
-        selected_item = self.items_listbox.get(self.items_listbox.curselection())
-        if selected_item:
-            item_data = self.items_data[selected_item]
-            item_data["description"] = simpledialog.askstring("Edit Item", f"Enter description for {selected_item}:", initialvalue=item_data["description"])
-            self.display_item_details(item_data)
-            self.modified_files.add('items')
-
-    def delete_item(self):
-        selected_item = self.items_listbox.get(self.items_listbox.curselection())
-        if selected_item:
-            del self.items_data[selected_item]
-            self.items_listbox.delete(self.items_listbox.curselection())
-            self.modified_files.add('items')
-
-    def duplicate_item(self):
-        selected_item = self.items_listbox.get(self.items_listbox.curselection())
-        if selected_item:
-            new_item_id = self.generate_item_id(selected_item + "_copy")
-            self.items_data[new_item_id] = self.items_data[selected_item].copy()
-            self.items_listbox.insert(tk.END, new_item_id)
-            self.items_listbox.selection_set(tk.END)
-            self.modified_files.add('items')
-
-    def combine_items(self):
-        item_ids = list(self.items_data.keys())
-        if len(item_ids) < 2:
-            messagebox.showerror("Error", "Not enough items to combine.")
-            return
-
-        item1_var = tk.StringVar(value=item_ids[0])
-        item2_var = tk.StringVar(value=item_ids[1])
-
-        combine_window = tk.Toplevel(self.root)
-        combine_window.title("Combine Items")
-        combine_window.geometry("400x200")
-
-        combine_frame = ttk.Frame(combine_window)
-        combine_frame.pack(padx=10, pady=10)
-
-        item1_label = ttk.Label(combine_frame, text="Select first item:")
-        item1_label.pack(anchor=tk.W)
-        item1_dropdown = ttk.Combobox(combine_frame, textvariable=item1_var, values=item_ids)
-        item1_dropdown.pack(pady=5)
-
-        item2_label = ttk.Label(combine_frame, text="Select second item:")
-        item2_label.pack(anchor=tk.W)
-        item2_dropdown = ttk.Combobox(combine_frame, textvariable=item2_var, values=item_ids)
-        item2_dropdown.pack(pady=5)
-
-        new_item_name_var = tk.StringVar()
-        new_item_name_label = ttk.Label(combine_frame, text="Enter the name of the combined item:")
-        new_item_name_label.pack(anchor=tk.W)
-        new_item_name_entry = ttk.Entry(combine_frame, textvariable=new_item_name_var)
-        new_item_name_entry.pack(pady=5)
-
-        def on_combine():
-            item1_id = item1_var.get()
-            item2_id = item2_var.get()
-            new_item_name = new_item_name_var.get()
-            if not new_item_name:
-                messagebox.showerror("Error", "New item name cannot be empty.")
+        # Ingredient controls
+        ingredient_buttons = ttk.Frame(ingredients_frame)
+        ingredient_buttons.pack(fill=tk.X, pady=5)
+        for text, command in [
+            ("Add Ingredient", self.add_ingredient),
+            ("Edit Ingredient", self.edit_ingredient),
+            ("Remove Ingredient", self.remove_ingredient)
+        ]:
+            ttk.Button(ingredient_buttons, text=text, command=command).pack(side=tk.LEFT, padx=2)
+
+        # Recipe controls
+        recipe_buttons = ttk.Frame(editor_frame)
+        recipe_buttons.pack(fill=tk.X, pady=5)
+        for text, command in [
+            ("New Recipe", self.new_recipe),
+            ("Save Recipe", self.save_recipe),
+            ("Delete Recipe", self.delete_recipe)
+        ]:
+            ttk.Button(recipe_buttons, text=text, command=command).pack(side=tk.LEFT, padx=2)
+
+        self.recipes_listbox.bind('<<ListboxSelect>>', self.on_recipe_select)
+
+    def find_references(self):
+        """Find all references to the selected item/character"""
+        current_tab = self.notebook.select()
+        tab_name = self.notebook.tab(current_tab)["text"].lower()
+
+        if tab_name == "items":
+            if not (selection := self.items_listbox.curselection()):
                 return
+            item_id = list(self.items_data.keys())[selection[0]]
+            self.show_item_references(item_id)
+        elif tab_name == "characters":
+            if not (selection := self.chars_listbox.curselection()):
+                return
+            char_id = list(self.characters_data.keys())[selection[0]]
+            self.show_character_references(char_id)
 
-            combination_key = f"{item1_id} + {item2_id}"
-            new_item_id = self.generate_item_id(new_item_name)
-            self.items_data[new_item_id] = {
-                "name": new_item_name,
-                "description": f"Combined from {item1_id} and {item2_id}",
-                "usable": False,
-                "readable_item": "",
-                "type": "Story"
-            }
-            if "combinations" not in self.items_data:
-                self.items_data["combinations"] = {}
-            self.items_data["combinations"][combination_key] = new_item_id
-            self.items_listbox.insert(tk.END, new_item_id)
-            self.items_listbox.selection_set(tk.END)
-            self.modified_files.add('items')
-            combine_window.destroy()
+    def show_item_references(self, item_id):
+        """Show all references to a specific item"""
+        references = []
+        
+        # Check scenes
+        for scene in self.scenes_data:
+            if item_id in scene.get('items', []):
+                references.append(f"Scene: {scene['name']} (inventory)")
 
-        combine_button = ttk.Button(combine_frame, text="Combine", command=on_combine)
-        combine_button.pack(pady=5)
+        # Check characters
+        for char_id, char in self.characters_data.items():
+            if item_id in char.get('inventory', []):
+                references.append(f"Character: {char['name']} (inventory)")
+            if item_id in char.get('crafting_requirements', []):
+                references.append(f"Character: {char['name']} (crafting)")
 
-        combine_window.wait_window(combine_window)
+        self.show_references_window("Item References", item_id, references)
 
-    def add_character(self):
-        character_name = simpledialog.askstring("Add Character", "Enter character name:")
-        if character_name:
-            character_id = self.generate_character_id(character_name)
-            self.characters_data[character_id] = {
-                "id": character_id,
-                "name": character_name,
-                "type": "Friendly",
-                "dialogue": {},
-                "dialogue_options": {},
-                "interactions": {},
-                "stats": {},
-                "greeting": ""
-            }
-            self.characters_listbox.insert(tk.END, character_id)
-            self.characters_listbox.selection_set(tk.END)
-            self.modified_files.add('characters')
+    def show_character_references(self, char_id):
+        """Show all references to a specific character"""
+        references = []
+        
+        # Check scenes
+        for scene in self.scenes_data:
+            if char_id in scene.get('characters', []):
+                references.append(f"Scene: {scene['name']}")
+            for exit in scene.get('exits', []):
+                if char_id in exit.get('dialogue_requirements', []):
+                    references.append(f"Scene: {scene['name']} (exit requirement)")
 
-    def generate_character_id(self, character_name):
-        base_id = re.sub(r'\s+', '_', character_name.lower())
-        character_id = base_id
-        counter = 1
-        while character_id in self.characters_data:
-            character_id = f"{base_id}{counter:02}"
-            counter += 1
-        return character_id
+        self.show_references_window("Character References", char_id, references)
 
-    def edit_character(self):
-        selected_character = self.characters_listbox.get(self.characters_listbox.curselection())
-        if selected_character:
-            character_data = self.characters_data[selected_character]
-            character_data["description"] = simpledialog.askstring("Edit Character", f"Enter description for {selected_character}:", initialvalue=character_data["description"])
-            self.display_character_details(character_data)
-            self.modified_files.add('characters')
+    def show_references_window(self, title, entity_id, references):
+        """Display references in a new window"""
+        window = tk.Toplevel(self.root)
+        window.title(title)
+        window.geometry("400x300")
 
-    def delete_character(self):
-        selected_character = self.characters_listbox.get(self.characters_listbox.curselection())
-        if selected_character:
-            del self.characters_data[selected_character]
-            self.characters_listbox.delete(self.characters_listbox.curselection())
-            self.modified_files.add('characters')
+        ttk.Label(window, text=f"References to: {entity_id}").pack(pady=5)
+        
+        ref_list = self.create_custom_listbox(window)
+        ref_list.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
-    def duplicate_character(self):
-        selected_character = self.characters_listbox.get(self.characters_listbox.curselection())
-        if selected_character:
-            new_character_id = self.generate_character_id(selected_character + "_copy")
-            self.characters_data[new_character_id] = self.characters_data[selected_character].copy()
-            self.characters_listbox.insert(tk.END, new_character_id)
-            self.characters_listbox.selection_set(tk.END)
-            self.modified_files.add('characters')
+        if references:
+            for ref in references:
+                ref_list.insert(tk.END, ref)
+        else:
+            ref_list.insert(tk.END, "No references found")
 
-    def add_dialogue(self):
-        character_id = simpledialog.askstring("Add Dialogue", "Enter character ID:")
-        if character_id:
-            dialogue_key = simpledialog.askstring("Add Dialogue", "Enter dialogue key:")
-            if dialogue_key:
-                self.characters_data[character_id]["dialogue"][dialogue_key] = {
-                    "text": "",
-                    "show_once": False
-                }
-                self.dialogues_listbox.insert(tk.END, dialogue_key)
-                self.modified_files.add('characters')
-
-    def edit_dialogue(self):
-        selected_dialogue = self.dialogues_listbox.get(self.dialogues_listbox.curselection())
-        if selected_dialogue:
-            character_id = simpledialog.askstring("Edit Dialogue", "Enter character ID:")
-            if character_id:
-                dialogue_data = self.characters_data[character_id]["dialogue"][selected_dialogue]
-                dialogue_data["text"] = simpledialog.askstring("Edit Dialogue", f"Enter text for {selected_dialogue}:", initialvalue=dialogue_data["text"])
-                self.display_dialogue_details(dialogue_data)
-                self.modified_files.add('characters')
-
-    def delete_dialogue(self):
-        selected_dialogue = self.dialogues_listbox.get(self.dialogues_listbox.curselection())
-        if selected_dialogue:
-            character_id = simpledialog.askstring("Delete Dialogue", "Enter character ID:")
-            if character_id:
-                del self.characters_data[character_id]["dialogue"][selected_dialogue]
-                self.dialogues_listbox.delete(self.dialogues_listbox.curselection())
-                self.modified_files.add('characters')
+        ttk.Button(window, text="Close", 
+                command=window.destroy).pack(pady=5)   
 
     def add_item_to_scene(self):
-        selected_scene = self.scenes_listbox.get(self.scenes_listbox.curselection())
-        if not selected_scene:
-            selected_scene = self.get_current_scene()
-        if selected_scene:
-            try:
-                scene_data = next(scene for scene in self.scenes_data if scene["name"] == selected_scene)
-                item_id = self.select_or_create_item()
-                if item_id:
-                    scene_data["items"].append(item_id)
-                    self.display_scene_details(scene_data)
-                    self.modified_files.add('scenes')
-            except StopIteration:
-                messagebox.showerror("Error", f"Scene with name {selected_scene} not found.")
+        selection = self.scenes_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("Warning", "Please select a scene first")
+            return
 
-    def get_current_scene(self):
-        selected_scene = self.scenes_listbox.get(self.scenes_listbox.curselection())
-        if selected_scene:
-            return next(scene for scene in self.scenes_data if scene["name"] == selected_scene)["id"]
-        return None
+        if not self.items_data:
+            messagebox.showwarning("Warning", "No items available")
+            return
 
-    def select_or_create_item(self):
-        item_id = None  # Initialize item_id here
-        item_window = tk.Toplevel(self.root)
-        item_window.title("Item | Select or Create")
-        item_window.geometry("400x200")
+        scene = self.scenes_data[selection[0]]
+        
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Add Item")
+        dialog.geometry("300x200")
+        dialog.transient(self.root)
+        dialog.grab_set()
 
-        item_frame = ttk.Frame(item_window)
-        item_frame.pack(padx=10, pady=10)
+        item_list = self.create_custom_listbox(dialog)
+        item_list.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        item_label = ttk.Label(item_frame, text="Select an existing item or create a new one:")
-        item_label.pack(anchor=tk.W)
+        for item_id, item in self.items_data.items():
+            item_list.insert(tk.END, f"{item['name']} ({item_id})")
 
-        item_var = tk.StringVar(value="Create New Item")
-        item_dropdown = ttk.Combobox(item_frame, textvariable=item_var, values=list(self.items_data.keys()))
-        item_dropdown.pack(pady=5)
+        def add_selected_item():
+            if not (sel := item_list.curselection()):
+                return
+            item_id = list(self.items_data.keys())[sel[0]]
+            if 'items' not in scene:
+                scene['items'] = []
+            scene['items'].append(item_id)
+            self.scene_items_list.insert(tk.END, self.items_data[item_id]['name'])
+            self.modified.add('scenes')
+            dialog.destroy()
 
-        def on_select():
-            nonlocal item_id
-            item_id = item_var.get()
-            if item_id == "Create New Item":
-                item_name = simpledialog.askstring("Create New Item", "Enter item name:")
-                if item_name:
-                    item_id = self.generate_item_id(item_name)
-                    self.items_data[item_id] = {
-                        "name": item_name,
-                        "description": "",
-                        "usable": False,
-                        "readable_item": "",
-                        "type": "Story"
-                    }
-                    self.items_listbox.insert(tk.END, item_id)
-                    self.items_listbox.selection_set(tk.END)
-                    self.modified_files.add('items')
-            item_window.destroy()
+        ttk.Button(dialog, text="Add", command=add_selected_item).pack(pady=5)
 
-        item_button = ttk.Button(item_frame, text="Select", command=on_select)
-        item_button.pack(pady=5)
+    def remove_item_from_scene(self):
+        scene_sel = self.scenes_listbox.curselection()
+        item_sel = self.scene_items_list.curselection()
+        
+        if not (scene_sel and item_sel):
+            messagebox.showwarning("Warning", "Please select a scene and item")
+            return
 
-        item_window.wait_window(item_window)
-        return item_id
+        scene = self.scenes_data[scene_sel[0]]
+        item_index = item_sel[0]
+        
+        if 'items' in scene and item_index < len(scene['items']):
+            del scene['items'][item_index]
+            self.scene_items_list.delete(item_sel)
+            self.modified.add('scenes')
 
     def add_character_to_scene(self):
-        selected_scene = self.scenes_listbox.get(self.scenes_listbox.curselection())
-        if not selected_scene:
-            selected_scene = self.get_current_scene()
-        if selected_scene:
-            try:
-                scene_data = next(scene for scene in self.scenes_data if scene["name"] == selected_scene)
-                character_id = self.select_or_create_character()
-                if character_id:
-                    scene_data["characters"].append(character_id)
-                    self.display_scene_details(scene_data)
-                    self.modified_files.add('scenes')
-            except StopIteration:
-                messagebox.showerror("Error", f"Scene with name {selected_scene} not found.")
+        selection = self.scenes_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("Warning", "Please select a scene first")
+            return
 
-    def select_or_create_character(self):
-        character_id = None  # Initialize character_id here
-        character_window = tk.Toplevel(self.root)
-        character_window.title("Character | Select or Create")
-        character_window.geometry("400x200")
+        if not self.characters_data:
+            messagebox.showwarning("Warning", "No characters available")
+            return
 
-        character_frame = ttk.Frame(character_window)
-        character_frame.pack(padx=10, pady=10)
+        scene = self.scenes_data[selection[0]]
+        
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Add Character")
+        dialog.geometry("300x200")
+        dialog.transient(self.root)
+        dialog.grab_set()
 
-        character_label = ttk.Label(character_frame, text="Select an existing character or create a new one:")
-        character_label.pack(anchor=tk.W)
+        char_list = self.create_custom_listbox(dialog)
+        char_list.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        character_var = tk.StringVar(value="Create New Character")
-        character_dropdown = ttk.Combobox(character_frame, textvariable=character_var, values=list(self.characters_data.keys()))
-        character_dropdown.pack(pady=5)
+        for char_id, char in self.characters_data.items():
+            char_list.insert(tk.END, f"{char['name']} ({char_id})")
 
-        def on_select():
-            nonlocal character_id
-            character_id = character_var.get()
-            if character_id == "Create New Character":
-                character_name = simpledialog.askstring("Create New Character", "Enter character name:")
-                if character_name:
-                    character_id = self.generate_character_id(character_name)
-                    self.characters_data[character_id] = {
-                        "id": character_id,
-                        "name": character_name,
-                        "type": "Friendly",
-                        "dialogue": {},
-                        "dialogue_options": {},
-                        "interactions": {},
-                        "stats": {},
-                        "greeting": ""
-                    }
-                    self.characters_listbox.insert(tk.END, character_id)
-                    self.characters_listbox.selection_set(tk.END)
-                    self.modified_files.add('characters')
-            character_window.destroy()
+        def add_selected_character():
+            if not (sel := char_list.curselection()):
+                return
+            char_id = list(self.characters_data.keys())[sel[0]]
+            if 'characters' not in scene:
+                scene['characters'] = []
+            scene['characters'].append(char_id)
+            self.scene_chars_list.insert(tk.END, self.characters_data[char_id]['name'])
+            self.modified.add('scenes')
+            dialog.destroy()
 
-        character_button = ttk.Button(character_frame, text="Select", command=on_select)
-        character_button.pack(pady=5)
+        ttk.Button(dialog, text="Add", command=add_selected_character).pack(pady=5)
 
-        character_window.wait_window(character_window)
-        return character_id
+    def remove_character_from_scene(self):
+        scene_sel = self.scenes_listbox.curselection()
+        char_sel = self.scene_chars_list.curselection()
+        
+        if not (scene_sel and char_sel):
+            messagebox.showwarning("Warning", "Please select a scene and character")
+            return
 
-    def add_exit_to_scene(self):
-        selected_scene = self.scenes_listbox.get(self.scenes_listbox.curselection())
-        if not selected_scene:
-            selected_scene = self.get_current_scene()
-        if selected_scene:
-            try:
-                scene_data = next(scene for scene in self.scenes_data if scene["name"] == selected_scene)
-                door_name = simpledialog.askstring("Add Exit to Scene", "Enter door name:")
-                if door_name:
-                    target_scene_id = self.select_or_create_scene()
-                    if target_scene_id:
-                        exit_data = {
-                            "door_name": door_name,
-                            "locked": False,
-                            "lock_text": "",
-                            "unlock_text": "",
-                            "required_item": "",
-                            "scene_id": target_scene_id
-                        }
-                        scene_data["exits"].append(exit_data)
-                        self.display_scene_details(scene_data)
-                        self.modified_files.add('scenes')
-            except StopIteration:
-                messagebox.showerror("Error", f"Scene with name {selected_scene} not found.")
+        scene = self.scenes_data[scene_sel[0]]
+        char_index = char_sel[0]
+        
+        if 'characters' in scene and char_index < len(scene['characters']):
+            del scene['characters'][char_index]
+            self.scene_chars_list.delete(char_sel)
+            self.modified.add('scenes')       
 
-    def select_or_create_scene(self):
-        scene_id = None  # Initialize scene_id here
-        scene_window = tk.Toplevel(self.root)
-        scene_window.title("Scene | Select or Create")
-        scene_window.geometry("400x200")
+    def add_exit(self):
+        selection = self.scenes_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("Warning", "Please select a scene first")
+            return
 
-        scene_frame = ttk.Frame(scene_window)
-        scene_frame.pack(padx=10, pady=10)
+        scene = self.scenes_data[selection[0]]
+        
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Add Exit")
+        dialog.geometry("300x200")
+        dialog.transient(self.root)
+        dialog.grab_set()
 
-        scene_label = ttk.Label(scene_frame, text="Select an existing scene or create a new one:")
-        scene_label.pack(anchor=tk.W)
+        door_frame = ttk.Frame(dialog)
+        door_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(door_frame, text="Door Name:").pack(side=tk.LEFT)
+        door_var = tk.StringVar()
+        ttk.Entry(door_frame, textvariable=door_var).pack(side=tk.LEFT, padx=5)
 
-        scene_var = tk.StringVar(value="Create New Scene")
-        scene_dropdown = ttk.Combobox(scene_frame, textvariable=scene_var, values=[scene["name"] for scene in self.scenes_data])
-        scene_dropdown.pack(pady=5)
+        target_frame = ttk.Frame(dialog)
+        target_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(target_frame, text="Target Scene:").pack(side=tk.LEFT)
+        target_var = tk.StringVar()
+        target_combo = ttk.Combobox(target_frame, textvariable=target_var,
+                                values=[s['name'] for s in self.scenes_data])
+        target_combo.pack(side=tk.LEFT, padx=5)
 
-        def on_select():
-            nonlocal scene_id
-            scene_id = scene_var.get()
-            if scene_id == "Create New Scene":
-                scene_name = simpledialog.askstring("Create New Scene", "Enter scene name:")
-                if scene_name:
-                    scene_data = {
-                        "id": self.generate_scene_id(scene_name),
-                        "name": scene_name,
-                        "description": "",
-                        "items": [],
-                        "characters": [],
-                        "exits": [],
-                        "music": "",
-                        "sound_effects": {},
-                        "random_events": [],
-                        "hint": ""
-                    }
-                    self.scenes_data.append(scene_data)
-                    self.scenes_listbox.insert(tk.END, scene_name)
-                    self.scenes_listbox.selection_set(tk.END)
-                    self.modified_files.add('scenes')
-                    scene_id = scene_data["id"]
-            scene_window.destroy()
-
-        scene_button = ttk.Button(scene_frame, text="Select", command=on_select)
-        scene_button.pack(pady=5)
-
-        scene_window.wait_window(scene_window)
-        return scene_id
-
-    def display_scene_details(self, scene_data):
-        self.scene_details_text.delete(1.0, tk.END)
-        self.scene_details_text.insert(tk.END, json.dumps(scene_data, indent=4))
-
-    def display_item_details(self, item_data):
-        self.item_details_text.delete(1.0, tk.END)
-        self.item_details_text.insert(tk.END, json.dumps(item_data, indent=4))
-
-    def display_character_details(self, character_data):
-        self.character_details_text.delete(1.0, tk.END)
-        self.character_details_text.insert(tk.END, json.dumps(character_data, indent=4))
-
-    def display_dialogue_details(self, dialogue_data):
-        self.dialogue_details_text.delete(1.0, tk.END)
-        self.dialogue_details_text.insert(tk.END, json.dumps(dialogue_data, indent=4))
-
-    def preview_scene_structure(self):
-        scene_structure = self.generate_scene_structure()
-        preview_window = self.create_preview_window(title="Scene Structure Preview", width=1200, height=800)
-        canvas = preview_window
-        self.draw_scene_structure(canvas, scene_structure)
-
-    def generate_scene_structure(self):
-        scene_structure = {}
-        for scene in self.scenes_data:
-            scene_structure[scene["id"]] = {
-                "name": scene["name"],
-                "description": scene["description"],
-                "items": scene["items"],
-                "characters": scene["characters"],
-                "exits": [(exit["door_name"], exit["scene_id"]) for exit in scene["exits"]]
-            }
-        return scene_structure
-
-    def draw_scene_structure(self, canvas, scene_structure):
-        padding = 50
-        box_size = 300  # Increased box size to fit more text
-        arrow_length = 40
-
-        positions = {}
-        x = padding
-        y = padding
-        for scene_id in scene_structure:
-            positions[scene_id] = (x, y)
-            x += box_size + padding
-            if x > canvas.winfo_width() - box_size - padding:
-                x = padding
-                y += box_size + padding
-
-        for scene_id, (x, y) in positions.items():
-            scene_info = scene_structure[scene_id]
-            canvas.create_rectangle(x, y, x + box_size, y + box_size, outline="black")
-            canvas.create_text(x + box_size / 2, y + 10, text=scene_info["name"])
-
-            # Display items and characters
-            y_offset = 30
-            for item_id in scene_info["items"]:
-                item_name = self.items_data.get(item_id, {}).get("name", "Unknown Item")
-                canvas.create_text(x + 10, y + y_offset, text=item_name, anchor=tk.W, fill="dark green")
-                y_offset += 20
-            for char_id in scene_info["characters"]:
-                char_name = self.characters_data.get(char_id, {}).get("name", "Unknown Character")
-                canvas.create_text(x + 10, y + y_offset, text=char_name, anchor=tk.W, fill="dark red")
-                y_offset += 20
-
-        for scene_id, (x, y) in positions.items():
-            scene_info = scene_structure[scene_id]
-            exit_y_offset = y + box_size + 10
-            for exit_name, target_scene_id in scene_info["exits"]:
-                if target_scene_id in positions:
-                    target_x, target_y = positions[target_scene_id]
-                    arrow_x = x + box_size
-                    arrow_y = y + box_size / 2
-                    target_arrow_x = target_x
-                    target_arrow_y = target_y + box_size / 2
-                    canvas.create_line(arrow_x, arrow_y, target_arrow_x, target_arrow_y, arrow=tk.LAST, fill="blue")
-                    canvas.create_text(canvas.winfo_width() - 10, exit_y_offset, text=exit_name, anchor=tk.W, fill="blue")
-                    exit_y_offset += 20
-
-        canvas.configure(scrollregion=canvas.bbox(tk.ALL))
-
-    def on_mouse_wheel(self, event):
-        if event.delta > 0:
-            self.zoom_level *= 1.1
-        else:
-            self.zoom_level /= 1.1
-        self.zoom_level = max(0.5, min(2.0, self.zoom_level))
-        self.preview_scene_structure()
-
-    def create_settings_menu(self):
-        settings_window = tk.Toplevel(self.root)
-        settings_window.title("Settings")
-        settings_window.geometry("200x200")
-
-        settings_frame = ttk.Frame(settings_window)
-        settings_frame.pack(padx=10, pady=10)
-
-        settings_label = ttk.Label(settings_frame, text="Settings:")
-        settings_label.pack(anchor=tk.W)
-
-        text_size_var = tk.StringVar(value="12")
-        text_size_label = ttk.Label(settings_frame, text="Text Size:")
-        text_size_label.pack(anchor=tk.W)
-        text_size_entry = ttk.Entry(settings_frame, textvariable=text_size_var)
-        text_size_entry.pack(pady=5)
-
-        light_mode_check = ttk.Checkbutton(settings_frame, text="Light Mode", variable=self.light_mode, command=self.toggle_light_mode)
-        light_mode_check.pack(anchor=tk.W, pady=5)
-
-        syntax_highlighting_check = ttk.Checkbutton(settings_frame, text="Syntax Highlighting", variable=self.syntax_highlighting_var, command=self.toggle_syntax_highlighting)
-        syntax_highlighting_check.pack(anchor=tk.W, pady=5)
-
-        def apply_settings():
-            text_size = text_size_var.get()
-            try:
-                text_size = int(text_size)
-            except ValueError:
-                messagebox.showerror("Error", "Invalid text size. Please enter a number.")
+        def add_exit_to_scene():
+            door_name = door_var.get().strip()
+            target_scene_name = target_var.get()
+            if not door_name or not target_scene_name:
+                messagebox.showerror("Error", "Door name and target scene required")
                 return
 
-            self.scene_details_text.config(font=("Helvetica", text_size))
-            self.item_details_text.config(font=("Helvetica", text_size))
-            self.character_details_text.config(font=("Helvetica", text_size))
-            self.dialogue_details_text.config(font=("Helvetica", text_size))
+            target_scene = next((s for s in self.scenes_data 
+                            if s['name'] == target_scene_name), None)
+            if not target_scene:
+                messagebox.showerror("Error", "Invalid target scene")
+                return
 
-        apply_button = ttk.Button(settings_frame, text="Apply", command=apply_settings)
-        apply_button.pack(pady=5)
+            if 'exits' not in scene:
+                scene['exits'] = []
 
-        settings_window.wait_window(settings_window)
+            scene['exits'].append({
+                'door_name': door_name,
+                'scene_id': target_scene['id']
+            })
 
-    def toggle_light_mode(self):
-        if self.light_mode.get():
-            self.style.theme_use('clam')
-        else:
-            self.style.theme_use('equilux')
+            self.scene_exits_list.insert(tk.END, f"{door_name} → {target_scene_name}")
+            self.modified.add('scenes')
+            dialog.destroy()
 
-    def toggle_syntax_highlighting(self):
-        if self.syntax_highlighting_var.get():
-            # Implement syntax highlighting
-            self.apply_syntax_highlighting()
-        else:
-            # Disable syntax highlighting
-            self.remove_syntax_highlighting()
+        ttk.Button(dialog, text="Add Exit", command=add_exit_to_scene).pack(pady=10)
 
-        # Apply syntax highlighting using pygments
+    def edit_exit(self):
+        scene_sel = self.scenes_listbox.curselection()
+        exit_sel = self.scene_exits_list.curselection()
+        
+        if not (scene_sel and exit_sel):
+            messagebox.showwarning("Warning", "Please select a scene and exit")
+            return
 
-    def apply_syntax_highlighting(self, text_widget):
-        text = text_widget.get(1.0, tk.END)
-        # Simple example: highlight JSON keys
-        import json
-        try:
-            data = json.loads(text)
-            for key in data.keys():
-                start = text.find(f'"{key}":')
-                if start != -1:
-                    end = start + len(key) + 2  # Account for quotes
-                    text_widget.tag_add("key", f"1.{start}", f"1.{end}")
-                    text_widget.tag_config("key", foreground="blue")
-        except json.JSONDecodeError:
-            pass
+        scene = self.scenes_data[scene_sel[0]]
+        exit_index = exit_sel[0]
+        exit_data = scene['exits'][exit_index]
 
-    def remove_syntax_highlighting(self):
-        # Remove syntax highlighting
-        self.scene_details_text.config(font=("Helvetica", 12))
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Edit Exit")
+        dialog.geometry("300x200")
+        dialog.transient(self.root)
+        dialog.grab_set()
 
-    def on_scene_double_click(self, event):
-        selected_scene = self.scenes_listbox.get(self.scenes_listbox.curselection())
-        if selected_scene:
+        door_frame = ttk.Frame(dialog)
+        door_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(door_frame, text="Door Name:").pack(side=tk.LEFT)
+        door_var = tk.StringVar(value=exit_data['door_name'])
+        ttk.Entry(door_frame, textvariable=door_var).pack(side=tk.LEFT, padx=5)
+
+        target_frame = ttk.Frame(dialog)
+        target_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(target_frame, text="Target Scene:").pack(side=tk.LEFT)
+        target_scene = next(s for s in self.scenes_data if s['id'] == exit_data['scene_id'])
+        target_var = tk.StringVar(value=target_scene['name'])
+        target_combo = ttk.Combobox(target_frame, textvariable=target_var,
+                                values=[s['name'] for s in self.scenes_data])
+        target_combo.pack(side=tk.LEFT, padx=5)
+
+        def update_exit():
+            door_name = door_var.get().strip()
+            target_scene_name = target_var.get()
+            if not door_name or not target_scene_name:
+                messagebox.showerror("Error", "Door name and target scene required")
+                return
+
+            new_target = next((s for s in self.scenes_data 
+                            if s['name'] == target_scene_name), None)
+            if not new_target:
+                messagebox.showerror("Error", "Invalid target scene")
+                return
+
+            scene['exits'][exit_index].update({
+                'door_name': door_name,
+                'scene_id': new_target['id']
+            })
+
+            self.scene_exits_list.delete(exit_sel)
+            self.scene_exits_list.insert(exit_sel, f"{door_name} → {target_scene_name}")
+            self.modified.add('scenes')
+            dialog.destroy()
+
+        ttk.Button(dialog, text="Update Exit", command=update_exit).pack(pady=10)
+
+    def remove_exit(self):
+        scene_sel = self.scenes_listbox.curselection()
+        exit_sel = self.scene_exits_list.curselection()
+        
+        if not (scene_sel and exit_sel):
+            messagebox.showwarning("Warning", "Please select a scene and exit")
+            return
+
+        if not messagebox.askyesno("Confirm", "Remove this exit?"):
+            return
+
+        scene = self.scenes_data[scene_sel[0]]
+        exit_index = exit_sel[0]
+        
+        del scene['exits'][exit_index]
+        self.scene_exits_list.delete(exit_sel)
+        self.modified.add('scenes')
+
+    def add_item_effect(self):
+        if not (selection := self.items_listbox.curselection()):
+            messagebox.showwarning("Warning", "Please select an item first")
+            return
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Add Effect")
+        dialog.geometry("300x200")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        type_frame = ttk.Frame(dialog)
+        type_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(type_frame, text="Effect Type:").pack(side=tk.LEFT)
+        type_var = tk.StringVar(value="health")
+        ttk.Combobox(type_frame, textvariable=type_var,
+                    values=["health", "attack", "defense", "speed"]).pack(side=tk.LEFT, padx=5)
+
+        value_frame = ttk.Frame(dialog)
+        value_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(value_frame, text="Value:").pack(side=tk.LEFT)
+        value_var = tk.StringVar()
+        ttk.Entry(value_frame, textvariable=value_var).pack(side=tk.LEFT, padx=5)
+
+        duration_frame = ttk.Frame(dialog)
+        duration_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(duration_frame, text="Duration:").pack(side=tk.LEFT)
+        duration_var = tk.StringVar(value="permanent")
+        ttk.Combobox(duration_frame, textvariable=duration_var,
+                    values=["permanent", "temporary", "single-use"]).pack(side=tk.LEFT, padx=5)
+
+        def add_effect():
             try:
-                scene_data = next(scene for scene in self.scenes_data if scene["name"] == selected_scene)
-                self.display_scene_details(scene_data)
-            except StopIteration:
-                messagebox.showerror("Error", f"Scene with name {selected_scene} not found.")
+                value = float(value_var.get())
+            except ValueError:
+                messagebox.showerror("Error", "Value must be a number")
+                return
 
-    def on_item_double_click(self, event):
-        selected_item = self.items_listbox.get(self.items_listbox.curselection())
-        if selected_item:
-            self.display_item_details(self.items_data[selected_item])
+            item_id = list(self.items_data.keys())[selection[0]]
+            item = self.items_data[item_id]
+            
+            if 'effects' not in item:
+                item['effects'] = {}
 
-    def on_character_double_click(self, event):
-        selected_character = self.characters_listbox.get(self.characters_listbox.curselection())
-        if selected_character:
-            self.display_character_details(self.characters_data[selected_character])
-
-    def on_dialogue_double_click(self, event):
-        selected_dialogue = self.dialogues_listbox.get(self.dialogues_listbox.curselection())
-        if selected_dialogue:
-            character_id = simpledialog.askstring("Dialogue Details", "Enter character ID:")
-            if character_id:
-                dialogue_data = self.characters_data[character_id]["dialogue"][selected_dialogue]
-                dialogue_text = f"Greet: {dialogue_data.get('greet', '')}\n"
-                dialogue_text += "Dialogue Options:\n"
-                for option, response in dialogue_data.get("dialogue_options", {}).items():
-                    dialogue_text += f"{option}: {response}\n"
-                dialogue_text += "Dialogue Rewards:\n"
-                for reward, details in dialogue_data.get("dialogue_rewards", {}).items():
-                    dialogue_text += f"{reward}: {details}\n"
-                self.dialogue_details_text.delete(1.0, tk.END)
-                self.dialogue_details_text.insert(tk.END, dialogue_text)
-
-    def show_context_menu(self, event):
-        context_menu = tk.Menu(self.root, tearoff=0)
-        context_menu.add_command(label="Copy", command=self.copy_to_clipboard)
-        context_menu.add_command(label="Paste", command=self.paste_from_clipboard)
-        context_menu.add_command(label="Undo", command=self.undo)
-        context_menu.add_command(label="Redo", command=self.redo)
-        context_menu.post(event.x_root, event.y_root)
-
-    def copy_to_clipboard(self):
-        selected_text = self.root.clipboard_get()
-        if selected_text:
-            self.root.clipboard_clear()
-            self.root.clipboard_append(selected_text)
-
-    def paste_from_clipboard(self):
-        clipboard_text = self.root.clipboard_get()
-        if clipboard_text:
-            self.root.insert(tk.END, clipboard_text)
-            self.root.clipboard_clear()
-
-    def undo(self):
-        self.root.edit_undo()
-
-    def redo(self):
-        self.root.edit_redo()
-
-    def preview_scene_map(self):
-        scene_map = self.generate_scene_map()
-        preview_window = self.create_preview_window(title="Scene Map Preview", width=1200, height=800)
-        canvas = preview_window
-        self.draw_scene_map(canvas, scene_map)
-
-    def generate_scene_map(self):
-        scene_map = {}
-        for scene in self.scenes_data:
-            scene_map[scene["id"]] = {
-                "name": scene["name"],
-                "exits": [(exit["door_name"], exit["scene_id"]) for exit in scene["exits"]]
+            effect_type = type_var.get()
+            item['effects'][effect_type] = {
+                'value': value,
+                'duration': duration_var.get()
             }
-        return scene_map
 
-    def draw_scene_map(self, canvas, scene_map):
-        padding = 50
-        box_size = 80
-        arrow_length = 40
+            self.effects_list.insert(tk.END, f"{effect_type}: {value} ({duration_var.get()})")
+            self.modified.add('items')
+            dialog.destroy()
 
-        positions = {}
-        x = padding
-        y = padding
-        for scene_id in scene_map:
-            positions[scene_id] = (x, y)
-            x += box_size + padding
-            if x > canvas.winfo_width() - box_size - padding:
-                x = padding
-                y += box_size + padding
+        ttk.Button(dialog, text="Add", command=add_effect).pack(pady=10)
 
-        for scene_id, (x, y) in positions.items():
-            scene_info = scene_map[scene_id]
-            canvas.create_rectangle(x, y, x + box_size, y + box_size, outline="black")
-            canvas.create_text(x + box_size / 2, y + box_size / 2, text=scene_info["name"])
+    def edit_item_effect(self):
+        item_sel = self.items_listbox.curselection()
+        effect_sel = self.effects_list.curselection()
 
-        for scene_id, (x, y) in positions.items():
-            scene_info = scene_map[scene_id]
-            for exit_name, target_scene_id in scene_info["exits"]:
-                if target_scene_id in positions:
-                    target_x, target_y = positions[target_scene_id]
-                    arrow_x = x + box_size
-                    arrow_y = y + box_size / 2
-                    target_arrow_x = target_x
-                    target_arrow_y = target_y + box_size / 2
-                    canvas.create_line(arrow_x, arrow_y, target_arrow_x, target_arrow_y, arrow=tk.LAST, fill="red")
-                    canvas.create_rectangle(arrow_x + 10, arrow_y - 10, arrow_x + 110, arrow_y + 10, fill="white")
-                    canvas.create_text(arrow_x + 60, arrow_y, text=exit_name, fill="black")
+        if not (item_sel and effect_sel):
+            messagebox.showwarning("Warning", "Please select an item and effect")
+            return
 
-        canvas.configure(scrollregion=canvas.bbox(tk.ALL))
+        item_id = list(self.items_data.keys())[item_sel[0]]
+        item = self.items_data[item_id]
+        
+        effect_text = self.effects_list.get(effect_sel)
+        effect_type = effect_text.split(':')[0].strip()
+        effect = item['effects'][effect_type]
 
-    def add_story_text(self):
-        text_key = simpledialog.askstring("Add Story Text", "Enter text key:")
-        if text_key:
-            self.story_texts_data[text_key] = {
-                "text": "",
-                "show_once": False
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Edit Effect")
+        dialog.geometry("300x200")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        value_frame = ttk.Frame(dialog)
+        value_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(value_frame, text="Value:").pack(side=tk.LEFT)
+        value_var = tk.StringVar(value=str(effect['value']))
+        ttk.Entry(value_frame, textvariable=value_var).pack(side=tk.LEFT, padx=5)
+
+        duration_frame = ttk.Frame(dialog)
+        duration_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(duration_frame, text="Duration:").pack(side=tk.LEFT)
+        duration_var = tk.StringVar(value=effect['duration'])
+        ttk.Combobox(duration_frame, textvariable=duration_var,
+                    values=["permanent", "temporary", "single-use"]).pack(side=tk.LEFT, padx=5)
+
+        def update_effect():
+            try:
+                value = float(value_var.get())
+            except ValueError:
+                messagebox.showerror("Error", "Value must be a number")
+                return
+
+            item['effects'][effect_type].update({
+                'value': value,
+                'duration': duration_var.get()
+            })
+
+            self.effects_list.delete(effect_sel)
+            self.effects_list.insert(effect_sel, f"{effect_type}: {value} ({duration_var.get()})")
+            self.modified.add('items')
+            dialog.destroy()
+
+        ttk.Button(dialog, text="Update", command=update_effect).pack(pady=10)
+
+    def remove_item_effect(self):
+        item_sel = self.items_listbox.curselection()
+        effect_sel = self.effects_list.curselection()
+
+        if not (item_sel and effect_sel):
+            messagebox.showwarning("Warning", "Please select an item and effect")
+            return
+
+        if not messagebox.askyesno("Confirm", "Remove this effect?"):
+            return
+
+        item_id = list(self.items_data.keys())[item_sel[0]]
+        item = self.items_data[item_id]
+        
+        effect_text = self.effects_list.get(effect_sel)
+        effect_type = effect_text.split(':')[0].strip()
+        
+        del item['effects'][effect_type]
+        self.effects_list.delete(effect_sel)
+        self.modified.add('items')         
+
+    def add_dialogue_option(self):
+        if not (selection := self.chars_listbox.curselection()):
+            messagebox.showwarning("Warning", "Please select a character first")
+            return
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Add Dialogue Option")
+        dialog.geometry("500x400")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Option text
+        option_frame = ttk.Frame(dialog)
+        option_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(option_frame, text="Option Text:").pack(anchor=tk.W)
+        option_var = tk.StringVar()
+        ttk.Entry(option_frame, textvariable=option_var).pack(fill=tk.X)
+
+        # Response
+        response_frame = ttk.LabelFrame(dialog, text="Response")
+        response_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        response_text = self.create_custom_text(response_frame)
+        response_text.pack(fill=tk.BOTH, expand=True)
+
+        # Conditions
+        conditions_frame = ttk.LabelFrame(dialog, text="Conditions")
+        conditions_frame.pack(fill=tk.X, padx=5, pady=5)
+        self.dialog_conditions_list = self.create_custom_listbox(conditions_frame, height=3)
+        self.dialog_conditions_list.pack(fill=tk.X)
+
+        condition_buttons = ttk.Frame(conditions_frame)
+        condition_buttons.pack(fill=tk.X)
+        ttk.Button(condition_buttons, text="Add Condition", 
+                command=lambda: self.add_dialogue_condition(self.dialog_conditions_list)).pack(side=tk.LEFT, padx=2)
+        ttk.Button(condition_buttons, text="Remove Condition",
+                command=lambda: self.remove_dialogue_condition(self.dialog_conditions_list)).pack(side=tk.LEFT, padx=2)
+
+        def add():
+            if not (option_text := option_var.get().strip()):
+                messagebox.showerror("Error", "Option text required")
+                return
+            if not (response := response_text.get('1.0', tk.END).strip()):
+                messagebox.showerror("Error", "Response text required")
+                return
+
+            char_id = list(self.characters_data.keys())[selection[0]]
+            char = self.characters_data[char_id]
+            
+            if 'dialogue_options' not in char:
+                char['dialogue_options'] = {}
+
+            conditions = {}
+            for i in range(self.dialog_conditions_list.size()):
+                cond = self.dialog_conditions_list.get(i)
+                type, value = cond.split(': ')
+                conditions[type] = value
+
+            char['dialogue_options'][option_text] = {
+                'response': response,
+                'conditions': conditions
             }
-            self.story_texts_listbox.insert(tk.END, text_key)
-            self.modified_files.add('story_texts')
 
-    def save_story_text(self):
-        selected_text = self.story_texts_listbox.get(self.story_texts_listbox.curselection())
-        if selected_text:
-            text_content = self.story_text_editor.get(1.0, tk.END).strip()
-            self.story_texts_data[selected_text]["text"] = text_content
-            self.modified_files.add('story_texts')
+            self.dialogue_options_list.insert(tk.END, option_text)
+            self.modified.add('characters')
+            dialog.destroy()
 
-    def delete_story_text(self):
-        selected_text = self.story_texts_listbox.get(self.story_texts_listbox.curselection())
-        if selected_text:
-            del self.story_texts_data[selected_text]
-            self.story_texts_listbox.delete(self.story_texts_listbox.curselection())
-            self.modified_files.add('story_texts')
+        ttk.Button(dialog, text="Add Option", command=add).pack(pady=10)
 
-    def add_ingredient(self):
-        ingredient_name = simpledialog.askstring("Add Ingredient", "Enter ingredient name:")
-        if ingredient_name:
-            self.ingredients_list.insert(tk.END, ingredient_name)
+    def edit_dialogue_option(self):
+        char_sel = self.chars_listbox.curselection()
+        option_sel = self.dialogue_options_list.curselection()
 
-    def remove_ingredient(self):
-        selected_ingredient = self.ingredients_list.get(self.ingredients_list.curselection())
-        if selected_ingredient:
-            self.ingredients_list.delete(self.ingredients_list.curselection())
+        if not (char_sel and option_sel):
+            messagebox.showwarning("Warning", "Please select a character and dialogue option")
+            return
 
-    def save_recipe(self):
-        result_item = self.result_item_entry.get()
-        ingredients = list(self.ingredients_list.get(0, tk.END))
-        if result_item and ingredients:
-            recipe_data = {
-                "result_item": result_item,
-                "ingredients": ingredients
+        char_id = list(self.characters_data.keys())[char_sel[0]]
+        char = self.characters_data[char_id]
+        
+        option_text = self.dialogue_options_list.get(option_sel)
+        option = char['dialogue_options'][option_text]
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Edit Dialogue Option")
+        dialog.geometry("500x400")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Option text
+        text_frame = ttk.Frame(dialog)
+        text_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(text_frame, text="Option Text:").pack(anchor=tk.W)
+        text_var = tk.StringVar(value=option_text)
+        ttk.Entry(text_frame, textvariable=text_var).pack(fill=tk.X)
+
+        # Response
+        response_frame = ttk.LabelFrame(dialog, text="Response")
+        response_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        response_text = self.create_custom_text(response_frame)
+        response_text.insert('1.0', option['response'])
+        response_text.pack(fill=tk.BOTH, expand=True)
+
+        # Conditions
+        conditions_frame = ttk.LabelFrame(dialog, text="Conditions")
+        conditions_frame.pack(fill=tk.X, padx=5, pady=5)
+        conditions_list = self.create_custom_listbox(conditions_frame, height=3)
+        conditions_list.pack(fill=tk.X)
+
+        for cond_type, value in option.get('conditions', {}).items():
+            conditions_list.insert(tk.END, f"{cond_type}: {value}")
+
+        condition_buttons = ttk.Frame(conditions_frame)
+        condition_buttons.pack(fill=tk.X)
+        ttk.Button(condition_buttons, text="Add Condition",
+                command=lambda: self.add_dialogue_condition(conditions_list)).pack(side=tk.LEFT, padx=2)
+        ttk.Button(condition_buttons, text="Remove Condition",
+                command=lambda: self.remove_dialogue_condition(conditions_list)).pack(side=tk.LEFT, padx=2)
+
+        def update():
+            if not (new_text := text_var.get().strip()):
+                messagebox.showerror("Error", "Option text required")
+                return
+            if not (response := response_text.get('1.0', tk.END).strip()):
+                messagebox.showerror("Error", "Response text required")
+                return
+
+            # Create new conditions dict
+            new_conditions = {}
+            for i in range(conditions_list.size()):
+                cond = conditions_list.get(i)
+                type, value = cond.split(': ')
+                new_conditions[type] = value
+
+            # Remove old option if text changed
+            if new_text != option_text:
+                del char['dialogue_options'][option_text]
+                self.dialogue_options_list.delete(option_sel)
+
+            # Add updated option
+            char['dialogue_options'][new_text] = {
+                'response': response,
+                'conditions': new_conditions
             }
-            # Save the recipe data to the appropriate file or data structure
-            self.modified_files.add('recipes')
+
+            self.dialogue_options_list.insert(option_sel, new_text)
+            self.modified.add('characters')
+            dialog.destroy()
+
+        ttk.Button(dialog, text="Update", command=update).pack(pady=10)
+
+    def remove_dialogue_option(self):
+        char_sel = self.chars_listbox.curselection()
+        option_sel = self.dialogue_options_list.curselection()
+
+        if not (char_sel and option_sel):
+            messagebox.showwarning("Warning", "Please select a character and dialogue option")
+            return
+
+        if not messagebox.askyesno("Confirm", "Remove this dialogue option?"):
+            return
+
+        char_id = list(self.characters_data.keys())[char_sel[0]]
+        char = self.characters_data[char_id]
+        option_text = self.dialogue_options_list.get(option_sel)
+
+        del char['dialogue_options'][option_text]
+        self.dialogue_options_list.delete(option_sel)
+        self.modified.add('characters')    
+
+    def add_character_stat(self):
+        if not (selection := self.chars_listbox.curselection()):
+            messagebox.showwarning("Warning", "Please select a character first")
+            return
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Add Stat")
+        dialog.geometry("300x150")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        name_frame = ttk.Frame(dialog)
+        name_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(name_frame, text="Name:").pack(side=tk.LEFT)
+        name_var = tk.StringVar()
+        ttk.Entry(name_frame, textvariable=name_var).pack(side=tk.LEFT, padx=5)
+
+        value_frame = ttk.Frame(dialog)
+        value_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(value_frame, text="Value:").pack(side=tk.LEFT)
+        value_var = tk.StringVar()
+        ttk.Entry(value_frame, textvariable=value_var).pack(side=tk.LEFT, padx=5)
+
+        def add():
+            if not (stat_name := name_var.get().strip()):
+                messagebox.showerror("Error", "Stat name required")
+                return
+                
+            try:
+                value = float(value_var.get())
+            except ValueError:
+                messagebox.showerror("Error", "Value must be a number")
+                return
+
+            char_id = list(self.characters_data.keys())[selection[0]]
+            char = self.characters_data[char_id]
+            
+            if 'stats' not in char:
+                char['stats'] = {}
+
+            char['stats'][stat_name] = value
+            self.stats_tree.insert('', 'end', text=stat_name, values=(value,))
+            self.modified.add('characters')
+            dialog.destroy()
+
+        ttk.Button(dialog, text="Add", command=add).pack(pady=10)
+
+    def edit_character_stat(self):
+        char_sel = self.chars_listbox.curselection()
+        stat_sel = self.stats_tree.selection()
+
+        if not (char_sel and stat_sel):
+            messagebox.showwarning("Warning", "Please select a character and stat")
+            return
+
+        char_id = list(self.characters_data.keys())[char_sel[0]]
+        char = self.characters_data[char_id]
+        
+        stat_item = self.stats_tree.item(stat_sel[0])
+        stat_name = stat_item['text']
+        current_value = char['stats'][stat_name]
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Edit Stat")
+        dialog.geometry("250x100")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        value_frame = ttk.Frame(dialog)
+        value_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(value_frame, text=f"{stat_name}:").pack(side=tk.LEFT)
+        value_var = tk.StringVar(value=str(current_value))
+        ttk.Entry(value_frame, textvariable=value_var).pack(side=tk.LEFT, padx=5)
+
+        def update():
+            try:
+                value = float(value_var.get())
+            except ValueError:
+                messagebox.showerror("Error", "Value must be a number")
+                return
+
+            char['stats'][stat_name] = value
+            self.stats_tree.set(stat_sel[0], column='value', value=value)
+            self.modified.add('characters')
+            dialog.destroy()
+
+        ttk.Button(dialog, text="Update", command=update).pack(pady=10)
+
+    def remove_character_stat(self):
+        char_sel = self.chars_listbox.curselection()
+        stat_sel = self.stats_tree.selection()
+
+        if not (char_sel and stat_sel):
+            messagebox.showwarning("Warning", "Please select a character and stat")
+            return
+
+        if not messagebox.askyesno("Confirm", "Remove this stat?"):
+            return
+
+        char_id = list(self.characters_data.keys())[char_sel[0]]
+        char = self.characters_data[char_id]
+        
+        stat_item = self.stats_tree.item(stat_sel[0])
+        stat_name = stat_item['text']
+        
+        del char['stats'][stat_name]
+        self.stats_tree.delete(stat_sel[0])
+        self.modified.add('characters')
 
     def run(self):
         self.root.mainloop()
 
-if __name__ == "__main__":
-    root = ThemedTk(theme="equilux")  # Using ThemedTk for better dark theme support
+def main():
+    root = ThemedTk(theme="equilux")
     app = GameDataEditor(root)
     app.run()
+
+if __name__ == "__main__":
+    main()

@@ -88,6 +88,8 @@ class GameDataEditor:
         self.items_data = {}
         self.characters_data = {}
         self.story_texts_data = {}
+        self.dialogue_data = {}
+        self.recipes_data = []
         
         self.search_vars = {
             'scene': tk.StringVar(),
@@ -704,9 +706,26 @@ class GameDataEditor:
             self.load_items()
             self.load_characters()
             self.load_story_texts()
+            self.load_dialogue_data()
             self.refresh_all_lists()
         except Exception as e:
             self.show_error_dialog(f"Error loading data: {str(e)}")
+
+    def load_dialogue_data(self):
+        """Load dialogue data from file"""
+        try:
+            with open('game_files/dialogues.json', 'r') as f:
+                self.dialogue_data = json.load(f)
+                self.refresh_dialogue_tree()
+        except FileNotFoundError:
+            self.dialogue_data = {
+                'default': {
+                    'name': 'Default Dialogue',
+                    'content': 'Default dialogue content',
+                    'responses': []
+                }
+            }
+            self.refresh_dialogue_tree()            
 
     def load_scenes(self):
         try:
@@ -1993,6 +2012,661 @@ class GameDataEditor:
         del char['stats'][stat_name]
         self.stats_tree.delete(stat_sel[0])
         self.modified.add('characters')
+
+    @safe_operation
+    def save_current_character(self):
+        """Save the currently selected character"""
+        if not (selection := self.chars_listbox.curselection()):
+            return
+
+        char_id = list(self.characters_data.keys())[selection[0]]
+        character = self.characters_data[char_id]
+
+        # Store old data for undo
+        old_data = character.copy()
+        
+        # Update character data
+        character.update({
+            'name': self.char_name_var.get(),
+            'type': self.char_type_var.get(),
+            'description': self.char_desc_text.get('1.0', tk.END).strip(),
+            'greeting': self.char_greeting_text.get('1.0', tk.END).strip(),
+            'movable': self.char_movable_var.get(),
+            'follows_player': self.char_follows_var.get()
+        })
+
+        self.add_undo_action('modify', 'characters',
+                            {'id': char_id, 'data': old_data},
+                            {'id': char_id, 'data': character.copy()},
+                            f"Modified character {character['name']}")
+
+        self.modified.add('characters')
+        self.update_status(f"Saved character {character['name']}")
+
+    @safe_operation
+    def delete_current_character(self):
+        """Delete the currently selected character"""
+        if not (selection := self.chars_listbox.curselection()):
+            return
+
+        char_id = list(self.characters_data.keys())[selection[0]]
+        character = self.characters_data[char_id]
+
+        if not messagebox.askyesno("Confirm Deletion", 
+                                f"Delete character '{character['name']}'?"):
+            return
+
+        # Store for undo
+        old_data = character.copy()
+        
+        # Remove character
+        del self.characters_data[char_id]
+        self.chars_listbox.delete(selection)
+
+        self.add_undo_action('delete', 'characters',
+                            {'id': char_id, 'data': old_data},
+                            None,
+                            f"Deleted character {character['name']}")
+
+        self.modified.add('characters')
+        self.update_status(f"Deleted character {character['name']}")
+
+    @safe_operation
+    def duplicate_current_character(self):
+        """Duplicate the currently selected character"""
+        if not (selection := self.chars_listbox.curselection()):
+            return
+
+        char_id = list(self.characters_data.keys())[selection[0]]
+        original = self.characters_data[char_id]
+
+        # Create new ID
+        new_id = f"{char_id}_copy"
+        while new_id in self.characters_data:
+            new_id += "_copy"
+
+        # Copy character data
+        new_char = copy.deepcopy(original)
+        new_char['name'] = f"{original['name']} (Copy)"
+        self.characters_data[new_id] = new_char
+
+        # Add to list
+        self.chars_listbox.insert(tk.END, new_char['name'])
+
+        self.add_undo_action('create', 'characters',
+                            None,
+                            {'id': new_id, 'data': new_char},
+                            f"Duplicated character {original['name']}")
+
+        self.modified.add('characters')
+        self.update_status(f"Duplicated character {original['name']}") 
+
+    def add_dialogue_response(self):
+        """Add a new response option to the current dialogue"""
+        if not self.dialogue_tree.selection():
+            messagebox.showwarning("Warning", "Please select a dialogue first")
+            return
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Add Response")
+        dialog.geometry("400x300")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Response text
+        text_frame = ttk.Frame(dialog)
+        text_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(text_frame, text="Response Text:").pack(anchor=tk.W)
+        response_text = self.create_custom_text(text_frame, height=4)
+        response_text.pack(fill=tk.X)
+
+        # Next dialogue selection
+        next_frame = ttk.Frame(dialog)
+        next_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(next_frame, text="Next Dialogue:").pack(side=tk.LEFT)
+        next_var = tk.StringVar()
+        next_combo = ttk.Combobox(next_frame, textvariable=next_var)
+        next_combo['values'] = self.get_dialogue_list()
+        next_combo.pack(side=tk.LEFT, padx=5)
+
+        # Conditions
+        cond_frame = ttk.LabelFrame(dialog, text="Conditions")
+        cond_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        conditions_list = self.create_custom_listbox(cond_frame)
+        conditions_list.pack(fill=tk.BOTH, expand=True)
+
+        button_frame = ttk.Frame(cond_frame)
+        button_frame.pack(fill=tk.X)
+        ttk.Button(button_frame, text="Add Condition",
+                command=lambda: self.add_dialogue_condition(conditions_list)).pack(side=tk.LEFT, padx=2)
+        ttk.Button(button_frame, text="Remove Condition",
+                command=lambda: self.remove_dialogue_condition(conditions_list)).pack(side=tk.LEFT, padx=2)
+
+        def add():
+            if not (text := response_text.get('1.0', tk.END).strip()):
+                messagebox.showerror("Error", "Response text required")
+                return
+
+            response_data = {
+                'text': text,
+                'conditions': self.get_conditions_from_list(conditions_list)
+            }
+
+            if next_dialogue := next_var.get():
+                response_data['next_dialogue'] = next_dialogue
+
+            self.add_response_to_dialogue(response_data)
+            dialog.destroy()
+
+        ttk.Button(dialog, text="Add", command=add).pack(pady=10)
+
+    def add_response_to_dialogue(self, response_data):
+        """Add a response to the current dialogue"""
+        selected = self.dialogue_tree.selection()[0]
+        dialogue_data = self.dialogue_tree.item(selected)
+        responses = dialogue_data.get('responses', [])
+        responses.append(response_data)
+        
+        # Update dialogue data
+        self.dialogue_tree.item(selected, responses=responses)
+        self.response_list.insert(tk.END, response_data['text'])
+        self.modified.add('dialogues')
+
+    def edit_dialogue_response(self):
+        """Edit selected dialogue response"""
+        if not self.dialogue_tree.selection():
+            return
+        if not (response_sel := self.response_list.curselection()):
+            messagebox.showwarning("Warning", "Please select a response to edit")
+            return
+
+        dialogue_item = self.dialogue_tree.item(self.dialogue_tree.selection()[0])
+        response_data = dialogue_item['responses'][response_sel[0]]
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Edit Response")
+        dialog.geometry("400x300")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Response text
+        text_frame = ttk.Frame(dialog)
+        text_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(text_frame, text="Response Text:").pack(anchor=tk.W)
+        response_text = self.create_custom_text(text_frame, height=4)
+        response_text.insert('1.0', response_data['text'])
+        response_text.pack(fill=tk.X)
+
+        # Next dialogue selection
+        next_frame = ttk.Frame(dialog)
+        next_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(next_frame, text="Next Dialogue:").pack(side=tk.LEFT)
+        next_var = tk.StringVar(value=response_data.get('next_dialogue', ''))
+        next_combo = ttk.Combobox(next_frame, textvariable=next_var)
+        next_combo['values'] = self.get_dialogue_list()
+        next_combo.pack(side=tk.LEFT, padx=5)
+
+        # Conditions
+        cond_frame = ttk.LabelFrame(dialog, text="Conditions")
+        cond_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        conditions_list = self.create_custom_listbox(cond_frame)
+        conditions_list.pack(fill=tk.BOTH, expand=True)
+
+        for cond_type, value in response_data.get('conditions', {}).items():
+            conditions_list.insert(tk.END, f"{cond_type}: {value}")
+
+        button_frame = ttk.Frame(cond_frame)
+        button_frame.pack(fill=tk.X)
+        ttk.Button(button_frame, text="Add Condition",
+                command=lambda: self.add_dialogue_condition(conditions_list)).pack(side=tk.LEFT, padx=2)
+        ttk.Button(button_frame, text="Remove Condition",
+                command=lambda: self.remove_dialogue_condition(conditions_list)).pack(side=tk.LEFT, padx=2)
+
+        def update():
+            if not (text := response_text.get('1.0', tk.END).strip()):
+                messagebox.showerror("Error", "Response text required")
+                return
+
+            response_data.update({
+                'text': text,
+                'conditions': self.get_conditions_from_list(conditions_list)
+            })
+
+            if next_dialogue := next_var.get():
+                response_data['next_dialogue'] = next_dialogue
+            elif 'next_dialogue' in response_data:
+                del response_data['next_dialogue']
+
+            self.response_list.delete(response_sel)
+            self.response_list.insert(response_sel, text)
+            self.modified.add('dialogues')
+            dialog.destroy()
+
+        ttk.Button(dialog, text="Update", command=update).pack(pady=10)
+
+    def remove_dialogue_response(self):
+        """Remove selected dialogue response"""
+        if not self.dialogue_tree.selection():
+            return
+        if not (response_sel := self.response_list.curselection()):
+            messagebox.showwarning("Warning", "Please select a response to remove")
+            return
+
+        if not messagebox.askyesno("Confirm", "Remove this response?"):
+            return
+
+        selected = self.dialogue_tree.selection()[0]
+        dialogue_data = self.dialogue_tree.item(selected)
+        responses = dialogue_data.get('responses', [])
+        del responses[response_sel[0]]
+        
+        # Update dialogue data
+        self.dialogue_tree.item(selected, responses=responses)
+        self.response_list.delete(response_sel)
+        self.modified.add('dialogues')
+
+    def get_dialogue_list(self):
+        """Get list of all dialogue IDs"""
+        dialogues = []
+        def collect_dialogues(item):
+            for child in self.dialogue_tree.get_children(item):
+                dialogues.append(child)
+                collect_dialogues(child)
+        collect_dialogues('')
+        return dialogues
+
+    def get_conditions_from_list(self, listbox):
+        """Convert listbox conditions to dictionary"""
+        conditions = {}
+        for i in range(listbox.size()):
+            cond = listbox.get(i)
+            type, value = cond.split(': ')
+            conditions[type] = value
+        return conditions     
+
+    def on_dialogue_select(self, event=None):
+        """Handle dialogue tree selection"""
+        if not (selection := self.dialogue_tree.selection()):
+            return
+
+        # Get selected dialogue
+        dialogue_item = self.dialogue_tree.item(selection[0])
+        
+        # Update content editor
+        self.dialogue_content.delete('1.0', tk.END)
+        if content := dialogue_item.get('content'):
+            self.dialogue_content.insert('1.0', content)
+
+        # Update response list
+        self.response_list.delete(0, tk.END)
+        for response in dialogue_item.get('responses', []):
+            self.response_list.insert(tk.END, response['text'])
+
+        # Clear current conditions
+        self.dialogue_conditions.delete(0, tk.END)
+        
+        # Add conditions if any exist
+        for cond_type, value in dialogue_item.get('conditions', {}).items():
+            self.dialogue_conditions.insert(tk.END, f"{cond_type}: {value}")
+
+    def refresh_dialogue_tree(self):
+        """Refresh the dialogue tree view"""
+        self.dialogue_tree.delete(*self.dialogue_tree.get_children())
+        
+        for dialogue_id, dialogue in self.dialogue_data.items():
+            # Add main dialogue entry
+            self.dialogue_tree.insert('', 'end', dialogue_id, text=dialogue.get('name', dialogue_id))
+            
+            # Add any child dialogues
+            if children := dialogue.get('children', []):
+                for child in children:
+                    self.dialogue_tree.insert(dialogue_id, 'end', child['id'], text=child.get('name', child['id'])) 
+
+    def add_story_text(self):
+        """Add a new story text entry"""
+        if not (text_key := simpledialog.askstring("Add Story Text", "Enter text key:")):
+            return
+            
+        if text_key in self.story_texts_data:
+            messagebox.showerror("Error", "Text key already exists")
+            return
+
+        self.story_texts_data[text_key] = {
+            "text": "",
+            "show_once": False
+        }
+        self.story_texts_listbox.insert(tk.END, text_key)
+        self.modified.add('story_texts')
+        
+        # Select the new item
+        index = self.story_texts_listbox.size() - 1
+        self.story_texts_listbox.selection_clear(0, tk.END)
+        self.story_texts_listbox.selection_set(index)
+        self.story_texts_listbox.see(index)
+        self.on_story_text_select()
+
+    def save_story_text(self):
+        """Save the currently selected story text"""
+        if not (selection := self.story_texts_listbox.curselection()):
+            return
+
+        text_key = self.story_texts_listbox.get(selection)
+        if not text_key:
+            return
+
+        if text_key not in self.story_texts_data:
+            self.story_texts_data[text_key] = {}
+
+        old_data = self.story_texts_data[text_key].copy()
+        
+        self.story_texts_data[text_key].update({
+            "text": self.story_text_editor.get('1.0', tk.END).strip(),
+            "show_once": self.show_once_var.get()
+        })
+
+        self.add_undo_action('modify', 'story_texts',
+                            {'id': text_key, 'data': old_data},
+                            {'id': text_key, 'data': self.story_texts_data[text_key].copy()},
+                            f"Modified story text {text_key}")
+
+        self.modified.add('story_texts')
+        self.update_status(f"Saved story text {text_key}")
+
+    def delete_story_text(self):
+        """Delete the currently selected story text"""
+        if not (selection := self.story_texts_listbox.curselection()):
+            return
+
+        text_key = self.story_texts_listbox.get(selection)
+        if not messagebox.askyesno("Confirm Delete", f"Delete story text '{text_key}'?"):
+            return
+
+        old_data = self.story_texts_data[text_key].copy()
+        del self.story_texts_data[text_key]
+        self.story_texts_listbox.delete(selection)
+
+        self.add_undo_action('delete', 'story_texts',
+                            {'id': text_key, 'data': old_data},
+                            None,
+                            f"Deleted story text {text_key}")
+
+        self.modified.add('story_texts')
+        self.update_status(f"Deleted story text {text_key}")
+
+    def on_story_text_select(self, event=None):
+        """Handle story text selection"""
+        if not (selection := self.story_texts_listbox.curselection()):
+            return
+
+        text_key = self.story_texts_listbox.get(selection)
+        if not (text_data := self.story_texts_data.get(text_key)):
+            return
+
+        # Update editor
+        self.text_key_var.set(text_key)
+        self.show_once_var.set(text_data.get('show_once', False))
+        
+        self.story_text_editor.delete('1.0', tk.END)
+        if text := text_data.get('text'):
+            self.story_text_editor.insert('1.0', text)     
+
+    def add_ingredient(self):
+        """Add an ingredient to the current recipe"""
+        if not self.items_data:
+            messagebox.showwarning("Warning", "No items available")
+            return
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Add Ingredient")
+        dialog.geometry("300x200")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        ttk.Label(dialog, text="Select Item:").pack(pady=5)
+        
+        item_list = self.create_custom_listbox(dialog)
+        item_list.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        for item_id, item in self.items_data.items():
+            item_list.insert(tk.END, f"{item['name']} ({item_id})")
+
+        amount_frame = ttk.Frame(dialog)
+        amount_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(amount_frame, text="Amount:").pack(side=tk.LEFT)
+        amount_var = tk.StringVar(value="1")
+        ttk.Entry(amount_frame, textvariable=amount_var, width=10).pack(side=tk.LEFT, padx=5)
+
+        def add_selected():
+            if not (selection := item_list.curselection()):
+                messagebox.showerror("Error", "Please select an item")
+                return
+                
+            try:
+                amount = int(amount_var.get())
+                if amount < 1:
+                    raise ValueError()
+            except ValueError:
+                messagebox.showerror("Error", "Amount must be a positive number")
+                return
+
+            item_id = list(self.items_data.keys())[selection[0]]
+            item = self.items_data[item_id]
+            
+            self.ingredients_list.insert(tk.END, f"{item['name']} x{amount} ({item_id})")
+            dialog.destroy()
+
+        ttk.Button(dialog, text="Add", command=add_selected).pack(pady=10)
+
+    def edit_ingredient(self):
+        """Edit the selected ingredient"""
+        if not (selection := self.ingredients_list.curselection()):
+            messagebox.showwarning("Warning", "Please select an ingredient to edit")
+            return
+
+        ingredient_text = self.ingredients_list.get(selection)
+        current_amount = int(re.search(r'x(\d+)', ingredient_text).group(1))
+        item_id = re.search(r'\((.*?)\)', ingredient_text).group(1)
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Edit Ingredient")
+        dialog.geometry("250x100")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        amount_frame = ttk.Frame(dialog)
+        amount_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(amount_frame, text=f"Amount of {self.items_data[item_id]['name']}:").pack(side=tk.LEFT)
+        amount_var = tk.StringVar(value=str(current_amount))
+        ttk.Entry(amount_frame, textvariable=amount_var, width=10).pack(side=tk.LEFT, padx=5)
+
+        def update_amount():
+            try:
+                amount = int(amount_var.get())
+                if amount < 1:
+                    raise ValueError()
+            except ValueError:
+                messagebox.showerror("Error", "Amount must be a positive number")
+                return
+
+            new_text = f"{self.items_data[item_id]['name']} x{amount} ({item_id})"
+            self.ingredients_list.delete(selection)
+            self.ingredients_list.insert(selection, new_text)
+            dialog.destroy()
+
+        ttk.Button(dialog, text="Update", command=update_amount).pack(pady=10)
+
+    def remove_ingredient(self):
+        """Remove the selected ingredient"""
+        if not (selection := self.ingredients_list.curselection()):
+            messagebox.showwarning("Warning", "Please select an ingredient to remove")
+            return
+
+        if messagebox.askyesno("Confirm", "Remove this ingredient?"):
+            self.ingredients_list.delete(selection)
+
+    def new_recipe(self):
+        """Create a new crafting recipe"""
+        self.result_item_var.set('')
+        self.ingredients_list.delete(0, tk.END)
+        self.recipes_listbox.selection_clear(0, tk.END)
+
+    def save_recipe(self):
+        """Save the current recipe"""
+        if not (result_item := self.result_item_var.get()):
+            messagebox.showerror("Error", "Please select a result item")
+            return
+
+        if self.ingredients_list.size() == 0:
+            messagebox.showerror("Error", "Please add at least one ingredient")
+            return
+
+        ingredients = []
+        for i in range(self.ingredients_list.size()):
+            ingredient_text = self.ingredients_list.get(i)
+            amount = int(re.search(r'x(\d+)', ingredient_text).group(1))
+            item_id = re.search(r'\((.*?)\)', ingredient_text).group(1)
+            ingredients.append({
+                'item_id': item_id,
+                'amount': amount
+            })
+
+        recipe_data = {
+            'result': result_item,
+            'ingredients': ingredients
+        }
+
+        if selection := self.recipes_listbox.curselection():
+            # Update existing recipe
+            recipe_index = selection[0]
+            old_recipe = self.recipes_data[recipe_index].copy()
+            self.recipes_data[recipe_index] = recipe_data
+            
+            self.add_undo_action('modify', 'recipes',
+                                {'index': recipe_index, 'data': old_recipe},
+                                {'index': recipe_index, 'data': recipe_data},
+                                "Modified recipe")
+        else:
+            # Add new recipe
+            self.recipes_data.append(recipe_data)
+            self.recipes_listbox.insert(tk.END, f"{self.items_data[result_item]['name']}")
+            
+            self.add_undo_action('create', 'recipes',
+                                None,
+                                {'index': len(self.recipes_data)-1, 'data': recipe_data},
+                                "Added new recipe")
+
+        self.modified.add('recipes')
+        self.update_status("Saved recipe")
+
+    def delete_recipe(self):
+        """Delete the selected recipe"""
+        if not (selection := self.recipes_listbox.curselection()):
+            messagebox.showwarning("Warning", "Please select a recipe to delete")
+            return
+
+        if not messagebox.askyesno("Confirm", "Delete this recipe?"):
+            return
+
+        recipe_index = selection[0]
+        old_recipe = self.recipes_data[recipe_index]
+        del self.recipes_data[recipe_index]
+        self.recipes_listbox.delete(selection)
+
+        self.add_undo_action('delete', 'recipes',
+                            {'index': recipe_index, 'data': old_recipe},
+                            None,
+                            "Deleted recipe")
+
+        self.modified.add('recipes')
+        self.update_status("Deleted recipe")
+
+    def on_recipe_select(self, event=None):
+        """Handle recipe selection"""
+        if not (selection := self.recipes_listbox.curselection()):
+            return
+
+        recipe = self.recipes_data[selection[0]]
+        
+        # Update result item
+        self.result_item_var.set(recipe['result'])
+        
+        # Update ingredients list
+        self.ingredients_list.delete(0, tk.END)
+        for ingredient in recipe['ingredients']:
+            item = self.items_data[ingredient['item_id']]
+            self.ingredients_list.insert(tk.END, 
+                f"{item['name']} x{ingredient['amount']} ({ingredient['item_id']})")   
+
+    def refresh_all_lists(self):
+        """Refresh all listboxes"""
+        self.refresh_scenes_list()
+        self.refresh_items_list()
+        self.refresh_characters_list()
+        self.refresh_story_texts_list()
+
+    def refresh_scenes_list(self):
+        """Refresh scenes listbox"""
+        self.scenes_listbox.delete(0, tk.END)
+        for scene in self.scenes_data:
+            self.scenes_listbox.insert(tk.END, scene['name'])
+
+    def refresh_items_list(self):
+        """Refresh items listbox"""
+        self.items_listbox.delete(0, tk.END)
+        for item_id, item in self.items_data.items():
+            self.items_listbox.insert(tk.END, item.get('name', item_id))
+
+    def refresh_characters_list(self):
+        """Refresh characters listbox"""
+        self.chars_listbox.delete(0, tk.END)
+        for char_id, char in self.characters_data.items():
+            self.chars_listbox.insert(tk.END, char.get('name', char_id))
+
+    def refresh_story_texts_list(self):
+        """Refresh story texts listbox"""
+        self.story_texts_listbox.delete(0, tk.END)
+        for text_key in self.story_texts_data:
+            self.story_texts_listbox.insert(tk.END, text_key)
+
+    def filter_scenes(self):
+        """Filter scenes listbox based on search text"""
+        search_text = self.search_vars['scene'].get().lower()
+        self.scenes_listbox.delete(0, tk.END)
+        for scene in self.scenes_data:
+            if (search_text in scene['name'].lower() or 
+                search_text in scene['id'].lower()):
+                self.scenes_listbox.insert(tk.END, scene['name'])
+
+    def filter_items(self):
+        """Filter items listbox based on search text"""
+        search_text = self.search_vars['item'].get().lower()
+        self.items_listbox.delete(0, tk.END)
+        for item_id, item in self.items_data.items():
+            if (search_text in item_id.lower() or
+                search_text in item.get('name', '').lower() or
+                search_text in item.get('type', '').lower()):
+                self.items_listbox.insert(tk.END, item.get('name', item_id))
+
+    def filter_characters(self):
+        """Filter characters listbox based on search text"""
+        search_text = self.search_vars['character'].get().lower()
+        self.chars_listbox.delete(0, tk.END)
+        for char_id, char in self.characters_data.items():
+            if (search_text in char_id.lower() or
+                search_text in char.get('name', '').lower() or
+                search_text in char.get('type', '').lower()):
+                self.chars_listbox.insert(tk.END, char.get('name', char_id))
+
+    def reload_data(self):
+        """Reload all data from disk"""
+        if self.modified:
+            if not messagebox.askyesno("Confirm Reload", 
+                "You have unsaved changes. Are you sure you want to reload?"):
+                return
+
+        self.load_data()
+        self.modified.clear()
+        self.update_status("Data reloaded from disk")                                                 
 
     def run(self):
         self.root.mainloop()

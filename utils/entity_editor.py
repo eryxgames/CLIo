@@ -84,6 +84,9 @@ class GameDataEditor:
         self.undo_stack = []
         self.redo_stack = []
         self.modified = set()
+                # Transaction state
+        self.in_transaction = False
+        self.transaction_backup = None
         self.scenes_data = []
         self.items_data = {}
         self.characters_data = {}
@@ -243,19 +246,37 @@ class GameDataEditor:
             ttk.Button(toolbar, text=text, command=command).pack(side=tk.LEFT, padx=2)
 
     def create_status_bar(self):
+        """Create status bar with game path display"""
+        status_frame = ttk.Frame(self.root)
+        status_frame.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # Path display
+        self.path_var = tk.StringVar()
+        path_label = ttk.Label(status_frame, textvariable=self.path_var, 
+                            relief=tk.SUNKEN, anchor=tk.W)
+        path_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        # Status messages
         self.status_var = tk.StringVar()
-        status_bar = ttk.Label(self.root, textvariable=self.status_var,
-                             relief=tk.SUNKEN, anchor=tk.W)
-        status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+        status_label = ttk.Label(status_frame, textvariable=self.status_var, 
+                                relief=tk.SUNKEN, anchor=tk.W)
+        status_label.pack(side=tk.RIGHT, fill=tk.X, expand=True)
+
         self.update_status()
 
     def update_status(self, message=None):
+        """Update status bar display"""
+        # Update path display
+        self.path_var.set(f"Game Path: {self.game_path}")
+
+        # Update status message
         if message:
             self.status_var.set(message)
         else:
             modified = len(self.modified)
-            self.status_var.set(f"Modified files: {', '.join(self.modified)}" if modified else "No modifications")
-
+            self.status_var.set(f"Modified files: {', '.join(self.modified)}" if modified 
+                            else "No modifications")
+        
     # Include all previously defined methods for:
     # - Tab creation (create_scenes_tab, create_items_tab, etc.)
     # - Event handling (setup_event_bindings)
@@ -702,6 +723,10 @@ class GameDataEditor:
     def load_data(self):
         """Load all game data files"""
         try:
+            paths_checked = self.verify_game_paths()
+            if not paths_checked:
+                return
+
             self.load_scenes()
             self.load_items()
             self.load_characters()
@@ -710,6 +735,27 @@ class GameDataEditor:
             self.refresh_all_lists()
         except Exception as e:
             self.show_error_dialog(f"Error loading data: {str(e)}")
+
+    def verify_game_paths(self):
+        """Verify game paths exist or prompt for creation"""
+        required_paths = {
+            'root': self.game_path,
+            'scenes': os.path.join(self.game_path, 'scenes')
+        }
+
+        missing = [path for path, full_path in required_paths.items() 
+                if not os.path.exists(full_path)]
+
+        if missing:
+            if messagebox.askyesno("Create Directories", 
+                f"The following directories are missing:\n" + 
+                "\n".join(missing) + "\n\nCreate them?"):
+                for path in required_paths.values():
+                    os.makedirs(path, exist_ok=True)
+                return True
+            else:
+                return False
+        return True            
 
     def load_dialogue_data(self):
         """Load dialogue data from file"""
@@ -728,57 +774,93 @@ class GameDataEditor:
             self.refresh_dialogue_tree()            
 
     def load_scenes(self):
+        """Load scenes data"""
+        file_path = os.path.join(self.game_path, 'scenes', 'scenes.json')
         try:
-            with open('game_files/scenes/scenes.json', 'r') as f:
+            with open(file_path, 'r', encoding='utf-8') as f:
                 self.scenes_data = json.load(f)
         except FileNotFoundError:
             self.scenes_data = []
             self.create_default_scenes()
+        except json.JSONDecodeError:
+            self.handle_corrupted_file('scenes', file_path)
 
     def load_items(self):
+        """Load items data"""
+        file_path = os.path.join(self.game_path, 'items.json')
         try:
-            with open('game_files/items.json', 'r') as f:
+            with open(file_path, 'r', encoding='utf-8') as f:
                 self.items_data = json.load(f)
         except FileNotFoundError:
             self.items_data = {}
             self.create_default_items()
+        except json.JSONDecodeError:
+            self.handle_corrupted_file('items', file_path)
 
     def load_characters(self):
+        """Load characters data"""
+        file_path = os.path.join(self.game_path, 'characters.json')
         try:
-            with open('game_files/characters.json', 'r') as f:
+            with open(file_path, 'r', encoding='utf-8') as f:
                 self.characters_data = json.load(f)
         except FileNotFoundError:
             self.characters_data = {}
             self.create_default_characters()
+        except json.JSONDecodeError:
+            self.handle_corrupted_file('characters', file_path)
 
     def load_story_texts(self):
+        """Load story texts data"""
+        file_path = os.path.join(self.game_path, 'story_texts.json')
         try:
-            with open('game_files/story_texts.json', 'r') as f:
+            with open(file_path, 'r', encoding='utf-8') as f:
                 self.story_texts_data = json.load(f)
         except FileNotFoundError:
             self.story_texts_data = {}
+        except json.JSONDecodeError:
+            self.handle_corrupted_file('story_texts', file_path)
+
+    def handle_corrupted_file(self, data_type, file_path):
+        """Handle corrupted JSON files"""
+        backup_path = f"{file_path}.corrupted"
+        try:
+            if os.path.exists(file_path):
+                shutil.copy2(file_path, backup_path)
+                messagebox.showwarning("Warning", 
+                    f"Corrupted {data_type} file found. Backup saved as:\n{backup_path}")
+            
+            # Create fresh data
+            if data_type == 'scenes':
+                self.scenes_data = []
+                self.create_default_scenes()
+            elif data_type == 'items':
+                self.items_data = {}
+                self.create_default_items()
+            elif data_type == 'characters':
+                self.characters_data = {}
+                self.create_default_characters()
+            elif data_type == 'story_texts':
+                self.story_texts_data = {}
+        except Exception as e:
+            self.show_error_dialog(f"Error handling corrupted {data_type} file: {str(e)}")            
 
     def save_all(self):
-        """Save all modified data files"""
+        """Save all modified data"""
         if not self.modified:
             return
 
         try:
             self.create_backup()
             
-            if 'scenes' in self.modified:
-                self.save_scenes()
-            if 'items' in self.modified:
-                self.save_items()
-            if 'characters' in self.modified:
-                self.save_characters()
-            if 'story_texts' in self.modified:
-                self.save_story_texts()
+            for data_type in self.modified:
+                self.save_data_type(data_type)
 
             self.modified.clear()
             self.update_status("All changes saved successfully")
         except Exception as e:
             self.show_error_dialog(f"Error saving data: {str(e)}")
+
+
 
     def save_scenes(self):
         os.makedirs('game_files/scenes', exist_ok=True)
@@ -797,23 +879,32 @@ class GameDataEditor:
         with open('game_files/story_texts.json', 'w') as f:
             json.dump(self.story_texts_data, f, indent=4)
 
+    def save_data_type(self, data_type):
+        """Save specific data type"""
+        file_path = self.get_file_path(data_type)
+        if not file_path:
+            return
+
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+        try:
+            data = getattr(self, f"{data_type}_data")
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            raise Exception(f"Failed to save {data_type}: {str(e)}")
+
     def create_backup(self):
         """Create backup of current data files"""
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        backup_dir = os.path.join('backups', timestamp)
+        backup_dir = os.path.join(self.game_path, 'backups', timestamp)
         os.makedirs(backup_dir, exist_ok=True)
 
-        files_to_backup = {
-            'scenes': 'game_files/scenes/scenes.json',
-            'items': 'game_files/items.json',
-            'characters': 'game_files/characters.json',
-            'story_texts': 'game_files/story_texts.json'
-        }
-
-        for data_type, filepath in files_to_backup.items():
-            if data_type in self.modified and os.path.exists(filepath):
-                backup_path = os.path.join(backup_dir, os.path.basename(filepath))
-                shutil.copy2(filepath, backup_path)
+        for data_type in self.modified:
+            file_path = self.get_file_path(data_type)
+            if file_path and os.path.exists(file_path):
+                backup_path = os.path.join(backup_dir, os.path.basename(file_path))
+                shutil.copy2(file_path, backup_path)
 
     def reload_data(self):
         """Reload all data from disk"""
@@ -904,6 +995,12 @@ class GameDataEditor:
             "Search scenes..."
         )
 
+        # Add buttons frame at the top
+        buttons_frame = ttk.Frame(self.scenes_frame)
+        buttons_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Button(buttons_frame, text="Add Scene", command=self.add_scene).pack(side=tk.LEFT, padx=2)
+
+
         # Properties Frame
         props_frame = ttk.LabelFrame(editor_frame, text="Scene Properties")
         props_frame.pack(fill=tk.X, padx=5, pady=5)
@@ -976,6 +1073,12 @@ class GameDataEditor:
             "Search items..."
         )
 
+        # Add buttons frame at the top
+        buttons_frame = ttk.Frame(self.items_frame)
+        buttons_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Button(buttons_frame, text="Add Item", command=self.add_new_item).pack(side=tk.LEFT, padx=2)
+        
+
         # Properties Frame
         props_frame = ttk.LabelFrame(editor_frame, text="Item Properties")
         props_frame.pack(fill=tk.X, padx=5, pady=5)
@@ -1045,6 +1148,12 @@ class GameDataEditor:
             self.search_vars['character'],
             "Search characters..."
         )
+
+        # Add buttons frame at the top
+        buttons_frame = ttk.Frame(self.characters_frame)
+        buttons_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Button(buttons_frame, text="Add Character", command=self.add_new_character).pack(side=tk.LEFT, padx=2)
+
 
         notebook = ttk.Notebook(editor_frame)
         notebook.pack(fill=tk.BOTH, expand=True)
@@ -1420,6 +1529,202 @@ class GameDataEditor:
             del scene['items'][item_index]
             self.scene_items_list.delete(item_sel)
             self.modified.add('scenes')
+
+    # Adding scene to the list
+    def add_scene(self):
+        """Add a new scene"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Add New Scene")
+        dialog.geometry("400x200")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Scene ID
+        id_frame = ttk.Frame(dialog)
+        id_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(id_frame, text="Scene ID:").pack(side=tk.LEFT)
+        id_var = tk.StringVar()
+        ttk.Entry(id_frame, textvariable=id_var).pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+
+        # Scene Name
+        name_frame = ttk.Frame(dialog)
+        name_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(name_frame, text="Scene Name:").pack(side=tk.LEFT)
+        name_var = tk.StringVar()
+        ttk.Entry(name_frame, textvariable=name_var).pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+
+        def create_scene():
+            scene_id = id_var.get().strip()
+            scene_name = name_var.get().strip()
+
+            if not scene_id or not scene_name:
+                messagebox.showerror("Error", "Both ID and name are required")
+                return
+
+            if any(s['id'] == scene_id for s in self.scenes_data):
+                messagebox.showerror("Error", "Scene ID already exists")
+                return
+
+            new_scene = {
+                'id': scene_id,
+                'name': scene_name,
+                'description': '',
+                'exits': [],
+                'items': [],
+                'characters': []
+            }
+
+            self.scenes_data.append(new_scene)
+            self.scenes_listbox.insert(tk.END, scene_name)
+            self.modified.add('scenes')
+            dialog.destroy()
+
+            # Select the new scene
+            self.scenes_listbox.selection_clear(0, tk.END)
+            self.scenes_listbox.selection_set(tk.END)
+            self.scenes_listbox.see(tk.END)
+            self.on_scene_select()
+
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(fill=tk.X, pady=10)
+        ttk.Button(button_frame, text="Create", command=create_scene).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT, padx=5)
+
+    def add_new_item(self):
+        """Add a new item"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Add New Item")
+        dialog.geometry("400x250")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Item ID
+        id_frame = ttk.Frame(dialog)
+        id_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(id_frame, text="Item ID:").pack(side=tk.LEFT)
+        id_var = tk.StringVar()
+        ttk.Entry(id_frame, textvariable=id_var).pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+
+        # Item Name
+        name_frame = ttk.Frame(dialog)
+        name_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(name_frame, text="Item Name:").pack(side=tk.LEFT)
+        name_var = tk.StringVar()
+        ttk.Entry(name_frame, textvariable=name_var).pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+
+        # Item Type
+        type_frame = ttk.Frame(dialog)
+        type_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(type_frame, text="Type:").pack(side=tk.LEFT)
+        type_var = tk.StringVar(value="Regular")
+        ttk.Combobox(type_frame, textvariable=type_var,
+                    values=["Regular", "Quest", "Key", "Tool", "Weapon", "Consumable"]).pack(
+            side=tk.LEFT, padx=5)
+
+        def create_item():
+            item_id = id_var.get().strip()
+            item_name = name_var.get().strip()
+
+            if not item_id or not item_name:
+                messagebox.showerror("Error", "Both ID and name are required")
+                return
+
+            if item_id in self.items_data:
+                messagebox.showerror("Error", "Item ID already exists")
+                return
+
+            new_item = {
+                'name': item_name,
+                'type': type_var.get(),
+                'description': '',
+                'usable': False,
+                'equippable': False,
+                'consumable': False,
+            }
+
+            self.items_data[item_id] = new_item
+            self.items_listbox.insert(tk.END, item_name)
+            self.modified.add('items')
+            dialog.destroy()
+
+            # Select the new item
+            self.items_listbox.selection_clear(0, tk.END)
+            self.items_listbox.selection_set(tk.END)
+            self.items_listbox.see(tk.END)
+            self.on_item_select()
+
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(fill=tk.X, pady=10)
+        ttk.Button(button_frame, text="Create", command=create_item).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT, padx=5)
+
+    def add_new_character(self):
+        """Add a new character"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Add New Character")
+        dialog.geometry("400x250")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Character ID
+        id_frame = ttk.Frame(dialog)
+        id_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(id_frame, text="Character ID:").pack(side=tk.LEFT)
+        id_var = tk.StringVar()
+        ttk.Entry(id_frame, textvariable=id_var).pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+
+        # Character Name
+        name_frame = ttk.Frame(dialog)
+        name_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(name_frame, text="Character Name:").pack(side=tk.LEFT)
+        name_var = tk.StringVar()
+        ttk.Entry(name_frame, textvariable=name_var).pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+
+        # Character Type
+        type_frame = ttk.Frame(dialog)
+        type_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(type_frame, text="Type:").pack(side=tk.LEFT)
+        type_var = tk.StringVar(value="neutral")
+        ttk.Combobox(type_frame, textvariable=type_var,
+                    values=["friendly", "hostile", "neutral", "merchant"]).pack(
+            side=tk.LEFT, padx=5)
+
+        def create_character():
+            char_id = id_var.get().strip()
+            char_name = name_var.get().strip()
+
+            if not char_id or not char_name:
+                messagebox.showerror("Error", "Both ID and name are required")
+                return
+
+            if char_id in self.characters_data:
+                messagebox.showerror("Error", "Character ID already exists")
+                return
+
+            new_char = {
+                'name': char_name,
+                'type': type_var.get(),
+                'description': '',
+                'greeting': '',
+                'dialogue_options': {},
+                'stats': {}
+            }
+
+            self.characters_data[char_id] = new_char
+            self.chars_listbox.insert(tk.END, char_name)
+            self.modified.add('characters')
+            dialog.destroy()
+
+            # Select the new character
+            self.chars_listbox.selection_clear(0, tk.END)
+            self.chars_listbox.selection_set(tk.END)
+            self.chars_listbox.see(tk.END)
+            self.on_character_select()
+
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(fill=tk.X, pady=10)
+        ttk.Button(button_frame, text="Create", command=create_character).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT, padx=5)        
 
     def add_character_to_scene(self):
         selection = self.scenes_listbox.curselection()
@@ -2666,7 +2971,170 @@ class GameDataEditor:
 
         self.load_data()
         self.modified.clear()
-        self.update_status("Data reloaded from disk")                                                 
+        self.update_status("Data reloaded from disk")   
+
+    def update_scene_contents(self, scene):
+        """Update the scene contents lists (items and characters)"""
+        # Update items list
+        self.scene_items_list.delete(0, tk.END)
+        for item_id in scene.get('items', []):
+            if item := self.items_data.get(item_id):
+                self.scene_items_list.insert(tk.END, f"{item.get('name', item_id)}")
+            else:
+                self.scene_items_list.insert(tk.END, f"Unknown item: {item_id}")
+
+        # Update characters list
+        self.scene_chars_list.delete(0, tk.END)
+        for char_id in scene.get('characters', []):
+            if char := self.characters_data.get(char_id):
+                self.scene_chars_list.insert(tk.END, f"{char.get('name', char_id)}")
+            else:
+                self.scene_chars_list.insert(tk.END, f"Unknown character: {char_id}")
+
+        # Update exits list
+        self.scene_exits_list.delete(0, tk.END)
+        for exit in scene.get('exits', []):
+            if target_scene := next((s for s in self.scenes_data if s['id'] == exit['scene_id']), None):
+                self.scene_exits_list.insert(tk.END, f"{exit['door_name']} → {target_scene['name']}")
+            else:
+                self.scene_exits_list.insert(tk.END, f"{exit['door_name']} → Unknown ({exit['scene_id']})")
+
+    def update_scene_contents(self, scene):
+        """Update the scene contents lists (items and characters)"""
+        # Update items list
+        self.scene_items_list.delete(0, tk.END)
+        for item_id in scene.get('items', []):
+            if item := self.items_data.get(item_id):
+                self.scene_items_list.insert(tk.END, f"{item.get('name', item_id)}")
+            else:
+                self.scene_items_list.insert(tk.END, f"Unknown item: {item_id}")
+
+        # Update characters list
+        self.scene_chars_list.delete(0, tk.END)
+        for char_id in scene.get('characters', []):
+            if char := self.characters_data.get(char_id):
+                self.scene_chars_list.insert(tk.END, f"{char.get('name', char_id)}")
+            else:
+                self.scene_chars_list.insert(tk.END, f"Unknown character: {char_id}")
+
+        # Update exits list
+        self.scene_exits_list.delete(0, tk.END)
+        for exit in scene.get('exits', []):
+            if target_scene := next((s for s in self.scenes_data if s['id'] == exit['scene_id']), None):
+                self.scene_exits_list.insert(tk.END, f"{exit['door_name']} → {target_scene['name']}")
+            else:
+                self.scene_exits_list.insert(tk.END, f"{exit['door_name']} → Unknown ({exit['scene_id']})")     
+
+    def update_item_editor(self, item_id, item):
+        """Update item editor fields with item data"""
+        # Update basic properties
+        self.item_id_var.set(item_id)
+        self.item_name_var.set(item.get('name', ''))
+        self.item_type_var.set(item.get('type', 'Regular'))
+
+        # Update flags
+        self.item_usable_var.set(item.get('usable', False))
+        self.item_equippable_var.set(item.get('equippable', False))
+        self.item_consumable_var.set(item.get('consumable', False))
+
+        # Update description
+        self.item_desc_text.delete('1.0', tk.END)
+        self.item_desc_text.insert('1.0', item.get('description', ''))
+
+        # Update effects list
+        self.effects_list.delete(0, tk.END)
+        for effect_type, effect in item.get('effects', {}).items():
+            self.effects_list.insert(tk.END, 
+                f"{effect_type}: {effect['value']} ({effect['duration']})")
+
+    def update_character_editor(self, char_id, character):
+        """Update character editor fields with character data"""
+        # Basic Info tab
+        self.char_id_var.set(char_id)
+        self.char_name_var.set(character.get('name', ''))
+        self.char_type_var.set(character.get('type', 'neutral'))
+
+        self.char_desc_text.delete('1.0', tk.END)
+        self.char_desc_text.insert('1.0', character.get('description', ''))
+
+        # Movement options
+        self.char_movable_var.set(character.get('movable', False))
+        self.char_follows_var.set(character.get('follows_player', False))
+
+        # Dialogue tab
+        self.char_greeting_text.delete('1.0', tk.END)
+        self.char_greeting_text.insert('1.0', character.get('greeting', ''))
+
+        self.dialogue_options_list.delete(0, tk.END)
+        for option_text in character.get('dialogue_options', {}).keys():
+            self.dialogue_options_list.insert(tk.END, option_text)
+
+        # Stats tab
+        self.stats_tree.delete(*self.stats_tree.get_children())
+        for stat_name, value in character.get('stats', {}).items():
+            self.stats_tree.insert('', 'end', text=stat_name, values=(value,)) 
+
+        # Game path for loading CLIo games
+
+    def initialize_game_path(self):
+        """Initialize game data path"""
+        self.game_path = os.getenv('GAME_PATH', 'game_files')
+        
+        if not os.path.exists(self.game_path):
+            self.select_game_path()
+
+    def select_game_path(self):
+        """Let user select game data directory"""
+        path = filedialog.askdirectory(
+            title="Select Game Data Directory",
+            mustexist=False
+        )
+        if path:
+            self.game_path = path
+            os.makedirs(self.game_path, exist_ok=True)
+            os.makedirs(os.path.join(self.game_path, 'scenes'), exist_ok=True)
+            self.save_config()
+
+    def save_config(self):
+        """Save configuration"""
+        config = {
+            'game_path': self.game_path
+        }
+        with open('editor_config.json', 'w') as f:
+            json.dump(config, f)
+
+    def load_config(self):
+        """Load configuration"""
+        try:
+            with open('editor_config.json', 'r') as f:
+                config = json.load(f)
+                self.game_path = config.get('game_path', 'game_files')
+        except FileNotFoundError:
+            self.game_path = 'game_files'
+
+    def create_toolbar(self):
+        """Create toolbar with added game path selection"""
+        toolbar = ttk.Frame(self.root)
+        toolbar.pack(fill=tk.X, padx=5, pady=2)
+
+        ttk.Button(toolbar, text="Select Game Path", 
+                command=self.select_game_path).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="Save All", 
+                command=self.save_all).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="Reload", 
+                command=self.reload_data).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="Validate", 
+                command=self.validate_all_data).pack(side=tk.LEFT, padx=2)
+
+    def get_file_path(self, file_type):
+        """Get full path for a game data file"""
+        paths = {
+            'scenes': os.path.join(self.game_path, 'scenes', 'scenes.json'),
+            'items': os.path.join(self.game_path, 'items.json'),
+            'characters': os.path.join(self.game_path, 'characters.json'),
+            'story_texts': os.path.join(self.game_path, 'story_texts.json')
+        }
+        return paths.get(file_type)                                                                            
 
     def run(self):
         self.root.mainloop()

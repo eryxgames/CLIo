@@ -110,6 +110,29 @@ class ThemeManager:
                 'notebook_bg': '#f0f0f0',
                 'tab_bg': '#e1e1e1',
                 'tab_selected_bg': '#ffffff'
+            },
+            'Mocca': {
+                'bg': '#f0f0f0',
+                'fg': '#000000',
+                'select_bg': '#0078d7',
+                'select_fg': '#ffffff',
+                'input_bg': '#2d2d2d',  # Dark input background
+                'button_bg': '#e1e1e1',
+                'button_active': '#cce4f7',
+                'labelframe_bg': '#f0f0f0',
+                'entry_bg': '#2d2d2d',  # Dark entry background
+                'entry_fg': '#ffffff',   # Light text for dark backgrounds
+                'treeview_bg': '#ffffff',
+                'treeview_fg': '#000000',
+                'treeview_selected_bg': '#0078d7',
+                'menu_bg': '#f0f0f0',
+                'menu_fg': '#000000',
+                'dialog_bg': '#f0f0f0',
+                'dialog_fg': '#000000',
+                'toplevel_bg': '#f0f0f0',
+                'notebook_bg': '#f0f0f0',
+                'tab_bg': '#e1e1e1',
+                'tab_selected_bg': '#ffffff'
             }
         }
         self.current_theme = 'Dark'
@@ -118,29 +141,59 @@ class ThemeManager:
         """Apply theme to a single widget"""
         theme = self.themes[self.current_theme]
         
-        if isinstance(widget, tk.Toplevel) or isinstance(widget, tk.Tk):
-            widget.configure(bg=theme['bg'])
+        if isinstance(widget, (tk.Toplevel, tk.Tk)):
+            widget.configure(background=theme['bg'])
             self.apply_theme_recursive(widget, theme)
         else:
             self.apply_theme_recursive(widget, theme)
 
-    def apply_theme_to_all(self, root, style):
-        """Apply theme to all widgets and configure ttk styles"""
-        theme = self.themes[self.current_theme]
-        
-        # Configure ttk styles
-        self.configure_ttk_styles(style, theme)
-        
-        # Configure root window
-        root.configure(bg=theme['bg'])
-        
-        # Apply theme to all existing windows and widgets
-        for window in root.winfo_children():
-            if isinstance(window, tk.Toplevel):
-                window.configure(bg=theme['bg'])
-                self.apply_theme_recursive(window, theme)
-            else:
-                self.apply_theme_recursive(window, theme)
+    def apply_theme_recursive(self, widget, theme):
+        """Apply theme to widget and all its children recursively"""
+        if isinstance(widget, tk.Menu):
+            widget.configure(
+                background=theme['menu_bg'],
+                foreground=theme['menu_fg'],
+                activebackground=theme['select_bg'],
+                activeforeground=theme['select_fg']
+            )
+        elif isinstance(widget, tk.Text):
+            widget.configure(
+                background=theme['input_bg'],
+                foreground=theme['fg'],
+                insertbackground=theme['fg'],
+                selectbackground=theme['select_bg'],
+                selectforeground=theme['select_fg']
+            )
+        elif isinstance(widget, tk.Entry):
+            widget.configure(
+                background=theme['input_bg'],
+                foreground=theme['fg'],
+                insertbackground=theme['fg']
+            )
+        elif isinstance(widget, tk.Listbox):
+            widget.configure(
+                background=theme['input_bg'],
+                foreground=theme['fg'],
+                selectbackground=theme['select_bg'],
+                selectforeground=theme['select_fg']
+            )
+        elif isinstance(widget, ttk.Notebook):
+            widget.configure(style='TNotebook')
+        elif isinstance(widget, ttk.LabelFrame):
+            widget.configure(style='TLabelframe')
+            # Handle LabelFrame label separately
+            for child in widget.winfo_children():
+                if str(child).endswith('Label'):
+                    child.configure(background=theme['labelframe_bg'],
+                                  foreground=theme['fg'])
+        elif isinstance(widget, tk.Frame):
+            widget.configure(background=theme['bg'])
+        elif isinstance(widget, ttk.Frame):
+            widget.configure(style='TFrame')
+
+        # Apply theme to all child widgets
+        for child in widget.winfo_children():
+            self.apply_theme_recursive(child, theme)
 
     def configure_ttk_styles(self, style, theme):
         """Configure all ttk widget styles"""
@@ -182,64 +235,34 @@ class ThemeManager:
                  background=[('selected', theme['treeview_selected_bg'])],
                  foreground=[('selected', theme['select_fg'])])
 
-    def apply_theme_recursive(self, widget, theme):
-        """Apply theme to widget and all its children recursively"""
-        if isinstance(widget, tk.Menu):
-            widget.configure(
-                bg=theme['menu_bg'],
-                fg=theme['menu_fg'],
-                activebackground=theme['select_bg'],
-                activeforeground=theme['select_fg']
-            )
-        elif isinstance(widget, tk.Text):
-            widget.configure(
-                bg=theme['input_bg'],
-                fg=theme['fg'],
-                insertbackground=theme['fg'],
-                selectbackground=theme['select_bg'],
-                selectforeground=theme['select_fg']
-            )
-        elif isinstance(widget, tk.Entry):
-            widget.configure(
-                bg=theme['input_bg'],
-                fg=theme['fg'],
-                insertbackground=theme['fg']
-            )
-        elif isinstance(widget, tk.Listbox):
-            widget.configure(
-                bg=theme['input_bg'],
-                fg=theme['fg'],
-                selectbackground=theme['select_bg'],
-                selectforeground=theme['select_fg']
-            )
-        elif isinstance(widget, ttk.Notebook):
-            widget.configure(style='TNotebook')
-        elif isinstance(widget, ttk.LabelFrame):
-            widget.configure(style='TLabelframe')
-            # Handle LabelFrame label separately
-            for child in widget.winfo_children():
-                if str(child).endswith('Label'):
-                    child.configure(background=theme['labelframe_bg'],
-                                  foreground=theme['fg'])
-        elif isinstance(widget, tk.Frame):
-            widget.configure(bg=theme['bg'])
-        elif isinstance(widget, ttk.Frame):
-            widget.configure(style='TFrame')
-
-        # Apply theme to all child widgets
-        for child in widget.winfo_children():
-            self.apply_theme_recursive(child, theme)
+    def apply_theme_to_all(self, root, style):
+        """Apply theme to all widgets and configure ttk styles"""
+        theme = self.themes[self.current_theme]
+        
+        # Configure ttk styles
+        self.configure_ttk_styles(style, theme)
+        
+        # Configure root window
+        root.configure(background=theme['bg'])
+        
+        # Apply theme to all existing windows and widgets
+        for window in root.winfo_children():
+            if isinstance(window, tk.Toplevel):
+                window.configure(background=theme['bg'])
+                self.apply_theme_recursive(window, theme)
+            else:
+                self.apply_theme_recursive(window, theme)
 
     def apply_theme_to_dialog(self, dialog):
         """Apply theme to a dialog window"""
         theme = self.themes[self.current_theme]
-        dialog.configure(bg=theme['toplevel_bg'])
+        dialog.configure(background=theme['bg'])
         self.apply_theme_recursive(dialog, theme)
 
     def get_theme_colors(self):
         """Get current theme colors"""
         return self.themes[self.current_theme]
-    
+        
 class Settings:
     def __init__(self):
         # Theme settings
@@ -308,7 +331,7 @@ class Settings:
             pass  # Use defaults if file doesn't exist or is invalid
 
 class SettingsDialog:
-    def __init__(self, parent, settings, theme_manager, style):  # Add style parameter
+    def __init__(self, parent, settings, theme_manager, editor):
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Settings")
         self.dialog.geometry("400x500")
@@ -318,37 +341,12 @@ class SettingsDialog:
         self.settings = settings
         self.theme_manager = theme_manager
         self.parent = parent
-        self.style = style  # Store style reference
+        self.editor = editor  # Store reference to editor
         
         # Apply current theme to dialog
-        self.theme_manager.apply_theme(self.dialog)
+        self.theme_manager.apply_theme_to_dialog(self.dialog)
         
         self.create_widgets()
-
-    def apply_settings(self):
-        try:
-            # Validate font sizes
-            menu_size = int(self.menu_size_var.get())
-            text_size = int(self.text_size_var.get())
-            if not (6 <= menu_size <= 72 and 6 <= text_size <= 72):
-                raise ValueError("Font size must be between 6 and 72")
-
-            # Update settings
-            self.settings.theme = self.theme_var.get()
-            self.settings.font_family = self.font_var.get()
-            self.settings.menu_font_size = menu_size
-            self.settings.text_font_size = text_size
-
-            # Apply theme using stored style reference
-            self.theme_manager.current_theme = self.settings.theme
-            self.theme_manager.apply_theme(self.dialog)
-            self.theme_manager.apply_theme_to_all(self.parent, self.style)
-
-            # Apply fonts
-            self.apply_fonts()
-
-        except ValueError as e:
-            messagebox.showerror("Error", str(e))
 
     def create_widgets(self):
         # Theme settings
@@ -356,7 +354,7 @@ class SettingsDialog:
         theme_frame.pack(fill=tk.X, padx=10, pady=5)
 
         self.theme_var = tk.StringVar(value=self.settings.theme)
-        for theme in ['Dark', 'Light']:
+        for theme in ['Dark', 'Light', 'Mocca']:
             ttk.Radiobutton(theme_frame, text=theme, value=theme,
                            variable=self.theme_var).pack(padx=10, pady=2, anchor=tk.W)
 
@@ -431,38 +429,41 @@ class SettingsDialog:
             self.settings.menu_font_size = menu_size
             self.settings.text_font_size = text_size
 
-            # Apply theme
+            # Apply theme using editor's style reference
             self.theme_manager.current_theme = self.settings.theme
-            self.theme_manager.apply_theme(self.parent.style, self.parent)
+            self.theme_manager.apply_theme_to_all(self.parent, self.editor.style)
 
             # Apply fonts
-            self.apply_fonts()
+            menu_font = (self.settings.font_family, self.settings.menu_font_size)
+            text_font = (self.settings.font_family, self.settings.text_font_size)
+            
+            # Update menu fonts
+            self.parent.option_add('*Menu.font', menu_font)
+            self.parent.option_add('*TButton.font', menu_font)
+            self.parent.option_add('*TLabel.font', menu_font)
+            
+            # Update text widget fonts using editor method
+            self.update_all_fonts(text_font)
 
         except ValueError as e:
             messagebox.showerror("Error", str(e))
 
-    def apply_fonts(self):
-        menu_font = (self.settings.font_family, self.settings.menu_font_size)
-        text_font = (self.settings.font_family, self.settings.text_font_size)
-
-        # Update menu fonts
-        self.parent.option_add('*Menu.font', menu_font)
-        self.parent.option_add('*TButton.font', menu_font)
-        self.parent.option_add('*TLabel.font', menu_font)
-        
-        # Update text widget fonts
+    def update_all_fonts(self, font):
+        """Update fonts for all text widgets"""
         for widget in self.parent.winfo_children():
-            self._update_widget_fonts(widget, text_font)
+            self._update_widget_fonts(widget, font)
 
     def _update_widget_fonts(self, widget, font):
+        """Recursively update fonts for text widgets"""
         if isinstance(widget, (tk.Text, tk.Entry)):
             widget.configure(font=font)
         for child in widget.winfo_children():
             self._update_widget_fonts(child, font)
 
     def save_settings(self):
+        """Save settings and close dialog"""
         self.apply_settings()
-        self.dialog.destroy()                       
+        self.dialog.destroy()
 
 class GameDataEditor:
     def __init__(self, root):
@@ -708,8 +709,9 @@ class GameDataEditor:
                 self.apply_menu_theme(item)    
 
     def show_settings(self):
-        """Show settings dialog with style reference"""
-        SettingsDialog(self.root, self.settings, self.theme_manager, self.style)
+        """Show settings dialog"""
+        # Pass self instead of self.style
+        SettingsDialog(self.root, self.settings, self.theme_manager, self)
 
     def apply_theme_to_dialog(self, dialog):
         """Apply current theme to a dialog window"""

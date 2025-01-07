@@ -62,14 +62,422 @@ class PlaceholderEntry(ttk.Entry):
             self.delete(0, tk.END)
             self['foreground'] = self.default_fg_color
 
+class ThemeManager:
+    def __init__(self):
+        self.themes = {
+            'Dark': {
+                'bg': '#1e1e1e',
+                'fg': '#ffffff',
+                'select_bg': '#404040',
+                'select_fg': '#ffffff',
+                'input_bg': '#2d2d2d',
+                'button_bg': '#3d3d3d',
+                'button_active': '#4d4d4d',
+                'labelframe_bg': '#2d2d2d',
+                'entry_bg': '#2d2d2d',
+                'entry_fg': '#ffffff',
+                'treeview_bg': '#2d2d2d',
+                'treeview_fg': '#ffffff',
+                'treeview_selected_bg': '#404040',
+                'menu_bg': '#2d2d2d',
+                'menu_fg': '#ffffff',
+                'dialog_bg': '#1e1e1e',
+                'dialog_fg': '#ffffff',
+                'toplevel_bg': '#1e1e1e',
+                'notebook_bg': '#2d2d2d',
+                'tab_bg': '#3d3d3d',
+                'tab_selected_bg': '#404040'
+            },
+            'Light': {
+                'bg': '#f0f0f0',
+                'fg': '#000000',
+                'select_bg': '#0078d7',
+                'select_fg': '#ffffff',
+                'input_bg': '#ffffff',
+                'button_bg': '#e1e1e1',
+                'button_active': '#cce4f7',
+                'labelframe_bg': '#f0f0f0',
+                'entry_bg': '#ffffff',
+                'entry_fg': '#000000',
+                'treeview_bg': '#ffffff',
+                'treeview_fg': '#000000',
+                'treeview_selected_bg': '#0078d7',
+                'menu_bg': '#f0f0f0',
+                'menu_fg': '#000000',
+                'dialog_bg': '#f0f0f0',
+                'dialog_fg': '#000000',
+                'toplevel_bg': '#f0f0f0',
+                'notebook_bg': '#f0f0f0',
+                'tab_bg': '#e1e1e1',
+                'tab_selected_bg': '#ffffff'
+            }
+        }
+        self.current_theme = 'Dark'
+
+    def apply_theme(self, widget):
+        """Apply theme to a single widget"""
+        theme = self.themes[self.current_theme]
+        
+        if isinstance(widget, tk.Toplevel) or isinstance(widget, tk.Tk):
+            widget.configure(bg=theme['bg'])
+            self.apply_theme_recursive(widget, theme)
+        else:
+            self.apply_theme_recursive(widget, theme)
+
+    def apply_theme_to_all(self, root, style):
+        """Apply theme to all widgets and configure ttk styles"""
+        theme = self.themes[self.current_theme]
+        
+        # Configure ttk styles
+        self.configure_ttk_styles(style, theme)
+        
+        # Configure root window
+        root.configure(bg=theme['bg'])
+        
+        # Apply theme to all existing windows and widgets
+        for window in root.winfo_children():
+            if isinstance(window, tk.Toplevel):
+                window.configure(bg=theme['bg'])
+                self.apply_theme_recursive(window, theme)
+            else:
+                self.apply_theme_recursive(window, theme)
+
+    def configure_ttk_styles(self, style, theme):
+        """Configure all ttk widget styles"""
+        style.configure('TFrame', background=theme['bg'])
+        style.configure('TLabel', background=theme['bg'], foreground=theme['fg'])
+        style.configure('TButton',
+                       background=theme['button_bg'],
+                       foreground=theme['fg'])
+        style.map('TButton',
+                 background=[('active', theme['button_active'])])
+        
+        style.configure('TEntry',
+                       fieldbackground=theme['entry_bg'],
+                       foreground=theme['entry_fg'])
+        
+        style.configure('TNotebook',
+                       background=theme['notebook_bg'],
+                       borderwidth=0)
+        style.configure('TNotebook.Tab',
+                       background=theme['tab_bg'],
+                       foreground=theme['fg'],
+                       padding=[10, 2])
+        style.map('TNotebook.Tab',
+                 background=[('selected', theme['tab_selected_bg'])],
+                 foreground=[('selected', theme['fg'])])
+        
+        style.configure('TLabelframe',
+                       background=theme['labelframe_bg'],
+                       foreground=theme['fg'])
+        style.configure('TLabelframe.Label',
+                       background=theme['labelframe_bg'],
+                       foreground=theme['fg'])
+        
+        style.configure('Treeview',
+                       background=theme['treeview_bg'],
+                       foreground=theme['treeview_fg'],
+                       fieldbackground=theme['treeview_bg'])
+        style.map('Treeview',
+                 background=[('selected', theme['treeview_selected_bg'])],
+                 foreground=[('selected', theme['select_fg'])])
+
+    def apply_theme_recursive(self, widget, theme):
+        """Apply theme to widget and all its children recursively"""
+        if isinstance(widget, tk.Menu):
+            widget.configure(
+                bg=theme['menu_bg'],
+                fg=theme['menu_fg'],
+                activebackground=theme['select_bg'],
+                activeforeground=theme['select_fg']
+            )
+        elif isinstance(widget, tk.Text):
+            widget.configure(
+                bg=theme['input_bg'],
+                fg=theme['fg'],
+                insertbackground=theme['fg'],
+                selectbackground=theme['select_bg'],
+                selectforeground=theme['select_fg']
+            )
+        elif isinstance(widget, tk.Entry):
+            widget.configure(
+                bg=theme['input_bg'],
+                fg=theme['fg'],
+                insertbackground=theme['fg']
+            )
+        elif isinstance(widget, tk.Listbox):
+            widget.configure(
+                bg=theme['input_bg'],
+                fg=theme['fg'],
+                selectbackground=theme['select_bg'],
+                selectforeground=theme['select_fg']
+            )
+        elif isinstance(widget, ttk.Notebook):
+            widget.configure(style='TNotebook')
+        elif isinstance(widget, ttk.LabelFrame):
+            widget.configure(style='TLabelframe')
+            # Handle LabelFrame label separately
+            for child in widget.winfo_children():
+                if str(child).endswith('Label'):
+                    child.configure(background=theme['labelframe_bg'],
+                                  foreground=theme['fg'])
+        elif isinstance(widget, tk.Frame):
+            widget.configure(bg=theme['bg'])
+        elif isinstance(widget, ttk.Frame):
+            widget.configure(style='TFrame')
+
+        # Apply theme to all child widgets
+        for child in widget.winfo_children():
+            self.apply_theme_recursive(child, theme)
+
+    def apply_theme_to_dialog(self, dialog):
+        """Apply theme to a dialog window"""
+        theme = self.themes[self.current_theme]
+        dialog.configure(bg=theme['toplevel_bg'])
+        self.apply_theme_recursive(dialog, theme)
+
+    def get_theme_colors(self):
+        """Get current theme colors"""
+        return self.themes[self.current_theme]
+    
+class Settings:
+    def __init__(self):
+        # Theme settings
+        self.theme = 'Dark'
+        
+        # Font settings
+        self.menu_font_size = 10
+        self.text_font_size = 12
+        self.font_family = "TkDefaultFont"
+        
+        # Editor preferences
+        self.auto_save = False
+        self.backup_enabled = True
+        self.max_undo_steps = 100
+        self.show_line_numbers = True
+        self.wrap_text = True
+        
+        # Window settings
+        self.remember_window_size = True
+        self.window_size = (1400, 900)
+        self.split_positions = {}  # Store pane split positions
+        
+        # Path settings
+        self.last_game_path = 'game_files'
+        self.recent_paths = []  # List of recently used game paths
+        
+    def save(self, filename='editor_settings.json'):
+        """Save settings to file"""
+        settings_data = {
+            'theme': self.theme,
+            'menu_font_size': self.menu_font_size,
+            'text_font_size': self.text_font_size,
+            'font_family': self.font_family,
+            'auto_save': self.auto_save,
+            'backup_enabled': self.backup_enabled,
+            'max_undo_steps': self.max_undo_steps,
+            'show_line_numbers': self.show_line_numbers,
+            'wrap_text': self.wrap_text,
+            'window_size': self.window_size,
+            'split_positions': self.split_positions,
+            'last_game_path': self.last_game_path,
+            'recent_paths': self.recent_paths
+        }
+        with open(filename, 'w') as f:
+            json.dump(settings_data, f, indent=4)
+            
+    def load(self, filename='editor_settings.json'):
+        """Load settings from file"""
+        try:
+            with open(filename, 'r') as f:
+                settings_data = json.load(f)
+                self.theme = settings_data.get('theme', 'Dark')
+                self.menu_font_size = settings_data.get('menu_font_size', 10)
+                self.text_font_size = settings_data.get('text_font_size', 12)
+                self.font_family = settings_data.get('font_family', 'TkDefaultFont')
+                self.auto_save = settings_data.get('auto_save', False)
+                self.backup_enabled = settings_data.get('backup_enabled', True)
+                self.max_undo_steps = settings_data.get('max_undo_steps', 100)
+                self.show_line_numbers = settings_data.get('show_line_numbers', True)
+                self.wrap_text = settings_data.get('wrap_text', True)
+                self.window_size = settings_data.get('window_size', (1400, 900))
+                self.split_positions = settings_data.get('split_positions', {})
+                self.last_game_path = settings_data.get('last_game_path', 'game_files')
+                self.recent_paths = settings_data.get('recent_paths', [])
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass  # Use defaults if file doesn't exist or is invalid
+
+class SettingsDialog:
+    def __init__(self, parent, settings, theme_manager, style):  # Add style parameter
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Settings")
+        self.dialog.geometry("400x500")
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        
+        self.settings = settings
+        self.theme_manager = theme_manager
+        self.parent = parent
+        self.style = style  # Store style reference
+        
+        # Apply current theme to dialog
+        self.theme_manager.apply_theme(self.dialog)
+        
+        self.create_widgets()
+
+    def apply_settings(self):
+        try:
+            # Validate font sizes
+            menu_size = int(self.menu_size_var.get())
+            text_size = int(self.text_size_var.get())
+            if not (6 <= menu_size <= 72 and 6 <= text_size <= 72):
+                raise ValueError("Font size must be between 6 and 72")
+
+            # Update settings
+            self.settings.theme = self.theme_var.get()
+            self.settings.font_family = self.font_var.get()
+            self.settings.menu_font_size = menu_size
+            self.settings.text_font_size = text_size
+
+            # Apply theme using stored style reference
+            self.theme_manager.current_theme = self.settings.theme
+            self.theme_manager.apply_theme(self.dialog)
+            self.theme_manager.apply_theme_to_all(self.parent, self.style)
+
+            # Apply fonts
+            self.apply_fonts()
+
+        except ValueError as e:
+            messagebox.showerror("Error", str(e))
+
+    def create_widgets(self):
+        # Theme settings
+        theme_frame = ttk.LabelFrame(self.dialog, text="Theme")
+        theme_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        self.theme_var = tk.StringVar(value=self.settings.theme)
+        for theme in ['Dark', 'Light']:
+            ttk.Radiobutton(theme_frame, text=theme, value=theme,
+                           variable=self.theme_var).pack(padx=10, pady=2, anchor=tk.W)
+
+        # Font settings
+        font_frame = ttk.LabelFrame(self.dialog, text="Font")
+        font_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        # Font family
+        ttk.Label(font_frame, text="Font Family:").pack(padx=10, pady=2, anchor=tk.W)
+        self.font_var = tk.StringVar(value=self.settings.font_family)
+        font_combo = ttk.Combobox(font_frame, textvariable=self.font_var)
+        font_combo['values'] = ['TkDefaultFont', 'Courier', 'Helvetica', 'Times']
+        font_combo.pack(padx=10, pady=2, fill=tk.X)
+
+        # Menu font size
+        ttk.Label(font_frame, text="Menu Font Size:").pack(padx=10, pady=2, anchor=tk.W)
+        self.menu_size_var = tk.StringVar(value=str(self.settings.menu_font_size))
+        ttk.Entry(font_frame, textvariable=self.menu_size_var).pack(padx=10, pady=2, fill=tk.X)
+
+        # Text font size
+        ttk.Label(font_frame, text="Text Font Size:").pack(padx=10, pady=2, anchor=tk.W)
+        self.text_size_var = tk.StringVar(value=str(self.settings.text_font_size))
+        ttk.Entry(font_frame, textvariable=self.text_size_var).pack(padx=10, pady=2, fill=tk.X)
+
+        # Preview
+        preview_frame = ttk.LabelFrame(self.dialog, text="Preview")
+        preview_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+
+        self.preview_text = tk.Text(preview_frame, height=5, width=40)
+        self.preview_text.pack(padx=10, pady=5, fill=tk.BOTH, expand=True)
+        self.preview_text.insert('1.0', "This is a preview of how your text will look.\n"
+                                      "You can see the effects of your font choices here.")
+
+        # Buttons
+        button_frame = ttk.Frame(self.dialog)
+        button_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        ttk.Button(button_frame, text="Apply", command=self.apply_settings).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="OK", command=self.save_settings).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=self.dialog.destroy).pack(side=tk.LEFT, padx=5)
+
+        # Bind events for live preview
+        self.theme_var.trace('w', self.update_preview)
+        self.font_var.trace('w', self.update_preview)
+        self.menu_size_var.trace('w', self.update_preview)
+        self.text_size_var.trace('w', self.update_preview)
+
+    def update_preview(self, *args):
+        try:
+            # Update preview text widget
+            font_family = self.font_var.get()
+            text_size = int(self.text_size_var.get())
+            self.preview_text.configure(
+                font=(font_family, text_size),
+                bg=self.theme_manager.themes[self.theme_var.get()]['input_bg'],
+                fg=self.theme_manager.themes[self.theme_var.get()]['fg']
+            )
+        except ValueError:
+            pass  # Ignore invalid font sizes
+
+    def apply_settings(self):
+        try:
+            # Validate font sizes
+            menu_size = int(self.menu_size_var.get())
+            text_size = int(self.text_size_var.get())
+            if not (6 <= menu_size <= 72 and 6 <= text_size <= 72):
+                raise ValueError("Font size must be between 6 and 72")
+
+            # Update settings
+            self.settings.theme = self.theme_var.get()
+            self.settings.font_family = self.font_var.get()
+            self.settings.menu_font_size = menu_size
+            self.settings.text_font_size = text_size
+
+            # Apply theme
+            self.theme_manager.current_theme = self.settings.theme
+            self.theme_manager.apply_theme(self.parent.style, self.parent)
+
+            # Apply fonts
+            self.apply_fonts()
+
+        except ValueError as e:
+            messagebox.showerror("Error", str(e))
+
+    def apply_fonts(self):
+        menu_font = (self.settings.font_family, self.settings.menu_font_size)
+        text_font = (self.settings.font_family, self.settings.text_font_size)
+
+        # Update menu fonts
+        self.parent.option_add('*Menu.font', menu_font)
+        self.parent.option_add('*TButton.font', menu_font)
+        self.parent.option_add('*TLabel.font', menu_font)
+        
+        # Update text widget fonts
+        for widget in self.parent.winfo_children():
+            self._update_widget_fonts(widget, text_font)
+
+    def _update_widget_fonts(self, widget, font):
+        if isinstance(widget, (tk.Text, tk.Entry)):
+            widget.configure(font=font)
+        for child in widget.winfo_children():
+            self._update_widget_fonts(child, font)
+
+    def save_settings(self):
+        self.apply_settings()
+        self.dialog.destroy()                       
+
 class GameDataEditor:
     def __init__(self, root):
         """Initialize the editor"""
         self.root = root
         self.game_path = 'game_files'  # Default path
         
-        # Basic initialization
+        # Initialize theme and settings first
+        self.theme_manager = ThemeManager()
+        self.settings = Settings()
+        
+        # Then do window setup
         self.setup_window()
+        
+        # Continue with other initializations
         self.initialize_data()
         self.load_config()
         
@@ -81,42 +489,117 @@ class GameDataEditor:
         # Load game data
         self.initialize_game_path()
         self.load_data()
-
+     
     def setup_window(self):
+        """Setup main window with theme"""
         self.root.title("CLIo Game Data Editor")
         self.root.geometry("1400x900")
-        self.root.configure(bg='#1e1e1e')
+        
+        # Initialize style
         self.style = ttk.Style()
         self.style.theme_use('clam')
-        self.configure_dark_theme()
+        
+        # Apply initial theme
+        self.theme_manager.apply_theme_to_all(self.root, self.style)
 
     def initialize_data(self):
-        """Initialize data structures"""
-        # Stacks and modification tracking
+        """Initialize all data structures"""
+        # UI state variables need to be created before any UI elements
+        self.path_var = tk.StringVar()
+        self.status_var = tk.StringVar()
+        
+        # Search variables for each tab
+        self.search_vars = {
+            'scene': tk.StringVar(),
+            'item': tk.StringVar(),
+            'character': tk.StringVar()
+        }
+
+        # Scene variables
+        self.scene_id_var = tk.StringVar()
+        self.scene_name_var = tk.StringVar()
+
+        # Item variables
+        self.item_id_var = tk.StringVar()
+        self.item_name_var = tk.StringVar()
+        self.item_type_var = tk.StringVar()
+        self.item_usable_var = tk.BooleanVar()
+        self.item_equippable_var = tk.BooleanVar()
+        self.item_consumable_var = tk.BooleanVar()
+
+        # Character variables
+        self.char_id_var = tk.StringVar()
+        self.char_name_var = tk.StringVar()
+        self.char_type_var = tk.StringVar()
+        self.char_movable_var = tk.BooleanVar()
+        self.char_follows_var = tk.BooleanVar()
+        
+        # Story text variables
+        self.text_key_var = tk.StringVar()
+        self.show_once_var = tk.BooleanVar()
+
+        # Crafting variables
+        self.result_item_var = tk.StringVar()
+
+        # Undo/Redo stacks
         self.undo_stack = []
         self.redo_stack = []
+        
+        # Modification tracking
         self.modified = set()
         
         # Transaction state
         self.in_transaction = False
         self.transaction_backup = None
 
-        # UI state variables
-        self.path_var = tk.StringVar()
-        self.status_var = tk.StringVar()
-        self.search_vars = {
-            'scene': tk.StringVar(),
-            'item': tk.StringVar(),
-            'character': tk.StringVar()
-        }
-        
-        # Game data
+        # Game data structures
         self.scenes_data = []
         self.items_data = {}
         self.characters_data = {}
         self.story_texts_data = {}
         self.dialogue_data = {}
         self.recipes_data = []
+
+        # Font settings
+        self.font_settings = {
+            'menu': ('TkDefaultFont', 10),
+            'text': ('TkDefaultFont', 12),
+            'heading': ('TkDefaultFont', 14, 'bold')
+        }
+
+        # Load application settings
+        self.load_settings()
+
+        # Initialize the theme manager if not already done
+        if not hasattr(self, 'theme_manager'):
+            self.theme_manager = ThemeManager()
+            
+        # Initialize settings if not already done
+        if not hasattr(self, 'settings'):
+            self.settings = Settings()
+
+    def load_settings(self):
+        """Load editor settings"""
+        try:
+            with open('editor_settings.json', 'r') as f:
+                saved_settings = json.load(f)
+                self.settings.theme = saved_settings.get('theme', 'Dark')
+                self.settings.menu_font_size = saved_settings.get('menu_font_size', 10)
+                self.settings.text_font_size = saved_settings.get('text_font_size', 12)
+                self.settings.font_family = saved_settings.get('font_family', 'TkDefaultFont')
+        except FileNotFoundError:
+            pass  # Use defaults
+
+    def save_settings(self):
+        """Save editor settings"""
+        settings_data = {
+            'theme': self.settings.theme,
+            'menu_font_size': self.settings.menu_font_size,
+            'text_font_size': self.settings.text_font_size,
+            'font_family': self.settings.font_family
+        }
+        with open('editor_settings.json', 'w') as f:
+            json.dump(settings_data, f, indent=4)        
 
     def setup_ui(self):
         """Set up the user interface"""
@@ -162,18 +645,18 @@ class GameDataEditor:
         file_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="File", menu=file_menu)
         file_menu.add_command(label="Select Game Path", command=self.select_game_path)
-        file_menu.add_command(label="Save All", command=self.save_all)
-        file_menu.add_command(label="Reload", command=self.reload_data)
+        file_menu.add_command(label="Save All", command=self.save_all, accelerator="Ctrl+S")
+        file_menu.add_command(label="Reload", command=self.reload_data, accelerator="Ctrl+R")
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.on_close)
 
         # Edit menu
         edit_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Edit", menu=edit_menu)
-        edit_menu.add_command(label="Undo", command=self.undo)
-        edit_menu.add_command(label="Redo", command=self.redo)
+        edit_menu.add_command(label="Undo", command=self.undo, accelerator="Ctrl+Z")
+        edit_menu.add_command(label="Redo", command=self.redo, accelerator="Ctrl+Y")
         edit_menu.add_separator()
-        edit_menu.add_command(label="Find References", command=self.find_references)
+        edit_menu.add_command(label="Find References", command=self.find_references, accelerator="Ctrl+F")
 
         # Tools menu
         tools_menu = tk.Menu(menubar, tearoff=0)
@@ -182,34 +665,154 @@ class GameDataEditor:
         tools_menu.add_command(label="Export Data", command=lambda: self.export_data("all"))
         tools_menu.add_command(label="Import Data", command=lambda: self.import_data("all"))
 
+        # Settings menu
+        settings_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Settings", menu=settings_menu)
+        settings_menu.add_command(label="Preferences", command=self.show_settings)
+
         # Help menu
         help_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Help", menu=help_menu)
-        help_menu.add_command(label="About", command=self.show_about)
         help_menu.add_command(label="Documentation", command=self.show_documentation)
+        help_menu.add_command(label="About", command=self.show_about)
+
+        self.apply_menu_theme(menubar)
+
+    def create_dialog(self, title, size="300x200"):
+        """Create a themed dialog window"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title(title)
+        dialog.geometry(size)
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Apply theme
+        self.theme_manager.apply_theme_to_dialog(dialog)
+        
+        return dialog
+
+    def apply_menu_theme(self, menu):
+        """Apply theme to menu and all submenus"""
+        theme = self.theme_manager.themes[self.theme_manager.current_theme]
+        
+        menu.configure(
+            bg=theme['menu_bg'],
+            fg=theme['menu_fg'],
+            activebackground=theme['select_bg'],
+            activeforeground=theme['select_fg']
+        )
+        
+        # Apply to all submenus
+        for item in menu.winfo_children():
+            if isinstance(item, tk.Menu):
+                self.apply_menu_theme(item)    
+
+    def show_settings(self):
+        """Show settings dialog with style reference"""
+        SettingsDialog(self.root, self.settings, self.theme_manager, self.style)
+
+    def apply_theme_to_dialog(self, dialog):
+        """Apply current theme to a dialog window"""
+        theme = self.theme_manager.themes[self.theme_manager.current_theme]
+        
+        dialog.configure(bg=theme['bg'])
+        
+        # Apply theme to all widgets in the dialog
+        for widget in dialog.winfo_children():
+            self._apply_theme_to_widget(widget, theme)
+
+    def _apply_theme_to_widget(self, widget, theme):
+        """Recursively apply theme to widget and its children"""
+        if isinstance(widget, tk.Text):
+            widget.configure(
+                bg=theme['input_bg'],
+                fg=theme['fg'],
+                insertbackground=theme['fg'],
+                selectbackground=theme['select_bg'],
+                selectforeground=theme['select_fg']
+            )
+        elif isinstance(widget, tk.Entry):
+            widget.configure(
+                bg=theme['input_bg'],
+                fg=theme['fg'],
+                insertbackground=theme['fg']
+            )
+        elif isinstance(widget, tk.Listbox):
+            widget.configure(
+                bg=theme['input_bg'],
+                fg=theme['fg'],
+                selectbackground=theme['select_bg'],
+                selectforeground=theme['select_fg']
+            )
+        elif isinstance(widget, ttk.Frame):
+            style = ttk.Style()
+            style.configure('TFrame', background=theme['bg'])
+
+        # Recursively apply to children
+        for child in widget.winfo_children():
+            self._apply_theme_to_widget(child, theme)                  
 
     def show_about(self):
-        """Show about dialog"""
-        about_text = """CLIo Game Data Editor
-    Version 1.0
-
-    A tool for editing game data files for CLIo text adventure games.
-        """
-        messagebox.showinfo("About", about_text)
+        """Show themed about dialog"""
+        dialog = self.create_dialog("About", "400x300")
+        
+        content = ttk.Frame(dialog)
+        content.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        
+        ttk.Label(content, text="CLIo Game Data Editor", 
+                font=('TkDefaultFont', 14, 'bold')).pack(pady=10)
+        ttk.Label(content, text="Version 1.0").pack()
+        ttk.Label(content, text="\nA tool for editing game data files\nfor CLIo text adventure games."
+                ).pack(pady=10)
+        
+        ttk.Button(content, text="OK", command=dialog.destroy).pack(pady=20)
 
     def show_documentation(self):
-        """Show documentation"""
-        doc_text = """Documentation:
+        """Show themed documentation dialog"""
+        dialog = self.create_dialog("Documentation", "600x400")
+        
+        content = ttk.Frame(dialog)
+        content.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        
+        doc_text = tk.Text(content, wrap=tk.WORD)
+        doc_text.pack(fill=tk.BOTH, expand=True)
+        
+        # Apply theme to text widget
+        theme = self.theme_manager.themes[self.theme_manager.current_theme]
+        doc_text.configure(
+            bg=theme['input_bg'],
+            fg=theme['fg'],
+            font=(self.settings.font_family, self.settings.text_font_size)
+        )
+        
+        doc_text.insert('1.0', """CLIo Game Data Editor Documentation
 
-    1. Scenes: Create and edit game scenes, including exits, items, and characters
-    2. Items: Manage game items, their properties, and effects
-    3. Characters: Create NPCs with dialogues and statistics
-    4. Story Texts: Manage game text content
-    5. Crafting: Create and edit crafting recipes
+    Sections:
+    1. Scenes
+    - Create and edit game scenes
+    - Manage exits, items, and characters
 
-    For more information, please refer to the user manual.
-        """
-        messagebox.showinfo("Documentation", doc_text)
+    2. Items
+    - Create and manage game items
+    - Set item properties and effects
+
+    3. Characters
+    - Create and edit NPCs
+    - Manage dialogue and stats
+
+    4. Story Texts
+    - Manage game text content
+    - Set display conditions
+
+    5. Crafting
+    - Create crafting recipes
+    - Manage ingredients and results
+
+    For more detailed information, please refer to the user manual.""")
+        
+        doc_text.configure(state='disabled')
+        
+        ttk.Button(content, text="Close", command=dialog.destroy).pack(pady=10)
 
     def configure_dark_theme(self):
         colors = {
@@ -513,9 +1116,21 @@ class GameDataEditor:
         self.notebook.bind('<<NotebookTabChanged>>', self.on_tab_change)
 
     def on_close(self):
-        if self.modified and messagebox.askyesno("Save Changes", "Save changes before closing?"):
-            self.save_all()
-        self.root.destroy()
+        """Handle application closing"""
+        if self.modified:
+            save = messagebox.askyesnocancel(
+                "Save Changes",
+                "There are unsaved changes. Save before closing?"
+            )
+            if save is None:  # Cancel
+                return
+            if save:
+                self.save_all()
+        
+        # Save settings
+        self.save_settings()
+        
+        self.root.quit()
 
     def on_tab_change(self, event=None):
         current = self.notebook.select()
@@ -1636,12 +2251,8 @@ class GameDataEditor:
 
     # Adding scene to the list
     def add_scene(self):
-        """Add a new scene"""
-        dialog = tk.Toplevel(self.root)
-        dialog.title("Add New Scene")
-        dialog.geometry("400x200")
-        dialog.transient(self.root)
-        dialog.grab_set()
+        """Add a new scene with themed dialog"""
+        dialog = self.create_dialog("Add New Scene")
 
         # Scene ID
         id_frame = ttk.Frame(dialog)

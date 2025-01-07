@@ -160,15 +160,13 @@ class ThemeManager:
             widget.configure(
                 background=theme['input_bg'],
                 foreground=theme['fg'],
-                insertforeground=theme['fg'],
                 selectbackground=theme['select_bg'],
                 selectforeground=theme['select_fg']
             )
         elif isinstance(widget, tk.Entry):
             widget.configure(
                 background=theme['input_bg'],
-                foreground=theme['fg'],
-                insertforeground=theme['fg']
+                foreground=theme['fg']
             )
         elif isinstance(widget, tk.Listbox):
             widget.configure(
@@ -262,7 +260,7 @@ class ThemeManager:
     def get_theme_colors(self):
         """Get current theme colors"""
         return self.themes[self.current_theme]
-                    
+                        
 class Settings:
     def __init__(self):
         # Theme settings
@@ -481,7 +479,7 @@ class SettingsDialog:
         """Save settings and close dialog"""
         self.apply_settings()
         self.dialog.destroy()
-        
+
 class GameDataEditor:
     def __init__(self, root):
         """Initialize the editor"""

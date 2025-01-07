@@ -1787,94 +1787,108 @@ class GameDataEditor:
         self.scene_exits_list.bind('<Double-Button-1>', lambda e: self.edit_exit())
 
     def create_items_tab(self):
-        """Create the items tab"""
-        # Add buttons frame at the top
-        buttons_frame = ttk.Frame(self.tabs['items'])
-        buttons_frame.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Button(buttons_frame, text="Add Item", command=self.add_new_item).pack(side=tk.LEFT, padx=2)
+            """Create the items tab"""
+            # Add buttons frame at the top
+            buttons_frame = ttk.Frame(self.tabs['items'])
+            buttons_frame.pack(fill=tk.X, padx=5, pady=5)
+            ttk.Button(buttons_frame, text="Add Item", command=self.add_new_item).pack(side=tk.LEFT, padx=2)
 
-        # Create the main layout
-        self.items_listbox, editor_frame = self.create_tab_layout(
-            self.tabs['items'],
-            self.search_vars['item'],
-            "Search items..."
-        )
+            # Create the main layout
+            self.items_listbox, editor_frame = self.create_tab_layout(
+                self.tabs['items'],
+                self.search_vars['item'],
+                "Search items..."
+            )
 
-        # Properties Frame
-        props_frame = ttk.LabelFrame(editor_frame, text="Item Properties")
-        props_frame.pack(fill=tk.X, padx=5, pady=5)
+            # Properties Frame
+            props_frame = ttk.LabelFrame(editor_frame, text="Item Properties")
+            props_frame.pack(fill=tk.X, padx=5, pady=5)
 
-        self.item_id_var = tk.StringVar()
-        self.item_name_var = tk.StringVar()
-        self.item_type_var = tk.StringVar()
+            self.item_id_var = tk.StringVar()
+            self.item_name_var = tk.StringVar()
+            self.item_type_var = tk.StringVar()
 
-        # Grid layout for properties
-        grid_items = [
-            ("ID:", self.item_id_var, 'readonly'),
-            ("Name:", self.item_name_var, 'normal'),
-            ("Type:", self.item_type_var, ["Regular", "Quest", "Key", "Tool", "Weapon", "Consumable"])
-        ]
+            # Grid layout for properties
+            grid_items = [
+                ("ID:", self.item_id_var, 'readonly'),
+                ("Name:", self.item_name_var, 'normal'),
+                ("Type:", self.item_type_var, ["Regular", "Quest", "Key", "Tool", "Weapon", "Consumable"])
+            ]
 
-        for i, (label, var, state_or_values) in enumerate(grid_items):
-            ttk.Label(props_frame, text=label).grid(row=i, column=0, padx=5, pady=2)
-            if isinstance(state_or_values, list):
-                ttk.Combobox(props_frame, textvariable=var, values=state_or_values).grid(
-                    row=i, column=1, padx=5, pady=2, sticky='ew')
-            else:
-                ttk.Entry(props_frame, textvariable=var, state=state_or_values).grid(
-                    row=i, column=1, padx=5, pady=2, sticky='ew')
+            for i, (label, var, state_or_values) in enumerate(grid_items):
+                ttk.Label(props_frame, text=label).grid(row=i, column=0, padx=5, pady=2)
+                if isinstance(state_or_values, list):
+                    ttk.Combobox(props_frame, textvariable=var, values=state_or_values).grid(
+                        row=i, column=1, padx=5, pady=2, sticky='ew')
+                else:
+                    ttk.Entry(props_frame, textvariable=var, state=state_or_values).grid(
+                        row=i, column=1, padx=5, pady=2, sticky='ew')
 
-        props_frame.columnconfigure(1, weight=1)  # Make second column expandable
+            props_frame.columnconfigure(1, weight=1)  # Make second column expandable
 
-        # Checkboxes Frame
-        checks_frame = ttk.Frame(props_frame)
-        checks_frame.grid(row=len(grid_items), column=0, columnspan=2, padx=5, pady=2)
+            # Checkboxes Frame
+            checks_frame = ttk.Frame(props_frame)
+            checks_frame.grid(row=len(grid_items), column=0, columnspan=2, padx=5, pady=2)
 
-        self.item_usable_var = tk.BooleanVar()
-        self.item_equippable_var = tk.BooleanVar()
-        self.item_consumable_var = tk.BooleanVar()
+            self.item_usable_var = tk.BooleanVar()
+            self.item_equippable_var = tk.BooleanVar()
+            self.item_consumable_var = tk.BooleanVar()
 
-        for text, var in [
-            ("Usable", self.item_usable_var),
-            ("Equippable", self.item_equippable_var),
-            ("Consumable", self.item_consumable_var)
-        ]:
-            ttk.Checkbutton(checks_frame, text=text, variable=var).pack(side=tk.LEFT, padx=5)
+            for text, var in [
+                ("Usable", self.item_usable_var),
+                ("Equippable", self.item_equippable_var),
+                ("Consumable", self.item_consumable_var)
+            ]:
+                ttk.Checkbutton(checks_frame, text=text, variable=var).pack(side=tk.LEFT, padx=5)
 
-        # Description Frame
-        desc_frame = ttk.LabelFrame(editor_frame, text="Description")
-        desc_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        self.item_desc_text = self.create_custom_text(desc_frame)
-        self.item_desc_text.pack(fill=tk.BOTH, expand=True)
+            # Description Frame
+            desc_frame = ttk.LabelFrame(editor_frame, text="Description")
+            desc_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+            self.item_desc_text = self.create_custom_text(desc_frame, height=5)
+            self.item_desc_text.pack(fill=tk.BOTH, expand=True)
 
-        # Effects Frame
-        effects_frame = ttk.LabelFrame(editor_frame, text="Effects")
-        effects_frame.pack(fill=tk.X, padx=5, pady=5)
-        self.effects_list = self.create_custom_listbox(effects_frame, height=5)
-        self.effects_list.pack(fill=tk.X)
+            # Effects Frame
+            effects_frame = ttk.LabelFrame(editor_frame, text="Effects")
+            effects_frame.pack(fill=tk.X, padx=5, pady=5)
+            self.effects_list = self.create_custom_listbox(effects_frame, height=4)
+            self.effects_list.pack(fill=tk.X)
 
-        effect_buttons = ttk.Frame(effects_frame)
-        effect_buttons.pack(fill=tk.X)
-        for text, command in [
-            ("Add Effect", self.add_item_effect),
-            ("Edit Effect", self.edit_item_effect),
-            ("Remove Effect", self.remove_item_effect)
-        ]:
-            ttk.Button(effect_buttons, text=text, command=command).pack(side=tk.LEFT, padx=2)
+            effect_buttons = ttk.Frame(effects_frame)
+            effect_buttons.pack(fill=tk.X)
+            for text, command in [
+                ("Add Effect", self.add_item_effect),
+                ("Edit Effect", self.edit_item_effect),
+                ("Remove Effect", self.remove_item_effect)
+            ]:
+                ttk.Button(effect_buttons, text=text, command=command).pack(side=tk.LEFT, padx=2)
 
-        # Save/Delete/Duplicate buttons
-        button_frame = ttk.Frame(editor_frame)
-        button_frame.pack(fill=tk.X, padx=5, pady=5)
-        for text, command in [
-            ("Save Item", self.save_current_item),
-            ("Delete Item", self.delete_current_item),
-            ("Duplicate Item", self.duplicate_current_item)
-        ]:
-            ttk.Button(button_frame, text=text, command=command).pack(side=tk.LEFT, padx=2)
+            # Components Frame
+            components_frame = ttk.LabelFrame(editor_frame, text="Craftable Components")
+            components_frame.pack(fill=tk.X, padx=5, pady=5)
+            self.components_list = self.create_custom_listbox(components_frame, height=4)
+            self.components_list.pack(fill=tk.X)
 
-        # Bindings
-        self.items_listbox.bind('<<ListboxSelect>>', self.on_item_select)
-        self.effects_list.bind('<Double-Button-1>', lambda e: self.edit_item_effect())
+            component_buttons = ttk.Frame(components_frame)
+            component_buttons.pack(fill=tk.X)
+            for text, command in [
+                ("Add Component", self.add_item_component),
+                ("Remove Component", self.remove_item_component)
+            ]:
+                ttk.Button(component_buttons, text=text, command=command).pack(side=tk.LEFT, padx=2)
+
+            # Save/Delete/Duplicate buttons
+            button_frame = ttk.Frame(editor_frame)
+            button_frame.pack(fill=tk.X, padx=5, pady=5)
+            for text, command in [
+                ("Save Item", self.save_current_item),
+                ("Delete Item", self.delete_current_item),
+                ("Duplicate Item", self.duplicate_current_item)
+            ]:
+                ttk.Button(button_frame, text=text, command=command).pack(side=tk.LEFT, padx=2)
+
+            # Bindings
+            self.items_listbox.bind('<<ListboxSelect>>', self.on_item_select)
+            self.effects_list.bind('<Double-Button-1>', lambda e: self.edit_item_effect())
 
     def create_characters_tab(self):
         """Create the characters tab"""
@@ -2766,61 +2780,74 @@ class GameDataEditor:
         self.modified.add('scenes')
 
     def add_item_effect(self):
-        if not (selection := self.items_listbox.curselection()):
-            messagebox.showwarning("Warning", "Please select an item first")
-            return
-
-        dialog = tk.Toplevel(self.root)
-        dialog.title("Add Effect")
-        dialog.geometry("300x200")
-        dialog.transient(self.root)
-        dialog.grab_set()
-
-        type_frame = ttk.Frame(dialog)
-        type_frame.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Label(type_frame, text="Effect Type:").pack(side=tk.LEFT)
-        type_var = tk.StringVar(value="health")
-        ttk.Combobox(type_frame, textvariable=type_var,
-                    values=["health", "attack", "defense", "speed"]).pack(side=tk.LEFT, padx=5)
-
-        value_frame = ttk.Frame(dialog)
-        value_frame.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Label(value_frame, text="Value:").pack(side=tk.LEFT)
-        value_var = tk.StringVar()
-        ttk.Entry(value_frame, textvariable=value_var).pack(side=tk.LEFT, padx=5)
-
-        duration_frame = ttk.Frame(dialog)
-        duration_frame.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Label(duration_frame, text="Duration:").pack(side=tk.LEFT)
-        duration_var = tk.StringVar(value="permanent")
-        ttk.Combobox(duration_frame, textvariable=duration_var,
-                    values=["permanent", "temporary", "single-use"]).pack(side=tk.LEFT, padx=5)
-
-        def add_effect():
-            try:
-                value = float(value_var.get())
-            except ValueError:
-                messagebox.showerror("Error", "Value must be a number")
+            """Add effect to the current item"""
+            if not (selection := self.items_listbox.curselection()):
+                messagebox.showwarning("Warning", "Please select an item first")
                 return
 
-            item_id = list(self.items_data.keys())[selection[0]]
-            item = self.items_data[item_id]
+            dialog = tk.Toplevel(self.root)
+            dialog.title("Add Effect")
+            dialog.geometry("300x250")
+            dialog.transient(self.root)
+            dialog.grab_set()
+
+            # Effect Type
+            type_frame = ttk.Frame(dialog)
+            type_frame.pack(fill=tk.X, padx=5, pady=5)
+            ttk.Label(type_frame, text="Effect Type:").pack(side=tk.LEFT)
+            type_var = tk.StringVar(value="health")
+            effect_types = ["health", "attack", "defense", "speed", "repair"]  # Add more as needed
+            ttk.Combobox(type_frame, textvariable=type_var, values=effect_types).pack(side=tk.LEFT, padx=5)
+
+            # Effect Value
+            value_frame = ttk.Frame(dialog)
+            value_frame.pack(fill=tk.X, padx=5, pady=5)
+            ttk.Label(value_frame, text="Value:").pack(side=tk.LEFT)
+            value_var = tk.StringVar()
+            ttk.Entry(value_frame, textvariable=value_var).pack(side=tk.LEFT, padx=5)
+
+            # Duration (if needed)
+            duration_frame = ttk.Frame(dialog)
+            duration_frame.pack(fill=tk.X, padx=5, pady=5)
+            ttk.Label(duration_frame, text="Duration:").pack(side=tk.LEFT)
+            duration_var = tk.StringVar(value="permanent")
+            durations = ["permanent", "temporary", "single-use"]
+            ttk.Combobox(duration_frame, textvariable=duration_var, values=durations).pack(side=tk.LEFT, padx=5)
+
+            def add_effect():
+                try:
+                    value = float(value_var.get())
+                except ValueError:
+                    messagebox.showerror("Error", "Value must be a number")
+                    return
+
+                item_id = list(self.items_data.keys())[selection[0]]
+                item = self.items_data[item_id]
+                
+                effect_type = type_var.get()
+                duration = duration_var.get()
+
+                # Update item effects based on structure
+                if 'effect' not in item:
+                    item['effect'] = {}
+                
+                if duration == "permanent":
+                    item['effect'][effect_type] = value
+                else:
+                    if 'effects' not in item:
+                        item['effects'] = {}
+                    item['effects'][effect_type] = {
+                        'value': value,
+                        'duration': duration
+                    }
+
+                self.effects_list.insert(tk.END, 
+                    f"{effect_type}: {value}" + (f" ({duration})" if duration != "permanent" else ""))
+                self.modified.add('items')
+                dialog.destroy()
+
+            ttk.Button(dialog, text="Add", command=add_effect).pack(pady=10)
             
-            if 'effects' not in item:
-                item['effects'] = {}
-
-            effect_type = type_var.get()
-            item['effects'][effect_type] = {
-                'value': value,
-                'duration': duration_var.get()
-            }
-
-            self.effects_list.insert(tk.END, f"{effect_type}: {value} ({duration_var.get()})")
-            self.modified.add('items')
-            dialog.destroy()
-
-        ttk.Button(dialog, text="Add", command=add_effect).pack(pady=10)
-
     def edit_item_effect(self):
         item_sel = self.items_listbox.curselection()
         effect_sel = self.effects_list.curselection()
@@ -2894,6 +2921,70 @@ class GameDataEditor:
         del item['effects'][effect_type]
         self.effects_list.delete(effect_sel)
         self.modified.add('items')         
+
+    def add_item_component(self):
+        """Add a component to the current item"""
+        if not (selection := self.items_listbox.curselection()):
+            messagebox.showwarning("Warning", "Please select an item first")
+            return
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Add Component")
+        dialog.geometry("300x200")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Component selection listbox
+        ttk.Label(dialog, text="Select Component:").pack(padx=5, pady=2)
+        component_list = self.create_custom_listbox(dialog)
+        component_list.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        # Populate with available items
+        for item_id, item in self.items_data.items():
+            component_list.insert(tk.END, f"{item['name']} ({item_id})")
+
+        def add_selected():
+            if not (comp_sel := component_list.curselection()):
+                messagebox.showwarning("Warning", "Please select a component")
+                return
+
+            item_id = list(self.items_data.keys())[selection[0]]
+            item = self.items_data[item_id]
+            component_id = list(self.items_data.keys())[comp_sel[0]]
+            
+            if 'components' not in item:
+                item['components'] = []
+            
+            if component_id not in item['components']:
+                item['components'].append(component_id)
+                self.components_list.insert(tk.END, 
+                    f"{self.items_data[component_id]['name']} ({component_id})")
+                self.modified.add('items')
+            
+            dialog.destroy()
+
+        ttk.Button(dialog, text="Add", command=add_selected).pack(pady=5)
+
+    def remove_item_component(self):
+        """Remove selected component from current item"""
+        item_sel = self.items_listbox.curselection()
+        comp_sel = self.components_list.curselection()
+
+        if not (item_sel and comp_sel):
+            messagebox.showwarning("Warning", "Please select an item and component")
+            return
+
+        if not messagebox.askyesno("Confirm", "Remove this component?"):
+            return
+
+        item_id = list(self.items_data.keys())[item_sel[0]]
+        item = self.items_data[item_id]
+        component_index = comp_sel[0]
+
+        if 'components' in item and component_index < len(item['components']):
+            del item['components'][component_index]
+            self.components_list.delete(comp_sel)
+            self.modified.add('items')
 
     def add_dialogue_option(self):
         if not (selection := self.chars_listbox.curselection()):
@@ -3881,26 +3972,47 @@ class GameDataEditor:
                 self.scene_exits_list.insert(tk.END, f"{exit['door_name']} → Unknown ({exit['scene_id']})")     
 
     def update_item_editor(self, item_id, item):
-        """Update item editor fields with item data"""
-        # Update basic properties
-        self.item_id_var.set(item_id)
-        self.item_name_var.set(item.get('name', ''))
-        self.item_type_var.set(item.get('type', 'Regular'))
+            """Update item editor fields with item data"""
+            # Update basic properties
+            self.item_id_var.set(item_id)
+            self.item_name_var.set(item.get('name', ''))
+            self.item_type_var.set(item.get('type', 'Regular'))
 
-        # Update flags
-        self.item_usable_var.set(item.get('usable', False))
-        self.item_equippable_var.set(item.get('equippable', False))
-        self.item_consumable_var.set(item.get('consumable', False))
+            # Update flags
+            self.item_usable_var.set(item.get('usable', False))
+            self.item_equippable_var.set(item.get('equippable', False))
+            self.item_consumable_var.set(item.get('consumable', False))
 
-        # Update description
-        self.item_desc_text.delete('1.0', tk.END)
-        self.item_desc_text.insert('1.0', item.get('description', ''))
+            # Update description
+            self.item_desc_text.delete('1.0', tk.END)
+            self.item_desc_text.insert('1.0', item.get('description', ''))
 
-        # Update effects list
-        self.effects_list.delete(0, tk.END)
-        for effect_type, effect in item.get('effects', {}).items():
-            self.effects_list.insert(tk.END, 
-                f"{effect_type}: {effect['value']} ({effect['duration']})")
+            # Update effects list
+            self.effects_list.delete(0, tk.END)
+            
+            # Handle direct effects
+            if effect := item.get('effect'):
+                for effect_type, value in effect.items():
+                    self.effects_list.insert(tk.END, f"{effect_type}: {value}")
+            
+            # Handle compound effects
+            if effects := item.get('effects'):
+                for effect_type, effect_data in effects.items():
+                    if isinstance(effect_data, dict):
+                        value = effect_data.get('value', '')
+                        duration = effect_data.get('duration', 'permanent')
+                        self.effects_list.insert(tk.END, f"{effect_type}: {value} ({duration})")
+                    else:
+                        self.effects_list.insert(tk.END, f"{effect_type}: {effect_data}")
+
+            # Update components list
+            self.components_list.delete(0, tk.END)
+            if components := item.get('components', []):
+                for component_id in components:
+                    if component := self.items_data.get(component_id):
+                        self.components_list.insert(tk.END, f"{component['name']} ({component_id})")
+                    else:
+                        self.components_list.insert(tk.END, f"Unknown item ({component_id})")
 
     def update_character_editor(self, char_id, character):
         """Update character editor fields with character data"""

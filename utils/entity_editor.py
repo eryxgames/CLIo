@@ -64,12 +64,22 @@ class PlaceholderEntry(ttk.Entry):
 
 class GameDataEditor:
     def __init__(self, root):
+        """Initialize the editor"""
         self.root = root
+        self.game_path = 'game_files'  # Default path
+        
+        # Basic initialization
         self.setup_window()
         self.initialize_data()
+        self.load_config()
+        
+        # UI setup
         self.setup_ui()
         self.setup_error_handlers()
         self.setup_event_bindings()
+        
+        # Load game data
+        self.initialize_game_path()
         self.load_data()
 
     def setup_window(self):
@@ -81,29 +91,40 @@ class GameDataEditor:
         self.configure_dark_theme()
 
     def initialize_data(self):
+        """Initialize data structures"""
+        # Stacks and modification tracking
         self.undo_stack = []
         self.redo_stack = []
         self.modified = set()
-                # Transaction state
+        
+        # Transaction state
         self.in_transaction = False
         self.transaction_backup = None
+
+        # UI state variables
+        self.path_var = tk.StringVar()
+        self.status_var = tk.StringVar()
+        self.search_vars = {
+            'scene': tk.StringVar(),
+            'item': tk.StringVar(),
+            'character': tk.StringVar()
+        }
+        
+        # Game data
         self.scenes_data = []
         self.items_data = {}
         self.characters_data = {}
         self.story_texts_data = {}
         self.dialogue_data = {}
         self.recipes_data = []
-        
-        self.search_vars = {
-            'scene': tk.StringVar(),
-            'item': tk.StringVar(),
-            'character': tk.StringVar()
-        }
 
     def setup_ui(self):
+        """Set up the user interface"""
+        # Create notebook
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(expand=1, fill="both", padx=10, pady=10)
 
+        # Create base frames for each tab
         self.tabs = {
             'scenes': ttk.Frame(self.notebook),
             'items': ttk.Frame(self.notebook),
@@ -113,17 +134,82 @@ class GameDataEditor:
             'crafting': ttk.Frame(self.notebook)
         }
 
+        # Add tabs to notebook
         for name, frame in self.tabs.items():
             self.notebook.add(frame, text=name.title())
 
+        # Create toolbar and status bar
         self.create_toolbar()
         self.create_status_bar()
+
+        # Create tab contents
         self.create_scenes_tab()
         self.create_items_tab()
         self.create_characters_tab()
         self.create_dialogues_tab()
         self.create_story_text_editor()
         self.create_crafting_editor()
+
+        # Create menu
+        self.create_menu()
+
+    def create_menu(self):
+        """Create the application menu"""
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)
+
+        # File menu
+        file_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="File", menu=file_menu)
+        file_menu.add_command(label="Select Game Path", command=self.select_game_path)
+        file_menu.add_command(label="Save All", command=self.save_all)
+        file_menu.add_command(label="Reload", command=self.reload_data)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self.on_close)
+
+        # Edit menu
+        edit_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Edit", menu=edit_menu)
+        edit_menu.add_command(label="Undo", command=self.undo)
+        edit_menu.add_command(label="Redo", command=self.redo)
+        edit_menu.add_separator()
+        edit_menu.add_command(label="Find References", command=self.find_references)
+
+        # Tools menu
+        tools_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Tools", menu=tools_menu)
+        tools_menu.add_command(label="Validate Data", command=self.validate_all_data)
+        tools_menu.add_command(label="Export Data", command=lambda: self.export_data("all"))
+        tools_menu.add_command(label="Import Data", command=lambda: self.import_data("all"))
+
+        # Help menu
+        help_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Help", menu=help_menu)
+        help_menu.add_command(label="About", command=self.show_about)
+        help_menu.add_command(label="Documentation", command=self.show_documentation)
+
+    def show_about(self):
+        """Show about dialog"""
+        about_text = """CLIo Game Data Editor
+    Version 1.0
+
+    A tool for editing game data files for CLIo text adventure games.
+        """
+        messagebox.showinfo("About", about_text)
+
+    def show_documentation(self):
+        """Show documentation"""
+        doc_text = """Documentation:
+
+    1. Scenes: Create and edit game scenes, including exits, items, and characters
+    2. Items: Manage game items, their properties, and effects
+    3. Characters: Create NPCs with dialogues and statistics
+    4. Story Texts: Manage game text content
+    5. Crafting: Create and edit crafting recipes
+
+    For more information, please refer to the user manual.
+        """
+        messagebox.showinfo("Documentation", doc_text)
 
     def configure_dark_theme(self):
         colors = {
@@ -246,29 +332,21 @@ class GameDataEditor:
             ttk.Button(toolbar, text=text, command=command).pack(side=tk.LEFT, padx=2)
 
     def create_status_bar(self):
-        """Create status bar with game path display"""
+        """Create status bar"""
         status_frame = ttk.Frame(self.root)
         status_frame.pack(side=tk.BOTTOM, fill=tk.X)
 
-        # Path display
-        self.path_var = tk.StringVar()
+        # Status messages
         path_label = ttk.Label(status_frame, textvariable=self.path_var, 
                             relief=tk.SUNKEN, anchor=tk.W)
         path_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        # Status messages
-        self.status_var = tk.StringVar()
         status_label = ttk.Label(status_frame, textvariable=self.status_var, 
                                 relief=tk.SUNKEN, anchor=tk.W)
         status_label.pack(side=tk.RIGHT, fill=tk.X, expand=True)
 
-        self.update_status()
-
     def update_status(self, message=None):
-        """Update status bar display"""
-        # Update path display
-        self.path_var.set(f"Game Path: {self.game_path}")
-
+        """Update status bar messages"""
         # Update status message
         if message:
             self.status_var.set(message)
@@ -276,7 +354,7 @@ class GameDataEditor:
             modified = len(self.modified)
             self.status_var.set(f"Modified files: {', '.join(self.modified)}" if modified 
                             else "No modifications")
-        
+                
     # Include all previously defined methods for:
     # - Tab creation (create_scenes_tab, create_items_tab, etc.)
     # - Event handling (setup_event_bindings)
@@ -989,17 +1067,18 @@ class GameDataEditor:
                 self.show_error_dialog(f'Error importing {data_type}: {str(e)}')    
 
     def create_scenes_tab(self):
+        """Create the scenes tab"""
+        # Add buttons frame at the top
+        buttons_frame = ttk.Frame(self.tabs['scenes'])
+        buttons_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Button(buttons_frame, text="Add Scene", command=self.add_scene).pack(side=tk.LEFT, padx=2)
+
+        # Create the main layout
         self.scenes_listbox, editor_frame = self.create_tab_layout(
             self.tabs['scenes'], 
             self.search_vars['scene'],
             "Search scenes..."
         )
-
-        # Add buttons frame at the top
-        buttons_frame = ttk.Frame(self.scenes_frame)
-        buttons_frame.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Button(buttons_frame, text="Add Scene", command=self.add_scene).pack(side=tk.LEFT, padx=2)
-
 
         # Properties Frame
         props_frame = ttk.LabelFrame(editor_frame, text="Scene Properties")
@@ -1008,10 +1087,11 @@ class GameDataEditor:
         self.scene_id_var = tk.StringVar()
         self.scene_name_var = tk.StringVar()
         
+        # Grid layout for properties
         ttk.Label(props_frame, text="ID:").grid(row=0, column=0, padx=5, pady=2)
         ttk.Entry(props_frame, textvariable=self.scene_id_var, state='readonly').grid(
             row=0, column=1, padx=5, pady=2, sticky='ew')
-            
+                
         ttk.Label(props_frame, text="Name:").grid(row=1, column=0, padx=5, pady=2)
         ttk.Entry(props_frame, textvariable=self.scene_name_var).grid(
             row=1, column=1, padx=5, pady=2, sticky='ew')
@@ -1067,17 +1147,18 @@ class GameDataEditor:
         self.scene_exits_list.bind('<Double-Button-1>', lambda e: self.edit_exit())
 
     def create_items_tab(self):
+        """Create the items tab"""
+        # Add buttons frame at the top
+        buttons_frame = ttk.Frame(self.tabs['items'])
+        buttons_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Button(buttons_frame, text="Add Item", command=self.add_new_item).pack(side=tk.LEFT, padx=2)
+
+        # Create the main layout
         self.items_listbox, editor_frame = self.create_tab_layout(
             self.tabs['items'],
             self.search_vars['item'],
             "Search items..."
         )
-
-        # Add buttons frame at the top
-        buttons_frame = ttk.Frame(self.items_frame)
-        buttons_frame.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Button(buttons_frame, text="Add Item", command=self.add_new_item).pack(side=tk.LEFT, padx=2)
-        
 
         # Properties Frame
         props_frame = ttk.LabelFrame(editor_frame, text="Item Properties")
@@ -1087,21 +1168,23 @@ class GameDataEditor:
         self.item_name_var = tk.StringVar()
         self.item_type_var = tk.StringVar()
 
+        # Grid layout for properties
         grid_items = [
             ("ID:", self.item_id_var, 'readonly'),
             ("Name:", self.item_name_var, 'normal'),
-            ("Type:", self.item_type_var, 'normal')
+            ("Type:", self.item_type_var, ["Regular", "Quest", "Key", "Tool", "Weapon", "Consumable"])
         ]
 
-        for i, (label, var, state) in enumerate(grid_items):
+        for i, (label, var, state_or_values) in enumerate(grid_items):
             ttk.Label(props_frame, text=label).grid(row=i, column=0, padx=5, pady=2)
-            if label == "Type:":
-                ttk.Combobox(props_frame, textvariable=var,
-                            values=["Regular", "Quest", "Key", "Tool", "Weapon", "Consumable"]).grid(
+            if isinstance(state_or_values, list):
+                ttk.Combobox(props_frame, textvariable=var, values=state_or_values).grid(
                     row=i, column=1, padx=5, pady=2, sticky='ew')
             else:
-                ttk.Entry(props_frame, textvariable=var, state=state).grid(
+                ttk.Entry(props_frame, textvariable=var, state=state_or_values).grid(
                     row=i, column=1, padx=5, pady=2, sticky='ew')
+
+        props_frame.columnconfigure(1, weight=1)  # Make second column expandable
 
         # Checkboxes Frame
         checks_frame = ttk.Frame(props_frame)
@@ -1111,13 +1194,11 @@ class GameDataEditor:
         self.item_equippable_var = tk.BooleanVar()
         self.item_consumable_var = tk.BooleanVar()
 
-        check_items = [
+        for text, var in [
             ("Usable", self.item_usable_var),
             ("Equippable", self.item_equippable_var),
             ("Consumable", self.item_consumable_var)
-        ]
-
-        for text, var in check_items:
+        ]:
             ttk.Checkbutton(checks_frame, text=text, variable=var).pack(side=tk.LEFT, padx=5)
 
         # Description Frame
@@ -1134,27 +1215,42 @@ class GameDataEditor:
 
         effect_buttons = ttk.Frame(effects_frame)
         effect_buttons.pack(fill=tk.X)
-        ttk.Button(effect_buttons, text="Add Effect", command=self.add_item_effect).pack(side=tk.LEFT, padx=2)
-        ttk.Button(effect_buttons, text="Edit Effect", command=self.edit_item_effect).pack(side=tk.LEFT, padx=2)
-        ttk.Button(effect_buttons, text="Remove Effect", command=self.remove_item_effect).pack(side=tk.LEFT, padx=2)
+        for text, command in [
+            ("Add Effect", self.add_item_effect),
+            ("Edit Effect", self.edit_item_effect),
+            ("Remove Effect", self.remove_item_effect)
+        ]:
+            ttk.Button(effect_buttons, text=text, command=command).pack(side=tk.LEFT, padx=2)
+
+        # Save/Delete/Duplicate buttons
+        button_frame = ttk.Frame(editor_frame)
+        button_frame.pack(fill=tk.X, padx=5, pady=5)
+        for text, command in [
+            ("Save Item", self.save_current_item),
+            ("Delete Item", self.delete_current_item),
+            ("Duplicate Item", self.duplicate_current_item)
+        ]:
+            ttk.Button(button_frame, text=text, command=command).pack(side=tk.LEFT, padx=2)
 
         # Bindings
         self.items_listbox.bind('<<ListboxSelect>>', self.on_item_select)
         self.effects_list.bind('<Double-Button-1>', lambda e: self.edit_item_effect())
 
     def create_characters_tab(self):
+        """Create the characters tab"""
+        # Add buttons frame at the top
+        buttons_frame = ttk.Frame(self.tabs['characters'])
+        buttons_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Button(buttons_frame, text="Add Character", command=self.add_new_character).pack(side=tk.LEFT, padx=2)
+
+        # Create the main layout
         self.chars_listbox, editor_frame = self.create_tab_layout(
             self.tabs['characters'],
             self.search_vars['character'],
             "Search characters..."
         )
 
-        # Add buttons frame at the top
-        buttons_frame = ttk.Frame(self.characters_frame)
-        buttons_frame.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Button(buttons_frame, text="Add Character", command=self.add_new_character).pack(side=tk.LEFT, padx=2)
-
-
+        # Create notebook for character sections
         notebook = ttk.Notebook(editor_frame)
         notebook.pack(fill=tk.BOTH, expand=True)
 
@@ -1165,9 +1261,12 @@ class GameDataEditor:
         # Main buttons
         button_frame = ttk.Frame(editor_frame)
         button_frame.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Button(button_frame, text="Save Character", command=self.save_current_character).pack(side=tk.LEFT, padx=2)
-        ttk.Button(button_frame, text="Delete Character", command=self.delete_current_character).pack(side=tk.LEFT, padx=2)
-        ttk.Button(button_frame, text="Duplicate Character", command=self.duplicate_current_character).pack(side=tk.LEFT, padx=2)
+        for text, command in [
+            ("Save Character", self.save_current_character),
+            ("Delete Character", self.delete_current_character),
+            ("Duplicate Character", self.duplicate_current_character)
+        ]:
+            ttk.Button(button_frame, text=text, command=command).pack(side=tk.LEFT, padx=2)
 
         # Bindings
         self.chars_listbox.bind('<<ListboxSelect>>', self.on_character_select)
@@ -1274,6 +1373,7 @@ class GameDataEditor:
         self.stats_tree.bind('<Double-Button-1>', lambda e: self.edit_character_stat())
 
     def create_dialogues_tab(self):
+        """Create the dialogues tab"""
         dialogue_frame = ttk.Frame(self.tabs['dialogues'])
         paned = ttk.PanedWindow(dialogue_frame, orient=tk.HORIZONTAL)
         paned.pack(fill=tk.BOTH, expand=True)
@@ -1309,24 +1409,17 @@ class GameDataEditor:
         ]:
             ttk.Button(button_frame, text=text, command=command).pack(side=tk.LEFT, padx=2)
 
+        # Bindings
         self.dialogue_tree.bind('<<TreeviewSelect>>', self.on_dialogue_select)
 
     def create_story_text_editor(self):
-        story_frame = ttk.Frame(self.tabs['story_texts'])
-        paned = ttk.PanedWindow(story_frame, orient=tk.HORIZONTAL)
-        paned.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-
-        # Text list panel
-        list_frame = ttk.Frame(paned)
-        paned.add(list_frame, weight=1)
-
-        # Search
-        search_frame = self.create_search_frame(list_frame, tk.StringVar(), "Search texts...")
-        self.story_texts_listbox = self.create_custom_listbox(list_frame)
-
-        # Editor panel
-        editor_frame = ttk.Frame(paned)
-        paned.add(editor_frame, weight=2)
+        """Create the story texts tab"""
+        listbox, editor_frame = self.create_tab_layout(
+            self.tabs['story_texts'],
+            tk.StringVar(),  # No search needed
+            "Search texts..."
+        )
+        self.story_texts_listbox = listbox
 
         # Properties
         props_frame = ttk.LabelFrame(editor_frame, text="Properties")
@@ -1340,11 +1433,11 @@ class GameDataEditor:
         ttk.Checkbutton(props_frame, text="Show Once", variable=self.show_once_var).grid(
             row=1, column=0, columnspan=2, pady=2)
 
-        # Text editor
+        # Editor
         self.story_text_editor = self.create_custom_text(editor_frame)
         self.story_text_editor.pack(fill=tk.BOTH, expand=True, pady=5)
 
-        # Control buttons
+        # Controls
         controls = ttk.Frame(editor_frame)
         controls.pack(fill=tk.X)
         for text, command in [
@@ -1354,19 +1447,31 @@ class GameDataEditor:
         ]:
             ttk.Button(controls, text=text, command=command).pack(side=tk.LEFT, padx=2)
 
+        # Bindings
         self.story_texts_listbox.bind('<<ListboxSelect>>', self.on_story_text_select)
 
+
     def create_crafting_editor(self):
-        crafting_frame = ttk.Frame(self.tabs['crafting'])
-        paned = ttk.PanedWindow(crafting_frame, orient=tk.HORIZONTAL)
-        paned.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        """Create the crafting tab"""
+        craft_frame = ttk.Frame(self.tabs['crafting'])
+        paned = ttk.PanedWindow(craft_frame, orient=tk.HORIZONTAL)
+        paned.pack(fill=tk.BOTH, expand=True)
 
         # Recipe list panel
         list_frame = ttk.Frame(paned)
         paned.add(list_frame, weight=1)
 
-        search_frame = self.create_search_frame(list_frame, tk.StringVar(), "Search recipes...")
-        self.recipes_listbox = self.create_custom_listbox(list_frame)
+        # Add button at top
+        button_frame = ttk.Frame(list_frame)
+        button_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Button(button_frame, text="New Recipe", command=self.new_recipe).pack(side=tk.LEFT, padx=2)
+
+        # Recipe list
+        list_frame = self.create_tab_layout(
+            list_frame,
+            tk.StringVar(),
+            "Search recipes..."
+        )[0]  # We only need the listbox
 
         # Editor panel
         editor_frame = ttk.Frame(paned)
@@ -1376,10 +1481,12 @@ class GameDataEditor:
         details_frame = ttk.LabelFrame(editor_frame, text="Recipe Details")
         details_frame.pack(fill=tk.X, pady=5)
 
-        ttk.Label(details_frame, text="Result:").grid(row=0, column=0, padx=5, pady=2)
+        result_frame = ttk.Frame(details_frame)
+        result_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(result_frame, text="Result Item:").pack(side=tk.LEFT)
         self.result_item_var = tk.StringVar()
-        self.result_combo = ttk.Combobox(details_frame, textvariable=self.result_item_var)
-        self.result_combo.grid(row=0, column=1, sticky='ew', padx=5, pady=2)
+        self.result_combo = ttk.Combobox(result_frame, textvariable=self.result_item_var)
+        self.result_combo.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
         # Ingredients
         ingredients_frame = ttk.LabelFrame(editor_frame, text="Ingredients")
@@ -1401,13 +1508,10 @@ class GameDataEditor:
         recipe_buttons = ttk.Frame(editor_frame)
         recipe_buttons.pack(fill=tk.X, pady=5)
         for text, command in [
-            ("New Recipe", self.new_recipe),
             ("Save Recipe", self.save_recipe),
             ("Delete Recipe", self.delete_recipe)
         ]:
             ttk.Button(recipe_buttons, text=text, command=command).pack(side=tk.LEFT, padx=2)
-
-        self.recipes_listbox.bind('<<ListboxSelect>>', self.on_recipe_select)
 
     def find_references(self):
         """Find all references to the selected item/character"""
@@ -1589,6 +1693,121 @@ class GameDataEditor:
         button_frame.pack(fill=tk.X, pady=10)
         ttk.Button(button_frame, text="Create", command=create_scene).pack(side=tk.RIGHT, padx=5)
         ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT, padx=5)
+
+    def save_current_item(self):
+        """Save the currently selected item"""
+        if not (selection := self.items_listbox.curselection()):
+            return
+
+        item_id = list(self.items_data.keys())[selection[0]]
+        old_item = self.items_data[item_id].copy()
+        
+        # Update item data
+        self.items_data[item_id].update({
+            'name': self.item_name_var.get(),
+            'type': self.item_type_var.get(),
+            'description': self.item_desc_text.get('1.0', tk.END).strip(),
+            'usable': self.item_usable_var.get(),
+            'equippable': self.item_equippable_var.get(),
+            'consumable': self.item_consumable_var.get()
+        })
+
+        self.add_undo_action('modify', 'items',
+                            {'id': item_id, 'data': old_item},
+                            {'id': item_id, 'data': self.items_data[item_id].copy()},
+                            f"Modified item {self.items_data[item_id]['name']}")
+
+        self.modified.add('items')
+        self.update_status(f"Saved item {self.items_data[item_id]['name']}")
+
+    def delete_current_item(self):
+        """Delete the currently selected item"""
+        if not (selection := self.items_listbox.curselection()):
+            return
+
+        item_id = list(self.items_data.keys())[selection[0]]
+        item = self.items_data[item_id]
+
+        if not messagebox.askyesno("Confirm Delete", 
+                                f"Delete item '{item['name']}'?"):
+            return
+
+        # Store for undo
+        old_data = item.copy()
+        
+        # Check for references before deleting
+        references = self.find_item_references(item_id)
+        if references:
+            if not messagebox.askyesno("Warning",
+                f"This item is referenced in the following locations:\n\n" +
+                "\n".join(references) + "\n\nDelete anyway?"):
+                return
+
+        # Remove item
+        del self.items_data[item_id]
+        self.items_listbox.delete(selection)
+
+        self.add_undo_action('delete', 'items',
+                            {'id': item_id, 'data': old_data},
+                            None,
+                            f"Deleted item {item['name']}")
+
+        self.modified.add('items')
+        self.update_status(f"Deleted item {item['name']}")
+
+    def duplicate_current_item(self):
+        """Duplicate the currently selected item"""
+        if not (selection := self.items_listbox.curselection()):
+            return
+
+        item_id = list(self.items_data.keys())[selection[0]]
+        original = self.items_data[item_id]
+
+        # Create new ID
+        new_id = f"{item_id}_copy"
+        while new_id in self.items_data:
+            new_id += "_copy"
+
+        # Copy item data
+        new_item = copy.deepcopy(original)
+        new_item['name'] = f"{original['name']} (Copy)"
+        self.items_data[new_id] = new_item
+
+        # Add to list
+        self.items_listbox.insert(tk.END, new_item['name'])
+
+        self.add_undo_action('create', 'items',
+                            None,
+                            {'id': new_id, 'data': new_item},
+                            f"Duplicated item {original['name']}")
+
+        self.modified.add('items')
+        self.update_status(f"Duplicated item {original['name']}")
+
+    def find_item_references(self, item_id):
+        """Find all references to an item"""
+        references = []
+        
+        # Check scenes
+        for scene in self.scenes_data:
+            if item_id in scene.get('items', []):
+                references.append(f"Scene: {scene['name']}")
+
+        # Check characters
+        for char_id, char in self.characters_data.items():
+            if item_id in char.get('inventory', []):
+                references.append(f"Character: {char['name']} (inventory)")
+            if item_id in char.get('crafting_requirements', []):
+                references.append(f"Character: {char['name']} (crafting)")
+
+        # Check recipes
+        for i, recipe in enumerate(self.recipes_data):
+            if recipe.get('result') == item_id:
+                references.append(f"Recipe {i+1} (result)")
+            if item_id in recipe.get('ingredients', []):
+                references.append(f"Recipe {i+1} (ingredient)")
+
+        return references        
 
     def add_new_item(self):
         """Add a new item"""
@@ -3077,11 +3296,29 @@ class GameDataEditor:
         # Game path for loading CLIo games
 
     def initialize_game_path(self):
-        """Initialize game data path"""
-        self.game_path = os.getenv('GAME_PATH', 'game_files')
-        
+        """Initialize or verify game data path"""
+        # Check if game path exists
         if not os.path.exists(self.game_path):
-            self.select_game_path()
+            response = messagebox.askyesno(
+                "Game Path Not Found",
+                f"Game path '{self.game_path}' not found.\nWould you like to create it?"
+            )
+            if response:
+                try:
+                    os.makedirs(self.game_path)
+                    os.makedirs(os.path.join(self.game_path, 'scenes'))
+                    os.makedirs(os.path.join(self.game_path, 'backups'))
+                except Exception as e:
+                    messagebox.showerror(
+                        "Error",
+                        f"Failed to create game directories: {str(e)}"
+                    )
+                    self.select_game_path()
+            else:
+                self.select_game_path()
+        
+        # Update status
+        self.path_var.set(f"Game Path: {self.game_path}")
 
     def select_game_path(self):
         """Let user select game data directory"""
@@ -3104,13 +3341,16 @@ class GameDataEditor:
             json.dump(config, f)
 
     def load_config(self):
-        """Load configuration"""
+        """Load editor configuration"""
         try:
-            with open('editor_config.json', 'r') as f:
-                config = json.load(f)
-                self.game_path = config.get('game_path', 'game_files')
-        except FileNotFoundError:
+            config_path = os.path.join(os.path.dirname(__file__), 'editor_config.json')
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    config = json.load(f)
+                    self.game_path = config.get('game_path', 'game_files')
+        except Exception as e:
             self.game_path = 'game_files'
+            print(f"Failed to load config: {e}")
 
     def create_toolbar(self):
         """Create toolbar with added game path selection"""

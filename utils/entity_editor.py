@@ -618,40 +618,46 @@ class GameDataEditor:
             json.dump(settings_data, f, indent=4)        
 
     def setup_ui(self):
-        """Set up the user interface"""
-        # Create notebook
-        self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(expand=1, fill="both", padx=10, pady=10)
+            """Set up the user interface"""
+            # Create main container frame
+            main_container = ttk.Frame(self.root)
+            main_container.pack(fill=tk.BOTH, expand=True)
 
-        # Create base frames for each tab
-        self.tabs = {
-            'scenes': ttk.Frame(self.notebook),
-            'items': ttk.Frame(self.notebook),
-            'characters': ttk.Frame(self.notebook),
-            'dialogues': ttk.Frame(self.notebook),
-            'story_texts': ttk.Frame(self.notebook),
-            'crafting': ttk.Frame(self.notebook)
-        }
+            # Create toolbar at the top
+            self.create_toolbar(main_container)
 
-        # Add tabs to notebook
-        for name, frame in self.tabs.items():
-            self.notebook.add(frame, text=name.title())
+            # Create notebook
+            self.notebook = ttk.Notebook(main_container)
+            self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=(5, 10))
 
-        # Create toolbar and status bar
-        self.create_toolbar()
-        self.create_status_bar()
+            # Create base frames for each tab
+            self.tabs = {
+                'scenes': ttk.Frame(self.notebook),
+                'items': ttk.Frame(self.notebook),
+                'characters': ttk.Frame(self.notebook),
+                'dialogues': ttk.Frame(self.notebook),
+                'story_texts': ttk.Frame(self.notebook),
+                'crafting': ttk.Frame(self.notebook)
+            }
 
-        # Create tab contents
-        self.create_scenes_tab()
-        self.create_items_tab()
-        self.create_characters_tab()
-        self.create_dialogues_tab()
-        self.create_story_text_editor()
-        self.create_crafting_editor()
+            # Add tabs to notebook
+            for name, frame in self.tabs.items():
+                self.notebook.add(frame, text=name.title())
 
-        # Create menu
-        self.create_menu()
+            # Create tab contents
+            self.create_scenes_tab()
+            self.create_items_tab()
+            self.create_characters_tab()
+            self.create_dialogues_tab()
+            self.create_story_text_editor()
+            self.create_crafting_editor()
 
+            # Create menu
+            self.create_menu()
+
+            # Create status bar - must be last to stay at bottom
+            self.create_status_bar()
+            
     def create_menu(self):
         """Create the application menu"""
         menubar = tk.Menu(self.root)
@@ -935,36 +941,38 @@ class GameDataEditor:
         
         return listbox, editor_frame
 
-    def create_toolbar(self):
-        toolbar = ttk.Frame(self.root)
-        toolbar.pack(fill=tk.X, padx=5, pady=2)
+    def create_toolbar(self, parent):
+            """Create toolbar with added game path selection"""
+            toolbar = ttk.Frame(parent)
+            toolbar.pack(fill=tk.X, padx=5, pady=2)
 
-        buttons = [
-            ("Save All", self.save_all),
-            ("Reload", self.reload_data),
-            ("Undo", self.undo),
-            ("Redo", self.redo),
-            ("Validate", self.validate_all_data),
-            ("Find References", self.find_references)
-        ]
+            # Left-side buttons
+            left_buttons = ttk.Frame(toolbar)
+            left_buttons.pack(side=tk.LEFT, fill=tk.X)
 
-        for text, command in buttons:
-            ttk.Button(toolbar, text=text, command=command).pack(side=tk.LEFT, padx=2)
+            ttk.Button(left_buttons, text="Select Game Path", 
+                    command=self.select_game_path).pack(side=tk.LEFT, padx=2)
+            ttk.Button(left_buttons, text="Save All", 
+                    command=self.save_all).pack(side=tk.LEFT, padx=2)
+            ttk.Button(left_buttons, text="Reload", 
+                    command=self.reload_data).pack(side=tk.LEFT, padx=2)
+            ttk.Button(left_buttons, text="Validate", 
+                    command=self.validate_all_data).pack(side=tk.LEFT, padx=2)
 
     def create_status_bar(self):
-        """Create status bar"""
-        status_frame = ttk.Frame(self.root)
-        status_frame.pack(side=tk.BOTTOM, fill=tk.X)
+            """Create status bar"""
+            status_frame = ttk.Frame(self.root)
+            status_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=2)
 
-        # Status messages
-        path_label = ttk.Label(status_frame, textvariable=self.path_var, 
-                            relief=tk.SUNKEN, anchor=tk.W)
-        path_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
-
-        status_label = ttk.Label(status_frame, textvariable=self.status_var, 
+            # Status messages
+            path_label = ttk.Label(status_frame, textvariable=self.path_var, 
                                 relief=tk.SUNKEN, anchor=tk.W)
-        status_label.pack(side=tk.RIGHT, fill=tk.X, expand=True)
+            path_label.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 2))
 
+            status_label = ttk.Label(status_frame, textvariable=self.status_var, 
+                                    relief=tk.SUNKEN, anchor=tk.W)
+            status_label.pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(2, 0))
+            
     def update_status(self, message=None):
         """Update status bar messages"""
         # Update status message
@@ -3979,20 +3987,6 @@ class GameDataEditor:
         except Exception as e:
             self.game_path = 'game_files'
             print(f"Failed to load config: {e}")
-
-    def create_toolbar(self):
-        """Create toolbar with added game path selection"""
-        toolbar = ttk.Frame(self.root)
-        toolbar.pack(fill=tk.X, padx=5, pady=2)
-
-        ttk.Button(toolbar, text="Select Game Path", 
-                command=self.select_game_path).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="Save All", 
-                command=self.save_all).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="Reload", 
-                command=self.reload_data).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="Validate", 
-                command=self.validate_all_data).pack(side=tk.LEFT, padx=2)
 
     def get_file_path(self, file_type):
         """Get full path for a game data file"""

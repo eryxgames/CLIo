@@ -1908,9 +1908,12 @@ class GameDataEditor:
         notebook = ttk.Notebook(editor_frame)
         notebook.pack(fill=tk.BOTH, expand=True)
 
+        # Create all character tabs
         self.create_character_basic_info(notebook)
         self.create_character_dialogue(notebook)
         self.create_character_stats(notebook)
+        self.create_character_interactions(notebook)
+        self.create_character_random_events(notebook)
 
         # Main buttons
         button_frame = ttk.Frame(editor_frame)
@@ -1950,16 +1953,6 @@ class GameDataEditor:
             else:
                 ttk.Entry(props_frame, textvariable=var, state=state_or_values).grid(
                     row=i, column=1, padx=5, pady=2, sticky='ew')
-
-        # Movement Options
-        movement_frame = ttk.LabelFrame(basic_frame, text="Movement Options")
-        movement_frame.pack(fill=tk.X, padx=5, pady=5)
-
-        self.char_movable_var = tk.BooleanVar()
-        self.char_follows_var = tk.BooleanVar()
-
-        ttk.Checkbutton(movement_frame, text="Movable", variable=self.char_movable_var).pack(anchor=tk.W, padx=5)
-        ttk.Checkbutton(movement_frame, text="Follows Player", variable=self.char_follows_var).pack(anchor=tk.W, padx=5)
 
         # Description
         desc_frame = ttk.LabelFrame(basic_frame, text="Description")
@@ -2002,29 +1995,177 @@ class GameDataEditor:
         stats_frame = ttk.Frame(notebook)
         notebook.add(stats_frame, text="Stats")
 
-        # Stats Treeview
-        self.stats_tree = ttk.Treeview(stats_frame, columns=("value"), show="headings")
+        # Stats Treeview with proper columns
+        self.stats_tree = ttk.Treeview(stats_frame, columns=("value"), show="headings", height=10)
         self.stats_tree.heading("value", text="Value")
+        self.stats_tree.column("value", width=100, anchor="center")
         self.stats_tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         scrollbar = ttk.Scrollbar(stats_frame, orient=tk.VERTICAL, command=self.stats_tree.yview)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.stats_tree.configure(yscrollcommand=scrollbar.set)
 
-        # Buttons for stat management
+        # Buttons frame
         button_frame = ttk.Frame(stats_frame)
         button_frame.pack(fill=tk.X, padx=5, pady=5)
         
-        buttons = [
-            ("Add Stat", self.add_character_stat),
-            ("Edit Stat", self.edit_character_stat),
-            ("Remove Stat", self.remove_character_stat)
-        ]
-        
-        for text, command in buttons:
-            ttk.Button(button_frame, text=text, command=command).pack(side=tk.LEFT, padx=2)
+        ttk.Button(button_frame, text="Add Stat", command=self.add_character_stat).pack(side=tk.LEFT, padx=2)
+        ttk.Button(button_frame, text="Edit Stat", command=self.edit_character_stat).pack(side=tk.LEFT, padx=2)
+        ttk.Button(button_frame, text="Remove Stat", command=self.remove_character_stat).pack(side=tk.LEFT, padx=2)
 
         self.stats_tree.bind('<Double-Button-1>', lambda e: self.edit_character_stat())
+
+    def create_character_interactions(self, notebook):
+        interactions_frame = ttk.Frame(notebook)
+        notebook.add(interactions_frame, text="Item Interactions")
+
+        # Item Interactions Tree
+        self.interactions_tree = ttk.Treeview(interactions_frame, columns=("type", "consume", "reward"), show="headings", height=10)
+        self.interactions_tree.heading("type", text="Type")
+        self.interactions_tree.heading("consume", text="Consumes Item")
+        self.interactions_tree.heading("reward", text="Reward/Effect")
+        
+        self.interactions_tree.column("type", width=100)
+        self.interactions_tree.column("consume", width=100)
+        self.interactions_tree.column("reward", width=150)
+        
+        self.interactions_tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        # Buttons frame
+        button_frame = ttk.Frame(interactions_frame)
+        button_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Button(button_frame, text="Add Interaction", command=self.add_item_interaction).pack(side=tk.LEFT, padx=2)
+        ttk.Button(button_frame, text="Edit Interaction", command=self.edit_item_interaction).pack(side=tk.LEFT, padx=2)
+        ttk.Button(button_frame, text="Remove Interaction", command=self.remove_item_interaction).pack(side=tk.LEFT, padx=2)
+
+    def edit_item_interaction(self):
+        """Edit selected item interaction"""
+        char_sel = self.chars_listbox.curselection()
+        interaction_sel = self.interactions_tree.selection()
+
+        if not (char_sel and interaction_sel):
+            messagebox.showwarning("Warning", "Please select a character and interaction")
+            return
+
+        char_id = list(self.characters_data.keys())[char_sel[0]]
+        char = self.characters_data[char_id]
+        
+        # Get current interaction data
+        item_id = self.interactions_tree.item(interaction_sel)['values'][0]
+        interaction = char['item_interactions'][item_id]
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Edit Item Interaction")
+        dialog.geometry("500x400")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Interaction type
+        type_frame = ttk.Frame(dialog)
+        type_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(type_frame, text="Type:").pack(side=tk.LEFT)
+        type_var = tk.StringVar(value=interaction.get('type', 'replicate'))
+        ttk.Combobox(type_frame, textvariable=type_var, 
+                    values=["replicate", "information", "analyze", "custom"]).pack(
+            side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+
+        # Response text
+        resp_frame = ttk.LabelFrame(dialog, text="Response")
+        resp_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        response_text = self.create_custom_text(resp_frame)
+        response_text.pack(fill=tk.BOTH, expand=True)
+        response_text.insert('1.0', interaction.get('response', ''))
+
+        # Options frame
+        options_frame = ttk.Frame(dialog)
+        options_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        # Consume item option
+        consume_var = tk.BooleanVar(value=interaction.get('consume_item', True))
+        ttk.Checkbutton(options_frame, text="Consume Item", variable=consume_var).pack(side=tk.LEFT)
+
+        # Reward/Flag frame
+        reward_frame = ttk.LabelFrame(dialog, text="Reward or Story Flag")
+        reward_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        # Reward type
+        reward_type_var = tk.StringVar(value="none")
+        reward_value_var = tk.StringVar()
+        
+        if 'reward_item' in interaction:
+            reward_type_var.set("item")
+            reward_value_var.set(interaction['reward_item'])
+        elif 'story_flag' in interaction:
+            reward_type_var.set("flag")
+            reward_value_var.set(interaction['story_flag'])
+
+        ttk.Radiobutton(reward_frame, text="None", value="none", 
+                        variable=reward_type_var).pack(anchor=tk.W)
+        ttk.Radiobutton(reward_frame, text="Item", value="item", 
+                        variable=reward_type_var).pack(anchor=tk.W)
+        ttk.Radiobutton(reward_frame, text="Story Flag", value="flag", 
+                        variable=reward_type_var).pack(anchor=tk.W)
+        
+        ttk.Entry(reward_frame, textvariable=reward_value_var).pack(fill=tk.X, padx=5, pady=2)
+
+        def update():
+            response = response_text.get('1.0', tk.END).strip()
+            if not response:
+                messagebox.showwarning("Warning", "Response text is required")
+                return
+
+            updated_interaction = {
+                'type': type_var.get(),
+                'response': response,
+                'consume_item': consume_var.get()
+            }
+
+            # Add reward or flag
+            reward_type = reward_type_var.get()
+            if reward_type == 'item' and reward_value_var.get():
+                updated_interaction['reward_item'] = reward_value_var.get()
+            elif reward_type == 'flag' and reward_value_var.get():
+                updated_interaction['story_flag'] = reward_value_var.get()
+
+            char['item_interactions'][item_id] = updated_interaction
+            
+            # Update treeview
+            reward = updated_interaction.get('reward_item', updated_interaction.get('story_flag', ''))
+            self.interactions_tree.item(interaction_sel, values=(
+                item_id,
+                updated_interaction['type'],
+                'Yes' if updated_interaction['consume_item'] else 'No',
+                reward
+            ))
+            
+            self.modified.add('characters')
+            dialog.destroy()
+
+        ttk.Button(dialog, text="Update", command=update).pack(pady=10)
+
+    def remove_item_interaction(self):
+        """Remove selected item interaction"""
+        char_sel = self.chars_listbox.curselection()
+        interaction_sel = self.interactions_tree.selection()
+
+        if not (char_sel and interaction_sel):
+            messagebox.showwarning("Warning", "Please select a character and interaction")
+            return
+
+        if not messagebox.askyesno("Confirm", "Remove this item interaction?"):
+            return
+
+        char_id = list(self.characters_data.keys())[char_sel[0]]
+        char = self.characters_data[char_id]
+        
+        # Get item ID from tree
+        item_id = self.interactions_tree.item(interaction_sel)['values'][0]
+        
+        # Remove interaction
+        del char['item_interactions'][item_id]
+        self.interactions_tree.delete(interaction_sel)
+        self.modified.add('characters')
 
     def create_dialogues_tab(self):
         """Create the dialogues tab"""
@@ -3156,6 +3297,7 @@ class GameDataEditor:
         self.modified.add('characters')    
 
     def add_character_stat(self):
+        """Add stat to the current character"""
         if not (selection := self.chars_listbox.curselection()):
             messagebox.showwarning("Warning", "Please select a character first")
             return
@@ -3166,27 +3308,28 @@ class GameDataEditor:
         dialog.transient(self.root)
         dialog.grab_set()
 
+        # Stat Name
         name_frame = ttk.Frame(dialog)
         name_frame.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Label(name_frame, text="Name:").pack(side=tk.LEFT)
+        ttk.Label(name_frame, text="Stat Name:").pack(side=tk.LEFT)
         name_var = tk.StringVar()
-        ttk.Entry(name_frame, textvariable=name_var).pack(side=tk.LEFT, padx=5)
+        ttk.Entry(name_frame, textvariable=name_var).pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
+        # Stat Value
         value_frame = ttk.Frame(dialog)
         value_frame.pack(fill=tk.X, padx=5, pady=5)
         ttk.Label(value_frame, text="Value:").pack(side=tk.LEFT)
         value_var = tk.StringVar()
-        ttk.Entry(value_frame, textvariable=value_var).pack(side=tk.LEFT, padx=5)
+        ttk.Entry(value_frame, textvariable=value_var).pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
         def add():
-            if not (stat_name := name_var.get().strip()):
-                messagebox.showerror("Error", "Stat name required")
-                return
-                
             try:
+                name = name_var.get().strip()
+                if not name:
+                    raise ValueError("Stat name is required")
                 value = float(value_var.get())
-            except ValueError:
-                messagebox.showerror("Error", "Value must be a number")
+            except ValueError as e:
+                messagebox.showerror("Error", str(e))
                 return
 
             char_id = list(self.characters_data.keys())[selection[0]]
@@ -3195,14 +3338,15 @@ class GameDataEditor:
             if 'stats' not in char:
                 char['stats'] = {}
 
-            char['stats'][stat_name] = value
-            self.stats_tree.insert('', 'end', text=stat_name, values=(value,))
+            char['stats'][name] = value
+            self.stats_tree.insert('', 'end', text=name, values=(value,))
             self.modified.add('characters')
             dialog.destroy()
 
         ttk.Button(dialog, text="Add", command=add).pack(pady=10)
 
     def edit_character_stat(self):
+        """Edit the selected stat"""
         char_sel = self.chars_listbox.curselection()
         stat_sel = self.stats_tree.selection()
 
@@ -3215,19 +3359,20 @@ class GameDataEditor:
         
         stat_item = self.stats_tree.item(stat_sel[0])
         stat_name = stat_item['text']
-        current_value = char['stats'][stat_name]
+        current_value = char['stats'].get(stat_name, 0)
 
         dialog = tk.Toplevel(self.root)
-        dialog.title("Edit Stat")
-        dialog.geometry("250x100")
+        dialog.title(f"Edit {stat_name}")
+        dialog.geometry("250x120")
         dialog.transient(self.root)
         dialog.grab_set()
 
+        # Value frame
         value_frame = ttk.Frame(dialog)
         value_frame.pack(fill=tk.X, padx=5, pady=5)
         ttk.Label(value_frame, text=f"{stat_name}:").pack(side=tk.LEFT)
         value_var = tk.StringVar(value=str(current_value))
-        ttk.Entry(value_frame, textvariable=value_var).pack(side=tk.LEFT, padx=5)
+        ttk.Entry(value_frame, textvariable=value_var).pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
         def update():
             try:
@@ -3237,11 +3382,19 @@ class GameDataEditor:
                 return
 
             char['stats'][stat_name] = value
-            self.stats_tree.set(stat_sel[0], column='value', value=value)
+            self.stats_tree.set(stat_sel[0], "value", value)
             self.modified.add('characters')
             dialog.destroy()
 
         ttk.Button(dialog, text="Update", command=update).pack(pady=10)
+
+    def update_character_stats_display(self, character):
+        """Update the stats display for a character"""
+        self.stats_tree.delete(*self.stats_tree.get_children())
+        
+        for stat_name, value in character.get('stats', {}).items():
+            item_id = self.stats_tree.insert('', 'end', text=stat_name, values=(value,))
+            self.stats_tree.item(item_id, tags=('stat',))        
 
     def remove_character_stat(self):
         char_sel = self.chars_listbox.curselection()
@@ -3263,6 +3416,8 @@ class GameDataEditor:
         del char['stats'][stat_name]
         self.stats_tree.delete(stat_sel[0])
         self.modified.add('characters')
+
+
 
     @safe_operation
     def save_current_character(self):
@@ -4014,32 +4169,274 @@ class GameDataEditor:
                     else:
                         self.components_list.insert(tk.END, f"Unknown item ({component_id})")
 
+    def create_character_random_events(self, notebook):
+        """Create the random events tab"""
+        events_frame = ttk.Frame(notebook)
+        notebook.add(events_frame, text="Random Events")
+
+        # Events Listbox
+        self.events_list = self.create_custom_listbox(events_frame)
+        self.events_list.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        # Buttons frame
+        button_frame = ttk.Frame(events_frame)
+        button_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Button(button_frame, text="Add Event", command=self.add_random_event).pack(side=tk.LEFT, padx=2)
+        ttk.Button(button_frame, text="Edit Event", command=self.edit_random_event).pack(side=tk.LEFT, padx=2)
+        ttk.Button(button_frame, text="Remove Event", command=self.remove_random_event).pack(side=tk.LEFT, padx=2)
+
+    def add_random_event(self):
+        """Add a new random event"""
+        if not (selection := self.chars_listbox.curselection()):
+            messagebox.showwarning("Warning", "Please select a character first")
+            return
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Add Random Event")
+        dialog.geometry("400x200")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Event text
+        ttk.Label(dialog, text="Event Text:").pack(anchor=tk.W, padx=5, pady=2)
+        event_text = self.create_custom_text(dialog, height=5)
+        event_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        def add():
+            text = event_text.get('1.0', tk.END).strip()
+            if not text:
+                messagebox.showerror("Error", "Event text is required")
+                return
+
+            char_id = list(self.characters_data.keys())[selection[0]]
+            char = self.characters_data[char_id]
+            
+            if 'random_events' not in char:
+                char['random_events'] = []
+
+            char['random_events'].append(text)
+            self.events_list.insert(tk.END, text)
+            self.modified.add('characters')
+            dialog.destroy()
+
+        ttk.Button(dialog, text="Add", command=add).pack(pady=10)
+
+    def edit_random_event(self):
+        """Edit selected random event"""
+        char_sel = self.chars_listbox.curselection()
+        event_sel = self.events_list.curselection()
+
+        if not (char_sel and event_sel):
+            messagebox.showwarning("Warning", "Please select a character and event")
+            return
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Edit Random Event")
+        dialog.geometry("400x200")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Event text
+        ttk.Label(dialog, text="Event Text:").pack(anchor=tk.W, padx=5, pady=2)
+        event_text = self.create_custom_text(dialog, height=5)
+        event_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # Load current text
+        event_text.insert('1.0', self.events_list.get(event_sel))
+
+        def update():
+            text = event_text.get('1.0', tk.END).strip()
+            if not text:
+                messagebox.showerror("Error", "Event text is required")
+                return
+
+            char_id = list(self.characters_data.keys())[char_sel[0]]
+            char = self.characters_data[char_id]
+            event_idx = event_sel[0]
+            
+            char['random_events'][event_idx] = text
+            self.events_list.delete(event_sel)
+            self.events_list.insert(event_sel, text)
+            self.modified.add('characters')
+            dialog.destroy()
+
+        ttk.Button(dialog, text="Update", command=update).pack(pady=10)
+
+    def remove_random_event(self):
+        """Remove selected random event"""
+        char_sel = self.chars_listbox.curselection()
+        event_sel = self.events_list.curselection()
+
+        if not (char_sel and event_sel):
+            messagebox.showwarning("Warning", "Please select a character and event")
+            return
+
+        if not messagebox.askyesno("Confirm", "Remove this random event?"):
+            return
+
+        char_id = list(self.characters_data.keys())[char_sel[0]]
+        char = self.characters_data[char_id]
+        event_idx = event_sel[0]
+        
+        del char['random_events'][event_idx]
+        self.events_list.delete(event_sel)
+        self.modified.add('characters')
+
+    def add_item_interaction(self):
+        """Add new item interaction"""
+        if not (selection := self.chars_listbox.curselection()):
+            messagebox.showwarning("Warning", "Please select a character first")
+            return
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Add Item Interaction")
+        dialog.geometry("500x400")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # Item selection
+        item_frame = ttk.LabelFrame(dialog, text="Select Item")
+        item_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        item_list = self.create_custom_listbox(item_frame, height=5)
+        item_list.pack(fill=tk.X, padx=5, pady=5)
+        
+        # Populate items list
+        for item_id, item in self.items_data.items():
+            item_list.insert(tk.END, f"{item['name']} ({item_id})")
+
+        # Interaction type
+        type_frame = ttk.Frame(dialog)
+        type_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(type_frame, text="Type:").pack(side=tk.LEFT)
+        type_var = tk.StringVar(value="replicate")
+        ttk.Combobox(type_frame, textvariable=type_var, 
+                    values=["replicate", "information", "analyze", "custom"]).pack(
+            side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+
+        # Response text
+        resp_frame = ttk.LabelFrame(dialog, text="Response")
+        resp_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        response_text = self.create_custom_text(resp_frame)
+        response_text.pack(fill=tk.BOTH, expand=True)
+
+        # Options frame
+        options_frame = ttk.Frame(dialog)
+        options_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        # Consume item option
+        consume_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(options_frame, text="Consume Item", variable=consume_var).pack(side=tk.LEFT)
+
+        # Reward/Flag frame
+        reward_frame = ttk.LabelFrame(dialog, text="Reward or Story Flag")
+        reward_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        # Reward type
+        reward_type_var = tk.StringVar(value="none")
+        ttk.Radiobutton(reward_frame, text="None", value="none", 
+                        variable=reward_type_var).pack(anchor=tk.W)
+        ttk.Radiobutton(reward_frame, text="Item", value="item", 
+                        variable=reward_type_var).pack(anchor=tk.W)
+        ttk.Radiobutton(reward_frame, text="Story Flag", value="flag", 
+                        variable=reward_type_var).pack(anchor=tk.W)
+        
+        reward_value_var = tk.StringVar()
+        ttk.Entry(reward_frame, textvariable=reward_value_var).pack(fill=tk.X, padx=5, pady=2)
+
+        def add():
+            if not (item_sel := item_list.curselection()):
+                messagebox.showwarning("Warning", "Please select an item")
+                return
+                
+            response = response_text.get('1.0', tk.END).strip()
+            if not response:
+                messagebox.showwarning("Warning", "Response text is required")
+                return
+
+            # Get selected item ID
+            item_text = item_list.get(item_sel)
+            item_id = item_text.split('(')[-1].strip(')')
+
+            char_id = list(self.characters_data.keys())[selection[0]]
+            char = self.characters_data[char_id]
+            
+            if 'item_interactions' not in char:
+                char['item_interactions'] = {}
+
+            interaction = {
+                'type': type_var.get(),
+                'response': response,
+                'consume_item': consume_var.get()
+            }
+
+            # Add reward or flag
+            reward_type = reward_type_var.get()
+            if reward_type == 'item' and reward_value_var.get():
+                interaction['reward_item'] = reward_value_var.get()
+            elif reward_type == 'flag' and reward_value_var.get():
+                interaction['story_flag'] = reward_value_var.get()
+
+            char['item_interactions'][item_id] = interaction
+            
+            # Update treeview
+            reward = interaction.get('reward_item', interaction.get('story_flag', ''))
+            self.interactions_tree.insert('', 'end', values=(
+                item_id,
+                interaction['type'],
+                'Yes' if interaction['consume_item'] else 'No',
+                reward
+            ))
+            
+            self.modified.add('characters')
+            dialog.destroy()
+
+        ttk.Button(dialog, text="Add", command=add).pack(pady=10)
+
     def update_character_editor(self, char_id, character):
         """Update character editor fields with character data"""
-        # Basic Info tab
+        # Basic Info
         self.char_id_var.set(char_id)
         self.char_name_var.set(character.get('name', ''))
         self.char_type_var.set(character.get('type', 'neutral'))
-
+        
         self.char_desc_text.delete('1.0', tk.END)
         self.char_desc_text.insert('1.0', character.get('description', ''))
 
-        # Movement options
-        self.char_movable_var.set(character.get('movable', False))
-        self.char_follows_var.set(character.get('follows_player', False))
-
-        # Dialogue tab
+        # Update greeting/dialogue
         self.char_greeting_text.delete('1.0', tk.END)
         self.char_greeting_text.insert('1.0', character.get('greeting', ''))
 
+        # Update dialogue options
         self.dialogue_options_list.delete(0, tk.END)
         for option_text in character.get('dialogue_options', {}).keys():
             self.dialogue_options_list.insert(tk.END, option_text)
 
-        # Stats tab
+        # Update stats - maintain exact names from JSON
         self.stats_tree.delete(*self.stats_tree.get_children())
-        for stat_name, value in character.get('stats', {}).items():
-            self.stats_tree.insert('', 'end', text=stat_name, values=(value,)) 
+        stats = character.get('stats', {})
+        for stat_name, value in stats.items():
+            self.stats_tree.insert('', 'end', text=stat_name, values=(value,))
+
+        # Update random events
+        self.events_list.delete(0, tk.END)
+        for event in character.get('random_events', []):
+            self.events_list.insert(tk.END, event)
+
+        # Update item interactions
+        self.interactions_tree.delete(*self.interactions_tree.get_children())
+        for item_id, interaction in character.get('item_interactions', {}).items():
+            reward = interaction.get('reward_item', '')
+            if not reward and 'story_flag' in interaction:
+                reward = f"Flag: {interaction['story_flag']}"
+                
+            self.interactions_tree.insert('', 'end', values=(
+                item_id,
+                interaction.get('type', ''),
+                'Yes' if interaction.get('consume_item') else 'No',
+                reward
+            ))
 
         # Game path for loading CLIo games
 

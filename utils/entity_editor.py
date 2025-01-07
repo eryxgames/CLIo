@@ -160,7 +160,7 @@ class ThemeManager:
             widget.configure(
                 background=theme['input_bg'],
                 foreground=theme['fg'],
-                insertbackground=theme['fg'],
+                insertforeground=theme['fg'],
                 selectbackground=theme['select_bg'],
                 selectforeground=theme['select_fg']
             )
@@ -168,7 +168,7 @@ class ThemeManager:
             widget.configure(
                 background=theme['input_bg'],
                 foreground=theme['fg'],
-                insertbackground=theme['fg']
+                insertforeground=theme['fg']
             )
         elif isinstance(widget, tk.Listbox):
             widget.configure(
@@ -262,7 +262,7 @@ class ThemeManager:
     def get_theme_colors(self):
         """Get current theme colors"""
         return self.themes[self.current_theme]
-        
+                    
 class Settings:
     def __init__(self):
         # Theme settings
@@ -433,17 +433,23 @@ class SettingsDialog:
             self.theme_manager.current_theme = self.settings.theme
             self.theme_manager.apply_theme_to_all(self.parent, self.editor.style)
 
-            # Apply fonts
+            # Create font configurations
             menu_font = (self.settings.font_family, self.settings.menu_font_size)
             text_font = (self.settings.font_family, self.settings.text_font_size)
             
+            # Configure ttk styles with new fonts
+            style = self.editor.style
+            style.configure('TButton', font=menu_font)
+            style.configure('TLabel', font=menu_font)
+            style.configure('TEntry', font=text_font)
+            style.configure('TNotebook.Tab', font=menu_font)
+            style.configure('Treeview', font=text_font)
+            
             # Update menu fonts
             self.parent.option_add('*Menu.font', menu_font)
-            self.parent.option_add('*TButton.font', menu_font)
-            self.parent.option_add('*TLabel.font', menu_font)
             
-            # Update text widget fonts using editor method
-            self.update_all_fonts(text_font)
+            # Update all text widgets
+            self.apply_fonts_recursive(self.parent, menu_font, text_font)
 
         except ValueError as e:
             messagebox.showerror("Error", str(e))
@@ -453,18 +459,29 @@ class SettingsDialog:
         for widget in self.parent.winfo_children():
             self._update_widget_fonts(widget, font)
 
-    def _update_widget_fonts(self, widget, font):
-        """Recursively update fonts for text widgets"""
-        if isinstance(widget, (tk.Text, tk.Entry)):
-            widget.configure(font=font)
-        for child in widget.winfo_children():
-            self._update_widget_fonts(child, font)
+    def apply_fonts_recursive(self, widget, menu_font, text_font):
+        """Recursively apply fonts to all widgets"""
+        try:
+            if isinstance(widget, (tk.Text, tk.Entry, ttk.Entry)):
+                widget.configure(font=text_font)
+            elif isinstance(widget, tk.Menu):
+                widget.configure(font=menu_font)
+            elif isinstance(widget, (ttk.Button, ttk.Label)):
+                widget.configure(font=menu_font)
+            elif isinstance(widget, (ttk.Treeview, tk.Listbox)):
+                widget.configure(font=text_font)
+                
+            # Recursively apply to children
+            for child in widget.winfo_children():
+                self.apply_fonts_recursive(child, menu_font, text_font)
+        except tk.TclError:
+            pass  # Skip if widget doesn't support font configuration
 
     def save_settings(self):
         """Save settings and close dialog"""
         self.apply_settings()
         self.dialog.destroy()
-
+        
 class GameDataEditor:
     def __init__(self, root):
         """Initialize the editor"""

@@ -3000,8 +3000,7 @@ class GameDataEditor:
         def add():
             try:
                 value = float(value_var.get())
-                formatted_value = float(self.format_number(value))
-                
+                formatted_value = self.format_number(value)                
                 item_id = list(self.items_data.keys())[selection[0]]
                 item = self.items_data[item_id]
                 
@@ -3070,8 +3069,7 @@ class GameDataEditor:
         def update():
             try:
                 value = float(value_var.get())
-                formatted_value = float(self.format_number(value))
-                
+                formatted_value = self.format_number(value)                
                 if 'effect' in item and effect_type in item['effect']:
                     item['effect'][effect_type] = formatted_value
                 elif 'effects' in item and effect_type in item['effects']:
@@ -3374,8 +3372,7 @@ class GameDataEditor:
                 if not stat_name:
                     raise ValueError("Stat name is required")
                 value = float(value_var.get())
-                formatted_value = float(self.format_number(value))
-
+                formatted_value = self.format_number(value)
                 char_id = list(self.characters_data.keys())[selection[0]]
                 char = self.characters_data[char_id]
                 
@@ -3426,7 +3423,7 @@ class GameDataEditor:
         def update():
             try:
                 value = float(value_var.get())
-                formatted_value = float(self.format_number(value))
+                formatted_value = self.format_number(value)
                 char['stats'][stat_name] = formatted_value
                 self.stats_tree.set(stat_sel[0], "value", self.format_number(formatted_value))
                 self.modified.add('characters')

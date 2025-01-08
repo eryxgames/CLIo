@@ -113,7 +113,7 @@ class ThemeManager:
             },
             'Mocca': {
                 'bg': '#f0f0f0',
-                'fg': '#000000',
+                'fg': '#9e9e9e',
                 'select_bg': '#0078d7',
                 'select_fg': '#ffffff',
                 'input_bg': '#2d2d2d',  # Dark input background
@@ -505,7 +505,54 @@ class GameDataEditor:
         # Load game data
         self.initialize_game_path()
         self.load_data()
-     
+
+        self.current_character = None
+        self.current_item = None
+
+                # Add selection storage
+        self._current_char_selection = None
+        self._current_item_selection = None
+        self._current_effect_selection = None
+        self._current_component_selection = None
+        self._current_interaction_selection = None
+        self._current_event_selection = None
+        self._current_dialogue_selection = None
+        self._current_scene_selection = None
+
+    def store_selection(self, listbox, selection_var):
+        """Store selection from a listbox"""
+        selection = listbox.curselection()
+        if selection:
+            setattr(self, selection_var, selection[0])
+
+    def restore_selection(self, listbox, selection_var):
+        """Restore previous selection in a listbox"""
+        selection = getattr(self, selection_var, None)
+        if selection is not None:
+            listbox.selection_clear(0, tk.END)
+            listbox.selection_set(selection)
+
+    def get_current_selection(self, selection_var):
+        """Get currently selected item index"""
+        return getattr(self, selection_var, None)
+
+    def format_number(self, value):
+            """Format number to remove trailing zeros and decimal points"""
+            try:
+                num = float(value)
+                if num.is_integer():
+                    return str(int(num))
+                return str(num)
+            except (ValueError, TypeError):
+                return str(value)
+
+    def update_character_stats_display(self, character):
+        self.stats_tree.delete(*self.stats_tree.get_children())
+        stats = character.get('stats', {})
+        for stat_name, value in stats.items():
+            formatted_value = self.format_number(value)
+            self.stats_tree.insert('', 'end', text=stat_name, values=(stat_name, formatted_value))
+
     def setup_window(self):
         """Setup main window with theme"""
         self.root.title("CLIo Game Data Editor")
@@ -1173,31 +1220,28 @@ class GameDataEditor:
             method()
 
     def on_scene_select(self, event=None):
-        if not (selection := self.scenes_listbox.curselection()):
-            return
-            
-        scene = self.scenes_data[selection[0]]
-        self.scene_id_var.set(scene['id'])
-        self.scene_name_var.set(scene['name'])
-        self.scene_desc_text.delete('1.0', tk.END)
-        self.scene_desc_text.insert('1.0', scene.get('description', ''))
-        self.update_scene_contents(scene)
-
-    def on_item_select(self, event=None):
-        if not (selection := self.items_listbox.curselection()):
-            return
-            
-        item_id = list(self.items_data.keys())[selection[0]]
-        item = self.items_data[item_id]
-        self.update_item_editor(item_id, item)
+        self.store_selection(self.scenes_listbox, '_current_scene_selection') 
+        if selection := self.get_current_selection('_current_scene_selection'):
+            scene = self.scenes_data[selection]  
+            self.scene_id_var.set(scene['id'])
+            self.scene_name_var.set(scene['name']) 
+            self.scene_desc_text.delete('1.0', tk.END)
+            self.scene_desc_text.insert('1.0', scene.get('description', ''))
+            self.update_scene_contents(scene)
 
     def on_character_select(self, event=None):
-        if not (selection := self.chars_listbox.curselection()):
-            return
-            
-        char_id = list(self.characters_data.keys())[selection[0]]
-        character = self.characters_data[char_id]
-        self.update_character_editor(char_id, character)
+        self.store_selection(self.chars_listbox, '_current_char_selection')
+        if selection := self.get_current_selection('_current_char_selection'):
+            char_id = list(self.characters_data.keys())[selection]
+            character = self.characters_data[char_id]
+            self.update_character_editor(char_id, character)
+
+    def on_item_select(self, event=None):
+        self.store_selection(self.items_listbox, '_current_item_selection')
+        if selection := self.get_current_selection('_current_item_selection'):
+            item_id = list(self.items_data.keys())[selection]
+            item = self.items_data[item_id]
+            self.update_item_editor(item_id, item)
 
     @safe_operation
     def undo(self):
@@ -1996,16 +2040,17 @@ class GameDataEditor:
         notebook.add(stats_frame, text="Stats")
 
         # Stats Treeview with proper columns
-        self.stats_tree = ttk.Treeview(stats_frame, columns=("value"), show="headings", height=10)
-        self.stats_tree.heading("value", text="Value")
-        self.stats_tree.column("value", width=100, anchor="center")
+        self.stats_tree = ttk.Treeview(stats_frame, columns=("name", "value"), show="tree headings")
+        self.stats_tree.heading("name", text="Value")
+        self.stats_tree.heading("value", text="New Value")
+        self.stats_tree.column("name", width=150)
+        self.stats_tree.column("value", width=100)
         self.stats_tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         scrollbar = ttk.Scrollbar(stats_frame, orient=tk.VERTICAL, command=self.stats_tree.yview)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.stats_tree.configure(yscrollcommand=scrollbar.set)
 
-        # Buttons frame
         button_frame = ttk.Frame(stats_frame)
         button_frame.pack(fill=tk.X, padx=5, pady=5)
         
@@ -2988,59 +3033,60 @@ class GameDataEditor:
                 dialog.destroy()
 
             ttk.Button(dialog, text="Add", command=add_effect).pack(pady=10)
-            
+                
     def edit_item_effect(self):
-        item_sel = self.items_listbox.curselection()
+        item_selection = self.get_current_selection('_current_item_selection')
+        if not item_selection:
+            messagebox.showwarning("Warning", "Please select an item")
+            return
+            
         effect_sel = self.effects_list.curselection()
-
-        if not (item_sel and effect_sel):
-            messagebox.showwarning("Warning", "Please select an item and effect")
+        if not effect_sel:
+            messagebox.showwarning("Warning", "Please select an effect")
             return
 
-        item_id = list(self.items_data.keys())[item_sel[0]]
+        item_id = list(self.items_data.keys())[item_selection]
         item = self.items_data[item_id]
         
         effect_text = self.effects_list.get(effect_sel)
         effect_type = effect_text.split(':')[0].strip()
-        effect = item['effects'][effect_type]
+
+        # Get current value
+        current_value = 0
+        if 'effect' in item and effect_type in item['effect']:
+            current_value = item['effect'][effect_type]
+        elif 'effects' in item and effect_type in item['effects']:
+            current_value = item['effects'][effect_type].get('value', 0)
 
         dialog = tk.Toplevel(self.root)
-        dialog.title("Edit Effect")
-        dialog.geometry("300x200")
+        dialog.title(f"Edit {effect_type}")
+        dialog.geometry("250x120")
         dialog.transient(self.root)
         dialog.grab_set()
 
         value_frame = ttk.Frame(dialog)
         value_frame.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Label(value_frame, text="Value:").pack(side=tk.LEFT)
-        value_var = tk.StringVar(value=str(effect['value']))
+        ttk.Label(value_frame, text=f"{effect_type}:").pack(side=tk.LEFT)
+        value_var = tk.StringVar(value=str(current_value))
         ttk.Entry(value_frame, textvariable=value_var).pack(side=tk.LEFT, padx=5)
 
-        duration_frame = ttk.Frame(dialog)
-        duration_frame.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Label(duration_frame, text="Duration:").pack(side=tk.LEFT)
-        duration_var = tk.StringVar(value=effect['duration'])
-        ttk.Combobox(duration_frame, textvariable=duration_var,
-                    values=["permanent", "temporary", "single-use"]).pack(side=tk.LEFT, padx=5)
-
-        def update_effect():
+        def update():
             try:
                 value = float(value_var.get())
+                if 'effect' in item and effect_type in item['effect']:
+                    item['effect'][effect_type] = value
+                elif 'effects' in item and effect_type in item['effects']:
+                    item['effects'][effect_type]['value'] = value
+
+                self.effects_list.delete(effect_sel)
+                self.effects_list.insert(effect_sel, f"{effect_type}: {value}")
+                self.modified.add('items')
+                dialog.destroy()
+                self.restore_selection(self.items_listbox, '_current_item_selection')
             except ValueError:
                 messagebox.showerror("Error", "Value must be a number")
-                return
 
-            item['effects'][effect_type].update({
-                'value': value,
-                'duration': duration_var.get()
-            })
-
-            self.effects_list.delete(effect_sel)
-            self.effects_list.insert(effect_sel, f"{effect_type}: {value} ({duration_var.get()})")
-            self.modified.add('items')
-            dialog.destroy()
-
-        ttk.Button(dialog, text="Update", command=update_effect).pack(pady=10)
+        ttk.Button(dialog, text="Update", command=update).pack(pady=10)
 
     def remove_item_effect(self):
         item_sel = self.items_listbox.curselection()
@@ -3324,8 +3370,8 @@ class GameDataEditor:
 
         def add():
             try:
-                name = name_var.get().strip()
-                if not name:
+                stat_name = name_var.get().strip()
+                if not stat_name:
                     raise ValueError("Stat name is required")
                 value = float(value_var.get())
             except ValueError as e:
@@ -3338,63 +3384,64 @@ class GameDataEditor:
             if 'stats' not in char:
                 char['stats'] = {}
 
-            char['stats'][name] = value
-            self.stats_tree.insert('', 'end', text=name, values=(value,))
+            char['stats'][stat_name] = value
+            self.stats_tree.insert('', 'end', values=(stat_name, value))
             self.modified.add('characters')
             dialog.destroy()
 
         ttk.Button(dialog, text="Add", command=add).pack(pady=10)
 
     def edit_character_stat(self):
-        """Edit the selected stat"""
-        char_sel = self.chars_listbox.curselection()
+        char_selection = self.get_current_selection('_current_char_selection')
         stat_sel = self.stats_tree.selection()
-
-        if not (char_sel and stat_sel):
-            messagebox.showwarning("Warning", "Please select a character and stat")
+        
+        if not char_selection:
+            messagebox.showwarning("Warning", "Please select a character")
+            return
+            
+        if not stat_sel:
+            messagebox.showwarning("Warning", "Please select a stat")
             return
 
-        char_id = list(self.characters_data.keys())[char_sel[0]]
+        char_id = list(self.characters_data.keys())[char_selection]
         char = self.characters_data[char_id]
         
         stat_item = self.stats_tree.item(stat_sel[0])
-        stat_name = stat_item['text']
-        current_value = char['stats'].get(stat_name, 0)
+        stat_name = stat_item['text']  # Changed from values to text
+        current_value = char['stats'][stat_name]
 
         dialog = tk.Toplevel(self.root)
         dialog.title(f"Edit {stat_name}")
         dialog.geometry("250x120")
         dialog.transient(self.root)
         dialog.grab_set()
+        
+        self.theme_manager.apply_theme_to_dialog(dialog)
 
-        # Value frame
         value_frame = ttk.Frame(dialog)
         value_frame.pack(fill=tk.X, padx=5, pady=5)
         ttk.Label(value_frame, text=f"{stat_name}:").pack(side=tk.LEFT)
-        value_var = tk.StringVar(value=str(current_value))
+        value_var = tk.StringVar(value=self.format_number(current_value))
         ttk.Entry(value_frame, textvariable=value_var).pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
         def update():
             try:
                 value = float(value_var.get())
+                char['stats'][stat_name] = value
+                self.stats_tree.set(stat_sel[0], "value", self.format_number(value))
+                self.modified.add('characters')
+                dialog.destroy()
+                
+                self.restore_selection(self.chars_listbox, '_current_char_selection')
             except ValueError:
                 messagebox.showerror("Error", "Value must be a number")
-                return
 
-            char['stats'][stat_name] = value
-            self.stats_tree.set(stat_sel[0], "value", value)
-            self.modified.add('characters')
-            dialog.destroy()
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(fill=tk.X, pady=10, padx=5)
+        ttk.Button(button_frame, text="Update", command=update).pack(side=tk.LEFT, padx=2)
+        ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=2)
 
-        ttk.Button(dialog, text="Update", command=update).pack(pady=10)
-
-    def update_character_stats_display(self, character):
-        """Update the stats display for a character"""
-        self.stats_tree.delete(*self.stats_tree.get_children())
-        
-        for stat_name, value in character.get('stats', {}).items():
-            item_id = self.stats_tree.insert('', 'end', text=stat_name, values=(value,))
-            self.stats_tree.item(item_id, tags=('stat',))        
+        dialog.geometry("+%d+%d" % (self.root.winfo_rootx() + 50, self.root.winfo_rooty() + 50))
 
     def remove_character_stat(self):
         char_sel = self.chars_listbox.curselection()

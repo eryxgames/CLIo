@@ -553,6 +553,7 @@ class GameDataEditor:
             formatted_value = self.format_number(value)
             self.stats_tree.insert('', 'end', text=stat_name, values=(stat_name, formatted_value))
 
+
     def setup_window(self):
         """Setup main window with theme"""
         self.root.title("CLIo Game Data Editor")
@@ -3393,12 +3394,11 @@ class GameDataEditor:
 
     def edit_character_stat(self):
         char_selection = self.get_current_selection('_current_char_selection')
-        stat_sel = self.stats_tree.selection()
-        
         if not char_selection:
             messagebox.showwarning("Warning", "Please select a character")
             return
             
+        stat_sel = self.stats_tree.selection()
         if not stat_sel:
             messagebox.showwarning("Warning", "Please select a stat")
             return
@@ -3407,7 +3407,7 @@ class GameDataEditor:
         char = self.characters_data[char_id]
         
         stat_item = self.stats_tree.item(stat_sel[0])
-        stat_name = stat_item['text']  # Changed from values to text
+        stat_name = stat_item['text']  
         current_value = char['stats'][stat_name]
 
         dialog = tk.Toplevel(self.root)
@@ -3428,7 +3428,12 @@ class GameDataEditor:
             try:
                 value = float(value_var.get())
                 char['stats'][stat_name] = value
-                self.stats_tree.set(stat_sel[0], "value", self.format_number(value))
+                
+                # Store selection ID before update
+                current_sel = stat_sel[0]
+                # Update the tree item value
+                self.stats_tree.set(current_sel, "value", self.format_number(value))
+                
                 self.modified.add('characters')
                 dialog.destroy()
                 

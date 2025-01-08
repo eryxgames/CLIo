@@ -162,3 +162,4 @@ cython_debug/
 #.idea/
 full.py
 app_fullproject.txt
+utils/editor_settings.json

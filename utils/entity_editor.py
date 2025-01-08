@@ -1877,8 +1877,11 @@ class GameDataEditor:
         # Add buttons frame at the top
         buttons_frame = ttk.Frame(self.tabs['scenes'])
         buttons_frame.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Button(buttons_frame, text="Add Scene", command=self.add_scene).pack(side=tk.LEFT, padx=2)
-
+        ttk.Button(buttons_frame, text="Add Scene", command=self.add_scene).pack(side=tk.LEFT, padx=2),
+        # Add Save Scene button
+        ttk.Button(buttons_frame, text="Save Scene", 
+                  command=self.save_current_scene).pack(side=tk.LEFT, padx=2)  
+        
         # Create the main layout
         self.scenes_listbox, editor_frame = self.create_tab_layout(
             self.tabs['scenes'], 
@@ -1947,12 +1950,7 @@ class GameDataEditor:
         ttk.Button(exit_buttons, text="Add Exit", command=self.add_exit).pack(side=tk.LEFT, padx=2)
         ttk.Button(exit_buttons, text="Edit Exit", command=self.edit_exit).pack(side=tk.LEFT, padx=2)
         ttk.Button(exit_buttons, text="Remove Exit", command=self.remove_exit).pack(side=tk.LEFT, padx=2)
-
-        # Add Save Scene button
-        save_button_frame = ttk.Frame(editor_frame)
-        save_button_frame.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Button(save_button_frame, text="Save Scene", 
-                  command=self.save_current_scene).pack(side=tk.LEFT, padx=2)        
+  
 
         # Bindings
         self.scenes_listbox.bind('<<ListboxSelect>>', self.on_scene_select)

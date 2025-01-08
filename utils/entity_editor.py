@@ -1243,28 +1243,105 @@ class GameDataEditor:
             method()
 
     def on_scene_select(self, event=None):
-        self.store_selection(self.scenes_listbox, '_current_scene_selection') 
-        if selection := self.get_current_selection('_current_scene_selection'):
-            scene = self.scenes_data[selection]  
-            self.scene_id_var.set(scene['id'])
-            self.scene_name_var.set(scene['name']) 
-            self.scene_desc_text.delete('1.0', tk.END)
-            self.scene_desc_text.insert('1.0', scene.get('description', ''))
-            self.update_scene_contents(scene)
+        """Handle scene selection"""
+        # Get current selection
+        selection = self.scenes_listbox.curselection()
+        if selection is None or len(selection) == 0:
+            return
+            
+        # Store the selection
+        self._current_scene_selection = selection[0]
+        
+        # Get the selected scene
+        scene = self.scenes_data[selection[0]]
+        
+        # Update the UI with scene data
+        self.scene_id_var.set(scene['id'])
+        self.scene_name_var.set(scene['name'])
+        self.scene_desc_text.delete('1.0', tk.END)
+        self.scene_desc_text.insert('1.0', scene.get('description', ''))
+        self.update_scene_contents(scene)
 
     def on_character_select(self, event=None):
-        self.store_selection(self.chars_listbox, '_current_char_selection')
-        if selection := self.get_current_selection('_current_char_selection'):
-            char_id = list(self.characters_data.keys())[selection]
-            character = self.characters_data[char_id]
-            self.update_character_editor(char_id, character)
+        """Handle character selection"""
+        # Get current selection
+        selection = self.chars_listbox.curselection()
+        if selection is None or len(selection) == 0:
+            return
+            
+        # Store the selection
+        self._current_char_selection = selection[0]
+        
+        # Get the selected character
+        char_id = list(self.characters_data.keys())[selection[0]]
+        character = self.characters_data[char_id]
+        
+        # Update UI with character data
+        self.char_id_var.set(char_id)
+        self.char_name_var.set(character.get('name', ''))
+        self.char_type_var.set(character.get('type', 'neutral'))
+        
+        self.char_desc_text.delete('1.0', tk.END)
+        self.char_desc_text.insert('1.0', character.get('description', ''))
+
+        # Update greeting/dialogue
+        self.char_greeting_text.delete('1.0', tk.END)
+        self.char_greeting_text.insert('1.0', character.get('greeting', ''))
+
+        # Update dialogue options
+        self.dialogue_options_list.delete(0, tk.END)
+        for option_text in character.get('dialogue_options', {}).keys():
+            self.dialogue_options_list.insert(tk.END, option_text)
+
+        # Update stats tree
+        self.update_character_stats_display(character)
 
     def on_item_select(self, event=None):
-        self.store_selection(self.items_listbox, '_current_item_selection')
-        if selection := self.get_current_selection('_current_item_selection'):
-            item_id = list(self.items_data.keys())[selection]
-            item = self.items_data[item_id]
-            self.update_item_editor(item_id, item)
+        """Handle item selection"""
+        # Get current selection
+        selection = self.items_listbox.curselection()
+        if selection is None or len(selection) == 0:
+            return
+            
+        # Store the selection
+        self._current_item_selection = selection[0]
+        
+        # Get the selected item
+        item_id = list(self.items_data.keys())[selection[0]]
+        item = self.items_data[item_id]
+        
+        # Update UI with item data
+        self.item_id_var.set(item_id)
+        self.item_name_var.set(item.get('name', ''))
+        self.item_type_var.set(item.get('type', 'Regular'))
+        
+        # Update flags
+        self.item_usable_var.set(item.get('usable', False))
+        self.item_equippable_var.set(item.get('equippable', False))
+        self.item_consumable_var.set(item.get('consumable', False))
+        
+        # Update description
+        self.item_desc_text.delete('1.0', tk.END)
+        self.item_desc_text.insert('1.0', item.get('description', ''))
+        
+        # Update effects list
+        self.effects_list.delete(0, tk.END)
+        if 'effects' in item:
+            for effect_type, effect_data in item['effects'].items():
+                if isinstance(effect_data, dict):
+                    value = effect_data.get('value', '')
+                    duration = effect_data.get('duration', 'permanent')
+                    self.effects_list.insert(tk.END, f"{effect_type}: {value} ({duration})")
+                else:
+                    self.effects_list.insert(tk.END, f"{effect_type}: {effect_data}")
+        
+        # Update components list
+        self.components_list.delete(0, tk.END)
+        for component_id in item.get('components', []):
+            if component := self.items_data.get(component_id):
+                self.components_list.insert(tk.END, f"{component['name']} ({component_id})")
+            else:
+                self.components_list.insert(tk.END, f"Unknown item ({component_id})")
 
     @safe_operation
     def undo(self):
@@ -4081,6 +4158,10 @@ class GameDataEditor:
         self.scenes_listbox.delete(0, tk.END)
         for scene in self.scenes_data:
             self.scenes_listbox.insert(tk.END, scene['name'])
+        # Select first item if list not empty
+        if self.scenes_listbox.size() > 0:
+            self.scenes_listbox.selection_set(0)
+            self.on_scene_select()         
 
     def refresh_items_list(self):
         """Refresh items listbox"""

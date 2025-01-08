@@ -553,7 +553,7 @@ class GameDataEditor:
         stats = character.get('stats', {})
         for stat_name, value in stats.items():
             formatted_value = self.format_number(value)
-            self.stats_tree.insert('', 'end', text=stat_name, values=(stat_name, formatted_value))
+            self.stats_tree.insert('', 'end', values=(stat_name, formatted_value))
 
 
     def setup_window(self):
@@ -2139,10 +2139,10 @@ class GameDataEditor:
         stats_frame = ttk.Frame(notebook)
         notebook.add(stats_frame, text="Stats")
 
-        # Stats Treeview with proper columns
-        self.stats_tree = ttk.Treeview(stats_frame, columns=("name", "value"), show="tree headings")
-        self.stats_tree.heading("name", text="Value")
-        self.stats_tree.heading("value", text="New Value")
+        # Stats Treeview with two columns
+        self.stats_tree = ttk.Treeview(stats_frame, columns=("name", "value"), show="headings")
+        self.stats_tree.heading("name", text="Stat Name")
+        self.stats_tree.heading("value", text="Value")
         self.stats_tree.column("name", width=150)
         self.stats_tree.column("value", width=100)
         self.stats_tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)

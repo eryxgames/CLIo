@@ -6,15 +6,18 @@ import sys
 def create_game_map(data: List[Dict[str, Any]], dark_theme: bool = False) -> graphviz.Digraph:
     """
     Create a visual map of the game scenes, their connections, items, and characters.
-    
+
+    To run this separately, you need Graphviz library https://graphviz.org/download/
+    IMPORTANT: Download graphviz, install it with system PATHs checked for it to work on Windows.
+
     Args:
         data: List of scene dictionaries containing game data
         dark_theme: Boolean to toggle dark theme colors
     
     Returns:
         Graphviz Digraph object representing the game map
-        
-    Example use:    
+
+    Example use (map.py will output parsed 'game_map' data and 'game_map.png'):    
         python map.py scenes.json  # Light theme
         python map.py scenes.json --dark  # Dark theme
     """

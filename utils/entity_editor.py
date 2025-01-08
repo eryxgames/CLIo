@@ -1722,7 +1722,29 @@ class GameDataEditor:
         except Exception as e:
             self.show_error_dialog(f"Error saving data: {str(e)}")
 
+    def save_current_scene(self):
+        """Save the currently selected scene"""
+        if not (selection := self.scenes_listbox.curselection()):
+            return
 
+        scene = self.scenes_data[selection[0]]
+        
+        # Store old data for undo
+        old_scene = scene.copy()
+        
+        # Update scene data
+        scene.update({
+            'name': self.scene_name_var.get(),
+            'description': self.scene_desc_text.get('1.0', tk.END).strip()
+        })
+
+        self.add_undo_action('modify', 'scenes',
+                            {'id': scene['id'], 'data': old_scene},
+                            {'id': scene['id'], 'data': scene.copy()},
+                            f"Modified scene {scene['name']}")
+
+        self.modified.add('scenes')
+        self.update_status(f"Saved scene {scene['name']}")
 
     def save_scenes(self):
         os.makedirs('game_files/scenes', exist_ok=True)
@@ -1925,6 +1947,12 @@ class GameDataEditor:
         ttk.Button(exit_buttons, text="Add Exit", command=self.add_exit).pack(side=tk.LEFT, padx=2)
         ttk.Button(exit_buttons, text="Edit Exit", command=self.edit_exit).pack(side=tk.LEFT, padx=2)
         ttk.Button(exit_buttons, text="Remove Exit", command=self.remove_exit).pack(side=tk.LEFT, padx=2)
+
+        # Add Save Scene button
+        save_button_frame = ttk.Frame(editor_frame)
+        save_button_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Button(save_button_frame, text="Save Scene", 
+                  command=self.save_current_scene).pack(side=tk.LEFT, padx=2)        
 
         # Bindings
         self.scenes_listbox.bind('<<ListboxSelect>>', self.on_scene_select)
@@ -4168,18 +4196,30 @@ class GameDataEditor:
         self.items_listbox.delete(0, tk.END)
         for item_id, item in self.items_data.items():
             self.items_listbox.insert(tk.END, item.get('name', item_id))
+        # Select first item if list not empty
+        if self.items_listbox.size() > 0:
+            self.items_listbox.selection_set(0)
+            self.on_item_select()
 
     def refresh_characters_list(self):
         """Refresh characters listbox"""
         self.chars_listbox.delete(0, tk.END)
         for char_id, char in self.characters_data.items():
             self.chars_listbox.insert(tk.END, char.get('name', char_id))
+        # Select first item if list not empty
+        if self.chars_listbox.size() > 0:
+            self.chars_listbox.selection_set(0)
+            self.on_character_select()
 
     def refresh_story_texts_list(self):
         """Refresh story texts listbox"""
         self.story_texts_listbox.delete(0, tk.END)
         for text_key in self.story_texts_data:
             self.story_texts_listbox.insert(tk.END, text_key)
+        # Select first item if list not empty
+        if self.story_texts_listbox.size() > 0:
+            self.story_texts_listbox.selection_set(0)
+            self.on_story_text_select()
 
     def filter_scenes(self):
         """Filter scenes listbox based on search text"""

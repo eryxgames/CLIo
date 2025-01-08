@@ -6,6 +6,7 @@ import shutil
 import os
 import re
 import sys
+sys.path.append('.')
 import copy
 import time
 import logging
@@ -18,6 +19,7 @@ from pygments import highlight
 from pygments.lexers import get_lexer_by_name
 from pygments.formatters import HtmlFormatter
 from tkhtmlview import HTMLScrolledText
+from game_map import MapViewer
 
 # Decorator definition
 def safe_operation(func):
@@ -1006,6 +1008,7 @@ class GameDataEditor:
                     command=self.reload_data).pack(side=tk.LEFT, padx=2)
             ttk.Button(left_buttons, text="Validate", 
                     command=self.validate_all_data).pack(side=tk.LEFT, padx=2)
+            ttk.Button(left_buttons, text="Project Map", command=self.show_project_map).pack(side=tk.LEFT, padx=2)
 
     def create_status_bar(self):
             """Create status bar"""
@@ -1030,7 +1033,26 @@ class GameDataEditor:
             modified = len(self.modified)
             self.status_var.set(f"Modified files: {', '.join(self.modified)}" if modified 
                             else "No modifications")
-                
+
+    def show_project_map(self):
+        """Show the project map visualization"""
+        if not self.scenes_data:
+            messagebox.showwarning("Warning", "No scene data available to display")
+            return
+            
+        try:
+            # Create map viewer with current theme setting
+            is_dark = self.theme_manager.current_theme == 'Dark'
+            map_viewer = MapViewer(self.root, self.scenes_data, dark_theme=is_dark)
+            
+            # Apply current editor theme to map window
+            self.theme_manager.apply_theme_to_dialog(map_viewer)
+            
+            # Position the window relative to main window
+            map_viewer.geometry(f"+{self.root.winfo_x() + 50}+{self.root.winfo_y() + 50}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to display map: {str(e)}")
+
     # Include all previously defined methods for:
     # - Tab creation (create_scenes_tab, create_items_tab, etc.)
     # - Event handling (setup_event_bindings)

@@ -537,14 +537,14 @@ class GameDataEditor:
         return getattr(self, selection_var, None)
 
     def format_number(self, value):
-            """Format number to remove trailing zeros and decimal points"""
-            try:
-                num = float(value)
-                if num.is_integer():
-                    return str(int(num))
-                return str(num)
-            except (ValueError, TypeError):
-                return str(value)
+        """Format number to remove trailing zeros and decimal points"""
+        try:
+            num = float(value)
+            if num.is_integer():
+                return int(num)  # Return integer directly, not string
+            return num  # Return float directly, not string
+        except (ValueError, TypeError):
+            return value
 
     def update_character_stats_display(self, character):
         self.stats_tree.delete(*self.stats_tree.get_children())
@@ -2967,75 +2967,72 @@ class GameDataEditor:
         self.modified.add('scenes')
 
     def add_item_effect(self):
-            """Add effect to the current item"""
-            if not (selection := self.items_listbox.curselection()):
-                messagebox.showwarning("Warning", "Please select an item first")
-                return
+        if not (selection := self.items_listbox.curselection()):
+            messagebox.showwarning("Warning", "Please select an item first")
+            return
 
-            dialog = tk.Toplevel(self.root)
-            dialog.title("Add Effect")
-            dialog.geometry("300x250")
-            dialog.transient(self.root)
-            dialog.grab_set()
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Add Effect")
+        dialog.geometry("300x250")
+        dialog.transient(self.root)
+        dialog.grab_set()
 
-            # Effect Type
-            type_frame = ttk.Frame(dialog)
-            type_frame.pack(fill=tk.X, padx=5, pady=5)
-            ttk.Label(type_frame, text="Effect Type:").pack(side=tk.LEFT)
-            type_var = tk.StringVar(value="health")
-            effect_types = ["health", "attack", "defense", "speed", "repair"]  # Add more as needed
-            ttk.Combobox(type_frame, textvariable=type_var, values=effect_types).pack(side=tk.LEFT, padx=5)
+        type_frame = ttk.Frame(dialog)
+        type_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(type_frame, text="Effect Type:").pack(side=tk.LEFT)
+        type_var = tk.StringVar(value="health")
+        ttk.Combobox(type_frame, textvariable=type_var, 
+                    values=["health", "attack", "defense", "speed", "repair"]).pack(side=tk.LEFT, padx=5)
 
-            # Effect Value
-            value_frame = ttk.Frame(dialog)
-            value_frame.pack(fill=tk.X, padx=5, pady=5)
-            ttk.Label(value_frame, text="Value:").pack(side=tk.LEFT)
-            value_var = tk.StringVar()
-            ttk.Entry(value_frame, textvariable=value_var).pack(side=tk.LEFT, padx=5)
+        value_frame = ttk.Frame(dialog)
+        value_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(value_frame, text="Value:").pack(side=tk.LEFT)
+        value_var = tk.StringVar()
+        ttk.Entry(value_frame, textvariable=value_var).pack(side=tk.LEFT, padx=5)
 
-            # Duration (if needed)
-            duration_frame = ttk.Frame(dialog)
-            duration_frame.pack(fill=tk.X, padx=5, pady=5)
-            ttk.Label(duration_frame, text="Duration:").pack(side=tk.LEFT)
-            duration_var = tk.StringVar(value="permanent")
-            durations = ["permanent", "temporary", "single-use"]
-            ttk.Combobox(duration_frame, textvariable=duration_var, values=durations).pack(side=tk.LEFT, padx=5)
+        duration_frame = ttk.Frame(dialog)
+        duration_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(duration_frame, text="Duration:").pack(side=tk.LEFT)
+        duration_var = tk.StringVar(value="permanent")
+        durations = ["permanent", "temporary", "single-use"]
+        ttk.Combobox(duration_frame, textvariable=duration_var, values=durations).pack(side=tk.LEFT, padx=5)
 
-            def add_effect():
-                try:
-                    value = float(value_var.get())
-                except ValueError:
-                    messagebox.showerror("Error", "Value must be a number")
-                    return
-
+        def add():
+            try:
+                value = float(value_var.get())
+                formatted_value = float(self.format_number(value))
+                
                 item_id = list(self.items_data.keys())[selection[0]]
                 item = self.items_data[item_id]
                 
                 effect_type = type_var.get()
                 duration = duration_var.get()
 
-                # Update item effects based on structure
-                if 'effect' not in item:
-                    item['effect'] = {}
-                
                 if duration == "permanent":
-                    item['effect'][effect_type] = value
+                    if 'effect' not in item:
+                        item['effect'] = {}
+                    item['effect'][effect_type] = formatted_value
                 else:
                     if 'effects' not in item:
                         item['effects'] = {}
                     item['effects'][effect_type] = {
-                        'value': value,
+                        'value': formatted_value,
                         'duration': duration
                     }
 
-                self.effects_list.insert(tk.END, 
-                    f"{effect_type}: {value}" + (f" ({duration})" if duration != "permanent" else ""))
+                effect_text = f"{effect_type}: {self.format_number(formatted_value)}"
+                if duration != "permanent":
+                    effect_text += f" ({duration})"
+                self.effects_list.insert(tk.END, effect_text)
+                
                 self.modified.add('items')
                 dialog.destroy()
+            except ValueError:
+                messagebox.showerror("Error", "Value must be a number")
 
-            ttk.Button(dialog, text="Add", command=add_effect).pack(pady=10)
-                
-    def edit_item_effect(self):
+        ttk.Button(dialog, text="Add", command=add).pack(pady=10)
+                   
+    def edit_item_effect(self):        
         item_selection = self.get_current_selection('_current_item_selection')
         if not item_selection:
             messagebox.showwarning("Warning", "Please select an item")
@@ -3052,7 +3049,6 @@ class GameDataEditor:
         effect_text = self.effects_list.get(effect_sel)
         effect_type = effect_text.split(':')[0].strip()
 
-        # Get current value
         current_value = 0
         if 'effect' in item and effect_type in item['effect']:
             current_value = item['effect'][effect_type]
@@ -3068,19 +3064,25 @@ class GameDataEditor:
         value_frame = ttk.Frame(dialog)
         value_frame.pack(fill=tk.X, padx=5, pady=5)
         ttk.Label(value_frame, text=f"{effect_type}:").pack(side=tk.LEFT)
-        value_var = tk.StringVar(value=str(current_value))
+        value_var = tk.StringVar(value=self.format_number(current_value))
         ttk.Entry(value_frame, textvariable=value_var).pack(side=tk.LEFT, padx=5)
 
         def update():
             try:
                 value = float(value_var.get())
+                formatted_value = float(self.format_number(value))
+                
                 if 'effect' in item and effect_type in item['effect']:
-                    item['effect'][effect_type] = value
+                    item['effect'][effect_type] = formatted_value
                 elif 'effects' in item and effect_type in item['effects']:
-                    item['effects'][effect_type]['value'] = value
+                    item['effects'][effect_type]['value'] = formatted_value
 
+                effect_text = f"{effect_type}: {self.format_number(formatted_value)}"
+                if item.get('effects', {}).get(effect_type, {}).get('duration'):
+                    effect_text += f" ({item['effects'][effect_type]['duration']})"
+                    
                 self.effects_list.delete(effect_sel)
-                self.effects_list.insert(effect_sel, f"{effect_type}: {value}")
+                self.effects_list.insert(effect_sel, effect_text)
                 self.modified.add('items')
                 dialog.destroy()
                 self.restore_selection(self.items_listbox, '_current_item_selection')
@@ -3344,25 +3346,22 @@ class GameDataEditor:
         self.modified.add('characters')    
 
     def add_character_stat(self):
-        """Add stat to the current character"""
         if not (selection := self.chars_listbox.curselection()):
             messagebox.showwarning("Warning", "Please select a character first")
             return
 
         dialog = tk.Toplevel(self.root)
         dialog.title("Add Stat")
-        dialog.geometry("300x150")
+        dialog.geometry("300x150") 
         dialog.transient(self.root)
         dialog.grab_set()
 
-        # Stat Name
         name_frame = ttk.Frame(dialog)
         name_frame.pack(fill=tk.X, padx=5, pady=5)
         ttk.Label(name_frame, text="Stat Name:").pack(side=tk.LEFT)
         name_var = tk.StringVar()
         ttk.Entry(name_frame, textvariable=name_var).pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
-        # Stat Value
         value_frame = ttk.Frame(dialog)
         value_frame.pack(fill=tk.X, padx=5, pady=5)
         ttk.Label(value_frame, text="Value:").pack(side=tk.LEFT)
@@ -3375,23 +3374,23 @@ class GameDataEditor:
                 if not stat_name:
                     raise ValueError("Stat name is required")
                 value = float(value_var.get())
+                formatted_value = float(self.format_number(value))
+
+                char_id = list(self.characters_data.keys())[selection[0]]
+                char = self.characters_data[char_id]
+                
+                if 'stats' not in char:
+                    char['stats'] = {}
+
+                char['stats'][stat_name] = formatted_value
+                self.stats_tree.insert('', 'end', text=stat_name, values=(stat_name, self.format_number(formatted_value)))
+                self.modified.add('characters')
+                dialog.destroy()
             except ValueError as e:
                 messagebox.showerror("Error", str(e))
-                return
-
-            char_id = list(self.characters_data.keys())[selection[0]]
-            char = self.characters_data[char_id]
-            
-            if 'stats' not in char:
-                char['stats'] = {}
-
-            char['stats'][stat_name] = value
-            self.stats_tree.insert('', 'end', values=(stat_name, value))
-            self.modified.add('characters')
-            dialog.destroy()
 
         ttk.Button(dialog, text="Add", command=add).pack(pady=10)
-
+   
     def edit_character_stat(self):
         char_selection = self.get_current_selection('_current_char_selection')
         if not char_selection:
@@ -3407,7 +3406,7 @@ class GameDataEditor:
         char = self.characters_data[char_id]
         
         stat_item = self.stats_tree.item(stat_sel[0])
-        stat_name = stat_item['text']  
+        stat_name = stat_item['text']
         current_value = char['stats'][stat_name]
 
         dialog = tk.Toplevel(self.root)
@@ -3427,13 +3426,9 @@ class GameDataEditor:
         def update():
             try:
                 value = float(value_var.get())
-                char['stats'][stat_name] = value
-                
-                # Store selection ID before update
-                current_sel = stat_sel[0]
-                # Update the tree item value
-                self.stats_tree.set(current_sel, "value", self.format_number(value))
-                
+                formatted_value = float(self.format_number(value))
+                char['stats'][stat_name] = formatted_value
+                self.stats_tree.set(stat_sel[0], "value", self.format_number(formatted_value))
                 self.modified.add('characters')
                 dialog.destroy()
                 

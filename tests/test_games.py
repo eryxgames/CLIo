@@ -109,6 +109,38 @@ class DerelictTests(unittest.TestCase):
             if not uni:
                 self.assertTrue(s.text.isascii())
 
+    def test_fits_very_narrow_screens(self):
+        """Smaller than any phone in portrait: nothing may overflow, art simply steps aside."""
+        for width in (24, 30):
+            s = Session("derelict", width=width).start()
+            for part in (OPENING, POWER, ["map", "journal", "inventory", "stats", "help", "help fight", "about",
+                                          "sound", "style list", "talk to marigold", "0", "hint"]):
+                s.do(*part)
+            for line in s.text.splitlines():
+                self.assertLessEqual(visible_len(line), width, repr(line))
+
+    def test_title_screens_fit_too(self):
+        for name, answers in (("derelict", ["look"]), ("depths", ["Ash", "1", "look"]),
+                              ("game_files", ["look"]), (os.path.join("templates", "starter"), ["look"])):
+            for width in (24, 34, 40):
+                s = Session(name, commands=list(answers), width=width)
+                s.run()                                     # the full start-up, title screen included
+                for line in s.text.splitlines():
+                    self.assertLessEqual(visible_len(line), width, "%s @%d: %r" % (name, width, line))
+
+    def test_safe_symbols(self):
+        s = Session("derelict", width=40)
+        from engine.term import GLYPHS_SAFE
+        s.term.glyph_mode, s.term.glyphs = "safe", GLYPHS_SAFE
+        s.start()
+        s.do(*OPENING)
+        s.do("journal", "stats", "fight droid", *["strike"] * 30)
+        for symbol in "♥♪★✔✘⚑◆◈†▸":
+            self.assertNotIn(symbol, s.text)
+        self.assertIn("┌", s.text + "╭")                       # frames are still drawn
+        for line in s.text.splitlines():
+            self.assertLessEqual(visible_len(line), 40, repr(line))
+
     def test_music_and_sound_are_requested(self):
         s = Session("derelict", record_audio=True).start()
         s.do("take wire", "unlock locker")
@@ -153,11 +185,12 @@ class DepthsTests(unittest.TestCase):
             self.assertGreaterEqual(results.count("win"), 6, "class %d: %s" % (klass, results))
 
     def test_fits_a_phone_screen(self):
-        bot = DepthsBot(seed=2, klass=2)
-        bot.term.forced_width = 40
-        bot.play()
-        for line in bot.text.splitlines():
-            self.assertLessEqual(visible_len(line), 40, repr(line))
+        for width in (40, 28):
+            bot = DepthsBot(seed=2, klass=2)
+            bot.term.forced_width = width
+            bot.play()
+            for line in bot.text.splitlines():
+                self.assertLessEqual(visible_len(line), width, repr(line))
 
     def test_save_and_load_mid_dungeon(self):
         bot = DepthsBot(seed=4)

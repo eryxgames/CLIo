@@ -45,7 +45,7 @@ python clio.py depths     # dungeon crawler
 - [x] Auto-map
 - [x] Generative maze
 - [x] Save / load of the *whole* world, named slots
-- [x] Two demo games, a starter template, 48 automated tests
+- [x] Two demo games, a starter template, 51 automated tests
 - [ ] Entity data editor (`utils/entity_editor.py`, Tkinter, desktop only - still alpha and
       still edits the CLIo 1 file layout in `game_files/`; its Project Map needs
       `pip install graphviz pillow` plus the Graphviz program)
@@ -60,6 +60,8 @@ python clio.py [game] [options]
   --no-sound      run silently
   --no-color      plain text
   --ascii         no box-drawing or block characters
+  --glyphs MODE   full, safe (frames stay, symbols become plain) or ascii
+  --test-display  draw a test page: frames, symbols, colours, a sprite
   --no-art        hide ASCII art and sprites
   --fast          no text animation
   --width N       force the layout width
@@ -79,6 +81,18 @@ python clio.py
 
 For sound, install any one player: `pkg install play-audio` (recommended) or `pkg install mpv`.
 Without one the game is simply silent; the in-game `sound` command tells you what it found.
+
+The layout follows the screen: it is tested from 24 columns up, and re-measures the
+terminal on every line, so rotating the phone or pinching to zoom just works. Art that
+does not fit is swapped for a smaller version or left out. To check a particular phone
+and font, run
+
+```
+python clio.py --test-display
+```
+
+and follow what it says. If a symbol shows as a box or a little picture, add
+`--glyphs safe` (or `export CLIO_GLYPHS=safe` in `~/.bashrc`).
 
 ### Sound on other systems
 
@@ -105,6 +119,9 @@ combine goo with suit   repair chip  equip cutter     journal (j)     stats
 save / load     hint    help         style retro      music off       volume 40
 speed fast      art off again (g)    quit
 ```
+
+Saved games live outside the game folder: `%APPDATA%\clio\saves` on Windows,
+`~/.local/share/clio/saves` elsewhere (set `CLIO_SAVES` to move them).
 
 In a fight the enemy shows what it is about to do. **Guard** when a heavy blow is coming,
 **strike** while it winds up, **focus** while it braces. Ctrl-C skips an animation.
@@ -151,12 +168,13 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 48 tests, about ten seconds
+python -m unittest discover -s tests     # 51 tests, about ten seconds
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 ```
 
 The tests play both demo games to every ending from scripts, check that every screen fits
-40 columns in both Unicode and ASCII, round-trip saves, and render every sound effect.
+40 columns in both Unicode and ASCII (and down to 24), round-trip saves, and render every
+sound effect. They write nothing into the repository: saves and audio go to temporary folders.
 
 ## Licence
 

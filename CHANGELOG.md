@@ -31,7 +31,9 @@ A rebuild of the engine. Games written for CLIo 1 still load.
 - Two demo games, *Derelict* and *The Hollow Depths*, and a starter template to copy.
 - A launcher (`clio.py`) with `--style`, `--no-sound`, `--ascii`, `--width`, `--seed`,
   `--check` and more.
-- An authoring guide (`docs/AUTHORING.md`) and 48 automated tests.
+- `--test-display`, a page for checking frames, symbols, colours and sprites on a given
+  terminal, and `--glyphs safe` for fonts that lack some symbols.
+- An authoring guide (`docs/AUTHORING.md`) and 51 automated tests.
 - Apache-2.0 licence for the engine and everything it ships for games to use.
 
 ### Changed
@@ -53,7 +55,8 @@ A rebuild of the engine. Games written for CLIo 1 still load.
 
 ### Known limitations
 
-- Not yet run on Windows or on a phone; tested on Linux, including a 40-column terminal.
+- Tested on Linux (layouts from 24 columns up) and on Windows with pygame installed.
+  Not yet run on a phone, or on Windows without pygame.
 - The Tkinter data editor still edits only the CLIo 1 layout in `game_files/`.
 - Combat is one enemy at a time.
 

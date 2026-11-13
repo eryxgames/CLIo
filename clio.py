@@ -64,6 +64,60 @@ def choose_game(term):
     return games[pick][0] if pick is not None else None
 
 
+def display_test(term):
+    """Draw a page that shows at a glance whether this terminal renders CLIo correctly."""
+    from engine.art import ArtLibrary
+    from engine.sprite import generate
+    from engine.term import is_termux, pad_to
+    ui = UI(term, load_theme("default"))
+    w = ui.width
+    cols, rows = term.size()
+    depth = {0: "none", 1: "16", 2: "256", 3: "truecolor"}[term.color_depth]
+    where = "Termux" if is_termux() else sys.platform
+    ui.heading("DISPLAY TEST")
+    ui.say("Terminal %dx%d, layout width %d. Colours: %s. Unicode: %s. Symbols: %s. System: %s."
+           % (cols, rows, w, depth, "yes" if term.unicode else "no", term.glyph_mode, where), "system")
+
+    ui.say("{key}1. Ruler{/} - the line below should end at the mark, with no wrapping:", "default")
+    ruler = "".join("|" if i % 10 == 0 else "-" for i in range(w - 1)) + "#"
+    ui.line(ruler)
+
+    ui.say("{key}2. Frames{/} - corners joined, right edge straight:", "default")
+    for frame in ("ROUNDED", "DOUBLE"):
+        ui.say("The quick brown fox jumps over the lazy dog.", "default", frame=frame, title=frame.title())
+
+    ui.say("{key}3. Symbols{/} - each should be one clear character, not a box, '?' or a picture. "
+           "The right edge must stay straight on every row:", "default")
+    names = ["heart", "note", "star", "bullet", "arrow", "check", "cross", "flag", "coin", "shield",
+             "sword", "dot", "up", "down", "bar_full", "bar_empty"]
+    cells = ["%-9s %s" % (n, term.glyphs[n]) for n in names]
+    per_row = max(1, (w - 4) // 14)
+    body = ["   ".join(pad_to(c, 11) for c in cells[i:i + per_row]) for i in range(0, len(cells), per_row)]
+    for l in ui.box_lines(body, "default", None, "SINGLE", 1):
+        ui.line(l)
+    ui.gap()
+
+    ui.say("{key}4. Colours{/} - a smooth run of colour, and readable roles:", "default")
+    if term.color_depth >= 2:
+        ui.line(" " + "".join(term.paint(term.glyphs["block"], str(c)) for c in
+                              ([196, 202, 208, 214, 220, 226, 190, 154, 118, 82, 46, 47, 48, 49, 50, 51, 45, 39,
+                                33, 27, 21, 57, 93, 129, 165, 201, 200, 199, 198, 197] * 3)[:w - 2]))
+    ui.say("{item}item{/} {character}character{/} {exit}exit{/} {error}error{/} {success}success{/} "
+           "{quest}quest{/} {hint}hint{/}", "default")
+
+    ui.say("{key}5. Pixel sprite and art{/} - a small creature with two eyes, and the CLIo logo:", "default")
+    for l in generate("display test", 12).render(term):
+        ui.line("   " + l)
+    logo = ArtLibrary(os.path.join(ROOT, "engine", "art")).get("clio_logo")
+    for l in (logo.render(term, w - 4) if logo else []):
+        ui.line("   " + l)
+    ui.gap()
+    ui.say("If symbols look wrong, run with {key}--glyphs safe{/} (or set CLIO_GLYPHS=safe). "
+           "If frames or the sprite look wrong, use {key}--ascii{/}. If colours look wrong, use {key}--no-color{/}. "
+           "In a game, {key}art off{/} hides art and sprites.", "hint")
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="clio", description="CLIo - a stylish command-line game engine.")
     ap.add_argument("game", nargs="?", help="game folder name or path")
@@ -73,6 +127,10 @@ def main(argv=None):
     ap.add_argument("--no-sound", action="store_true", help="run silently")
     ap.add_argument("--no-color", action="store_true", help="plain text, no colours")
     ap.add_argument("--ascii", action="store_true", help="ASCII only (no box-drawing or block characters)")
+    ap.add_argument("--glyphs", choices=("full", "safe", "ascii"),
+                    help="symbol set: 'safe' keeps frames but uses plain symbols (for fonts that lack them)")
+    ap.add_argument("--test-display", action="store_true",
+                    help="show a test page to check frames, symbols, colours and sprites on this terminal")
     ap.add_argument("--no-art", action="store_true", help="hide ASCII art and sprites")
     ap.add_argument("--fast", action="store_true", help="no text animation")
     ap.add_argument("--width", type=int, help="force the layout width in columns")
@@ -89,7 +147,10 @@ def main(argv=None):
     term = Term(width=args.width,
                 color=0 if args.no_color else None,
                 unicode=False if args.ascii else None,
-                animate=False if args.fast else None)
+                animate=False if args.fast else None,
+                glyphs=args.glyphs)
+    if args.test_display:
+        return display_test(term)
     try:
         game_dir = resolve_game(args.game) if args.game else choose_game(term)
     except QuitGame:

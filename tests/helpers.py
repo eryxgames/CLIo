@@ -10,8 +10,16 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-os.environ.setdefault("CLIO_SAVES", tempfile.mkdtemp(prefix="clio-test-saves-"))
-os.environ.setdefault("CLIO_CACHE", tempfile.mkdtemp(prefix="clio-test-cache-"))
+# Tests never touch real saves or the real audio cache: both go to temporary
+# folders outside the repository, removed again when the test run ends.
+import atexit                                       # noqa: E402
+import shutil                                       # noqa: E402
+
+for _var, _prefix in (("CLIO_SAVES", "clio-test-saves-"), ("CLIO_CACHE", "clio-test-cache-")):
+    if _var not in os.environ:
+        _dir = tempfile.mkdtemp(prefix=_prefix)
+        os.environ[_var] = _dir
+        atexit.register(shutil.rmtree, _dir, True)
 
 from engine.audio import Audio                      # noqa: E402
 from engine.audio.backends import NullBackend       # noqa: E402

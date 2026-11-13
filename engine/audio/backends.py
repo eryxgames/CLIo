@@ -294,7 +294,10 @@ class PygameBackend(Backend):
 
     def __init__(self):
         os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
-        import pygame                                   # noqa: F401 (optional dependency)
+        import warnings
+        with warnings.catch_warnings():                 # pygame's own deprecation chatter
+            warnings.simplefilter("ignore")
+            import pygame                               # noqa: F401 (optional dependency)
         self.pg = pygame
         pygame.mixer.init(frequency=22050, size=-16, channels=1, buffer=1024)
         self._cache = {}

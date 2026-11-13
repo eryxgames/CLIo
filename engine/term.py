@@ -276,6 +276,14 @@ GLYPHS_ASCII = {
     "lock": "x", "player": "@", "block": "#",
 }
 
+# Unicode frames and blocks, but plain ASCII for the symbols that some phone and
+# console fonts lack or draw as oversized emoji.
+GLYPHS_SAFE = dict(GLYPHS_UNICODE, **{
+    "arrow": ">", "heart": "HP", "note": "~", "star": "*", "ellipsis": "...", "check": "+",
+    "cross": "x", "coin": "$", "flag": "!", "shield": "#", "sword": "x", "up": "^", "down": "v",
+    "lock": "x",
+})
+
 FRAMES = {
     # horizontal, vertical, top-left, top-right, bottom-left, bottom-right
     "SINGLE": "─│┌┐└┘",
@@ -340,7 +348,7 @@ class Term:
     """What the terminal can do, plus the primitives to write to it."""
 
     def __init__(self, out=None, inp=None, width=None, height=None, color=None,
-                 unicode=None, animate=None, env=None):
+                 unicode=None, animate=None, env=None, glyphs=None):
         env = os.environ if env is None else env
         self.out = out if out is not None else sys.stdout
         self.inp = inp                      # callable(prompt) -> str, or None
@@ -377,7 +385,14 @@ class Term:
                 unicode = False
         self.unicode = bool(unicode)
         self.limited_glyphs = env.get("TERM", "") == "linux"   # kernel console font
-        self.glyphs = GLYPHS_UNICODE if self.unicode else GLYPHS_ASCII
+        # symbol set: full | safe (frames and blocks stay, symbols become ASCII) | ascii
+        mode = (glyphs or env.get("CLIO_GLYPHS") or "full").lower()
+        if not self.unicode or mode == "ascii":
+            mode = "ascii"
+        elif mode != "safe":
+            mode = "full"
+        self.glyph_mode = mode
+        self.glyphs = {"full": GLYPHS_UNICODE, "safe": GLYPHS_SAFE, "ascii": GLYPHS_ASCII}[mode]
 
         # ---- animation (typewriter, fades...) only on a real terminal
         if animate is None:

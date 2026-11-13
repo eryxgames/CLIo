@@ -40,7 +40,10 @@ class UI:
 
     @property
     def width(self):
-        return max(24, min(self.term.cols, int(self.theme.ui.get("max_width", 78))))
+        cols = self.term.cols
+        if cols < 60 and self.term.forced_width is None:
+            cols -= 1          # on a narrow screen keep the last column free: no accidental wraps
+        return max(24, min(cols, int(self.theme.ui.get("max_width", 78))))
 
     @property
     def narrow(self):
@@ -362,7 +365,8 @@ class UI:
             self.gap()
         margin = " " * int(self.theme.ui.get("margin", 1))
         if title:
-            self.line(margin + self.fmt(title, title_role or "list_category"))
+            for l in wrap_ansi(self.fmt(title, title_role or "list_category"), self.width - len(margin), margin):
+                self.line(l)
         b = (bullet if bullet is not None else self.g("bullet")) + " "
         for it in items:
             for l in wrap_ansi(self.fmt(it, role), self.width - len(margin) - 1,
@@ -436,6 +440,8 @@ class UI:
     def prompt(self, text=None):
         self._skip = False
         p = self.theme.ui.get("prompt", "> ") if text is None else text
+        if self.term.glyph_mode != "full" and any(ord(c) > 0xFF for c in p):
+            p = "".join(c if ord(c) <= 0xFF else ">" for c in p)
         value = self.term.read(self.term.paint(p, self.theme.color("prompt")))
         self._last = "text"
         return value
@@ -621,13 +627,18 @@ class UI:
         finally:
             term.hide_cursor(False)
         self._last = "text"
+        def centred(text, role):
+            for l in wrap_ansi(self.fmt(text, role), w - 2):
+                self.line(pad_to(l, w, "center").rstrip())
+
         if title:
-            t = self.gradient([pad_to(title, w, "center").rstrip()])[0]
-            self.line(self.term.style("b") + t)
+            for l in wrap_ansi(title, w - 2):
+                t = self.gradient([pad_to(l, w, "center").rstrip()])[0]
+                self.line(self.term.style("b") + t)
         if subtitle:
-            self.line(pad_to(self.fmt(subtitle, "ambient"), w, "center").rstrip())
+            centred(subtitle, "ambient")
         if credit:
-            self.line(pad_to(self.fmt(credit, "hint"), w, "center").rstrip())
+            centred(credit, "hint")
         self.gap()
 
     def clear(self):

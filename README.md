@@ -45,7 +45,7 @@ python clio.py depths     # dungeon crawler
 - [x] Auto-map
 - [x] Generative maze
 - [x] Save / load of the *whole* world, named slots
-- [x] Two demo games, a starter template, 47 automated tests
+- [x] Two demo games, a starter template, 48 automated tests
 - [ ] Entity data editor (`utils/entity_editor.py`, Tkinter, desktop only - still alpha and
       still edits the CLIo 1 file layout in `game_files/`; its Project Map needs
       `pip install graphviz pillow` plus the Graphviz program)
@@ -151,7 +151,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 47 tests, about ten seconds
+python -m unittest discover -s tests     # 48 tests, about ten seconds
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 ```
 

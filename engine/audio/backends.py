@@ -457,11 +457,15 @@ class ChainBackend(Backend):
             b.shutdown()
 
 
-def detect(env=None, which=shutil.which):
-    """Pick the best available backend. Returns ``(backend, note)``."""
+def detect(env=None, which=shutil.which, platform=None):
+    """Pick the best available backend. Returns ``(backend, note)``.
+
+    ``platform`` ("linux", "mac", "windows", "termux") overrides detection;
+    it exists so the selection rules can be tested on any machine.
+    """
     env = os.environ if env is None else env
     choice = (env.get("CLIO_AUDIO") or "").strip()
-    plat = platform_name(env)
+    plat = platform or platform_name(env)
 
     if choice.lower() in ("off", "none", "0", "no", "false", "silent"):
         return NullBackend(), "sound is switched off (CLIO_AUDIO=%s)" % choice

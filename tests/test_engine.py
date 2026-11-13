@@ -197,18 +197,35 @@ class AudioTests(unittest.TestCase):
         silent.music("battle")                  # must not raise
 
     def test_backend_detection(self):
+        # the rules are checked for a named platform, so this passes on any machine
         none = lambda name: None                                    # noqa: E731
+        quiet = {"CLIO_NO_PYGAME": "1"}
         b, note = detect({"CLIO_AUDIO": "off"})
         self.assertIsInstance(b, NullBackend)
-        b, note = detect({"CLIO_NO_PYGAME": "1"}, which=none)
+        b, note = detect(quiet, which=none, platform="linux")
         self.assertIsInstance(b, NullBackend)
         self.assertIn("no audio player", note)
-        b, note = detect({"CLIO_NO_PYGAME": "1", "TERMUX_VERSION": "0.118"}, which=none)
+        b, note = detect(dict(quiet, TERMUX_VERSION="0.118"), which=none)
+        self.assertIsInstance(b, NullBackend)
         self.assertIn("pkg install", note)
-        b, note = detect({"CLIO_NO_PYGAME": "1"}, which=lambda n: "/usr/bin/aplay" if n == "aplay" else None)
+        b, note = detect(quiet, which=lambda n: "/usr/bin/aplay" if n == "aplay" else None, platform="linux")
         self.assertEqual(b.name, "aplay")
         self.assertTrue(b.can_play("x.wav"))
         self.assertFalse(b.can_play("x.mp3"))
+        b, note = detect(quiet, which=lambda n: "/usr/bin/afplay" if n == "afplay" else None, platform="mac")
+        self.assertEqual(b.name, "afplay")
+        self.assertTrue(b.can_play("x.mp3"))
+        b, note = detect(dict(quiet, CLIO_AUDIO="mpv"), which=none, platform="linux")
+        self.assertIsInstance(b, NullBackend)
+        self.assertIn("not found", note)
+
+    @unittest.skipUnless(sys.platform.startswith("win"), "Windows only")
+    def test_windows_needs_no_extra_player(self):
+        b, note = detect({"CLIO_NO_PYGAME": "1"}, which=lambda name: None)
+        self.assertEqual(b.name, "winmm")
+        self.assertTrue(b.can_play("x.wav"))
+        self.assertTrue(b.can_play("x.mp3"))
+        b.shutdown()
 
 
 class ParserTests(unittest.TestCase):

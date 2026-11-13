@@ -31,7 +31,7 @@ A rebuild of the engine. Games written for CLIo 1 still load.
 - Two demo games, *Derelict* and *The Hollow Depths*, and a starter template to copy.
 - A launcher (`clio.py`) with `--style`, `--no-sound`, `--ascii`, `--width`, `--seed`,
   `--check` and more.
-- An authoring guide (`docs/AUTHORING.md`) and 47 automated tests.
+- An authoring guide (`docs/AUTHORING.md`) and 48 automated tests.
 - Apache-2.0 licence for the engine and everything it ships for games to use.
 
 ### Changed

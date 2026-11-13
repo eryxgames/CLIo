@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 import random
+import re
 
 from .term import (RESET, ANSI_RE, FRAMES, pad_to, strip_ansi,
                    truncate, visible_len, wrap_ansi)
@@ -29,6 +30,7 @@ class UI:
         self._last = "blank"        # blank | text | frame
         self._skip = False          # player pressed Ctrl-C during an effect
         self.effects_on = True
+        self.menu_number = None     # trailing number typed into a "numbered" menu
         self.apply_theme(theme)
 
     # ------------------------------------------------------------------ #
@@ -476,12 +478,15 @@ class UI:
         self._last = "blank"
 
     def menu(self, options, title=None, role="menu", cancel=True, prompt=None,
-             cancel_label=None, aliases=None, compact=False):
+             cancel_label=None, aliases=None, compact=False, numbered=False):
         """Numbered menu. Returns the chosen index, or None if cancelled.
 
         The player may type the number, or any distinctive part of an option.
+        With ``numbered`` a trailing number is accepted as well ("strike 2",
+        "s2") and left in ``self.menu_number`` for the caller.
         """
         options = list(options)
+        self.menu_number = None
         if not options:
             return None
         if self._last == "frame":
@@ -509,21 +514,14 @@ class UI:
             self.line(margin + " " + self.c(("%*d" % (numw, 0)) + ".", "key") + " " + self.fmt(cancel_label, "hint"))
         plain = [self.term.strip_markup(o).lower() for o in options]
         ptxt = prompt or ("#" + self.theme.ui.get("prompt", "> "))
-        for _ in range(6):
-            raw = self.prompt(margin + ptxt).strip().lower()
-            if raw in CANCEL_WORDS:
-                if cancel:
-                    return None
-                if raw == "":
-                    continue
+        def resolve(raw):
             if aliases and raw in aliases:
                 return aliases[raw]
             if raw.isdigit():
                 n = int(raw)
-                if 1 <= n <= len(options):
-                    return n - 1
-                self.say("Pick a number from 1 to %d." % len(options), "error")
-                continue
+                return n - 1 if 1 <= n <= len(options) else -1
+            if not raw:
+                return None
             exact = [i for i, o in enumerate(plain) if o == raw]
             starts = [i for i, o in enumerate(plain) if o.startswith(raw)]
             words = [i for i, o in enumerate(plain) if raw in o.split()]
@@ -531,6 +529,29 @@ class UI:
             for group in (exact, starts, words, inside):
                 if len(group) == 1:
                     return group[0]
+            return None
+
+        for _ in range(6):
+            raw = self.prompt(margin + ptxt).strip().lower()
+            if aliases and raw in aliases:
+                return aliases[raw]
+            if raw in CANCEL_WORDS:
+                if cancel:
+                    return None
+                if raw == "":
+                    continue
+            hit = resolve(raw)
+            if hit is None and numbered:
+                m = re.match(r"^(.*?\S)\s+(\d+)$", raw) or re.match(r"^([^\d\s]+)(\d+)$", raw)
+                if m:
+                    hit = resolve(m.group(1))
+                    if hit is not None and hit >= 0:
+                        self.menu_number = int(m.group(2))
+            if hit == -1:
+                self.say("Pick a number from 1 to %d." % len(options), "error")
+                continue
+            if hit is not None:
+                return hit
             self.say("Type the number of your choice%s." % (", or just press Enter to back out" if cancel else ""),
                      "error")
         return None

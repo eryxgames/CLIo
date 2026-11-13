@@ -23,17 +23,25 @@ A rebuild of the engine. Games written for CLIo 1 still load.
 - **Conditions and effects**: a small JSON vocabulary for game logic, so games stay data.
 - **Tactical combat**: enemies telegraph their next move; guard, focus, heavy blows,
   skills, status effects, items, fleeing.
+- **Fights against groups**: every hostile in the room joins in and shows its own intent;
+  targets are picked by number (`strike 2`); skills and items can hit everyone (`area`)
+  or spill over onto the rest (`splash`).
 - **RPG systems**: levels, experience, gold, character classes, a character generator, shops.
-- **Spawning** of characters and a **maze generator** for procedural dungeons.
+- **Spawning** of characters and a **maze generator** for procedural dungeons, with
+  monster packs and **endless dungeons** whose floors are scaled to get harder with depth.
+- **Game modes** chosen at the start or with `--mode`, **permadeath** (the run is saved as
+  it goes, there is no loading back, the save is erased at the end), **scores** and a
+  **records table** (`records`).
 - **Saves of the whole world** (opened containers, moved characters, unlocked doors) in
   named slots.
 - Parser: directions, `use X on Y`, game-defined verbs, typo suggestions, `again`.
-- Two demo games, *Derelict* and *The Hollow Depths*, and a starter template to copy.
+- Two demo games, *Derelict* and *The Hollow Depths* (with a story mode and a rogue mode),
+  and a starter template to copy.
 - A launcher (`clio.py`) with `--style`, `--no-sound`, `--ascii`, `--width`, `--seed`,
   `--check` and more.
 - `--test-display`, a page for checking frames, symbols, colours and sprites on a given
   terminal, and `--glyphs safe` for fonts that lack some symbols.
-- An authoring guide (`docs/AUTHORING.md`) and 52 automated tests.
+- An authoring guide (`docs/AUTHORING.md`) and 71 automated tests.
 - Apache-2.0 licence for the engine and everything it ships for games to use.
 
 ### Changed

@@ -57,6 +57,7 @@ VERBS = {
     "quit": ["quit", "q", "bye", "exit game", "quit game"],
     "restart": ["restart", "start over", "new game"],
     "about": ["about", "version", "credits", "info"],
+    "records": ["records", "record", "scores", "highscores", "high scores", "hall of fame", "ranking"],
     "again": ["again", "g", "repeat"],
 }
 

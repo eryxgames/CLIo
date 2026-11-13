@@ -2,9 +2,9 @@
   "id": "depths",
   "title": "The Hollow Depths",
   "subtitle": "A dungeon that is different every time",
-  "description": "Dungeon crawler. Three generated floors, tactical fights, one crown.",
+  "description": "Dungeon crawler. Generated floors, tactical fights against one or many - and a rogue mode with one life.",
   "author": "Daniel Sandner",
-  "version": "1.0",
+  "version": "1.1",
   "order": 2,
   "style": "retro",
   "initial_scene": "camp",
@@ -25,6 +25,29 @@
     "type": "maze",
     "entry": "camp",
     "loops": 0.22
+  },
+  "mode_prompt": "How will you go down?",
+  "modes": {
+    "story": {
+      "name": "Story",
+      "description": "Three floors and a crown. Your progress is saved at every stair."
+    },
+    "rogue": {
+      "name": "Rogue",
+      "description": "One life, and the dark below the Court never ends. How deep can you go?",
+      "permadeath": true,
+      "endless": true,
+      "text": "You leave no word with anyone about when you will be back. It seems more honest.",
+      "help": "Goal: go as deep as you can. One life - the run is saved as you go and erased when you fall. 'records' lists the best runs. 'map' is your friend; shrines (+) heal."
+    }
+  },
+  "score": {
+    "depth": 100,
+    "kills": 5,
+    "level": 20,
+    "gold": 1,
+    "crown_taken": 250,
+    "win": 500
   },
   "xp_base": 30,
   "level_growth": {
@@ -51,7 +74,7 @@
     "classes": {
       "warrior": {
         "name": "Warrior",
-        "description": "Tough and steady. Shield Bash stuns; learns Cleave.",
+        "description": "Tough and steady. Shield Bash stuns; learns Cleave, a sweep that catches the whole pack.",
         "stats": {
           "health": 95,
           "max_health": 95,
@@ -120,12 +143,12 @@
       },
       "mystic": {
         "name": "Mystic",
-        "description": "Fragile but dangerous. Firebolt ignores armour; Mend heals. Starts each fight with extra focus.",
+        "description": "Fragile but dangerous. Firebolt ignores armour; Mend heals; learns Nova. Starts each fight with extra focus.",
         "stats": {
-          "health": 72,
-          "max_health": 72,
+          "health": 78,
+          "max_health": 78,
           "attack": 3,
-          "defense": 3,
+          "defense": 4,
           "critical_hit_chance": 0.05
         },
         "items": [
@@ -146,10 +169,20 @@
           "defense": 1
         },
         "text": "You warm your hands on nothing at all. It will do.",
-        "focus_start": 2
+        "focus_start": 2,
+        "learn": {
+          "3": [
+            "nova"
+          ]
+        }
       }
     }
   },
   "website": "eryxian.com",
-  "license": "All rights reserved - see LICENSE.md in this game's folder"
+  "license": "All rights reserved - see LICENSE.md in this game's folder",
+  "abilities": {
+    "nova": {
+      "name": "Ember Nova"
+    }
+  }
 }

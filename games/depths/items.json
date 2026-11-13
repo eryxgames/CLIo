@@ -35,7 +35,7 @@
       "bomb"
     ],
     "value": 18,
-    "description": "A clay pot of pitch with a rag fuse. Throw it in a fight: 28 damage and the target burns.",
+    "description": "A clay pot of pitch with a rag fuse. Throw it in a fight: 28 damage to every enemy, and they burn.",
     "combat": {
       "damage": 28,
       "status": {
@@ -44,10 +44,11 @@
         "power": 4
       },
       "sfx": "explosion",
-      "text": "You light the fuse and throw. The pot bursts in a sheet of fire."
+      "text": "You light the fuse and throw. The pot bursts in a sheet of fire.",
+      "area": true
     },
     "use_text": "Best saved for a fight.",
-    "short": "28 damage + burn"
+    "short": "28 damage to all + burn"
   },
   "antidote": {
     "name": "Antidote",
@@ -403,7 +404,29 @@
     "description": "A circlet of dark iron set with coals that have never gone out.",
     "on_take": [
       {
-        "win": "outro_win"
+        "if": "endless",
+        "then": [
+          {
+            "set": "crown_taken"
+          },
+          {
+            "say": "The Ember Crown is warm in your hands, and then it is warm all through you. Emberfall can wait a little longer: behind the empty throne, a stair goes on down.",
+            "style": "story"
+          },
+          {
+            "stat": {
+              "max_health": 20
+            }
+          },
+          {
+            "heal": "full"
+          }
+        ],
+        "else": [
+          {
+            "win": "outro_win"
+          }
+        ]
       }
     ]
   }

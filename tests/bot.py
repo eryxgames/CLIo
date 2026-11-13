@@ -8,6 +8,7 @@ The tests use it to prove that generated dungeons can be finished, and it is
 handy for tuning difficulty:
 
     python tests/bot.py            # 30 runs per class, prints win rates
+    python tests/bot.py 30 rogue   # the same in rogue mode: how deep does it get
 """
 import os
 import sys
@@ -20,10 +21,11 @@ HEALS = ("greater_draught", "healing_draught")
 
 
 class DepthsBot(Session):
-    def __init__(self, seed=1, klass=1, name="Bot", verbose=False):
-        super().__init__("depths", commands=[name, str(klass)], seed=seed, width=70)
+    def __init__(self, seed=1, klass=1, name="Bot", verbose=False, mode="story"):
+        super().__init__("depths", commands=[name, str(klass)], seed=seed, width=70, mode=mode)
         self.steps = 0
         self.verbose = verbose
+        self.aim = 1
 
     # ---- answering prompts -------------------------------------------- #
     def _next(self, prompt):
@@ -31,6 +33,8 @@ class DepthsBot(Session):
             return self.queue.pop(0)
         if "Action>" in prompt:
             return self.battle_action()
+        if "Target>" in prompt:
+            return str(self.aim)
         return "1"
 
     def heal_index(self, items):
@@ -42,10 +46,15 @@ class DepthsBot(Session):
 
     def battle_action(self):
         b = self.game.battle
-        p, e = b.player, b.enemy
-        t = (b.intent or {}).get("type")
+        p = b.player
+        alive = b.alive
+        # aim at the weakest enemy that is not braced
+        e = min(alive, key=lambda f: (f.guarding, f.hp))
+        self.aim = alive.index(e) + 1
+        aim = " %d" % self.aim if len(alive) > 1 else ""
+        t = (e.intent or {}).get("type")
         items = b.usable_items()
-        if t == "release":
+        if any((f.intent or {}).get("type") == "release" for f in alive):
             return "guard"
         if p.hp < p.max_hp * 0.38:
             i = self.heal_index(items)
@@ -60,21 +69,28 @@ class DepthsBot(Session):
                 if iid == "antidote" and p.hp < p.max_hp * 0.6:
                     self.queue.append(str(i + 1))
                     return "item"
-        if e.hp > 40 and "firebomb" in items and not e.has("burn"):
+        crowd = sum(f.hp for f in alive)
+        if "firebomb" in items and ((len(alive) > 1 and crowd > 50) or (e.hp > 40 and not e.has("burn"))):
             self.queue.append(str(items.index("firebomb") + 1))
             return "item"
-        for aid, spec in b.available_abilities():
+        skills = b.available_abilities()
+        if len(alive) > 1:                      # against a pack, skills that reach everyone go first
+            skills = sorted(skills, key=lambda s: 0 if s[1].get("area") or s[1].get("splash") else 1)
+        for aid, spec in skills:
             if spec.get("kind") in ("attack", "debuff") and b.focus >= spec.get("cost", 1):
-                if spec.get("kind") == "debuff" and (e.has(spec["status"]["name"]) or e.hp < 20):
-                    continue
-                if (spec.get("status") or {}).get("name") in (b.char.get("immune") or []) and spec.get("kind") == "debuff":
-                    continue
-                return spec["name"].lower()
+                status = (spec.get("status") or {}).get("name")
+                if spec.get("kind") == "debuff":
+                    if spec.get("area"):
+                        if all(f.has(status) for f in alive) or crowd < 25:
+                            continue
+                    elif e.has(status) or e.hp < 20 or status in (e.char.get("immune") or []):
+                        continue
+                return spec["name"].lower() + aim
         if t == "guard":
             return "focus"
         if t == "heavy":
-            return "heavy"
-        return "strike"
+            return "heavy" + aim
+        return "strike" + aim
 
     # ---- exploring ----------------------------------------------------- #
     def cmd(self, line):
@@ -168,7 +184,9 @@ class DepthsBot(Session):
             sc = w.scene
             if "ember_crown" in sc.get("items", []):
                 self.cmd("take crown")
-                break
+                if g.over:
+                    break
+                continue
             ex = self.path_to(lambda sid: sid not in w.visited
                               and not (w.scenes[sid].get("kind") == "boss"))
             if ex is None:
@@ -194,28 +212,36 @@ class DepthsBot(Session):
         return g.over
 
 
-def trial(runs=30):
+def trial(runs=30, mode="story"):
     for klass, label in ((1, "warrior"), (2, "rogue"), (3, "mystic")):
-        wins, levels, turns, deaths = 0, [], [], {}
+        wins, levels, turns, deaths, depths = 0, [], [], {}, []
         for seed in range(1, runs + 1):
-            bot = DepthsBot(seed=seed, klass=klass)
-            result = bot.play()
+            bot = DepthsBot(seed=seed, klass=klass, mode=mode)
+            result = bot.play(900 if mode == "story" else 4000)
             w = bot.world
+            depths.append(int(w.vars.get("depth", 0)))
             if result == "win":
                 wins += 1
                 levels.append(w.player["level"])
                 turns.append(w.turn)
             else:
                 floor = w.scene.get("floor", 0)
-                killer = bot.game.battle.enemy.name if bot.game.battle else "?"
+                b = bot.game.battle
+                killer = (b.killer.name if b and b.killer else "?") if result == "lose" else "-"
                 key = "%s f%s %s" % (result, floor, killer)
                 deaths[key] = deaths.get(key, 0) + 1
-        print("%-8s wins %2d/%d  avg level %.1f  avg turns %d" % (
-            label, wins, runs, (sum(levels) / len(levels)) if levels else 0,
-            (sum(turns) / len(turns)) if turns else 0))
+        if mode == "story":
+            print("%-8s wins %2d/%d  avg level %.1f  avg turns %d" % (
+                label, wins, runs, (sum(levels) / len(levels)) if levels else 0,
+                (sum(turns) / len(turns)) if turns else 0))
+        else:
+            ds = sorted(depths)
+            print("%-8s depth: median %d  best %d  worst %d   %s" % (
+                label, ds[len(ds) // 2], ds[-1], ds[0], " ".join(str(d) for d in ds)))
         for k, v in sorted(deaths.items(), key=lambda kv: -kv[1])[:6]:
             print("      %2d x %s" % (v, k))
 
 
 if __name__ == "__main__":
-    trial(int(sys.argv[1]) if len(sys.argv) > 1 else 30)
+    args = [a for a in sys.argv[1:] if a.isdigit()]
+    trial(int(args[0]) if args else 30, "rogue" if "rogue" in sys.argv[1:] else "story")

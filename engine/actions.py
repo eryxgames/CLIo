@@ -3,7 +3,7 @@
 """Everything the player can do: one ``do_<verb>`` method per command."""
 from __future__ import annotations
 
-from . import __author__, __url__, __version__, automap, conditions
+from . import __author__, __url__, __version__, automap, conditions, records
 from .term import pad_to
 from .theme import available_themes, load_theme
 
@@ -218,6 +218,8 @@ class Actions:
             rows.append(["Experience", "%d / %d" % (p.get("xp", 0), self.xp_needed(p.get("level", 1)))])
         if p.get("gold") or self.cfg.get("rpg"):
             rows.append([self.cfg.get("currency", "gold").title(), str(p.get("gold", 0))])
+        if isinstance(self.cfg.get("score"), dict):
+            rows.append(["Score", str(records.score(self))])
         ui.gap()
         ui.rule(title)
         ui.table(rows)
@@ -1382,10 +1384,12 @@ class Actions:
                 "{key}Strike{/} is reliable. {key}Heavy{/} hits hard but can miss and leaves you open.",
                 "{key}Guard{/} halves damage and counters a charged blow; it also builds focus.",
                 "{key}Focus{/} skips your attack so the next one is a sure critical.",
-                "Skills cost focus. {key}Item{/} uses something from your pack. {key}Flee{/} may get you out."]),
+                "Skills cost focus. {key}Item{/} uses something from your pack. {key}Flee{/} may get you out.",
+                "Against a group, add a number to aim: {key}strike 2{/}. Some skills and items hit everyone."]),
             "game": ("The game itself", [
                 "{key}save{/} / {key}load{/} (add a name for extra slots: {key}save before-boss{/})",
                 "{key}journal{/} ({key}j{/}) shows quests; {key}stats{/} shows your condition; {key}hint{/}",
+                "{key}records{/} lists the best runs, if the game keeps score",
                 "{key}style [name]{/} changes the look; {key}sound{/}, {key}music off{/}, {key}volume 40{/}",
                 "{key}speed fast{/}|{key}normal{/}|{key}slow{/}|{key}off{/} sets text animation; {key}art off{/}",
                 "{key}again{/} ({key}g{/}) repeats; {key}quit{/} leaves. Ctrl-C skips an animation."]),
@@ -1404,7 +1408,7 @@ class Actions:
         for key in ("move", "items", "people", "game"):
             title, lines = topics[key]
             ui.bullets(lines[:3] if ui.narrow else lines, title=title)
-        extra = self.cfg.get("help")
+        extra = self.mode_spec.get("help") or self.cfg.get("help")
         if extra:
             self.say(extra, "hint")
         self.say("More: {key}help move{/}, {key}help items{/}, {key}help people{/}, {key}help fight{/}, "
@@ -1549,21 +1553,78 @@ class Actions:
     # session
     # ------------------------------------------------------------------ #
     def do_save(self, cmd):
-        self.save_slot(cmd.obj.strip() or "save")
+        name = cmd.obj.strip()
+        if self.permadeath:
+            if name:
+                self.say("A one-life run keeps a single save. Just type {key}save{/}.", "error")
+                return
+            if self.save_slot():
+                self.say("One life: this save is erased when the run ends.", "hint")
+            return
+        self.save_slot(name or None)
 
     def do_load(self, cmd):
-        self.load_slot(cmd.obj.strip() or "save")
+        if self.permadeath and not self.over:
+            self.say("There is no going back on a one-life run. It is saved as you go, and waits "
+                     "for you when you quit.", "error")
+            return
+        self.load_slot(cmd.obj.strip() or None)
 
     def do_quit(self, cmd):
-        if self.term.interactive:
+        if self.permadeath:
+            if self.term.interactive and not self.ui.confirm("Leave the run? It is saved and will wait for you."):
+                self.say("On with the adventure.", "system")
+                return
+            self.save_slot(quiet=True)
+        elif self.term.interactive:
             if not self.ui.confirm("Quit the game? Unsaved progress will be lost."):
                 self.say("On with the adventure.", "system")
                 return
         self.say("Thank you for playing. Goodbye!", "system")
         self.over = "quit"
 
+    def do_records(self, cmd):
+        """The table of best runs, one block per game mode."""
+        ui = self.ui
+        tables = records.load(self.saves())
+        modes = [m for m in (list(self.modes) or ["game"]) if tables.get(m)]
+        modes += [m for m in tables if m not in modes and tables[m]]
+        if not isinstance(self.cfg.get("score"), dict) and not modes:
+            self.say("This game keeps no score.", "system")
+            return
+        if not modes:
+            self.say("No finished runs yet. Yours could be the first.", "system")
+            return
+        for m in modes:
+            name = (self.modes.get(m) or {}).get("name")
+            ui.heading("RECORDS" + ((" %s %s" % (ui.g("dot"), name.upper())) if name else ""))
+            for i, e in enumerate(tables[m], 1):
+                who = str(e.get("name") or "?")
+                if e.get("class"):
+                    who += " the %s" % e["class"]
+                bits = []
+                if e.get("depth"):
+                    bits.append("depth %d" % e["depth"])
+                if e.get("level"):
+                    bits.append("level %d" % e["level"])
+                if e.get("note"):
+                    bits.append(str(e["note"]))
+                if e.get("date") and not ui.narrow:
+                    bits.append(str(e["date"]))
+                head = "%2d. {key}%5d{/}  {character}%s{/}" % (i, int(e.get("score", 0)), who)
+                for l in ui.wrap(head, "default", ui.width - 1, " ", "      "):
+                    ui.line(l)
+                for l in ui.wrap("{hint}%s{/}" % (" %s " % ui.g("dot")).join(bits), "default",
+                                 ui.width - 1, "      ", "      "):
+                    ui.line(l)
+        ui._last = "text"
+
     def do_restart(self, cmd):
-        if self.term.interactive and not self.ui.confirm("Start over from the beginning?"):
+        if self.permadeath and not self.over:
+            if self.term.interactive and not self.ui.confirm("Abandon this run for good and start over?"):
+                return
+            self.burn_save()
+        elif self.term.interactive and not self.ui.confirm("Start over from the beginning?"):
             return
         self.new_world(self.seed)
         self.ui.clear()

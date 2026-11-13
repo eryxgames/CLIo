@@ -7,7 +7,7 @@ import os
 import re
 import time
 
-from . import __version__, automap, conditions
+from . import __version__, automap, conditions, records
 from .actions import Actions
 from .art import ArtLibrary
 from .audio import Audio
@@ -25,11 +25,11 @@ ENGINE_ART = os.path.join(os.path.dirname(os.path.abspath(__file__)), "art")
 
 # verbs that do not advance the world clock
 FREE_VERBS = {"look", "examine", "inventory", "map", "journal", "stats", "help", "hint", "style",
-              "sound", "speed", "art", "save", "load", "quit", "restart", "about", "again", None}
+              "sound", "speed", "art", "save", "load", "quit", "restart", "about", "again", "records", None}
 
 
 class Game(Actions):
-    def __init__(self, game_dir, term=None, audio=None, seed=None, settings=None):
+    def __init__(self, game_dir, term=None, audio=None, seed=None, settings=None, mode=None):
         self.data = GameData(game_dir)
         self.term = term or Term()
         self.settings = {"art": True, "hud": True, "brief": False}
@@ -45,13 +45,17 @@ class Game(Actions):
         self.ui.audio = self.audio
         self.art = ArtLibrary(self.data.art_dir, ENGINE_ART)
         self.parser = Parser(self.data.config.get("verbs"))
-        self.abilities = dict(ABILITIES)
-        self.abilities.update(self.data.config.get("abilities", {}))
+        self.abilities = {k: dict(v) for k, v in ABILITIES.items()}
+        for aid, spec in (self.data.config.get("abilities") or {}).items():
+            # a game may add skills, or change a few fields of a built-in one
+            self.abilities.setdefault(aid, {}).update(spec)
         self.quests = QuestLog(self)
         self.over = None
         self.battle = None
         self.last_command = ""
         self.seed = seed
+        self.mode_request = mode        # a game mode asked for up front (else the player is asked)
+        self.started = False
         self.save_dir = None
         self._in_turn = False
         self.new_world(seed)
@@ -62,6 +66,8 @@ class Game(Actions):
     def new_world(self, seed=None):
         self.world = World(self.data, seed)
         self.over = None
+        self.started = False
+        self.battle = None
         if self.data.config.get("generator"):
             from . import maze
             maze.generate(self)
@@ -74,6 +80,74 @@ class Game(Actions):
         if self.save_dir is None:
             self.save_dir = saves_dir(self.data.id, self.data.dir)
         return self.save_dir
+
+    # ------------------------------------------------------------------ #
+    # game modes
+    # ------------------------------------------------------------------ #
+    @property
+    def modes(self):
+        """Ways to play, from ``"modes"`` in game.json (``{}`` for most games)."""
+        m = self.cfg.get("modes")
+        return m if isinstance(m, dict) else {}
+
+    @property
+    def mode(self):
+        return self.world.vars.get("mode")
+
+    @property
+    def mode_spec(self):
+        return self.modes.get(self.mode) or {}
+
+    @property
+    def permadeath(self):
+        """One life: no loading back, and the save is erased when the run ends."""
+        return bool(self.mode_spec.get("permadeath"))
+
+    def mode_slot(self, mode=None):
+        """The save slot a mode keeps its game in (the first mode uses plain "save")."""
+        mode = self.mode if mode is None else mode
+        spec = self.modes.get(mode) or {}
+        if spec.get("slot"):
+            return str(spec["slot"])
+        ids = list(self.modes)
+        return "save" if mode not in ids or mode == ids[0] else str(mode)
+
+    @property
+    def slot(self):
+        return self.mode_slot()
+
+    def set_mode(self, mid):
+        w = self.world
+        spec = self.modes.get(mid) or {}
+        w.vars["mode"] = mid
+        w.flags["mode_%s" % mid] = True
+        for flag in ("permadeath", "endless"):
+            if spec.get(flag):
+                w.flags[flag] = True
+        flags = spec.get("flags") or []
+        for flag in ([flags] if isinstance(flags, str) else flags):
+            w.flags[flag] = True
+
+    def choose_mode(self):
+        """Settle the game mode: the one asked for, the only one, or the player's pick."""
+        modes = self.modes
+        if not modes:
+            return
+        ids = list(modes)
+        if self.mode_request in modes:
+            mid = self.mode_request
+        elif len(ids) == 1:
+            mid = ids[0]
+        else:
+            ui = self.ui
+            labels = ["{key}%s{/} {hint}%s{/} %s" % (modes[m].get("name", m), ui.g("dot"),
+                                                     modes[m].get("description", "")) for m in ids]
+            pick = ui.menu(labels, title=self.cfg.get("mode_prompt", "How will you play?"), cancel=False)
+            mid = ids[pick or 0]
+            self.audio.sfx("select")
+        self.set_mode(mid)
+        if modes[mid].get("text"):
+            self.say(modes[mid]["text"], "story")
 
     # ------------------------------------------------------------------ #
     # text helpers
@@ -291,25 +365,43 @@ class Game(Actions):
         if ch is not None:
             run_dialogue(self, ch)
 
+    def fight_group(self, cid):
+        """The enemy and every other hostile in the room: they fight together."""
+        w = self.world
+        ids = [cid]
+        first = w.characters[cid]
+        if self.cfg.get("group_fights", True) and not first.get("solo") and cid in self.chars_here():
+            for other in self.chars_here():
+                ch = w.characters[other]
+                if other != cid and self.is_hostile(ch) and not ch.get("defeated") \
+                        and not ch.get("solo") and ch.get("stats"):
+                    ids.append(other)
+        return ids[:max(1, int(self.cfg.get("max_enemies", 4)))]
+
     def start_fight(self, cid, can_flee=True):
-        """Fight a character. Returns "win", "lose", "fled" or None."""
+        """Fight a character (and its allies in the room). Returns "win", "lose", "fled" or None."""
         w = self.world
         cid = self.resolve_char(cid)
         if cid is None:
             return None
-        ch = w.characters[cid]
-        result = Battle(self, cid, can_flee).run()
-        if result == "win":
-            self.on_defeat(cid)
-        elif result == "lose":
-            self.end_game("lose", ch.get("lose_text") or "outro_lose")
+        ids = self.fight_group(cid)
+        battle = Battle(self, ids, can_flee)
+        self.fight_started(ids)
+        result = battle.run()
+        self.fight_ended()
+        if result != "lose":
+            for dead in battle.fallen:          # also those brought down before running away
+                self.on_defeat(dead, named=len(ids) > 1)
+        if result == "lose":
+            killer = battle.killer.char if battle.killer else w.characters[cid]
+            self.end_game("lose", killer.get("lose_text") or "outro_lose")
         elif result == "fled":
             back = w.prev_scene
             if back and back in w.scenes and back != w.scene_id:
                 self.enter_scene(back, quiet=False, fled=True)
         return result
 
-    def on_defeat(self, cid):
+    def on_defeat(self, cid, named=False):
         w = self.world
         ch = w.characters[cid]
         ch["defeated"] = True
@@ -334,7 +426,8 @@ class Game(Actions):
             for d in drops:
                 sc.setdefault("items", []).append(d)
             if drops:
-                self.say("It leaves behind: %s." % ", ".join(self.iname(d) for d in drops), "loot")
+                self.say("%s leaves behind: %s." % (self.cname(cid) if named else "It",
+                                                    ", ".join(self.iname(d) for d in drops)), "loot")
         if ch.get("gold"):
             g = ch["gold"]
             if isinstance(g, (list, tuple)):
@@ -712,9 +805,10 @@ class Game(Actions):
                 if self.over == "quit" or not self.after_game():
                     break
         except QuitGame:
-            pass
+            self.suspend()
         except KeyboardInterrupt:
             self.ui.line("")
+            self.suspend()
         finally:
             self.audio.shutdown()
             self.term.hide_cursor(False)
@@ -737,23 +831,65 @@ class Game(Actions):
                             ("by %s" % cfg["author"]) if cfg.get("author") else "")
         else:
             ui.title_screen(self.art_lines("clio_logo"), self.data.title, "CLIo %s" % __version__)
-        if self.term.interactive and os.path.isfile(slot_path(self.saves(), "save")):
-            if ui.confirm("A saved game exists. Continue it?"):
-                if self.load_slot("save"):
-                    return
+        if self.term.interactive and self.offer_continue():
+            return
         if self.term.interactive:
             ui.pause("[Enter to begin]" if not ui.narrow else "[Enter]")
         self.begin_story()
 
+    def resumable(self):
+        """Saved games the title screen can offer: ``[(slot, label), ...]``."""
+        slots = [self.mode_slot(m) for m in self.modes] or ["save"]
+        found = []
+        for slot in dict.fromkeys(slots):
+            path = slot_path(self.saves(), slot)
+            if not os.path.isfile(path):
+                continue
+            label = ""
+            try:
+                blob = read_save(path)
+                mode = (blob.get("vars") or {}).get("mode")
+                bits = [self.modes[mode].get("name", mode)] if mode in self.modes else []
+                who = (blob.get("player") or {}).get("name")
+                if who and self.cfg.get("character_creation"):
+                    bits.append(str(who))
+                bits.append("turn %d" % int(blob.get("turn", 0)))
+                label = ", ".join(bits)
+            except (OSError, ValueError, TypeError, AttributeError):
+                pass
+            found.append((slot, label))
+        return found
+
+    def offer_continue(self):
+        """Ask whether to go on with a saved game. True if one was loaded."""
+        ui = self.ui
+        found = self.resumable()
+        if not found:
+            return False
+        if len(found) == 1:
+            slot, label = found[0]
+            if ui.confirm("A saved game exists%s. Continue it?" % ((" (%s)" % label) if label else "")):
+                return bool(self.load_slot(slot))
+            return False
+        pick = ui.menu(["Continue {hint}%s{/}" % label for _slot, label in found] + ["New game"],
+                       title="Saved games", cancel=False)
+        if pick is None or pick >= len(found):
+            return False
+        return bool(self.load_slot(found[pick][0]))
+
     def begin_story(self):
         cfg = self.cfg
+        self.choose_mode()
         cc = cfg.get("character_creation")
         if cc:
             self.create_character(cc)
-        intro = cfg.get("intro", "intro")
+        intro = self.mode_spec.get("intro") or cfg.get("intro", "intro")
         self.story_text(intro)
+        self.started = True
         if cfg.get("on_start"):
             conditions.run(cfg["on_start"], self)
+        if self.mode_spec.get("on_start"):
+            conditions.run(self.mode_spec["on_start"], self)
         self.quests.update()
         if not self.over:
             self.enter_scene(self.world.scene_id, first=True)
@@ -833,6 +969,8 @@ class Game(Actions):
         self.say(body, "story", title="THE END" if kind == "win" else "GAME OVER")
         mins = max(1, int((time.time() - w.started) / 60))
         facts = ["%d turns" % w.turn, "%d of %d places seen" % (len(w.visited), len(w.scenes))]
+        if w.vars.get("depth") and self.cfg.get("generator"):
+            facts.insert(0, "depth %d" % int(w.vars["depth"]))
         done = sum(1 for q in w.quests.values() if q.get("status") == "done")
         if self.data.quests:
             facts.append("%d of %d quests" % (done, len(self.data.quests)))
@@ -841,6 +979,49 @@ class Game(Actions):
         if self.term.interactive:
             facts.append("%d min" % mins)
         self.say((" %s " % ui.g("dot")).join(facts), "hint")
+        self.finish_run(kind)
+
+    def run_note(self, kind):
+        """How a run ended, in a few words (for the records table)."""
+        w = self.world
+        floor = w.scene.get("floor")
+        where = (" on floor %d" % floor) if floor else ""
+        if kind == "win":
+            return "won"
+        killer = getattr(self.battle, "killer", None) if self.battle else None
+        if killer is not None and self.battle.result == "lose":
+            return "slain by %s%s" % (killer.char.get("name", killer.name), where)
+        return "died%s" % where
+
+    def finish_run(self, kind):
+        """Score the run, file it in the records, and burn a permadeath save."""
+        w = self.world
+        if isinstance(self.cfg.get("score"), dict):
+            pts = records.score(self)
+            p = w.player
+            entry = {"score": pts, "name": p.get("name", ""), "class": p.get("class_name", ""),
+                     "level": p.get("level", 0) if self.cfg.get("rpg") else 0,
+                     "depth": int(w.vars.get("depth", 0) or 0), "turns": w.turn,
+                     "result": kind, "note": self.run_note(kind), "seed": w.seed}
+            place = None
+            try:
+                place = records.add(self.saves(), self.mode or "game", entry)
+            except (OSError, ValueError, TypeError):
+                pass
+            line = "{quest}%s Score: %d{/}" % (self.ui.g("star"), pts)
+            if place == 1:
+                line += " {success}- a new record!{/}"
+            elif place:
+                line += " {hint}- number %d in the records{/}" % place
+            self.say(line, "quest")
+        if self.permadeath:
+            self.burn_save()
+
+    def burn_save(self):
+        try:
+            os.remove(slot_path(self.saves(), self.slot))
+        except OSError:
+            pass
 
     def after_game(self):
         """Offer to load / restart. Returns True if play continues."""
@@ -848,7 +1029,7 @@ class Game(Actions):
             return False
         ui = self.ui
         options, actions = [], []
-        if self.over == "lose" and os.path.isfile(slot_path(self.saves(), "save")):
+        if self.over == "lose" and not self.permadeath and os.path.isfile(slot_path(self.saves(), self.slot)):
             options.append("Load your last save")
             actions.append("load")
         options.append("Start a new game")
@@ -859,7 +1040,7 @@ class Game(Actions):
         act = actions[pick] if pick is not None else "quit"
         if act == "load":
             self.over = None
-            return bool(self.load_slot("save"))
+            return bool(self.load_slot())
         if act == "new":
             self.new_world(self.seed)
             ui.clear()
@@ -870,7 +1051,8 @@ class Game(Actions):
     # ------------------------------------------------------------------ #
     # save / load
     # ------------------------------------------------------------------ #
-    def save_slot(self, slot="save", quiet=False):
+    def save_slot(self, slot=None, quiet=False):
+        slot = slot or self.slot
         try:
             path = slot_path(self.saves(), slot)
             write_save(path, self.world.to_save())
@@ -879,10 +1061,11 @@ class Game(Actions):
             return False
         if not quiet:
             self.audio.sfx("save")
-            self.say("Game saved%s." % ("" if slot in ("", "save") else " as '%s'" % slot), "success")
+            self.say("Game saved%s." % ("" if slot in ("", "save", self.slot) else " as '%s'" % slot), "success")
         return True
 
-    def load_slot(self, slot="save"):
+    def load_slot(self, slot=None):
+        slot = slot or self.slot
         path = slot_path(self.saves(), slot)
         if not os.path.isfile(path):
             self.say("There is no saved game%s." % ("" if slot in ("", "save") else " called '%s'" % slot), "error")
@@ -896,8 +1079,39 @@ class Game(Actions):
             self.say("Could not load that save: %s" % e, "error")
             return False
         self.over = None
+        self.started = True
+        self.battle = None
         self.audio.sfx("save")
         self.say("Game loaded.", "success")
         self.resume_music()
         self.describe_scene(full=True)
+        self.resume_fight()
         return True
+
+    # ------------------------------------------------------------------ #
+    # permadeath: the run is saved as it goes
+    # ------------------------------------------------------------------ #
+    def fight_started(self, ids):
+        """A battle is about to begin: a one-life run is saved with the fight pending."""
+        if self.permadeath and self.started:
+            self.world.vars["_fight"] = list(ids)
+            self.save_slot(quiet=True)
+
+    def fight_ended(self):
+        self.world.vars.pop("_fight", None)
+
+    def resume_fight(self):
+        """A run that was left in the middle of a battle goes straight back into it."""
+        w = self.world
+        pending = w.vars.pop("_fight", None)
+        if not pending:
+            return
+        here = [c for c in pending if c in self.chars_here() and not w.characters[c].get("defeated")]
+        if here:
+            self.say("There is no slipping out of a fight. It is still waiting for you.", "combat")
+            self.start_fight(here[0])
+
+    def suspend(self):
+        """The player left a one-life run without saying so: keep it for next time."""
+        if self.permadeath and self.started and not self.over and not self.world.vars.get("_fight"):
+            self.save_slot(quiet=True)

@@ -22,7 +22,12 @@
       },
       {
         "text": "Take the Ember Crown",
-        "done_when": "game_won"
+        "done_when": {
+          "any": [
+            "game_won",
+            "crown_taken"
+          ]
+        }
       }
     ]
   },
@@ -76,6 +81,25 @@
       },
       {
         "xp": 40
+      }
+    ]
+  },
+  "deep": {
+    "title": "The Long Dark",
+    "description": "Below the Hollow Court the stairs go on. Nobody knows how far.",
+    "auto_start": "crown_taken",
+    "stages": [
+      {
+        "text": "Reach the fifth floor",
+        "done_when": "floor_5"
+      },
+      {
+        "text": "Reach the eighth floor",
+        "done_when": "floor_8"
+      },
+      {
+        "text": "Reach the twelfth floor",
+        "done_when": "floor_12"
       }
     ]
   }

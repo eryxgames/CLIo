@@ -16,6 +16,7 @@ Created by **Daniel Sandner** · [eryxian.com](https://eryxian.com)
 python clio.py            # pick a game
 python clio.py derelict   # sci-fi adventure
 python clio.py depths     # dungeon crawler
+python clio.py depths --mode rogue    # ...with one life and no bottom
 ```
 
 ## The demo games
@@ -23,7 +24,7 @@ python clio.py depths     # dungeon crawler
 | Game | What it shows |
 | --- | --- |
 | **Derelict** (`games/derelict`) | A complete short adventure aboard an abandoned cargo hauler. Puzzles, dialogue trees, quests, a wandering NPC, one tactical fight that can also be talked around, and three endings. |
-| **The Hollow Depths** (`games/depths`) | A dungeon crawler that is different on every run: three generated floors, three character classes, tactical combat, loot, shrines, a peddler, generated monster sprites and generated music. `--seed 7` replays the same dungeon. |
+| **The Hollow Depths** (`games/depths`) | A dungeon crawler that is different on every run: three generated floors, three character classes, tactical combat against single monsters and packs, loot, shrines, a peddler, generated monster sprites and generated music. `--seed 7` replays the same dungeon. **Rogue mode** gives you one life and a dungeon that keeps going down, with a table of the best runs. |
 | **Sandbox** (`game_files`) | The original CLIo 1 test bed, loaded unchanged by the new engine. |
 
 ## Features
@@ -38,14 +39,16 @@ python clio.py depths     # dungeon crawler
 - [x] Quests with stages that track themselves, a journal, triggers
 - [x] RPG features: stats, levels, experience, gold, classes
 - [x] Tactical combat: telegraphed enemy moves, guard/focus/heavy, skills, status effects, items, fleeing
+- [x] Fights against groups: every enemy shows its intent, targets by number, area skills and items
 - [x] Character generator (name and class at the start of a game)
 - [x] Sounds and music: synthesizer, generative composer, optional audio files
 - [x] Styling: seven themes, frames, typewriter / fade / glitch effects, HUD
 - [x] ASCII art with colour masks, half-block pixel sprites, procedural sprites
 - [x] Auto-map
-- [x] Generative maze
+- [x] Generative maze, monster packs, endless dungeons that scale with depth
+- [x] Game modes (for example story and rogue), permadeath, scores and a records table
 - [x] Save / load of the *whole* world, named slots
-- [x] Two demo games, a starter template, 52 automated tests
+- [x] Two demo games, a starter template, 71 automated tests
 - [ ] Entity data editor (`utils/entity_editor.py`, Tkinter, desktop only - still alpha and
       still edits the CLIo 1 file layout in `game_files/`; its Project Map needs
       `pip install graphviz pillow` plus the Graphviz program)
@@ -66,6 +69,7 @@ python clio.py [game] [options]
   --fast          no text animation
   --width N       force the layout width
   --seed N        reproducible random numbers (same seed, same dungeon)
+  --mode NAME     game mode, for games that have several (depths: story, rogue)
   --check         validate a game's data files and exit
 ```
 
@@ -117,14 +121,20 @@ open crate      unlock locker        use relay on reactor             read log
 talk to bolt    give apple to bugrat fight droid      trade
 combine goo with suit   repair chip  equip cutter     journal (j)     stats
 save / load     hint    help         style retro      music off       volume 40
-speed fast      art off again (g)    quit
+speed fast      art off again (g)    records          quit
 ```
 
 Saved games live outside the game folder: `%APPDATA%\clio\saves` on Windows,
 `~/.local/share/clio/saves` elsewhere (set `CLIO_SAVES` to move them).
 
 In a fight the enemy shows what it is about to do. **Guard** when a heavy blow is coming,
-**strike** while it winds up, **focus** while it braces. Ctrl-C skips an animation.
+**strike** while it winds up, **focus** while it braces. Against a group, add a number to
+aim: `strike 2`. Ctrl-C skips an animation.
+
+A game can offer several modes. In The Hollow Depths, **Story** is three floors with a save
+at every stair; **Rogue** is one life in a dungeon without a bottom. A rogue run is saved
+as you go and waits for you when you quit, but there is no loading back, and the save is
+erased when you fall. `records` shows the best runs.
 
 ## Making a game
 
@@ -168,13 +178,14 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 52 tests, about ten seconds
+python -m unittest discover -s tests     # 71 tests, about fifteen seconds
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
+python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 ```
 
 The tests play both demo games to every ending from scripts, check that every screen fits
-40 columns in both Unicode and ASCII (and down to 24), round-trip saves, and render every
-sound effect. They write nothing into the repository: saves and audio go to temporary folders.
+40 columns in both Unicode and ASCII (and down to 24), fight packs, run rogue mode until
+the bot falls, round-trip saves, and render every sound effect. They write nothing into the repository: saves and audio go to temporary folders.
 
 ## Licence
 

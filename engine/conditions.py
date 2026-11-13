@@ -461,8 +461,17 @@ def _e_transition(g, arg, eff, ctx):
 
 
 def _e_save(g, arg, eff, ctx):
-    if g.save_slot(arg if isinstance(arg, str) else "save", quiet=True) and not eff.get("quiet"):
+    # {"save": true} writes the slot of the current game mode; a string names a slot
+    slot = arg if isinstance(arg, str) and arg not in ("", "save") else None
+    if g.save_slot(slot, quiet=True) and not eff.get("quiet"):
         g.say("(progress saved)", "hint")
+
+
+def _e_deepen(g, arg, eff, ctx):
+    """Endless dungeons: build the next floor below the deepest one."""
+    if g.cfg.get("generator"):
+        from . import maze
+        maze.extend(g)
 
 
 def _e_look(g, arg, eff, ctx):
@@ -480,5 +489,5 @@ _EFFECTS = {
     "fight": _e_fight, "dialogue": _e_dialogue, "win": _e_win, "lose": _e_lose,
     "random": _e_random, "do": _e_do, "learn": _e_learn, "end_dialogue": _e_end_dialogue,
     "turns": _e_turns, "shop": _e_shop, "story": _e_story, "transition": _e_transition,
-    "look": _e_look, "save": _e_save,
+    "look": _e_look, "save": _e_save, "deepen": _e_deepen,
 }

@@ -101,6 +101,19 @@ class UiTests(unittest.TestCase):
         self.assertEqual(ui.menu(["red", "green", "blue"]), 2)
         self.assertIsNone(ui.menu(["red", "green", "blue"]))
 
+    def test_menu_takes_a_trailing_number_when_asked_to(self):
+        answers = iter(["heavy 2", "s3", "2", "strike", "strike 2"] + ["strike 2"] * 6)
+        t = Term(out=io.StringIO(), inp=lambda p: next(answers), width=40, color=0, animate=False, env={})
+        ui = UI(t, load_theme("minimal"))
+        options = ["Strike", "Heavy blow", "Guard"]
+        got = []
+        for _ in range(4):
+            got.append((ui.menu(options, numbered=True, cancel=False), ui.menu_number))
+        self.assertEqual(got, [(1, 2), (0, 3), (1, None), (0, None)])
+        self.assertEqual(ui.menu(options, cancel=False, aliases={"strike 2": 2}), 2)   # aliases come first
+        self.assertIsNone(ui.menu(options))                     # without "numbered" it is no answer
+        self.assertIsNone(ui.menu_number)
+
 
 class ArtTests(unittest.TestCase):
     SRC = "# c\n@palette\na = red\n@art\n\n /\\\n/__\\\n@mask\n a\naaaa\n@small\n^\n"

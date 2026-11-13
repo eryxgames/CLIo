@@ -135,6 +135,7 @@ def main(argv=None):
     ap.add_argument("--fast", action="store_true", help="no text animation")
     ap.add_argument("--width", type=int, help="force the layout width in columns")
     ap.add_argument("--seed", type=int, help="random seed (same seed, same dungeon)")
+    ap.add_argument("--mode", help="game mode, for games that have several (e.g. story, rogue)")
     ap.add_argument("--version", action="version",
                     version="CLIo %s - %s, %s" % (__version__, __author__, __url__))
     args = ap.parse_args(argv)
@@ -176,7 +177,12 @@ def main(argv=None):
         settings = {}
         if args.no_art:
             settings["art"] = False
-        game = Game(game_dir, term=term, audio=audio, seed=args.seed, settings=settings)
+        game = Game(game_dir, term=term, audio=audio, seed=args.seed, settings=settings, mode=args.mode)
+        if args.mode and args.mode not in game.modes:
+            print("'%s' has no mode called '%s'%s." % (
+                game.data.title, args.mode,
+                (" (it has: %s)" % ", ".join(game.modes)) if game.modes else ""))
+            return 2
         if args.style:
             game.ui.apply_theme(load_theme(args.style, game.data.dir))
     except GameDataError as e:

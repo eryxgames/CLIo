@@ -28,7 +28,7 @@
       "shrine": 1,
       "monster_chance": 0.5,
       "trap_chance": 0.12,
-      "loot_chance": 0.22,
+      "loot_chance": 0.26,
       "trap_damage": [
         5,
         9
@@ -45,6 +45,30 @@
         [
           "crypt_crawler",
           3
+        ]
+      ],
+      "pack_chance": 0.25,
+      "packs": [
+        [
+          [
+            "bone_rat",
+            "bone_rat"
+          ],
+          3
+        ],
+        [
+          [
+            "bone_rat",
+            "gloom_bat"
+          ],
+          3
+        ],
+        [
+          [
+            "gloom_bat",
+            "gloom_bat"
+          ],
+          2
         ]
       ],
       "elite": "bone_warden",
@@ -178,7 +202,7 @@
       "shrine": 1,
       "monster_chance": 0.5,
       "trap_chance": 0.1,
-      "loot_chance": 0.22,
+      "loot_chance": 0.26,
       "trap_damage": [
         8,
         13
@@ -196,6 +220,38 @@
         [
           "rust_knight",
           3
+        ]
+      ],
+      "pack_chance": 0.25,
+      "packs": [
+        [
+          [
+            "mire_leech",
+            "mire_leech"
+          ],
+          3
+        ],
+        [
+          [
+            "drowned_thrall",
+            "mire_leech"
+          ],
+          2
+        ],
+        [
+          [
+            "bone_rat",
+            "bone_rat",
+            "bone_rat"
+          ],
+          2
+        ],
+        [
+          [
+            "drowned_thrall",
+            "gloom_bat"
+          ],
+          2
         ]
       ],
       "elite": "tide_hag",
@@ -341,7 +397,7 @@
       "shrine": 1,
       "monster_chance": 0.5,
       "trap_chance": 0.1,
-      "loot_chance": 0.22,
+      "loot_chance": 0.26,
       "trap_damage": [
         10,
         16
@@ -355,6 +411,37 @@
         [
           "hollow_guard",
           4
+        ]
+      ],
+      "pack_chance": 0.25,
+      "packs": [
+        [
+          [
+            "ash_wraith",
+            "mire_leech"
+          ],
+          2
+        ],
+        [
+          [
+            "hollow_guard",
+            "gloom_bat"
+          ],
+          2
+        ],
+        [
+          [
+            "drowned_thrall",
+            "drowned_thrall"
+          ],
+          2
+        ],
+        [
+          [
+            "rust_knight",
+            "mire_leech"
+          ],
+          2
         ]
       ],
       "boss": "hollow_king",
@@ -486,5 +573,107 @@
         ]
       }
     }
-  ]
+  ],
+  "endless": {
+    "growth": 0.22,
+    "prefixes": [
+      "Elder",
+      "Dread",
+      "Abyssal",
+      "Nameless"
+    ],
+    "names": [
+      "The Lower Crypt",
+      "The Drowned Deep",
+      "The Ashen Halls"
+    ],
+    "arrival": [
+      "The stair keeps going. Nobody ever drew a map of this far down.",
+      "Colder again. Your light seems to reach a little less far than it did.",
+      "The steps are worn hollow in the middle, as if by a great many feet going one way."
+    ],
+    "floor": {
+      "merchant": "merchant",
+      "loot_chance": 0.25,
+      "locked_chance": 0.4,
+      "chest_gold": [
+        25,
+        45
+      ],
+      "trap_damage": [
+        10,
+        16
+      ],
+      "loot": [
+        [
+          "greater_draught",
+          5
+        ],
+        [
+          "healing_draught",
+          2
+        ],
+        [
+          "firebomb",
+          3
+        ],
+        [
+          "focus_incense",
+          2
+        ],
+        [
+          "antidote",
+          1
+        ]
+      ],
+      "chest_loot": [
+        [
+          "heart_root",
+          3
+        ],
+        [
+          "iron_tonic",
+          3
+        ],
+        [
+          "whetstone",
+          3
+        ],
+        [
+          "greater_draught",
+          3
+        ],
+        [
+          "emberbrand",
+          1
+        ],
+        [
+          "warden_plate",
+          1
+        ],
+        [
+          "tower_shield",
+          1
+        ],
+        [
+          "grave_charm",
+          1
+        ]
+      ]
+    },
+    "boss": {
+      "name": "Echo of the Hollow King",
+      "battle_intro": "The throne is occupied. It should not be. You have already killed what sits there.",
+      "defeat_text": "The Echo comes apart into sparks, and the sparks go out one by one.",
+      "on_defeat": [
+        {
+          "add_item": "heart_root"
+        },
+        {
+          "say": "Where the Echo stood, a {item}Heart Root{/} is pushing up through the flagstones.",
+          "style": "story"
+        }
+      ]
+    }
+  }
 }

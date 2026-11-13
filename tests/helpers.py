@@ -37,7 +37,8 @@ def game_path(name):
 class Session:
     """A game driven by a list of commands instead of a keyboard."""
 
-    def __init__(self, name, commands=(), seed=1, width=80, color=0, unicode=True, record_audio=False):
+    def __init__(self, name, commands=(), seed=1, width=80, color=0, unicode=True, record_audio=False,
+                 mode=None):
         self.out = io.StringIO()
         self.queue = list(commands)
         # env={}: the result must not depend on the TERM, NO_COLOR... of whoever runs the tests
@@ -45,7 +46,11 @@ class Session:
                          unicode=unicode, animate=False, env={})
         self.backend = NullBackend(record=record_audio)
         self.audio = Audio(backend=self.backend, enabled=record_audio)
+        # mode: None plays the game's first mode without asking; "?" lets the script answer the menu
         self.game = Game(game_path(name), term=self.term, audio=self.audio, seed=seed)
+        if mode is None:
+            mode = next(iter(self.game.modes), None)
+        self.game.mode_request = None if mode == "?" else mode
 
     def _next(self, prompt):
         if not self.queue:
@@ -77,3 +82,20 @@ class Session:
     @property
     def world(self):
         return self.game.world
+
+
+class Scripted(Session):
+    """A session that answers any prompt left over after its script with a default."""
+
+    default = "1"
+
+    def _next(self, prompt):
+        return self.queue.pop(0) if self.queue else self.default
+
+
+def private_saves(session):
+    """Give a session its own empty folder for saves and records. Returns the path."""
+    folder = tempfile.mkdtemp(prefix="clio-test-run-")
+    atexit.register(shutil.rmtree, folder, True)
+    session.game.save_dir = folder
+    return folder

@@ -241,4 +241,71 @@ class GameData:
                     g = ch.get("goto")
                     if g and g not in nodes and g not in ("end", "back"):
                         problems.append("dialogue '%s': node '%s' goes to unknown node '%s'" % (did, nid, g))
+        problems += self._validate_modes()
+        problems += self._validate_dungeon()
+        return problems
+
+    def _validate_modes(self):
+        problems = []
+        modes = self.config.get("modes")
+        if modes is not None:
+            if not isinstance(modes, dict) or not modes:
+                problems.append("modes: must be an object of {id: {name, description, ...}}")
+            else:
+                for mid, spec in modes.items():
+                    if not isinstance(spec, dict):
+                        problems.append("mode '%s': must be an object" % mid)
+                    elif spec.get("endless") and not self.config.get("generator"):
+                        problems.append("mode '%s': 'endless' needs a dungeon generator" % mid)
+        score = self.config.get("score")
+        if score is not None:
+            if not isinstance(score, dict):
+                problems.append("score: must be an object of {name: weight}")
+            else:
+                for name, weight in score.items():
+                    if isinstance(weight, bool) or not isinstance(weight, (int, float)):
+                        problems.append("score: the weight of '%s' is not a number" % name)
+        return problems
+
+    def _validate_dungeon(self):
+        problems = []
+        floors = self.dungeon.get("floors") or []
+
+        def values(table):
+            out = []
+            for t in table or []:
+                weighted = isinstance(t, (list, tuple)) and len(t) == 2 \
+                    and isinstance(t[1], (int, float)) and not isinstance(t[1], bool)
+                out.append(t[0] if weighted else t)
+            return out
+
+        def check_floor(where, fl):
+            for mid in values(fl.get("monsters")):
+                if mid not in self.characters:
+                    problems.append("%s: unknown monster '%s'" % (where, mid))
+            for group in values(fl.get("packs")):
+                if not isinstance(group, (list, tuple)) or not group:
+                    problems.append("%s: a pack must be a list of monsters with a weight, "
+                                    "like [[\"rat\", \"rat\"], 2]" % where)
+                    continue
+                for mid in group:
+                    if mid not in self.characters:
+                        problems.append("%s: unknown monster '%s' in a pack" % (where, mid))
+            for key in ("elite", "boss", "wanderer", "merchant"):
+                ref = fl.get(key)
+                if isinstance(ref, str) and ref not in self.characters:
+                    problems.append("%s: unknown %s '%s'" % (where, key, ref))
+            for key in ("loot", "chest_loot"):
+                for iid in values(fl.get(key)):
+                    if iid not in self.items:
+                        problems.append("%s: unknown item '%s' in %s" % (where, iid, key))
+
+        for n, fl in enumerate(floors, 1):
+            check_floor("dungeon floor %d" % n, fl)
+        endless = self.dungeon.get("endless")
+        if isinstance(endless, dict):
+            check_floor("dungeon endless.floor", endless.get("floor") or {})
+            for i in endless.get("cycle") or []:
+                if not isinstance(i, int) or not 0 <= i < len(floors):
+                    problems.append("dungeon endless.cycle: there is no floor with index %r" % (i,))
         return problems

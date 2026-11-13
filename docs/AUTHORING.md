@@ -88,6 +88,9 @@ That is a finished game: `take corkscrew`, `use corkscrew on barrel`, `up`. It s
 | `character_creation` | Name prompt and classes; see `games/depths/game.json`. |
 | `abilities`, `verbs`, `actions` | Extra combat skills, extra verb synonyms, verbs that work everywhere. |
 | `generator` | Turns on the [dungeon generator](#generated-dungeons). |
+| `modes` | Ways to play the same game, chosen at the start: see [game modes](#game-modes-scores-and-records). |
+| `score` | What a run is worth; turns on the records table. |
+| `group_fights`, `max_enemies` | `false` makes every fight one on one; the most enemies in one fight (default 4). |
 | `files` | Override file names: `{"scenes": "world/rooms.json"}`. |
 
 Files are looked up by these default names: `scenes.json`, `items.json`,
@@ -231,7 +234,8 @@ Effects (one dict may hold several; they run in order):
 | `{"quest": ["id", "start"]}` (`advance`, `complete`, `fail`) | quests |
 | `{"fight": "char"}`, `{"dialogue": "char"}`, `{"shop": "char"}` | encounters |
 | `{"sfx": "name"}`, `{"music": "track"}`, `{"art": "name"}`, `{"pause": 0.5}` | presentation |
-| `{"save": "save"}`, `{"win": "text or key"}`, `{"lose": "text or key"}` | the game |
+| `{"save": true}` (the mode's own slot; a string names another), `{"win": "text or key"}`, `{"lose": "text or key"}` | the game |
+| `{"deepen": true}` | builds the next floor of an [endless dungeon](#endless-dungeons) (the generator does this itself) |
 | `{"if": cond, "then": [...], "else": [...]}`, `{"random": [[...], [...]]}` | control |
 
 `$player` in any text is replaced by the player's name.
@@ -314,6 +318,23 @@ Skills live in `engine/combat.py` (`ABILITIES`) and can be added in `game.json`:
 ```
 
 The player gets a skill from a class, from an item's `abilities`, or from the `learn` effect.
+Naming a built-in skill in `abilities` changes only the fields you give
+(`"nova": {"name": "Ember Nova"}`).
+
+### Fighting a group
+
+Every hostile character in the room joins a fight (at most `max_enemies`, 4 unless
+`game.json` says otherwise); two of a kind are told apart as *Bone Rat A* and *Bone Rat B*.
+Each enemy shows its own intent, and the player aims with a number - `strike 2`, `heavy 1`,
+`backstab 3` - or is asked. Guarding covers the whole round. Rewards are paid for every
+enemy that falls, also when the player then runs away.
+
+- `"solo": true` on a character keeps it out of other fights, and others out of its own.
+- `"group_fights": false` in `game.json` turns the whole thing off.
+- A skill with `"area": true` reaches every enemy; `"splash": 0.6` gives the others that
+  share of a blow aimed at one of them. The built-in `cleave` splashes, `smoke` and `nova`
+  are area skills.
+- The `combat` block of an item takes `"area": true` as well (a bomb, a flash powder).
 
 ## Text, colour and themes
 
@@ -451,6 +472,87 @@ generator connects it to the first floor. Floors are described in `dungeon.json`
 `merchant`, `treasure`, `shrine`, `wanderer`, loot tables, room texts per kind and
 `trap_damage`. `games/depths/dungeon.json` is a complete example. The world seed decides
 everything, so `--seed` replays a dungeon exactly.
+
+A monster room can hold a pack instead of a single creature. `packs` lists the groups
+with their weights, `pack_chance` says how often a monster room gets one. A pack always
+guards an item from the floor's loot table (`pack_loot` changes that chance).
+
+```json
+"pack_chance": 0.25,
+"packs": [[["bone_rat", "bone_rat"], 3], [["bone_rat", "gloom_bat"], 2]]
+```
+
+### Endless dungeons
+
+In a [game mode](#game-modes-scores-and-records) with `"endless": true` the dungeon does
+not stop at the last floor you wrote. Each time the player arrives on the deepest floor,
+one more is built below it and the keeper of the stair (the elite, or the boss) stands in
+the way. Deeper floors reuse the written floors in turn. Their monsters are scaled
+automatically so that every floor is `growth` stronger than the one above, whichever
+description it uses, and experience and gold grow with them. The `endless` block of
+`dungeon.json` tunes the rest; all of it is optional:
+
+```json
+"endless": {
+  "growth": 0.22,
+  "prefixes": ["Elder", "Dread", "Abyssal"],
+  "names": ["The Lower Crypt", "The Drowned Deep", "The Ashen Halls"],
+  "arrival": ["The stair keeps going. Nobody ever drew a map of this far down."],
+  "floor": {"merchant": "merchant", "chest_loot": [["heart_root", 3], ["whetstone", 3]]},
+  "boss": {"name": "Echo of the Hollow King", "on_defeat": [{"add_item": "heart_root"}]}
+}
+```
+
+| Key | Meaning |
+| --- | --- |
+| `growth` | How much stronger each floor is than the last (0.22 = 22%). |
+| `prefixes` | Name prefix for monsters, one per pass through the written floors. Characters marked `"unique": true` keep their name. |
+| `names`, `arrival` | Names and arrival texts for the deeper floors, used in turn. |
+| `cycle` | Which written floors to reuse, by index (default: all, in order). |
+| `floor` | Settings laid over every deeper floor: loot tables, a merchant, chances. |
+| `boss` | Changes to the boss when it returns: name, texts, `on_defeat`. |
+
+The variable `depth` holds the deepest floor reached, and every floor sets a flag
+`floor_N` on arrival, so quests and conditions can use both.
+
+## Game modes, scores and records
+
+`modes` in `game.json` offers several ways to play one game. The player picks one at the
+start (or passes `--mode rogue` on the command line); the first one listed is the default.
+
+```json
+"mode_prompt": "How will you go down?",
+"modes": {
+  "story": {"name": "Story", "description": "Three floors and a crown."},
+  "rogue": {"name": "Rogue", "description": "One life. How deep can you go?",
+            "permadeath": true, "endless": true}
+}
+```
+
+| Key | Meaning |
+| --- | --- |
+| `name`, `description` | Shown in the menu. |
+| `permadeath` | One life. `load` is refused, the run is saved as it goes (at every fight, on quitting), and the save is erased when the run ends. Leaving in the middle of a fight puts the player back at the start of that fight. |
+| `endless` | Sets the flag `endless`, which keeps a [generated dungeon](#endless-dungeons) going. |
+| `flags`, `on_start` | Extra flags to set and effects to run when the mode starts. |
+| `text`, `intro`, `help` | A line shown on choosing the mode; an intro and a help text that replace the game's. |
+| `slot` | Save slot of the mode. The first mode uses `save`, the others their own name, so a story save and a rogue run do not overwrite each other. |
+
+The chosen mode sets the flag `mode_<id>` and the variable `mode`, so any condition can
+ask for it: `{"if": "mode_rogue", "then": [...], "else": [...]}`.
+
+`score` says what a run is worth. Each name is a counter in the game's variables, one of
+`level`, `gold`, `xp`, `turns`, `places`, `quests`, `health`, `win`, or a flag (worth 1
+when set); the number is its weight.
+
+```json
+"score": {"depth": 100, "kills": 5, "level": 20, "gold": 1, "crown_taken": 250, "win": 500}
+```
+
+`kills` counts defeated spawned creatures, `depth` the deepest dungeon floor. With a
+`score`, the game shows the points in `stats` and at the end of a run, and keeps the ten
+best runs of every mode. `records` shows the table. It lives next to the saved games, in
+`records.dat`.
 
 ## Coming from CLIo 1
 

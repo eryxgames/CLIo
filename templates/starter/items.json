@@ -1,0 +1,25 @@
+{
+  "corkscrew": {
+    "name": "Corkscrew",
+    "description": "Sturdy. Pointed."
+  },
+  "iron_key": {
+    "name": "Iron Key",
+    "description": "Cold and heavy."
+  },
+  "barrel": {
+    "name": "Barrel",
+    "description": "A barrel with a loose bung.",
+    "takeable": false,
+    "use_with": {
+      "corkscrew": {
+        "text": "You work the bung out. Something clinks inside.",
+        "do": [
+          {
+            "give": "iron_key"
+          }
+        ]
+      }
+    }
+  }
+}

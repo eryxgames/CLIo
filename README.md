@@ -45,7 +45,7 @@ python clio.py depths     # dungeon crawler
 - [x] Auto-map
 - [x] Generative maze
 - [x] Save / load of the *whole* world, named slots
-- [x] Two demo games, 46 automated tests
+- [x] Two demo games, a starter template, 47 automated tests
 - [ ] Entity data editor (`utils/entity_editor.py`, Tkinter, desktop only - still alpha and
       still edits the CLIo 1 file layout in `game_files/`; its Project Map needs
       `pip install graphviz pillow` plus the Graphviz program)
@@ -112,7 +112,8 @@ In a fight the enemy shows what it is about to do. **Guard** when a heavy blow i
 ## Making a game
 
 A game is a folder under `games/` with a `game.json` and a few data files. The shortest
-useful game is about thirty lines of JSON. See **[docs/AUTHORING.md](docs/AUTHORING.md)** for
+useful game is about thirty lines of JSON: copy `templates/starter/` to `games/yourgame/`
+and edit it. See **[docs/AUTHORING.md](docs/AUTHORING.md)** for
 the full reference: scenes, items, characters, dialogue trees, quests, conditions and
 effects, art files, sprites, music notation, themes and the dungeon generator.
 
@@ -136,6 +137,7 @@ engine/
   conditions.py      conditions and effects   quests.py   dialogue.py   combat.py
   game.py            the turn loop
 games/               derelict/  depths/
+templates/starter/   a tiny complete game to copy (Apache-2.0)
 game_files/          the original CLIo 1 sandbox
 tests/               python -m unittest discover -s tests
 utils/               Tkinter data editor (desktop, alpha)
@@ -145,7 +147,7 @@ legacy/prototypes/   early dialogue / crafting experiments from CLIo 1
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 46 tests, about ten seconds
+python -m unittest discover -s tests     # 47 tests, about ten seconds
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 ```
 

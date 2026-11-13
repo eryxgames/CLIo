@@ -68,7 +68,9 @@ to have the engine look for broken references.
 }
 ```
 
-That is a finished game: `take corkscrew`, `use corkscrew on barrel`, `up`.
+That is a finished game: `take corkscrew`, `use corkscrew on barrel`, `up`. It ships as
+`templates/starter/` (run it with `python clio.py templates/starter`); copy that folder to
+`games/yourgame/` to begin. It is Apache-2.0 like the engine, so it is yours to change.
 
 ## game.json
 

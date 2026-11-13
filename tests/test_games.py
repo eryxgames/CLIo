@@ -199,6 +199,15 @@ class LegacyTests(unittest.TestCase):
              "give energy cells to friendly robot", "give broken communicator to friendly robot")
         self.assertIn("remote_control", s.world.inventory)
 
+    def test_starter_template_is_a_finished_game(self):
+        path = os.path.join(ROOT, "templates", "starter")
+        self.assertEqual(GameData(path).validate(), [])
+        s = Session(os.path.join("templates", "starter")).start()
+        s.do("up")
+        self.assertEqual(s.world.scene_id, "cellar")           # locked
+        s.do("take corkscrew", "use corkscrew on barrel", "up")
+        self.assertEqual(s.game.over, "win")
+
     def test_all_games_are_listed(self):
         names = [os.path.basename(p) for p, _t, _d in find_games(ROOT)]
         self.assertEqual(names[:2], ["derelict", "depths"])

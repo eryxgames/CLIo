@@ -2,7 +2,7 @@
 
 Notable changes to CLIo. Versions follow [semantic versioning](https://semver.org).
 
-## 2.0.0 - unreleased
+## 2.0.0 - 2026-11-13
 
 A rebuild of the engine. Games written for CLIo 1 still load.
 

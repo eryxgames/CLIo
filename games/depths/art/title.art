@@ -1,0 +1,15 @@
+@palette
+a = 214
+b = 208
+c = 202
+d = 196
+@art
+ ___   ___  ___  _____  _  _  ___
+|   \ | __|| _ \|_   _|| || |/ __|
+| |) || _| |  _/  | |  | __ |\__ \
+|___/ |___||_|    |_|  |_||_||___/
+@mask
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+cccccccccccccccccccccccccccccccccc
+dddddddddddddddddddddddddddddddddd

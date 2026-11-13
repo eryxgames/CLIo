@@ -1,49 +1,115 @@
 {
-  "text_speed": 0.05,
-  "horizontal_padding": 1,
+  "description": "Balanced colours, rounded frames.",
+  "text_speed": 0.012,
+  "horizontal_padding": 2,
   "vertical_padding": 0,
   "colors": {
-    "scene": "94",
-    "dialogue": "92",
-    "item": "93",
-    "combat": "91",
-    "system": "96",
-    "story": "95",
-    "intro": "34",
-    "inventory": "93",
-    "default": "97"
+    "default": "38;5;252",
+    "description": "38;5;250",
+    "story": "38;5;255",
+    "dialogue": "38;5;180",
+    "greeting": "38;5;175",
+    "character": "38;5;117",
+    "item": "38;5;221",
+    "exit": "38;5;121",
+    "ambient": "38;5;244",
+    "system": "38;5;67",
+    "error": "38;5;203",
+    "warning": "38;5;214",
+    "success": "38;5;114",
+    "menu": "38;5;146",
+    "reading": "38;5;251",
+    "combat": "38;5;209",
+    "list_title": "38;5;75",
+    "list_category": "38;5;147",
+    "list_content": "38;5;252",
+    "hud": "38;5;67",
+    "prompt": "1;38;5;255",
+    "quest": "38;5;228",
+    "hint": "3;38;5;244",
+    "key": "1;38;5;255"
   },
   "styles": {
-    "scene": {
-      "alignment": "center",
-      "padding": 1,
-      "frame": "SINGLE",
-      "character_delay": 0.05
+    "description": {
+      "frame": "ROUNDED",
+      "padding": 2,
+      "character_delay": 0.012
+    },
+    "story": {
+      "frame": "DOUBLE",
+      "padding": 2,
+      "character_delay": 0.018000000000000002,
+      "paragraph_delay": 0.4
     },
     "dialogue": {
-      "alignment": "center",
-      "padding": 1,
       "frame": "ROUNDED",
-      "character_delay": 0.05
+      "padding": 2,
+      "character_delay": 0.0144
     },
-    "inventory": {
-      "alignment": "center",
+    "reading": {
+      "frame": "SINGLE",
+      "padding": 2,
+      "character_delay": 0.012
+    },
+    "list_title": {
+      "frame": "DOUBLE",
       "padding": 1,
-      "frame": "ROUNDED"
+      "alignment": "center",
+      "gradient": true
+    },
+    "list_category": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "list_content": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "greeting": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "ambient": {
+      "frame": "NONE",
+      "padding": 1
     },
     "system": {
-      "padding": 1,
-      "frame": "ROUNDED"
-    },    
-    "story": {
-      "alignment": "center",
-      "padding": 2,
-      "frame": "ROUNDED"
+      "frame": "NONE",
+      "padding": 1
+    },
+    "error": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "warning": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "success": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "menu": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "combat": {
+      "frame": "NONE",
+      "padding": 1
     },
     "default": {
-      "alignment": "center",
-      "padding": 1,
-      "frame": "NONE"
+      "frame": "NONE",
+      "padding": 1
     }
+  },
+  "ui": {
+    "prompt": "> ",
+    "title_gradient": [
+      39,
+      45,
+      51,
+      87,
+      123
+    ]
   }
 }

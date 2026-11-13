@@ -1,0 +1,15 @@
+@color brown
+@palette
+s = steel
+o = orange
+@art
+      ____        ____
+  ___|____|___   |    |  ____
+ |    |  |    |  |____| |    |
+ |____|__|____|__|____|_|____|
+ |      |     |    |    |    |
+ |______|_____|____|____|____|
+@mask
+      ssss        oooo
+     ssssss      o    o
+                 oooooo

@@ -1,0 +1,433 @@
+{
+  "healing_draught": {
+    "name": "Healing Draught",
+    "aliases": [
+      "draught",
+      "potion",
+      "healing"
+    ],
+    "usable": true,
+    "effect": {
+      "health": 35
+    },
+    "value": 15,
+    "description": "A stoppered vial of something red and bitter. Restores 35 health.",
+    "use_text": "You drink the draught. Warmth spreads through your chest."
+  },
+  "greater_draught": {
+    "name": "Greater Draught",
+    "aliases": [
+      "greater",
+      "potion",
+      "draught"
+    ],
+    "usable": true,
+    "effect": {
+      "health": 70
+    },
+    "value": 32,
+    "description": "A heavy flask that glows faintly. Restores 70 health.",
+    "use_text": "You drain the flask. Your wounds close as you watch."
+  },
+  "firebomb": {
+    "name": "Firebomb",
+    "aliases": [
+      "bomb"
+    ],
+    "value": 18,
+    "description": "A clay pot of pitch with a rag fuse. Throw it in a fight: 28 damage to every enemy, and they burn.",
+    "combat": {
+      "damage": 28,
+      "status": {
+        "name": "burn",
+        "turns": 3,
+        "power": 4
+      },
+      "sfx": "explosion",
+      "text": "You light the fuse and throw. The pot bursts in a sheet of fire.",
+      "area": true
+    },
+    "use_text": "Best saved for a fight.",
+    "short": "28 damage to all + burn"
+  },
+  "antidote": {
+    "name": "Antidote",
+    "value": 8,
+    "description": "Chalky and foul. In a fight it clears poison, burning and bleeding.",
+    "combat": {
+      "cure": [
+        "poison",
+        "burn",
+        "bleed"
+      ],
+      "heal": 5,
+      "text": "You choke the antidote down."
+    },
+    "use_text": "You are not poisoned at the moment.",
+    "short": "cures poison, burn, bleed"
+  },
+  "focus_incense": {
+    "name": "Focus Incense",
+    "aliases": [
+      "incense"
+    ],
+    "value": 14,
+    "description": "A twist of bitter herbs. Burned in a fight it grants 3 focus at once.",
+    "combat": {
+      "focus": 3,
+      "sfx": "focus",
+      "text": "You breathe the smoke. The world slows and sharpens."
+    },
+    "use_text": "It only helps in the heat of a fight.",
+    "short": "+3 focus in a fight"
+  },
+  "whetstone": {
+    "name": "Whetstone",
+    "value": 30,
+    "description": "A fine-grained stone. Use it to put a lasting edge on your weapon (attack +1).",
+    "on_use": {
+      "text": "You work the stone along the edge until it sings.",
+      "consume": true,
+      "do": [
+        {
+          "stat": {
+            "attack": 1
+          }
+        }
+      ]
+    },
+    "short": "attack +1 for good"
+  },
+  "iron_tonic": {
+    "name": "Iron Tonic",
+    "aliases": [
+      "tonic"
+    ],
+    "value": 30,
+    "description": "Tastes of nails. Drink it to toughen your hide for good (defense +1).",
+    "on_use": {
+      "text": "You swallow the tonic. Your skin prickles and hardens.",
+      "consume": true,
+      "do": [
+        {
+          "stat": {
+            "defense": 1
+          }
+        }
+      ]
+    },
+    "short": "defense +1 for good"
+  },
+  "heart_root": {
+    "name": "Heart Root",
+    "aliases": [
+      "root"
+    ],
+    "value": 40,
+    "description": "A knotted root that beats, faintly, in your hand. Eat it to raise your maximum health by 15.",
+    "on_use": {
+      "text": "You chew the root. It is like eating a drum.",
+      "consume": true,
+      "do": [
+        {
+          "stat": {
+            "max_health": 15
+          }
+        }
+      ]
+    },
+    "short": "max health +15"
+  },
+  "thieves_tools": {
+    "name": "Thieves' Tools",
+    "aliases": [
+      "tools",
+      "lockpicks",
+      "picks"
+    ],
+    "lockpick": true,
+    "tool": true,
+    "value": 0,
+    "description": "Picks, rakes and a tension bar in an oiled roll. Any locked chest is merely a slow chest."
+  },
+  "skeleton_key": {
+    "name": "Skeleton Key",
+    "aliases": [
+      "key"
+    ],
+    "lockpick": true,
+    "tool": true,
+    "value": 0,
+    "description": "A key carved from a finger bone. It fits every lock down here, which says something about the locksmith."
+  },
+  "iron_sword": {
+    "name": "Iron Sword",
+    "equippable": true,
+    "slot": "weapon",
+    "effect": {
+      "attack": 4
+    },
+    "value": 15,
+    "description": "Plain, heavy and honest."
+  },
+  "twin_daggers": {
+    "name": "Twin Daggers",
+    "equippable": true,
+    "slot": "weapon",
+    "effect": {
+      "attack": 3,
+      "critical_hit_chance": 0.1
+    },
+    "value": 15,
+    "description": "A matched pair. Fast, and they find gaps."
+  },
+  "ash_staff": {
+    "name": "Ash Staff",
+    "equippable": true,
+    "slot": "weapon",
+    "effect": {
+      "attack": 2
+    },
+    "value": 12,
+    "description": "A charred staff, still warm at the tip."
+  },
+  "steel_blade": {
+    "name": "Steel Blade",
+    "equippable": true,
+    "slot": "weapon",
+    "effect": {
+      "attack": 7
+    },
+    "value": 45,
+    "description": "Good steel with a keen edge. Somebody loved this once."
+  },
+  "war_axe": {
+    "name": "War Axe",
+    "equippable": true,
+    "slot": "weapon",
+    "effect": {
+      "attack": 9
+    },
+    "value": 60,
+    "description": "Top-heavy and merciless."
+  },
+  "emberbrand": {
+    "name": "Emberbrand",
+    "equippable": true,
+    "slot": "weapon",
+    "effect": {
+      "attack": 12,
+      "critical_hit_chance": 0.05
+    },
+    "value": 120,
+    "description": "A blade with a line of fire sleeping in the fuller."
+  },
+  "wooden_shield": {
+    "name": "Wooden Shield",
+    "equippable": true,
+    "slot": "offhand",
+    "effect": {
+      "defense": 2
+    },
+    "value": 10,
+    "description": "Scarred oak bound in iron."
+  },
+  "tower_shield": {
+    "name": "Tower Shield",
+    "equippable": true,
+    "slot": "offhand",
+    "effect": {
+      "defense": 4
+    },
+    "value": 50,
+    "description": "A door with a handle. It stops most arguments."
+  },
+  "leather_jerkin": {
+    "name": "Leather Jerkin",
+    "equippable": true,
+    "slot": "body",
+    "effect": {
+      "defense": 2
+    },
+    "value": 20,
+    "description": "Boiled leather, stiff as a board."
+  },
+  "chain_shirt": {
+    "name": "Chain Shirt",
+    "equippable": true,
+    "slot": "body",
+    "effect": {
+      "defense": 4
+    },
+    "value": 55,
+    "description": "Rings on rings on rings. Heavy; worth it."
+  },
+  "warden_plate": {
+    "name": "Warden's Plate",
+    "equippable": true,
+    "slot": "body",
+    "effect": {
+      "defense": 6
+    },
+    "value": 110,
+    "description": "Blackened plate from an older war."
+  },
+  "lucky_coin": {
+    "name": "Lucky Coin",
+    "aliases": [
+      "coin"
+    ],
+    "equippable": true,
+    "slot": "trinket",
+    "value": 40,
+    "effect": {
+      "critical_hit_chance": 0.1
+    },
+    "description": "Both sides are heads. Wear it for luck (critical hits +10%)."
+  },
+  "grave_charm": {
+    "name": "Grave Charm",
+    "aliases": [
+      "charm"
+    ],
+    "equippable": true,
+    "slot": "trinket",
+    "value": 45,
+    "effect": {
+      "max_health": 20
+    },
+    "description": "A knot of hair and wire that hums against your chest (maximum health +20)."
+  },
+  "chest": {
+    "name": "Chest",
+    "aliases": [
+      "chest",
+      "box",
+      "coffer"
+    ],
+    "takeable": false,
+    "interactive": true,
+    "description": "An iron-bound chest.",
+    "lock_text": "The chest is locked. You would need a key - or a set of picks.",
+    "current_state": "closed",
+    "states": {
+      "locked": {
+        "description": "It is locked.",
+        "action": "unlock",
+        "next_state": "closed"
+      },
+      "closed": {
+        "description": "It is closed.",
+        "action": "open",
+        "next_state": "open"
+      },
+      "open": {
+        "description": "It stands open.",
+        "action": "take",
+        "next_state": "empty"
+      },
+      "empty": {
+        "description": "It is open and empty.",
+        "action": null,
+        "next_state": null
+      }
+    },
+    "contents": []
+  },
+  "shrine": {
+    "name": "Shrine",
+    "aliases": [
+      "shrine",
+      "altar",
+      "candle"
+    ],
+    "takeable": false,
+    "interactive": true,
+    "art": "shrine",
+    "description": "A small stone shrine with a single candle that has no business still burning.",
+    "current_state": "lit",
+    "states": {
+      "lit": {
+        "description": "The flame leans toward you.",
+        "actions": {
+          "pray": {
+            "text": "You kneel. The flame flares gold, and warmth pours through you. Then the candle gutters out.",
+            "sfx": "heal",
+            "next_state": "spent",
+            "do": [
+              {
+                "heal": "full"
+              },
+              {
+                "var": [
+                  "shrines",
+                  "+=",
+                  1
+                ]
+              }
+            ]
+          },
+          "use": {
+            "text": "You hold your hands to the flame. It flares gold, and warmth pours through you. Then the candle gutters out.",
+            "sfx": "heal",
+            "next_state": "spent",
+            "do": [
+              {
+                "heal": "full"
+              },
+              {
+                "var": [
+                  "shrines",
+                  "+=",
+                  1
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "spent": {
+        "description": "The candle has burned out. The stone is still warm.",
+        "actions": {
+          "pray": "You kneel, but the shrine has given all it had.",
+          "use": "The shrine has given all it had."
+        }
+      }
+    }
+  },
+  "ember_crown": {
+    "name": "Ember Crown",
+    "aliases": [
+      "crown"
+    ],
+    "value": 0,
+    "description": "A circlet of dark iron set with coals that have never gone out.",
+    "on_take": [
+      {
+        "if": "endless",
+        "then": [
+          {
+            "set": "crown_taken"
+          },
+          {
+            "say": "The Ember Crown is warm in your hands, and then it is warm all through you. Emberfall can wait a little longer: behind the empty throne, a stair goes on down.",
+            "style": "story"
+          },
+          {
+            "stat": {
+              "max_health": 20
+            }
+          },
+          {
+            "heal": "full"
+          }
+        ],
+        "else": [
+          {
+            "win": "outro_win"
+          }
+        ]
+      }
+    ]
+  }
+}

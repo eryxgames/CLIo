@@ -1,0 +1,31 @@
+[
+  {
+    "id": "camp",
+    "name": "Emberfall Cellar",
+    "area": "Emberfall",
+    "map": [
+      0,
+      0,
+      0
+    ],
+    "art": "camp",
+    "description": "The cellar of the old chapel. Somebody has cleared the rubble from a stair that winds down into the dark, and a lantern burns beside it.",
+    "items": [],
+    "passive_items": [],
+    "characters": [
+      "maren"
+    ],
+    "exits": [
+      {
+        "door_name": "Catacomb Stair",
+        "dir": "d",
+        "scene_id": "@floor1"
+      }
+    ],
+    "random_events": [
+      "The lantern gutters in a draught from below.",
+      "Far beneath you, something drags across stone."
+    ],
+    "hint": "Talk to Maren, then take the stair down. Type 'map' whenever you lose your bearings."
+  }
+]

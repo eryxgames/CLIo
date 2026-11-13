@@ -1,0 +1,13 @@
+{
+  "title": "The Cellar",
+  "description": "A three-command starter game. Copy this folder to begin your own.",
+  "author": "Your Name",
+  "license": "Apache-2.0 (free to copy, change and sell)",
+  "initial_scene": "cellar",
+  "player_stats": {
+    "health": 30,
+    "attack": 3,
+    "defense": 1
+  },
+  "intro": "You came down for a bottle of wine. The door has swung shut."
+}

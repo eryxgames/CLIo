@@ -1,0 +1,497 @@
+[
+  {
+    "id": "utility_room",
+    "name": "Utility Room",
+    "area": "Deck B",
+    "map": [
+      0,
+      0,
+      0
+    ],
+    "art": "utility_room",
+    "description": "A cramped maintenance closet: two dented lockers, a metal suitcase somebody left behind, and the cryo-nap pod you just climbed out of.",
+    "first_visit": "You wake with a stiff neck and the taste of freezer. The cryo-nap pod hisses shut behind you. The utility room is exactly as you left it - two dented lockers, a wall screen, your coffee - except for the dust, the silence, and a metal suitcase that is not yours.",
+    "items": [
+      "bent_wire",
+      "ship_log",
+      "broken_communicator"
+    ],
+    "passive_items": [
+      "rusty_metal_locker",
+      "metal_suitcase",
+      "cryo_pod"
+    ],
+    "characters": [
+      "mutated_bugrat",
+      "cleaning_microbot"
+    ],
+    "exits": [
+      {
+        "door_name": "Hatch",
+        "dir": "e",
+        "scene_id": "corridor",
+        "guard": "mutated_bugrat",
+        "guard_text": "The bugrat has nested in the hatch mechanism. It snaps at your ankles until you back off. You will have to deal with it first - one way or another."
+      }
+    ],
+    "random_events": [
+      "The broken screen on the wall shows a holographic map of some star system.",
+      "There is a distant hum of some device.",
+      "This starship remembers better days.",
+      "The wall screen scrolls an undecipherable error code."
+    ],
+    "hint": [
+      {
+        "if": {
+          "all": [
+            "!locker_opened",
+            "has:bent_wire"
+          ]
+        },
+        "text": "A bent wire makes a fine lockpick. Try: unlock locker"
+      },
+      {
+        "if": "!locker_opened",
+        "text": "Pick up the bent wire, then try the rusty locker."
+      },
+      {
+        "if": "here:mutated_bugrat",
+        "text": "The bugrat is guarding the hatch. Fight it - or offer it something to eat: give apple to bugrat"
+      },
+      {
+        "if": {
+          "all": [
+            "chip_installed",
+            "lacks:passcard"
+          ]
+        },
+        "text": "The terminal told you the suitcase code: 735. Try: unlock suitcase"
+      },
+      "The hatch leads east into the corridor."
+    ]
+  },
+  {
+    "id": "corridor",
+    "name": "Main Corridor",
+    "area": "Deck B",
+    "map": [
+      1,
+      0,
+      0
+    ],
+    "art": "corridor",
+    "description": "The spine of Deck B. Emergency strips glow amber along the floor. Doors lead off in every direction and a turbolift waits at the far end.",
+    "extra": [
+      {
+        "if": "reactor_online",
+        "text": "The overhead lights are back, bright and steady, and the turbolift panel glows a welcoming green."
+      },
+      {
+        "if": "!reactor_online",
+        "text": "The turbolift panel is dark."
+      }
+    ],
+    "items": [],
+    "passive_items": [],
+    "characters": [
+      "friendly_robot"
+    ],
+    "exits": [
+      {
+        "door_name": "Hatch",
+        "dir": "w",
+        "scene_id": "utility_room"
+      },
+      {
+        "door_name": "Hydroponics Arch",
+        "dir": "e",
+        "scene_id": "hydroponics"
+      },
+      {
+        "door_name": "Storage Bay Door",
+        "dir": "s",
+        "scene_id": "storage_bay",
+        "locked": true,
+        "required_item": "storage_room_key",
+        "lock_text": "The storage bay door is locked. It takes an old-fashioned key.",
+        "unlock_text": "The key turns with a crunch of old grease. The storage bay door slides open."
+      },
+      {
+        "door_name": "Turbolift",
+        "dir": "u",
+        "scene_id": "bridge",
+        "blocked": true,
+        "unblock_if": "reactor_online",
+        "block_text": "The turbolift is dead. No power, no lift.",
+        "unblock_text": "The turbolift chimes and its doors sigh open. Going up."
+      }
+    ],
+    "random_events": [
+      "A loose panel rattles somewhere overhead.",
+      "The amber floor strips flicker in sequence, pointing at an exit nobody used.",
+      "You hear water dripping from an unknown source."
+    ],
+    "hint": [
+      {
+        "if": "!talked:friendly_robot",
+        "text": "Talk to the robot. It knows what happened here."
+      },
+      {
+        "if": "lacks:storage_room_key",
+        "text": "The storage bay needs a key. Didn't something glint in the bugrat's teeth?"
+      },
+      {
+        "if": "!reactor_online",
+        "text": "The turbolift needs power. The reactor is in the engine room, beyond the storage bay."
+      },
+      "With the power back, the turbolift will take you up to the bridge."
+    ]
+  },
+  {
+    "id": "storage_bay",
+    "name": "Storage Bay",
+    "area": "Deck B",
+    "map": [
+      1,
+      1,
+      0
+    ],
+    "art": "storage_bay",
+    "description": "Crates and cargo netting, stacked to the ceiling and strapped down with more optimism than skill. A computer terminal is bolted to the wall between two shelves.",
+    "items": [
+      "broken_chip",
+      "energy_cells",
+      "first_aid_kit",
+      "torn_spacesuit"
+    ],
+    "passive_items": [
+      "supply_crate"
+    ],
+    "characters": [
+      "cyber_nexus_terminal"
+    ],
+    "exits": [
+      {
+        "door_name": "Corridor Door",
+        "dir": "n",
+        "scene_id": "corridor"
+      },
+      {
+        "door_name": "Engine Room Door",
+        "dir": "w",
+        "scene_id": "engine_room",
+        "locked": true,
+        "required_item": "passcard",
+        "lock_text": "The engine room door is sealed. A slot beside it wants a maintenance passcard.",
+        "unlock_text": "You slide the passcard through the slot. The engine room door grinds open on a wave of heat."
+      }
+    ],
+    "random_events": [
+      "Air conditioning hums softly, then gives up.",
+      "Something small shifts inside one of the crates. Probably cargo settling. Probably.",
+      "The artificial lights are flickering."
+    ],
+    "hint": [
+      {
+        "if": "!chip_installed",
+        "text": "The terminal needs its logic chip repaired. A screwdriver would do it: repair chip, then give chip to terminal"
+      },
+      {
+        "if": {
+          "all": [
+            "!crate_opened",
+            "has:bent_wire"
+          ]
+        },
+        "text": "The supply crate has a simple lock. Try: unlock crate"
+      },
+      {
+        "if": "lacks:passcard",
+        "text": "The terminal gave you a code for the suitcase back in the utility room."
+      },
+      "The engine room is through the door to the west."
+    ]
+  },
+  {
+    "id": "hydroponics",
+    "name": "Hydroponics Bay",
+    "area": "Deck B",
+    "map": [
+      2,
+      0,
+      0
+    ],
+    "art": "hydroponics",
+    "music": "hydro",
+    "enter_sfx": "open",
+    "description": "A lush greenhouse under grow-lamps, loud with the trickle of irrigation. The plants have had three unsupervised days and have made the most of them. A hulking replicator squats among the tomato vines.",
+    "items": [
+      "coolant_canister",
+      "blue_apple"
+    ],
+    "passive_items": [
+      "glass_container"
+    ],
+    "characters": [
+      "sentient_replicator"
+    ],
+    "exits": [
+      {
+        "door_name": "Corridor Arch",
+        "dir": "w",
+        "scene_id": "corridor"
+      }
+    ],
+    "random_events": [
+      "It starts to rain - the sprinklers, right on schedule.",
+      "A gentle breeze from the vents rustles the leaves.",
+      "One of the tomato plants appears to turn toward you. You decide not to think about it."
+    ],
+    "hint": [
+      {
+        "if": "item_here:coolant_canister",
+        "text": "That coolant canister looks useful for anything that is running too hot."
+      },
+      {
+        "if": "!replicated_once",
+        "text": "The replicator copies things, badly. Give it something and see: give apple to replicator"
+      },
+      {
+        "if": "lacks:blob_of_goo",
+        "text": "The specimen in the glass container might interest the replicator."
+      },
+      "Nothing more to do here. Enjoy the greenery."
+    ]
+  },
+  {
+    "id": "engine_room",
+    "name": "Engine Room",
+    "area": "Deck B",
+    "map": [
+      0,
+      1,
+      0
+    ],
+    "art": "engine_room",
+    "art_if": [
+      {
+        "if": "reactor_online",
+        "art": "engine_room_on"
+      }
+    ],
+    "music": "engine",
+    "music_if": [
+      {
+        "if": "reactor_online",
+        "music": "powered"
+      }
+    ],
+    "description": "Heat rolls off the walls. The reactor sits cold and dark in its cradle, an empty socket where its fission relay should be.",
+    "extra": [
+      {
+        "if": "reactor_online",
+        "replace": true,
+        "text": "The reactor turns in its cradle with a deep, contented thrum. Blue light spills across the deck plates."
+      },
+      {
+        "if": "reactor_stable",
+        "text": "The coolant loop ticks over smoothly. She is as healthy as she has been in years."
+      }
+    ],
+    "items": [
+      "battered_crowbar"
+    ],
+    "passive_items": [
+      "reactor"
+    ],
+    "characters": [
+      "hostile_droid"
+    ],
+    "exits": [
+      {
+        "door_name": "Storage Bay Door",
+        "dir": "e",
+        "scene_id": "storage_bay"
+      }
+    ],
+    "random_events": [
+      "A pipe ticks as it cools.",
+      "Somewhere a relief valve wheezes.",
+      "The deck plates are warm through your boots."
+    ],
+    "hint": [
+      {
+        "if": {
+          "all": [
+            "here:hostile_droid",
+            "!droid_calmed"
+          ]
+        },
+        "text": "The droid is overheating. Cool it down (give coolant to droid) or fight it - better armed and armoured than you are now."
+      },
+      {
+        "if": {
+          "all": [
+            "has:fission_relay",
+            "!reactor_online"
+          ]
+        },
+        "text": "The reactor has an empty relay socket. Try: use relay on reactor"
+      },
+      {
+        "if": {
+          "all": [
+            "reactor_online",
+            "!reactor_stable"
+          ]
+        },
+        "text": "The reactor runs, but hot. Coolant would steady it - if you have any left."
+      },
+      "The reactor is running. Head for the turbolift."
+    ]
+  },
+  {
+    "id": "bridge",
+    "name": "Bridge",
+    "area": "Deck A",
+    "map": [
+      1,
+      0,
+      1
+    ],
+    "art": "bridge",
+    "music": "bridge",
+    "enter_sfx": "teleport",
+    "description": "The bridge of the Marigold: a horseshoe of consoles under a wide viewport. A blue-green planet fills the lower half of the view, rather closer than a planet ought to be.",
+    "items": [],
+    "passive_items": [
+      "captain_console"
+    ],
+    "characters": [
+      "ship_ai"
+    ],
+    "exits": [
+      {
+        "door_name": "Turbolift",
+        "dir": "d",
+        "scene_id": "corridor"
+      },
+      {
+        "door_name": "Crew Quarters Door",
+        "dir": "w",
+        "scene_id": "crew_quarters"
+      },
+      {
+        "door_name": "Pod Bay Airlock",
+        "dir": "e",
+        "scene_id": "pod_bay",
+        "leave_if": {
+          "equipped": "patched_spacesuit"
+        },
+        "leave_text": "A red light above the airlock reads VACUUM. Without a sealed suit you would last about as long as your excuses."
+      }
+    ],
+    "random_events": [
+      "The control panels beep softly to one another.",
+      "The planet turns below, serene and enormous.",
+      "The bridge is quiet, with only the sound of your own breathing."
+    ],
+    "hint": [
+      {
+        "if": "!talked:ship_ai",
+        "text": "Talk to the ship's AI. She will lay out your options."
+      },
+      {
+        "if": "!pod_authorized",
+        "text": "For the escape pod, ask the AI to authorize it - and you will need a sealed spacesuit to cross the pod bay."
+      },
+      "Three ways off: the pod (sealed suit, east), a distress call (use a working communicator on the console), or flying home (stable reactor, and read the manual)."
+    ]
+  },
+  {
+    "id": "crew_quarters",
+    "name": "Crew Quarters",
+    "area": "Deck A",
+    "map": [
+      0,
+      0,
+      1
+    ],
+    "art": "crew_quarters",
+    "music": "bridge",
+    "description": "Two rows of bunks, hastily abandoned. Blankets trail on the floor, a mug has rolled under a bed, and a footlocker sits at the end of the captain's bunk.",
+    "items": [
+      "chx_cargo_hauler_manual",
+      "torn_research_paper",
+      "captains_photo"
+    ],
+    "passive_items": [
+      "footlocker"
+    ],
+    "characters": [],
+    "exits": [
+      {
+        "door_name": "Bridge Door",
+        "dir": "e",
+        "scene_id": "bridge"
+      }
+    ],
+    "random_events": [
+      "A reading lamp buzzes over an empty bunk.",
+      "Someone left in the middle of a card game. They were losing."
+    ],
+    "hint": [
+      {
+        "if": "!manual_read",
+        "text": "A pilot ought to read the manual: read manual"
+      },
+      {
+        "if": {
+          "all": [
+            "has:battered_crowbar",
+            "!footlocker_opened"
+          ]
+        },
+        "text": "The footlocker is rusted shut. A crowbar would persuade it: use crowbar on footlocker"
+      },
+      "The research paper explains more of what happened here."
+    ]
+  },
+  {
+    "id": "pod_bay",
+    "name": "Pod Bay",
+    "area": "Deck A",
+    "map": [
+      2,
+      0,
+      1
+    ],
+    "art": "pod_bay",
+    "music": "bridge",
+    "enter_sfx": "airlock",
+    "description": "Your breath is loud inside the helmet. The pod bay is open to space along one wall, stars wheeling slowly past. A single escape pod sits in its launch cradle.",
+    "items": [],
+    "passive_items": [
+      "escape_pod"
+    ],
+    "characters": [],
+    "exits": [
+      {
+        "door_name": "Bridge Airlock",
+        "dir": "w",
+        "scene_id": "bridge"
+      }
+    ],
+    "random_events": [
+      "Frost glitters on the launch rails.",
+      "The planet slides past the open bay, close enough to make out weather."
+    ],
+    "hint": [
+      {
+        "if": "!pod_authorized",
+        "text": "The pod will not launch without the AI's authorization. Ask her on the bridge."
+      },
+      "Climb in: use pod"
+    ]
+  }
+]

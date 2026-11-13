@@ -1,0 +1,188 @@
+{
+  "id": "depths",
+  "title": "The Hollow Depths",
+  "subtitle": "A dungeon that is different every time",
+  "description": "Dungeon crawler. Generated floors, tactical fights against one or many - and a rogue mode with one life.",
+  "author": "Daniel Sandner",
+  "version": "1.1",
+  "order": 2,
+  "style": "retro",
+  "initial_scene": "camp",
+  "rpg": true,
+  "currency": "gold",
+  "starting_gold": 10,
+  "player_stats": {
+    "health": 80,
+    "max_health": 80,
+    "attack": 5,
+    "defense": 3,
+    "critical_hit_chance": 0.05
+  },
+  "max_hints": 5,
+  "map_title": "The Depths",
+  "show_title": false,
+  "generator": {
+    "type": "maze",
+    "entry": "camp",
+    "loops": 0.22
+  },
+  "mode_prompt": "How will you go down?",
+  "modes": {
+    "story": {
+      "name": "Story",
+      "description": "Three floors and a crown. Your progress is saved at every stair."
+    },
+    "rogue": {
+      "name": "Rogue",
+      "description": "One life, and the dark below the Court never ends. How deep can you go?",
+      "permadeath": true,
+      "endless": true,
+      "text": "You leave no word with anyone about when you will be back. It seems more honest.",
+      "help": "Goal: go as deep as you can. One life - the run is saved as you go and erased when you fall. 'records' lists the best runs. 'map' is your friend; shrines (+) heal."
+    }
+  },
+  "score": {
+    "depth": 100,
+    "kills": 5,
+    "level": 20,
+    "gold": 1,
+    "crown_taken": 250,
+    "win": 500
+  },
+  "xp_base": 30,
+  "level_growth": {
+    "max_health": 10,
+    "attack": 1,
+    "defense": 1
+  },
+  "music": {
+    "generate": {
+      "mood": "mystery",
+      "seed": "emberfall"
+    }
+  },
+  "intro": "intro",
+  "default_hint": "Read the enemy's tell: guard when a heavy blow is coming, strike while it winds up. 'map' shows the floor; shrines (+) heal.",
+  "help": "Goal: descend three floors and take the Ember Crown. 'map' is your friend. 'pray' at a shrine, 'trade' with the peddler.",
+  "about": "A demo dungeon crawler for the CLIo engine: procedural mazes, generated sprites and music, tactical combat.",
+  "character_creation": {
+    "intro": "Emberfall has been cold since the Hollow King carried its crown into the catacombs. Tonight somebody is going down after it.",
+    "ask_name": true,
+    "name_prompt": "Your name, delver?",
+    "default_name": "Delver",
+    "class_prompt": "And what are you?",
+    "classes": {
+      "warrior": {
+        "name": "Warrior",
+        "description": "Tough and steady. Shield Bash stuns; learns Cleave, a sweep that catches the whole pack.",
+        "stats": {
+          "health": 95,
+          "max_health": 95,
+          "attack": 6,
+          "defense": 5,
+          "critical_hit_chance": 0.05
+        },
+        "items": [
+          "healing_draught",
+          "healing_draught"
+        ],
+        "equipped": [
+          "iron_sword",
+          "wooden_shield"
+        ],
+        "abilities": [
+          "shield_bash"
+        ],
+        "learn": {
+          "3": [
+            "cleave"
+          ]
+        },
+        "growth": {
+          "max_health": 12,
+          "attack": 1,
+          "defense": 1
+        },
+        "text": "You heft your sword and shield. They have seen worse than this. Probably."
+      },
+      "rogue": {
+        "name": "Rogue",
+        "description": "Quick and sharp. Critical hits, dodges, spots traps, picks locks.",
+        "stats": {
+          "health": 75,
+          "max_health": 75,
+          "attack": 6,
+          "defense": 3,
+          "critical_hit_chance": 0.2,
+          "evasion": 0.12
+        },
+        "items": [
+          "healing_draught",
+          "healing_draught",
+          "firebomb",
+          "thieves_tools"
+        ],
+        "equipped": [
+          "twin_daggers"
+        ],
+        "abilities": [
+          "backstab"
+        ],
+        "learn": {
+          "3": [
+            "smoke"
+          ]
+        },
+        "growth": {
+          "max_health": 9,
+          "attack": 1,
+          "defense": 1
+        },
+        "gold": 15,
+        "text": "You check your daggers, your tools and your exits, in that order."
+      },
+      "mystic": {
+        "name": "Mystic",
+        "description": "Fragile but dangerous. Firebolt ignores armour; Mend heals; learns Nova. Starts each fight with extra focus.",
+        "stats": {
+          "health": 78,
+          "max_health": 78,
+          "attack": 3,
+          "defense": 4,
+          "critical_hit_chance": 0.05
+        },
+        "items": [
+          "healing_draught",
+          "healing_draught",
+          "healing_draught"
+        ],
+        "equipped": [
+          "ash_staff"
+        ],
+        "abilities": [
+          "firebolt",
+          "mend"
+        ],
+        "growth": {
+          "max_health": 9,
+          "attack": 1,
+          "defense": 1
+        },
+        "text": "You warm your hands on nothing at all. It will do.",
+        "focus_start": 2,
+        "learn": {
+          "3": [
+            "nova"
+          ]
+        }
+      }
+    }
+  },
+  "website": "eryxian.com",
+  "license": "All rights reserved - see LICENSE.md in this game's folder",
+  "abilities": {
+    "nova": {
+      "name": "Ember Nova"
+    }
+  }
+}

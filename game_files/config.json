@@ -1,4 +1,7 @@
 {
+  "title": "Sandbox",
+  "description": "The original CLIo test bed, running unchanged on the new engine.",
+  "order": 9,
   "scenes_file": "game_files/scenes/scenes.json",
   "items_file": "game_files/items.json",
   "characters_file": "game_files/characters.json",
@@ -12,5 +15,6 @@
     "attack": 5,
     "equipment": []
   },
-  "max_hints": 5
+  "max_hints": 5,
+  "license": "Apache-2.0"
 }

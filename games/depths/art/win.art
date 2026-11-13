@@ -1,0 +1,15 @@
+@color gold
+@palette
+f = bred
+@art
+    *   *   *
+   /\  /\  /\
+  /  \/  \/  \
+  |__________|
+  |_*__*__*__|
+@mask
+    f   f   f
+
+
+
+    f  f  f

@@ -1,0 +1,19 @@
+@color steel
+@palette
+w = bwhite
+r = bred
+g = ice
+@art
+           ______
+        .-'      '-.
+   ____/   .----.   \____
+  |===|   |  ()  |   |===|
+  |___|    '----'    |___|
+       \            /
+        '-..____..-'
+@mask
+           wwwwww
+        www      www
+       w   gggggg   w
+   rrr    g  gg  g    rrr
+           gggggg

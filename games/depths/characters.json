@@ -1,0 +1,566 @@
+{
+  "maren": {
+    "name": "Old Maren",
+    "aliases": [
+      "maren",
+      "woman",
+      "keeper"
+    ],
+    "type": "friendly",
+    "portrait": "maren",
+    "description": "The chapel's last keeper, wrapped in three shawls and a great deal of disapproval.",
+    "greeting": "She looks you over as if pricing you for a coffin.",
+    "dialogue_tree": "maren",
+    "voice": {
+      "pitch": 300,
+      "wave": "triangle"
+    }
+  },
+  "merchant": {
+    "name": "Tallow the Peddler",
+    "aliases": [
+      "tallow",
+      "peddler",
+      "merchant",
+      "trader"
+    ],
+    "type": "friendly",
+    "portrait": "tallow",
+    "description": "A small figure under a very large pack, perfectly at home in the dark. Its lantern burns green.",
+    "greeting": "'Customer!' it whispers, delighted.",
+    "dialogue_tree": "tallow",
+    "voice": {
+      "pitch": 520,
+      "wave": "square"
+    },
+    "shop": {
+      "sells": [
+        "healing_draught",
+        "greater_draught",
+        "antidote",
+        "firebomb",
+        "focus_incense",
+        "whetstone",
+        "iron_tonic",
+        "leather_jerkin",
+        "chain_shirt"
+      ],
+      "buy_rate": 0.5,
+      "unlimited": true,
+      "greeting": "Everything fell off a wagon. Some of it fell quite a long way.",
+      "farewell": "Come back alive! Dead customers haggle terribly."
+    }
+  },
+  "bone_rat": {
+    "name": "Bone Rat",
+    "type": "hostile",
+    "description": "A rat that kept going after the rest of it stopped. Mostly teeth and spite.",
+    "sprite": "auto",
+    "stats": {
+      "health": 22,
+      "max_health": 22,
+      "attack": 6,
+      "defense": 0,
+      "critical_hit_chance": 0.05
+    },
+    "xp": 10,
+    "gold": [
+      1,
+      4
+    ],
+    "moves": [
+      {
+        "type": "attack",
+        "name": "a snapping bite",
+        "weight": 4
+      },
+      {
+        "type": "heavy",
+        "name": "A leaping bite",
+        "mult": 1.8,
+        "weight": 1,
+        "tell": "The bone rat coils, clicking, ready to spring."
+      }
+    ],
+    "greeting": "It has not noticed you. Yet.",
+    "show_hostile": true,
+    "tags": [
+      "undead",
+      "beast"
+    ],
+    "sprite_size": 10
+  },
+  "gloom_bat": {
+    "name": "Gloom Bat",
+    "type": "hostile",
+    "description": "A bat the size of a cloak. Darkness comes off its wings like smoke.",
+    "sprite": "auto",
+    "stats": {
+      "health": 20,
+      "max_health": 20,
+      "attack": 7,
+      "defense": 0,
+      "critical_hit_chance": 0.05
+    },
+    "xp": 10,
+    "gold": [
+      1,
+      5
+    ],
+    "moves": [
+      {
+        "type": "attack",
+        "name": "a raking swoop",
+        "weight": 3
+      },
+      {
+        "type": "status",
+        "name": "a cloud of gloom",
+        "status": "blind",
+        "turns": 2,
+        "weight": 2,
+        "mult": 0.6
+      }
+    ],
+    "greeting": "It has not noticed you. Yet.",
+    "show_hostile": true,
+    "tags": [
+      "beast"
+    ],
+    "sprite_size": 10
+  },
+  "crypt_crawler": {
+    "name": "Crypt Crawler",
+    "type": "hostile",
+    "description": "Too many legs, too few eyes, and all of them on you.",
+    "sprite": "auto",
+    "stats": {
+      "health": 31,
+      "max_health": 31,
+      "attack": 7,
+      "defense": 2,
+      "critical_hit_chance": 0.05
+    },
+    "xp": 14,
+    "gold": [
+      2,
+      6
+    ],
+    "moves": [
+      {
+        "type": "attack",
+        "name": "its mandibles",
+        "weight": 3
+      },
+      {
+        "type": "status",
+        "name": "a venomous bite",
+        "status": "poison",
+        "turns": 3,
+        "power": 3,
+        "weight": 2
+      },
+      {
+        "type": "guard",
+        "name": "curled in its shell",
+        "weight": 1
+      }
+    ],
+    "greeting": "It has not noticed you. Yet.",
+    "show_hostile": true,
+    "tags": [
+      "beast"
+    ]
+  },
+  "bone_warden": {
+    "name": "The Bone Warden",
+    "type": "hostile",
+    "description": "A skeleton in the rags of a gatekeeper's livery, a rusted halberd across its shoulders. It has been waiting a long time and does not mind.",
+    "sprite": "auto",
+    "stats": {
+      "health": 67,
+      "max_health": 67,
+      "attack": 10,
+      "defense": 4,
+      "critical_hit_chance": 0.05
+    },
+    "xp": 40,
+    "gold": [
+      12,
+      20
+    ],
+    "moves": [
+      {
+        "type": "attack",
+        "name": "its halberd",
+        "weight": 3
+      },
+      {
+        "type": "heavy",
+        "name": "The overhead chop",
+        "mult": 2.2,
+        "weight": 2,
+        "tell": "The Bone Warden raises its halberd high, joints creaking."
+      },
+      {
+        "type": "guard",
+        "name": "halberd crossed",
+        "weight": 1
+      }
+    ],
+    "greeting": "It stands before the stair down, motionless, watching.",
+    "show_hostile": true,
+    "tags": [
+      "undead"
+    ],
+    "sprite_size": 14,
+    "inventory": [
+      "skeleton_key"
+    ],
+    "battle_intro": "The Bone Warden turns its skull toward you and levels its halberd.",
+    "defeat_text": "The Bone Warden comes apart, bone by bone, with something like relief.",
+    "dialogue_tree": "warden"
+  },
+  "drowned_thrall": {
+    "name": "Drowned Thrall",
+    "type": "hostile",
+    "description": "It was a miner once. Water runs from its mouth when it tries to speak.",
+    "sprite": "auto",
+    "stats": {
+      "health": 48,
+      "max_health": 48,
+      "attack": 12,
+      "defense": 2,
+      "critical_hit_chance": 0.05
+    },
+    "xp": 24,
+    "gold": [
+      4,
+      9
+    ],
+    "moves": [
+      {
+        "type": "attack",
+        "name": "a sodden fist",
+        "weight": 3
+      },
+      {
+        "type": "heavy",
+        "name": "A crushing grab",
+        "mult": 2.0,
+        "weight": 1,
+        "tell": "The thrall spreads its arms wide, dripping."
+      }
+    ],
+    "greeting": "It has not noticed you. Yet.",
+    "show_hostile": true,
+    "tags": [
+      "undead"
+    ]
+  },
+  "mire_leech": {
+    "name": "Mire Leech",
+    "type": "hostile",
+    "description": "A leech as long as your arm, pale and patient.",
+    "sprite": "auto",
+    "stats": {
+      "health": 36,
+      "max_health": 36,
+      "attack": 11,
+      "defense": 0,
+      "critical_hit_chance": 0.05
+    },
+    "xp": 22,
+    "gold": [
+      3,
+      8
+    ],
+    "moves": [
+      {
+        "type": "drain",
+        "name": "latch on and drink",
+        "weight": 3,
+        "mult": 0.9
+      },
+      {
+        "type": "attack",
+        "name": "a lashing strike",
+        "weight": 2
+      }
+    ],
+    "greeting": "It has not noticed you. Yet.",
+    "show_hostile": true,
+    "tags": [
+      "beast"
+    ],
+    "sprite_size": 10
+  },
+  "rust_knight": {
+    "name": "Rust Knight",
+    "type": "hostile",
+    "description": "A suit of armour with nothing inside but rust and a grudge.",
+    "sprite": "auto",
+    "stats": {
+      "health": 56,
+      "max_health": 56,
+      "attack": 14,
+      "defense": 6,
+      "critical_hit_chance": 0.05
+    },
+    "xp": 30,
+    "gold": [
+      6,
+      12
+    ],
+    "moves": [
+      {
+        "type": "attack",
+        "name": "its notched sword",
+        "weight": 3
+      },
+      {
+        "type": "heavy",
+        "name": "The two-handed swing",
+        "mult": 2.2,
+        "weight": 2,
+        "tell": "The Rust Knight draws its sword back in both gauntlets."
+      },
+      {
+        "type": "guard",
+        "name": "shield raised",
+        "weight": 2
+      }
+    ],
+    "greeting": "It has not noticed you. Yet.",
+    "show_hostile": true,
+    "tags": [
+      "undead",
+      "machine"
+    ]
+  },
+  "tide_hag": {
+    "name": "The Tide Hag",
+    "type": "hostile",
+    "description": "She rises from the flooded stair, hair like weed, humming a tune you almost know.",
+    "sprite": "auto",
+    "stats": {
+      "health": 104,
+      "max_health": 104,
+      "attack": 15,
+      "defense": 3,
+      "critical_hit_chance": 0.05
+    },
+    "xp": 80,
+    "gold": [
+      20,
+      30
+    ],
+    "moves": [
+      {
+        "type": "attack",
+        "name": "her drowned-wood staff",
+        "weight": 3
+      },
+      {
+        "type": "status",
+        "name": "a cold curse",
+        "status": "weak",
+        "turns": 3,
+        "weight": 2,
+        "mult": 0.7
+      },
+      {
+        "type": "heavy",
+        "name": "The rising tide",
+        "mult": 2.2,
+        "weight": 2,
+        "tell": "The water around the Tide Hag draws back from the walls, gathering behind her."
+      },
+      {
+        "type": "heal",
+        "name": "drink from the dark water",
+        "amount": 16,
+        "weight": 2
+      }
+    ],
+    "greeting": "She waits waist-deep where the stair goes down, humming.",
+    "show_hostile": true,
+    "sprite_size": 14,
+    "inventory": [
+      "greater_draught"
+    ],
+    "battle_intro": "The humming stops. 'Mine,' says the Tide Hag.",
+    "defeat_text": "The Tide Hag sinks, still humming, and the water goes still."
+  },
+  "ash_wraith": {
+    "name": "Ash Wraith",
+    "type": "hostile",
+    "description": "A shape of drifting cinders around two points of light.",
+    "sprite": "auto",
+    "stats": {
+      "health": 62,
+      "max_health": 62,
+      "attack": 16,
+      "defense": 3,
+      "critical_hit_chance": 0.05
+    },
+    "xp": 44,
+    "gold": [
+      8,
+      14
+    ],
+    "moves": [
+      {
+        "type": "attack",
+        "name": "a searing touch",
+        "weight": 3
+      },
+      {
+        "type": "status",
+        "name": "a breath of embers",
+        "status": "burn",
+        "turns": 3,
+        "power": 5,
+        "weight": 2
+      },
+      {
+        "type": "heavy",
+        "name": "The cinder storm",
+        "mult": 2.1,
+        "weight": 1,
+        "tell": "The wraith spins faster, drawing every spark in the room into itself."
+      }
+    ],
+    "greeting": "It has not noticed you. Yet.",
+    "show_hostile": true,
+    "tags": [
+      "undead"
+    ],
+    "immune": [
+      "burn",
+      "bleed"
+    ]
+  },
+  "hollow_guard": {
+    "name": "Hollow Guard",
+    "type": "hostile",
+    "description": "Royal armour, royal crest, and nothing whatsoever inside the helm.",
+    "sprite": "auto",
+    "stats": {
+      "health": 78,
+      "max_health": 78,
+      "attack": 18,
+      "defense": 7,
+      "critical_hit_chance": 0.05
+    },
+    "xp": 50,
+    "gold": [
+      10,
+      16
+    ],
+    "moves": [
+      {
+        "type": "attack",
+        "name": "its glaive",
+        "weight": 3
+      },
+      {
+        "type": "heavy",
+        "name": "The executioner's sweep",
+        "mult": 2.2,
+        "weight": 2,
+        "tell": "The Hollow Guard plants its feet and swings the glaive back."
+      },
+      {
+        "type": "guard",
+        "name": "glaive braced",
+        "weight": 2
+      }
+    ],
+    "greeting": "It has not noticed you. Yet.",
+    "show_hostile": true,
+    "tags": [
+      "undead"
+    ],
+    "immune": [
+      "bleed"
+    ]
+  },
+  "hollow_king": {
+    "name": "The Hollow King",
+    "type": "hostile",
+    "description": "He sits where he has sat for a hundred years, the Ember Crown burning on a brow that is no longer there. The armour stands. The eyes are two coals.",
+    "sprite": "hollow_king",
+    "stats": {
+      "health": 250,
+      "max_health": 250,
+      "attack": 19,
+      "defense": 6,
+      "critical_hit_chance": 0.05
+    },
+    "xp": 0,
+    "gold": 0,
+    "moves": [
+      {
+        "type": "attack",
+        "name": "his rusted greatsword",
+        "weight": 4
+      },
+      {
+        "type": "heavy",
+        "name": "The Crown's Fire",
+        "mult": 2.4,
+        "weight": 2,
+        "tell": "The coals of the Crown blaze white. The King lifts one gauntlet, and the air begins to shake."
+      },
+      {
+        "type": "status",
+        "name": "a breath of the furnace",
+        "status": "burn",
+        "turns": 3,
+        "power": 5,
+        "weight": 2
+      },
+      {
+        "type": "guard",
+        "name": "sword grounded, waiting",
+        "weight": 1
+      },
+      {
+        "type": "heal",
+        "name": "draw on the Crown",
+        "amount": 22,
+        "weight": 2,
+        "below": 0.5
+      }
+    ],
+    "greeting": "It has not noticed you. Yet.",
+    "show_hostile": true,
+    "tags": [
+      "undead"
+    ],
+    "immune": [
+      "stun",
+      "bleed"
+    ],
+    "no_flee": true,
+    "ambush_text": "The doors boom shut behind you. On the throne, two coals open.",
+    "battle_intro": "'ANOTHER,' says the Hollow King, rising. 'GOOD. I WAS COLD.'",
+    "defeat_text": "The Hollow King kneels, slowly, as armour does when nothing holds it up. The Crown rolls to your feet, still burning.",
+    "battle_music": {
+      "generate": {
+        "mood": "battle",
+        "seed": "hollow-king"
+      }
+    },
+    "on_defeat": [
+      {
+        "add_item": "ember_crown"
+      },
+      {
+        "say": "The {item}Ember Crown{/} lies on the flagstones. All you have to do is take it.",
+        "style": "story"
+      }
+    ]
+  }
+}

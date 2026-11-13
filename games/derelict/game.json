@@ -1,0 +1,30 @@
+{
+  "id": "derelict",
+  "title": "Derelict",
+  "subtitle": "Adrift aboard the cargo hauler Marigold",
+  "description": "Sci-fi adventure. Wake up alone on an abandoned ship and find a way off.",
+  "author": "Daniel Sandner",
+  "version": "1.0",
+  "order": 1,
+  "style": "default",
+  "initial_scene": "utility_room",
+  "player_stats": {
+    "health": 60,
+    "max_health": 60,
+    "attack": 4,
+    "defense": 2,
+    "critical_hit_chance": 0.08
+  },
+  "max_hints": 8,
+  "rpg": false,
+  "intro": "intro",
+  "map_title": "CHX-7 Marigold",
+  "title_music": "theme",
+  "music": "lower_deck",
+  "show_title": false,
+  "default_hint": "Look at everything, read everything, and talk to anyone who will answer.",
+  "help": "Goal: get off the ship. 'journal' shows what you are working on.",
+  "about": "A demo adventure for the CLIo engine: puzzles, dialogue trees, quests, one tactical fight and three endings.",
+  "website": "eryxian.com",
+  "license": "All rights reserved - see LICENSE.md in this game's folder"
+}

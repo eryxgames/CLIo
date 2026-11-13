@@ -1,0 +1,107 @@
+{
+  "theme": {
+    "title": "Marigold (main theme)",
+    "tempo": 84,
+    "steps_per_beat": 4,
+    "volume": 0.6,
+    "instruments": {
+      "lead": {
+        "wave": "square",
+        "duty": 0.25,
+        "attack": 0.02,
+        "decay": 0.15,
+        "sustain": 0.5,
+        "release": 0.3,
+        "vibrato": [
+          5,
+          0.006
+        ],
+        "volume": 0.3,
+        "echo": [
+          0.357,
+          0.35
+        ]
+      },
+      "pad": {
+        "wave": "soft",
+        "attack": 0.25,
+        "decay": 0.2,
+        "sustain": 0.6,
+        "release": 0.5,
+        "volume": 0.12,
+        "gate": 1.0
+      },
+      "arp": {
+        "wave": "triangle",
+        "attack": 0.005,
+        "decay": 0.1,
+        "sustain": 0.3,
+        "release": 0.1,
+        "volume": 0.22,
+        "arp": 2
+      },
+      "bass": {
+        "wave": "triangle",
+        "attack": 0.01,
+        "decay": 0.1,
+        "sustain": 0.8,
+        "release": 0.1,
+        "volume": 0.5
+      }
+    },
+    "patterns": {
+      "intro": {
+        "pad": "[a3 c4 e4]:16 | [f3 a3 c4]:16 | [c3 e3 g3]:16 | [g3 b3 d4]:16",
+        "bass": "a1:16 | f1:16 | c2:16 | g1:16"
+      },
+      "A": {
+        "lead": "e5:4 .:2 c5:2 d5:2 e5:4 .:2 | f5:4 .:2 e5:2 d5:2 c5:4 .:2 | e5:4 .:2 g5:2 e5:2 d5:4 .:2 | d5:6 b4:2 g4:4 .:4",
+        "arp": "[a3 c4 e4 c4]:16 | [f3 a3 c4 a3]:16 | [c4 e4 g4 e4]:16 | [g3 b3 d4 b3]:16",
+        "pad": "[a3 c4 e4]:16 | [f3 a3 c4]:16 | [c3 e3 g3]:16 | [g3 b3 d4]:16",
+        "bass": "a1:8 a1:4 e2:4 | f1:8 f1:4 c2:4 | c2:8 c2:4 g1:4 | g1:8 g1:4 d2:4"
+      },
+      "B": {
+        "lead": "a5:6 g5:2 e5:4 .:4 | a5:4 c6:4 a5:4 f5:4 | g5:6 e5:2 c5:4 .:4 | b4:4 d5:4 g5:6 .:2",
+        "arp": "[a3 c4 e4 c4]:16 | [f3 a3 c4 a3]:16 | [c4 e4 g4 e4]:16 | [g3 b3 d4 b3]:16",
+        "pad": "[a3 c4 e4]:16 | [f3 a3 c4]:16 | [c3 e3 g3]:16 | [g3 b3 d4]:16",
+        "bass": "a1:8 a1:4 e2:4 | f1:8 f1:4 c2:4 | c2:8 c2:4 g1:4 | g1:8 g1:4 d2:4"
+      }
+    },
+    "sequence": [
+      "intro",
+      "A",
+      "B",
+      "A"
+    ]
+  },
+  "lower_deck": {
+    "generate": {
+      "mood": "dark",
+      "seed": "marigold-deck-b"
+    }
+  },
+  "hydro": {
+    "generate": {
+      "mood": "calm",
+      "seed": "tomatoes"
+    }
+  },
+  "engine": {
+    "generate": {
+      "mood": "tense",
+      "seed": "unit-4"
+    }
+  },
+  "powered": {
+    "generate": {
+      "mood": "heroic",
+      "seed": "marigold-awake"
+    }
+  },
+  "bridge": {
+    "generate": {
+      "mood": "space",
+      "seed": "marigold-deck-a"
+    }
+  }
+}

@@ -1,0 +1,13 @@
+@color darkgray
+@palette
+g = bgreen
+@art
+ .---------.
+ | > _     |
+ |  NEXUS  |
+ '---------'
+  /_______\
+@mask
+
+   ggg
+    ggggg

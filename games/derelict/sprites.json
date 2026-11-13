@@ -1,0 +1,53 @@
+{
+  "droid": {
+    "palette": {
+      "a": "#2b3340",
+      "A": "#8a96a8",
+      "h": "#c3ccd8",
+      "r": "#ff3b30",
+      "m": "#1a1f28",
+      "y": "#ffd23f",
+      "o": "#ff8a3d"
+    },
+    "pixels": [
+      "....aaaaaa....",
+      "...ahhhhhha...",
+      "..aAArrrrAAa..",
+      "..aAArrrrAAa..",
+      "..aAAAAAAAAa..",
+      "...aAmmmmAa...",
+      ".aaaaAAAAaaaa.",
+      "aAAaAhAAhAaAAa",
+      "aAAaAyAAyAaAAa",
+      "aooaAAAAAAaooa",
+      ".aa.aAAAAa.aa.",
+      "....aAaaAa....",
+      "...aAa..aAa...",
+      "..aaaa..aaaa.."
+    ]
+  },
+  "bugrat": {
+    "palette": {
+      "p": "#e88aa8",
+      "P": "#ffb8cc",
+      "b": "#3a2a22",
+      "B": "#8b5a3c",
+      "r": "#ff3030",
+      "w": "#ffffff",
+      "t": "#e88aa8",
+      "k": "#d6b25e"
+    },
+    "pixels": [
+      "..p......p..",
+      ".pPp....pPp.",
+      ".pPPbbbbPPp.",
+      "..bBBBBBBb..",
+      ".bBrBBBBrBb.",
+      ".bBBBBBBBBb.",
+      "..bBwkkwBb..",
+      "...bBBBBb.t.",
+      "..b.b..b.bt.",
+      "............"
+    ]
+  }
+}

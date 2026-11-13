@@ -1,0 +1,21 @@
+# CLIo logo
+@palette
+a = 39
+b = 45
+c = 51
+d = 87
+o = 220
+@art
+  ____ _     ___
+ / ___| |   |_ _|___
+| |   | |    | |/ _ \
+| |___| |___ | | (_) |
+ \____|_____|___\___/
+@mask
+  aaaa a     aaa
+ b bbbb b   bbbbbooo
+c c   c c    c co o o
+d ddddd dddd d d ooo o
+ ddddddddddddddddoooo
+@small
+ C L I o

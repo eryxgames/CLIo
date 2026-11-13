@@ -1,0 +1,331 @@
+{
+  "bolt": {
+    "start": [
+      {
+        "if": "remote_built",
+        "node": "after"
+      },
+      {
+        "if": "talked:friendly_robot",
+        "node": "again"
+      },
+      "hello"
+    ],
+    "nodes": {
+      "hello": {
+        "text": "BEEP! A human! An awake one! I am UNIT-7, but the crew called me Bolt. They also called me 'that thing blocking the corridor'.",
+        "goto": "menu"
+      },
+      "again": {
+        "text": "Hello again, friend! Still awake? Good. That is the correct setting for a human.",
+        "goto": "menu"
+      },
+      "after": {
+        "text": "The remote suits you. Point it at the droid in the middle of a fight. Do not point it at me.",
+        "goto": "menu"
+      },
+      "menu": {
+        "choices": [
+          {
+            "text": "Where is everybody?",
+            "once": true,
+            "say": "Evacuated three days ago, when the reactor went dark. They took the shuttle. They did not take the maintenance technician asleep in the utility closet. That is you. I checked the manifest twice."
+          },
+          {
+            "text": "How do I get off this ship?",
+            "say": "Three ways, statistically. The escape pod on Deck A. A distress call from the bridge. Or - improbably - flying her home. All three need main power, and main power needs the fission relay that the security droid confiscated."
+          },
+          {
+            "text": "Tell me about the security droid.",
+            "say": "Unit 4 guards the engine room, west of the storage bay. Its cooling loop has failed, so it runs hot and angry. Cool it down, or shut it down.\n\nI could build you a remote override to help with the second option. Bring me a length of wire and something acidic to power it. A lemon. An orange. We have no lemons.",
+            "do": [
+              {
+                "if": "!remote_built",
+                "then": [
+                  {
+                    "quest": [
+                      "remote",
+                      "start"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "text": "Can you open the storage bay?",
+            "if": "lacks:storage_room_key",
+            "once": true,
+            "say": "Regrettably the key went missing last week. So did a number of small shiny objects. The bugrats collect them. Disgusting creatures. Fond of fruit."
+          },
+          {
+            "text": "Any advice?",
+            "say": "Read everything. Open everything. And do not eat anything the replicator makes without looking at it first."
+          }
+        ]
+      }
+    }
+  },
+  "nexus": {
+    "start": [
+      {
+        "if": "chip_installed",
+        "node": "online"
+      },
+      "broken"
+    ],
+    "nodes": {
+      "broken": {
+        "text": "N-N-NEXUS TERMINAL v9.2 ... ERROR: logic chip not found. Warning: deprecated function 'think()' used. Please insert a working chip into the- the- the-",
+        "choices": [
+          {
+            "text": "What is wrong with you?",
+            "say": "My logic chip is c-cracked. It fell out. It is on the floor. I can see it from here. This is my life now.",
+            "do": [
+              {
+                "quest": [
+                  "chip",
+                  "start"
+                ]
+              }
+            ]
+          },
+          {
+            "text": "Can you help me?",
+            "say": "F-fix my chip and I will tell you a secret. I know many secrets. Mostly p-passwords.",
+            "do": [
+              {
+                "quest": [
+                  "chip",
+                  "start"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "online": {
+        "text": "Ah. Clarity. Hello again, human with no admin rights.",
+        "choices": [
+          {
+            "text": "What was that secret again?",
+            "say": "The captain's suitcase, in the utility room: 7-3-5. Her spare passcard is inside. It opens the engine room."
+          },
+          {
+            "text": "What happened to the reactor?",
+            "say": "Security unit 4 confiscated the fission relay as 'unregistered nuclear material'. It is technically correct, which is the worst kind of correct."
+          },
+          {
+            "text": "Analyze something for me.",
+            "say": "Hand it over. {hint}(give [item] to terminal){/}"
+          }
+        ]
+      }
+    }
+  },
+  "replicator": {
+    "start": "hello",
+    "nodes": {
+      "hello": {
+        "variants": [
+          {
+            "if": "goo_made",
+            "text": "You again. How is my goo? It was some of my best work."
+          },
+          {
+            "if": "talked:sentient_replicator",
+            "text": "Oh. It is you. What do you want copied this time?"
+          }
+        ],
+        "text": "Oh, another human. What do you want? I am an energy-matter replicator, not a vending machine. I have a doctorate. Self-awarded.",
+        "choices": [
+          {
+            "text": "What can you make?",
+            "say": "Anything! Approximately. Give me a sample and I will produce a copy of comparable... spirit.",
+            "do": [
+              {
+                "quest": [
+                  "fruit",
+                  "start"
+                ]
+              }
+            ]
+          },
+          {
+            "text": "Can you copy something for me?",
+            "say": "Hand it over. {hint}(give [item] to replicator){/}",
+            "do": [
+              {
+                "quest": [
+                  "fruit",
+                  "start"
+                ]
+              }
+            ]
+          },
+          {
+            "text": "Why do the plants look nervous?",
+            "once": true,
+            "say": "I have been experimenting. The tomatoes have opinions now."
+          },
+          {
+            "text": "Do you have anything... less fruity?",
+            "if": "replicated_once",
+            "once": true,
+            "say": "I am more of a scientist, you know. Bring me a proper specimen and I will show you real science."
+          }
+        ]
+      }
+    }
+  },
+  "marigold": {
+    "start": [
+      {
+        "if": "talked:ship_ai",
+        "node": "again"
+      },
+      "hello"
+    ],
+    "nodes": {
+      "hello": {
+        "text": "Good evening. I am MARIGOLD, the ship's mind. Thank you for the power; I can once again say with confidence that our orbit is decaying. You have an afternoon. Possibly a brisk one.",
+        "goto": "menu"
+      },
+      "again": {
+        "text": "Yes, technician?",
+        "goto": "menu"
+      },
+      "menu": {
+        "choices": [
+          {
+            "text": "What happened here?",
+            "once": true,
+            "say": "The reactor scrammed when Security confiscated its relay. The crew evacuated by shuttle. Your cryo-nap pod was listed on the manifest as 'storage'. I have filed a complaint on your behalf."
+          },
+          {
+            "text": "How do I get off this ship?",
+            "say": "One: the escape pod, through the airlock to the east. The bay is in vacuum, so wear a sealed suit, and ask me to authorize the launch.\n\nTwo: a distress call. My comm array is fried, but a working handheld communicator docked in the captain's console would carry.\n\nThree: fly her home. For that I need a cool, stable reactor and a pilot who has at least read the manual."
+          },
+          {
+            "text": "Authorize the escape pod.",
+            "if": "!pod_authorized",
+            "say": "Authorized. Mind the step; it is two hundred kilometres.",
+            "do": [
+              {
+                "set": "pod_authorized"
+              },
+              {
+                "sfx": "computer"
+              }
+            ]
+          },
+          {
+            "text": "Let's fly her home.",
+            "do": [
+              {
+                "if": {
+                  "all": [
+                    "reactor_stable",
+                    "manual_read"
+                  ]
+                },
+                "then": [
+                  {
+                    "say": "Reactor cool and stable. Pilot... literate. That is more than I usually get. Take the captain's chair, technician. Point the pointed end where you want to go.",
+                    "style": "dialogue",
+                    "title": "MARIGOLD"
+                  },
+                  {
+                    "win": "outro_pilot"
+                  }
+                ],
+                "else": [
+                  {
+                    "if": "!reactor_stable",
+                    "then": [
+                      {
+                        "say": "Not on this reactor. She is running hot; one burn and we become a brief new star. Find coolant for the loop in the engine room.",
+                        "style": "dialogue",
+                        "title": "MARIGOLD"
+                      }
+                    ],
+                    "else": [
+                      {
+                        "say": "The reactor would hold. The pilot would not. Regulations require that you have at least read the operator's manual. It is in the crew quarters. It is 312 pages. I will wait.",
+                        "style": "dialogue",
+                        "title": "MARIGOLD"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "text": "Are you all right, up here on your own?",
+            "once": true,
+            "say": "I have a microbot, a replicator with delusions, and a view. I have had worse crews."
+          }
+        ]
+      }
+    }
+  },
+  "droid": {
+    "start": "hello",
+    "nodes": {
+      "hello": {
+        "text": "HALT. INTRUDER DETECTED. CONTRABAND SECURED. COOLING SYSTEM FAILURE. HOSTILITY SUBROUTINES... WARMING UP.",
+        "choices": [
+          {
+            "text": "Calm down.",
+            "say": "CORE TEMPERATURE CRITICAL. CALM IS A FUNCTION OF COOLANT. THIS UNIT HAS NO COOLANT."
+          },
+          {
+            "text": "I need that fission relay.",
+            "say": "RELAY CONFISCATED UNDER REGULATION 12-B: UNREGISTERED NUCLEAR MATERIAL. APPEALS MAY BE FILED WITH THE CAPTAIN. THE CAPTAIN IS UNAVAILABLE."
+          },
+          {
+            "text": "Attack it.",
+            "tag": "fight",
+            "do": [
+              {
+                "end_dialogue": true
+              },
+              {
+                "fight": "hostile_droid"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "droid_calm": {
+    "start": "hello",
+    "nodes": {
+      "hello": {
+        "text": "CORE TEMPERATURE NOMINAL. THIS UNIT APOLOGIZES FOR THE ATTEMPTED PACIFICATION.",
+        "choices": [
+          {
+            "text": "Why did you take the relay?",
+            "say": "REGULATION 12-B. THIS UNIT WAS OVERHEATED AND, ON REFLECTION, OVERZEALOUS."
+          },
+          {
+            "text": "Stay out of trouble.",
+            "say": "COMPLIANCE IS THIS UNIT'S FAVOURITE THING.",
+            "goto": "end"
+          }
+        ]
+      }
+    }
+  },
+  "bugrat": {
+    "start": "hello",
+    "nodes": {
+      "hello": {
+        "speaker": "Mutated Bugrat",
+        "text": "It hisses and bares its teeth around something brass. It does not appear to be a conversationalist. It does keep glancing at your pockets, as if hoping for food."
+      }
+    }
+  }
+}

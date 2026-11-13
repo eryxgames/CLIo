@@ -1,0 +1,106 @@
+{
+  "crown": {
+    "title": "The Ember Crown",
+    "description": "Bring Emberfall's crown back from the Hollow King.",
+    "complete_on_win": true,
+    "stages": [
+      {
+        "text": "Descend into the Crypt",
+        "done_when": "floor_1"
+      },
+      {
+        "text": "Find the stair down to the Flooded Vaults",
+        "done_when": "floor_2"
+      },
+      {
+        "text": "Find the stair down to the Hollow Court",
+        "done_when": "floor_3"
+      },
+      {
+        "text": "Defeat the Hollow King",
+        "done_when": "hollow_king_defeated"
+      },
+      {
+        "text": "Take the Ember Crown",
+        "done_when": {
+          "any": [
+            "game_won",
+            "crown_taken"
+          ]
+        }
+      }
+    ]
+  },
+  "warden": {
+    "title": "The Gatekeeper",
+    "description": "Something bony is standing on the stair.",
+    "auto_start": "floor_1",
+    "stages": [
+      {
+        "text": "Get past the Bone Warden",
+        "done_when": "bone_warden_defeated"
+      }
+    ],
+    "on_complete": [
+      {
+        "xp": 15
+      }
+    ]
+  },
+  "candles": {
+    "title": "Three Candles",
+    "description": "Maren said a candle still burning down there is worth kneeling to.",
+    "auto_start": {
+      "var": [
+        "shrines",
+        ">=",
+        1
+      ]
+    },
+    "stages": [
+      {
+        "text": "Pray at a shrine on every floor",
+        "done_when": {
+          "var": [
+            "shrines",
+            ">=",
+            3
+          ]
+        }
+      }
+    ],
+    "on_complete": [
+      {
+        "say": "Three flames, three floors. Something old and kind takes notice of you.",
+        "style": "story"
+      },
+      {
+        "stat": {
+          "max_health": 15
+        }
+      },
+      {
+        "xp": 40
+      }
+    ]
+  },
+  "deep": {
+    "title": "The Long Dark",
+    "description": "Below the Hollow Court the stairs go on. Nobody knows how far.",
+    "auto_start": "crown_taken",
+    "stages": [
+      {
+        "text": "Reach the fifth floor",
+        "done_when": "floor_5"
+      },
+      {
+        "text": "Reach the eighth floor",
+        "done_when": "floor_8"
+      },
+      {
+        "text": "Reach the twelfth floor",
+        "done_when": "floor_12"
+      }
+    ]
+  }
+}

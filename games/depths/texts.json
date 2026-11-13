@@ -1,0 +1,14 @@
+{
+  "intro": {
+    "text": "The chapel bell has no rope any more. You go down by the cellar instead.",
+    "show_once": true
+  },
+  "outro_win": {
+    "text": "You lift the Ember Crown. It is warm, and then hot, and then it is simply light - going up the stair ahead of you, floor after floor, through the vaults and the crypt and out into the night.\n\nBy the time you climb into the chapel, every hearth in Emberfall is burning. Old Maren is waiting with a blanket and something that might, in poor light, be a smile.",
+    "show_once": false
+  },
+  "outro_lose": {
+    "text": "The dark closes over you. Somewhere above, Emberfall stays cold a while longer.\n\nThe depths will be different next time. So, perhaps, will you.",
+    "show_once": false
+  }
+}

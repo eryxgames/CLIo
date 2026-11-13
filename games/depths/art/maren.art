@@ -1,0 +1,12 @@
+@color gray
+@palette
+e = amber
+@art
+    .---.
+   / o o \
+   \  ~  /
+  /'-----'\
+ /  \   /  \
+@mask
+
+     e e

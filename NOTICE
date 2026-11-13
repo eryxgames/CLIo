@@ -1,0 +1,9 @@
+CLIo - a stylish command-line game engine
+Copyright 2024-2026 Daniel Sandner (https://eryxian.com)
+
+Licensed under the Apache License, Version 2.0 (see the LICENSE file).
+
+Not covered by that licence: the demonstration games in games/derelict and
+games/depths. Their story, text, characters, art, sprites and music are
+copyright Daniel Sandner, all rights reserved; see the LICENSE.md file in each
+of those folders.

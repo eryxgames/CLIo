@@ -1,0 +1,33 @@
+[
+  {
+    "id": "cellar",
+    "name": "Wine Cellar",
+    "description": "Racks of dusty bottles. Stone steps lead up to a heavy door.",
+    "items": [
+      "corkscrew"
+    ],
+    "passive_items": [
+      "barrel"
+    ],
+    "exits": [
+      {
+        "door_name": "Cellar Door",
+        "dir": "u",
+        "scene_id": "kitchen",
+        "locked": true,
+        "required_item": "iron_key",
+        "lock_text": "Locked. Of course it is."
+      }
+    ]
+  },
+  {
+    "id": "kitchen",
+    "name": "Kitchen",
+    "description": "Daylight, and the smell of bread.",
+    "on_enter": [
+      {
+        "win": "You are out, and you still have the corkscrew."
+      }
+    ]
+  }
+]

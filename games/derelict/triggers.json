@@ -1,0 +1,60 @@
+[
+  {
+    "id": "orbit_1",
+    "when": {
+      "turns": [
+        ">=",
+        50
+      ]
+    },
+    "do": [
+      {
+        "say": "The deck shivers under your feet. Far below, the first thin air brushes the hull.",
+        "style": "ambient"
+      }
+    ]
+  },
+  {
+    "id": "orbit_2",
+    "when": {
+      "turns": [
+        ">=",
+        120
+      ]
+    },
+    "do": [
+      {
+        "sfx": "alarm"
+      },
+      {
+        "say": "A long groan runs the length of the ship. The Marigold is sinking, slowly, toward the planet. No hurry. Some hurry.",
+        "style": "warning"
+      }
+    ]
+  },
+  {
+    "id": "relay_in_hand",
+    "when": {
+      "all": [
+        "has:fission_relay",
+        "!reactor_online"
+      ]
+    },
+    "do": [
+      {
+        "say": "The relay is warm in your hands. The reactor's empty socket is waiting.",
+        "style": "hint"
+      }
+    ]
+  },
+  {
+    "id": "suit_sealed",
+    "when": "has:patched_spacesuit",
+    "do": [
+      {
+        "say": "Remember to actually wear the suit before stepping into vacuum: equip spacesuit",
+        "style": "hint"
+      }
+    ]
+  }
+]

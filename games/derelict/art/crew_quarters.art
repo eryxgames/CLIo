@@ -1,0 +1,19 @@
+@color steel
+@palette
+b = navy
+p = sky
+@art
+  ___________________________
+ |  _________     _________  |
+ | |_________|   |_________| |
+ | |         |   |         | |
+ | |_________|   |_________| |
+ | |_________|   |_________| |
+ |___________________________|
+@mask
+
+
+    ppppppppp     ppppppppp
+
+    bbbbbbbbb     bbbbbbbbb
+    ppppppppp     ppppppppp

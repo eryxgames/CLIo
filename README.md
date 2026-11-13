@@ -144,6 +144,10 @@ utils/               Tkinter data editor (desktop, alpha)
 legacy/prototypes/   early dialogue / crafting experiments from CLIo 1
 ```
 
+## Changes
+
+See [CHANGELOG.md](CHANGELOG.md).
+
 ## Tests
 
 ```

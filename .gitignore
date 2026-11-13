@@ -163,3 +163,8 @@ cython_debug/
 full.py
 app_fullproject.txt
 utils/editor_settings.json
+
+# CLIo
+saves/
+savegame.json
+*.tmp

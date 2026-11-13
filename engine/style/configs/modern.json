@@ -1,40 +1,116 @@
 {
-  "text_speed": 0.03,
-  "horizontal_padding": 1,
+  "description": "High contrast with bold accents and heavy frames.",
+  "text_speed": 0.008,
+  "horizontal_padding": 2,
   "vertical_padding": 0,
   "colors": {
-    "scene": "38;5;75",
-    "dialogue": "38;5;156",
+    "default": "38;5;255",
+    "description": "38;5;255",
+    "story": "38;5;231",
+    "dialogue": "38;5;159",
+    "greeting": "38;5;219",
+    "character": "38;5;213",
     "item": "38;5;220",
-    "combat": "38;5;203",
-    "system": "38;5;147",
-    "story": "38;5;183",
-    "inventory": "38;5;226",
-    "default": "38;5;252"
+    "exit": "38;5;84",
+    "ambient": "38;5;245",
+    "system": "38;5;39",
+    "error": "38;5;197",
+    "warning": "38;5;208",
+    "success": "38;5;84",
+    "menu": "38;5;111",
+    "reading": "38;5;254",
+    "combat": "38;5;197",
+    "list_title": "1;38;5;39",
+    "list_category": "1;38;5;111",
+    "list_content": "38;5;255",
+    "hud": "38;5;39",
+    "prompt": "1;38;5;213",
+    "quest": "1;38;5;220",
+    "hint": "3;38;5;245",
+    "key": "1;38;5;231"
   },
   "styles": {
-    "scene": {
-      "padding": 1,
-      "frame": "rounded",
-      "speed": 0.02,
-      "fade_in": true
+    "description": {
+      "frame": "HEAVY",
+      "padding": 2,
+      "character_delay": 0.008
+    },
+    "story": {
+      "frame": "HEAVY",
+      "padding": 2,
+      "character_delay": 0.012,
+      "paragraph_delay": 0.4
     },
     "dialogue": {
-      "padding": 1,
-      "frame": "single",
-      "character_delay": 0.05
+      "frame": "SINGLE",
+      "padding": 2,
+      "character_delay": 0.0096
     },
-    "inventory": {
+    "reading": {
+      "frame": "SINGLE",
+      "padding": 2,
+      "character_delay": 0.008
+    },
+    "list_title": {
+      "frame": "HEAVY",
       "padding": 1,
-      "frame": "SINGLE"
+      "alignment": "center",
+      "gradient": true
+    },
+    "list_category": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "list_content": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "greeting": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "ambient": {
+      "frame": "NONE",
+      "padding": 1
     },
     "system": {
-      "padding": 1,
-      "frame": "ROUNDED"
+      "frame": "NONE",
+      "padding": 1
+    },
+    "error": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "warning": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "success": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "menu": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "combat": {
+      "frame": "NONE",
+      "padding": 1
     },
     "default": {
-      "padding": 1,
-      "frame": "none"
+      "frame": "NONE",
+      "padding": 1
     }
+  },
+  "ui": {
+    "prompt": "▸ ",
+    "title_gradient": [
+      213,
+      177,
+      141,
+      105,
+      69,
+      39
+    ]
   }
 }

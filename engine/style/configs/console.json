@@ -1,79 +1,117 @@
 {
-    "text_speed": 0.02,
-    "horizontal_padding": 0,
-    "vertical_padding": 0,
-    "colors": {
-      "description": "38;5;242",
-      "dialogue": "38;5;47",
-      "greeting": "38;5;48",
-      "system": "38;5;244",
-      "error": "38;5;196",
-      "warning": "38;5;208",
-      "success": "38;5;46",
-      "ambient": "38;5;240",
-      "item": "38;5;249",
-      "menu": "38;5;244",
-      "reading": "38;5;250",
-      "default": "38;5;252"
+  "description": "Amber terminal with dotted frames.",
+  "text_speed": 0.015,
+  "horizontal_padding": 2,
+  "vertical_padding": 0,
+  "colors": {
+    "default": "38;5;172",
+    "description": "38;5;214",
+    "story": "38;5;220",
+    "dialogue": "38;5;222",
+    "greeting": "38;5;178",
+    "character": "1;38;5;220",
+    "item": "1;38;5;214",
+    "exit": "38;5;178",
+    "ambient": "38;5;130",
+    "system": "38;5;130",
+    "error": "1;38;5;202",
+    "warning": "1;38;5;208",
+    "success": "38;5;220",
+    "menu": "38;5;178",
+    "reading": "38;5;214",
+    "combat": "1;38;5;208",
+    "list_title": "1;38;5;220",
+    "list_category": "1;38;5;214",
+    "list_content": "38;5;172",
+    "hud": "38;5;130",
+    "prompt": "1;38;5;220",
+    "quest": "1;38;5;226",
+    "hint": "38;5;130",
+    "key": "1;38;5;220"
+  },
+  "styles": {
+    "description": {
+      "frame": "SINGLE",
+      "padding": 2,
+      "character_delay": 0.015
     },
-    "styles": {
-      "description": {
-        "padding": 0,
-        "frame": "NONE",
-        "speed": 0.01,
-        "character_delay": 0.01
-      },
-      "dialogue": {
-        "padding": 0,
-        "frame": "NONE",
-        "speed": 0.02,
-        "character_delay": 0.01
-      },
-      "greeting": {
-        "padding": 0,
-        "frame": "NONE",
-        "speed": 0.02
-      },
-      "system": {
-        "padding": 0,
-        "frame": "NONE",
-        "prefix": "> "
-      },
-      "error": {
-        "padding": 0,
-        "frame": "NONE",
-        "prefix": "ERROR: ",
-        "flash": true
-      },
-      "warning": {
-        "padding": 0,
-        "frame": "NONE",
-        "prefix": "WARNING: "
-      },
-      "success": {
-        "padding": 0,
-        "frame": "NONE",
-        "prefix": "SUCCESS: "
-      },
-      "ambient": {
-        "padding": 0,
-        "frame": "NONE",
-        "character_delay": 0.02
-      },
-      "menu": {
-        "padding": 0,
-        "frame": "NONE",
-        "prefix": "$ "
-      },
-      "reading": {
-        "padding": 0,
-        "frame": "NONE",
-        "character_delay": 0.02,
-        "paragraph_delay": 0.8
-      },
-      "default": {
-        "padding": 0,
-        "frame": "NONE"
-      }
+    "story": {
+      "frame": "DOUBLE",
+      "padding": 2,
+      "character_delay": 0.0225,
+      "paragraph_delay": 0.4
+    },
+    "dialogue": {
+      "frame": "DOTS",
+      "padding": 2,
+      "character_delay": 0.018
+    },
+    "reading": {
+      "frame": "DOTS",
+      "padding": 2,
+      "character_delay": 0.015
+    },
+    "list_title": {
+      "frame": "DOUBLE",
+      "padding": 1,
+      "alignment": "center",
+      "gradient": true
+    },
+    "list_category": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "list_content": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "greeting": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "ambient": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "system": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "error": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "warning": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "success": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "menu": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "combat": {
+      "frame": "NONE",
+      "padding": 1
+    },
+    "default": {
+      "frame": "NONE",
+      "padding": 1
     }
+  },
+  "ui": {
+    "prompt": "$ ",
+    "title_gradient": [
+      130,
+      166,
+      172,
+      208,
+      214,
+      220
+    ],
+    "frame_color": "38;5;130"
   }
+}

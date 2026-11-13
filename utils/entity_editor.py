@@ -6,6 +6,7 @@ import shutil
 import os
 import re
 import sys
+sys.path.append('.')
 import copy
 import time
 import logging
@@ -18,6 +19,7 @@ from pygments import highlight
 from pygments.lexers import get_lexer_by_name
 from pygments.formatters import HtmlFormatter
 from tkhtmlview import HTMLScrolledText
+from game_map import MapViewer
 
 # Decorator definition
 def safe_operation(func):
@@ -551,7 +553,7 @@ class GameDataEditor:
         stats = character.get('stats', {})
         for stat_name, value in stats.items():
             formatted_value = self.format_number(value)
-            self.stats_tree.insert('', 'end', text=stat_name, values=(stat_name, formatted_value))
+            self.stats_tree.insert('', 'end', values=(stat_name, formatted_value))
 
 
     def setup_window(self):
@@ -1006,6 +1008,7 @@ class GameDataEditor:
                     command=self.reload_data).pack(side=tk.LEFT, padx=2)
             ttk.Button(left_buttons, text="Validate", 
                     command=self.validate_all_data).pack(side=tk.LEFT, padx=2)
+            ttk.Button(left_buttons, text="Project Map", command=self.show_project_map).pack(side=tk.LEFT, padx=2)
 
     def create_status_bar(self):
             """Create status bar"""
@@ -1030,7 +1033,26 @@ class GameDataEditor:
             modified = len(self.modified)
             self.status_var.set(f"Modified files: {', '.join(self.modified)}" if modified 
                             else "No modifications")
-                
+
+    def show_project_map(self):
+        """Show the project map visualization"""
+        if not self.scenes_data:
+            messagebox.showwarning("Warning", "No scene data available to display")
+            return
+            
+        try:
+            # Create map viewer with current theme setting
+            is_dark = self.theme_manager.current_theme == 'Dark'
+            map_viewer = MapViewer(self.root, self.scenes_data, dark_theme=is_dark)
+            
+            # Apply current editor theme to map window
+            self.theme_manager.apply_theme_to_dialog(map_viewer)
+            
+            # Position the window relative to main window
+            map_viewer.geometry(f"+{self.root.winfo_x() + 50}+{self.root.winfo_y() + 50}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to display map: {str(e)}")
+
     # Include all previously defined methods for:
     # - Tab creation (create_scenes_tab, create_items_tab, etc.)
     # - Event handling (setup_event_bindings)
@@ -1221,28 +1243,105 @@ class GameDataEditor:
             method()
 
     def on_scene_select(self, event=None):
-        self.store_selection(self.scenes_listbox, '_current_scene_selection') 
-        if selection := self.get_current_selection('_current_scene_selection'):
-            scene = self.scenes_data[selection]  
-            self.scene_id_var.set(scene['id'])
-            self.scene_name_var.set(scene['name']) 
-            self.scene_desc_text.delete('1.0', tk.END)
-            self.scene_desc_text.insert('1.0', scene.get('description', ''))
-            self.update_scene_contents(scene)
+        """Handle scene selection"""
+        # Get current selection
+        selection = self.scenes_listbox.curselection()
+        if selection is None or len(selection) == 0:
+            return
+            
+        # Store the selection
+        self._current_scene_selection = selection[0]
+        
+        # Get the selected scene
+        scene = self.scenes_data[selection[0]]
+        
+        # Update the UI with scene data
+        self.scene_id_var.set(scene['id'])
+        self.scene_name_var.set(scene['name'])
+        self.scene_desc_text.delete('1.0', tk.END)
+        self.scene_desc_text.insert('1.0', scene.get('description', ''))
+        self.update_scene_contents(scene)
 
     def on_character_select(self, event=None):
-        self.store_selection(self.chars_listbox, '_current_char_selection')
-        if selection := self.get_current_selection('_current_char_selection'):
-            char_id = list(self.characters_data.keys())[selection]
-            character = self.characters_data[char_id]
-            self.update_character_editor(char_id, character)
+        """Handle character selection"""
+        # Get current selection
+        selection = self.chars_listbox.curselection()
+        if selection is None or len(selection) == 0:
+            return
+            
+        # Store the selection
+        self._current_char_selection = selection[0]
+        
+        # Get the selected character
+        char_id = list(self.characters_data.keys())[selection[0]]
+        character = self.characters_data[char_id]
+        
+        # Update UI with character data
+        self.char_id_var.set(char_id)
+        self.char_name_var.set(character.get('name', ''))
+        self.char_type_var.set(character.get('type', 'neutral'))
+        
+        self.char_desc_text.delete('1.0', tk.END)
+        self.char_desc_text.insert('1.0', character.get('description', ''))
+
+        # Update greeting/dialogue
+        self.char_greeting_text.delete('1.0', tk.END)
+        self.char_greeting_text.insert('1.0', character.get('greeting', ''))
+
+        # Update dialogue options
+        self.dialogue_options_list.delete(0, tk.END)
+        for option_text in character.get('dialogue_options', {}).keys():
+            self.dialogue_options_list.insert(tk.END, option_text)
+
+        # Update stats tree
+        self.update_character_stats_display(character)
 
     def on_item_select(self, event=None):
-        self.store_selection(self.items_listbox, '_current_item_selection')
-        if selection := self.get_current_selection('_current_item_selection'):
-            item_id = list(self.items_data.keys())[selection]
-            item = self.items_data[item_id]
-            self.update_item_editor(item_id, item)
+        """Handle item selection"""
+        # Get current selection
+        selection = self.items_listbox.curselection()
+        if selection is None or len(selection) == 0:
+            return
+            
+        # Store the selection
+        self._current_item_selection = selection[0]
+        
+        # Get the selected item
+        item_id = list(self.items_data.keys())[selection[0]]
+        item = self.items_data[item_id]
+        
+        # Update UI with item data
+        self.item_id_var.set(item_id)
+        self.item_name_var.set(item.get('name', ''))
+        self.item_type_var.set(item.get('type', 'Regular'))
+        
+        # Update flags
+        self.item_usable_var.set(item.get('usable', False))
+        self.item_equippable_var.set(item.get('equippable', False))
+        self.item_consumable_var.set(item.get('consumable', False))
+        
+        # Update description
+        self.item_desc_text.delete('1.0', tk.END)
+        self.item_desc_text.insert('1.0', item.get('description', ''))
+        
+        # Update effects list
+        self.effects_list.delete(0, tk.END)
+        if 'effects' in item:
+            for effect_type, effect_data in item['effects'].items():
+                if isinstance(effect_data, dict):
+                    value = effect_data.get('value', '')
+                    duration = effect_data.get('duration', 'permanent')
+                    self.effects_list.insert(tk.END, f"{effect_type}: {value} ({duration})")
+                else:
+                    self.effects_list.insert(tk.END, f"{effect_type}: {effect_data}")
+        
+        # Update components list
+        self.components_list.delete(0, tk.END)
+        for component_id in item.get('components', []):
+            if component := self.items_data.get(component_id):
+                self.components_list.insert(tk.END, f"{component['name']} ({component_id})")
+            else:
+                self.components_list.insert(tk.END, f"Unknown item ({component_id})")
 
     @safe_operation
     def undo(self):
@@ -1623,7 +1722,29 @@ class GameDataEditor:
         except Exception as e:
             self.show_error_dialog(f"Error saving data: {str(e)}")
 
+    def save_current_scene(self):
+        """Save the currently selected scene"""
+        if not (selection := self.scenes_listbox.curselection()):
+            return
 
+        scene = self.scenes_data[selection[0]]
+        
+        # Store old data for undo
+        old_scene = scene.copy()
+        
+        # Update scene data
+        scene.update({
+            'name': self.scene_name_var.get(),
+            'description': self.scene_desc_text.get('1.0', tk.END).strip()
+        })
+
+        self.add_undo_action('modify', 'scenes',
+                            {'id': scene['id'], 'data': old_scene},
+                            {'id': scene['id'], 'data': scene.copy()},
+                            f"Modified scene {scene['name']}")
+
+        self.modified.add('scenes')
+        self.update_status(f"Saved scene {scene['name']}")
 
     def save_scenes(self):
         os.makedirs('game_files/scenes', exist_ok=True)
@@ -1756,8 +1877,11 @@ class GameDataEditor:
         # Add buttons frame at the top
         buttons_frame = ttk.Frame(self.tabs['scenes'])
         buttons_frame.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Button(buttons_frame, text="Add Scene", command=self.add_scene).pack(side=tk.LEFT, padx=2)
-
+        ttk.Button(buttons_frame, text="Add Scene", command=self.add_scene).pack(side=tk.LEFT, padx=2),
+        # Add Save Scene button
+        ttk.Button(buttons_frame, text="Save Scene", 
+                  command=self.save_current_scene).pack(side=tk.LEFT, padx=2)  
+        
         # Create the main layout
         self.scenes_listbox, editor_frame = self.create_tab_layout(
             self.tabs['scenes'], 
@@ -1826,6 +1950,7 @@ class GameDataEditor:
         ttk.Button(exit_buttons, text="Add Exit", command=self.add_exit).pack(side=tk.LEFT, padx=2)
         ttk.Button(exit_buttons, text="Edit Exit", command=self.edit_exit).pack(side=tk.LEFT, padx=2)
         ttk.Button(exit_buttons, text="Remove Exit", command=self.remove_exit).pack(side=tk.LEFT, padx=2)
+  
 
         # Bindings
         self.scenes_listbox.bind('<<ListboxSelect>>', self.on_scene_select)
@@ -2040,10 +2165,10 @@ class GameDataEditor:
         stats_frame = ttk.Frame(notebook)
         notebook.add(stats_frame, text="Stats")
 
-        # Stats Treeview with proper columns
-        self.stats_tree = ttk.Treeview(stats_frame, columns=("name", "value"), show="tree headings")
-        self.stats_tree.heading("name", text="Value")
-        self.stats_tree.heading("value", text="New Value")
+        # Stats Treeview with two columns
+        self.stats_tree = ttk.Treeview(stats_frame, columns=("name", "value"), show="headings")
+        self.stats_tree.heading("name", text="Stat Name")
+        self.stats_tree.heading("value", text="Value")
         self.stats_tree.column("name", width=150)
         self.stats_tree.column("value", width=100)
         self.stats_tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
@@ -4059,24 +4184,40 @@ class GameDataEditor:
         self.scenes_listbox.delete(0, tk.END)
         for scene in self.scenes_data:
             self.scenes_listbox.insert(tk.END, scene['name'])
+        # Select first item if list not empty
+        if self.scenes_listbox.size() > 0:
+            self.scenes_listbox.selection_set(0)
+            self.on_scene_select()         
 
     def refresh_items_list(self):
         """Refresh items listbox"""
         self.items_listbox.delete(0, tk.END)
         for item_id, item in self.items_data.items():
             self.items_listbox.insert(tk.END, item.get('name', item_id))
+        # Select first item if list not empty
+        if self.items_listbox.size() > 0:
+            self.items_listbox.selection_set(0)
+            self.on_item_select()
 
     def refresh_characters_list(self):
         """Refresh characters listbox"""
         self.chars_listbox.delete(0, tk.END)
         for char_id, char in self.characters_data.items():
             self.chars_listbox.insert(tk.END, char.get('name', char_id))
+        # Select first item if list not empty
+        if self.chars_listbox.size() > 0:
+            self.chars_listbox.selection_set(0)
+            self.on_character_select()
 
     def refresh_story_texts_list(self):
         """Refresh story texts listbox"""
         self.story_texts_listbox.delete(0, tk.END)
         for text_key in self.story_texts_data:
             self.story_texts_listbox.insert(tk.END, text_key)
+        # Select first item if list not empty
+        if self.story_texts_listbox.size() > 0:
+            self.story_texts_listbox.selection_set(0)
+            self.on_story_text_select()
 
     def filter_scenes(self):
         """Filter scenes listbox based on search text"""

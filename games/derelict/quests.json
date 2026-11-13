@@ -1,0 +1,89 @@
+{
+  "main": {
+    "title": "Abandon Ship (Eventually)",
+    "description": "Everyone else left three days ago. Time you did too.",
+    "auto_start": true,
+    "stages": [
+      {
+        "id": "leave",
+        "text": "Get out of the utility room",
+        "done_when": "visited:corridor"
+      },
+      {
+        "id": "power",
+        "text": "Restore main power: the reactor needs its fission relay",
+        "done_when": "reactor_online"
+      },
+      {
+        "id": "bridge",
+        "text": "Take the turbolift up to the bridge",
+        "done_when": "visited:bridge"
+      },
+      {
+        "id": "escape",
+        "text": "Get off the Marigold: by pod, by distress call, or by flying her home",
+        "done_when": "never"
+      }
+    ],
+    "complete_on_win": true
+  },
+  "pest": {
+    "title": "Pest Control",
+    "description": "A bugrat has nested in the hatch and will not let you past.",
+    "auto_start": true,
+    "stages": [
+      {
+        "text": "Deal with the bugrat: drive it off, or bribe it",
+        "done_when": {
+          "any": [
+            "mutated_bugrat_defeated",
+            "bugrat_fed"
+          ]
+        }
+      }
+    ]
+  },
+  "chip": {
+    "title": "A Chip Off the Old Block",
+    "description": "The Nexus terminal will trade a secret for a working logic chip.",
+    "stages": [
+      {
+        "text": "Repair the terminal's broken logic chip",
+        "done_when": {
+          "any": [
+            "has:fixed_chip",
+            "chip_installed"
+          ]
+        }
+      },
+      {
+        "text": "Give the fixed chip to the terminal",
+        "done_when": "chip_installed"
+      }
+    ]
+  },
+  "remote": {
+    "title": "Citrus Power",
+    "description": "Bolt can build a remote override for the security droid.",
+    "stages": [
+      {
+        "text": "Bring Bolt a length of wire and something acidic",
+        "done_when": "remote_built"
+      }
+    ]
+  },
+  "fruit": {
+    "title": "Comparable Spirit",
+    "description": "The replicator will copy anything you give it. Approximately.",
+    "stages": [
+      {
+        "text": "Give the replicator a sample to copy",
+        "done_when": "replicated_once"
+      },
+      {
+        "text": "Bring it a proper specimen for 'real science'",
+        "done_when": "goo_made"
+      }
+    ]
+  }
+}

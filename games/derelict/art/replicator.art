@@ -1,0 +1,17 @@
+@color brown
+@palette
+l = bmagenta
+s = steel
+@art
+   _____
+  /_____\
+ | o   o |
+ |  ___  |
+ | |___| |
+ '-------'
+@mask
+
+
+   l   l
+    sss
+   sssss

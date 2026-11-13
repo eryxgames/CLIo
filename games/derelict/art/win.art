@@ -1,0 +1,18 @@
+@color bwhite
+@palette
+s = byellow
+h = sky
+@art
+        *        .       *
+   .        __
+        ___/  \___      .
+  *    <___ () ___>   *
+           \__/
+      .          *
+@mask
+        s        s       s
+   s        hh
+        hhhhhhhhhh      s
+  s    hhhhhhhhhhhh   s
+           hhhh
+      s          s

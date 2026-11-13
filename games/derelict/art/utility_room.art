@@ -1,0 +1,18 @@
+@color steel
+@palette
+r = rust
+c = ice
+z = b white
+@art
+ _____________________________
+|  ___   ___  |   .-------.   |
+| |   | |   | |  /  z Z z  \  |
+| | : | | : | | |   _____   | |
+| |___| |___| | |  |_____|  | |
+|_____________|_|___________|_|
+@mask
+
+   rrr   rrr      ccccccccc
+  r   r r   r    c  z z z  c
+  r r r r r r   c   ccccc   c
+  rrrrr rrrrr   c  ccccccc  c

@@ -1,0 +1,19 @@
+@color green
+@palette
+f = byellow
+w = sky
+t = steel
+@art
+   \|/    \|/     \|/    \|/
+  --*--  --*--   --*--  --*--
+   /|\    /|\     /|\    /|\
+  __|______|_______|______|__
+ |~~~~~~~~~~~~~~~~~~~~~~~~~~~|
+ |___________________________|
+@mask
+
+    f      f       f      f
+
+  ttttttttttttttttttttttttttt
+ twwwwwwwwwwwwwwwwwwwwwwwwwwwt
+ ttttttttttttttttttttttttttttt

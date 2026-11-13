@@ -1,0 +1,30 @@
+{
+  "hollow_king": {
+    "palette": {
+      "y": "#e8b830",
+      "r": "#ff5a1f",
+      "a": "#1c1a22",
+      "A": "#5b5564",
+      "e": "#ffb347",
+      "m": "#0c0b10"
+    },
+    "pixels": [
+      "..y..y.yy.y..y..",
+      "..yyyyyyyyyyyy..",
+      "..yryyryyryyry..",
+      "...aaaaaaaaaa...",
+      "..aAAAAAAAAAAa..",
+      "..aAeeAAAAeeAa..",
+      "..aAAAAmmAAAAa..",
+      "...aAAmmmmAAa...",
+      ".aaaaAAAAAAaaaa.",
+      "aAAAaAAAAAAaAAAa",
+      "aAAAaAArrAAaAAAa",
+      "aAAa.aAAAAa.aAAa",
+      ".aa..aAAAAa..aa.",
+      ".....aAaaAa.....",
+      "....aAAa.aAAa...",
+      "....aaaa.aaaa..."
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+@color silver
+@palette
+e = bcyan
+c = amber
+@art
+   .---.
+  [ o o ]
+   | ^ |
+ .-'---'-.
+ | [===] |
+ '-|---|-'
+@mask
+
+    e e
+
+
+   ccccc

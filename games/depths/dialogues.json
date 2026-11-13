@@ -1,0 +1,100 @@
+{
+  "maren": {
+    "start": [
+      {
+        "if": "talked:maren",
+        "node": "again"
+      },
+      "hello"
+    ],
+    "nodes": {
+      "hello": {
+        "text": "So you are the one. $player, is it? Smaller than I hoped. The Hollow King took our Ember Crown down those stairs a hundred years ago, and Emberfall has not been warm since.",
+        "do": [
+          {
+            "quest": [
+              "crown",
+              "start"
+            ]
+          }
+        ],
+        "goto": "menu"
+      },
+      "again": {
+        "text": "Still here? The crown will not climb up on its own.",
+        "goto": "menu"
+      },
+      "menu": {
+        "choices": [
+          {
+            "text": "What is down there?",
+            "say": "Three floors. The Crypt, where we buried our dead. The Vaults, where the river got in. And the Court, where he sits. Each stair down has a keeper, and none of them are friendly."
+          },
+          {
+            "text": "Any advice?",
+            "say": "Watch what a thing is about to do before you swing at it. Guard when it winds up. Pray at the shrines - a candle still burning down there is a candle worth kneeling to. And mind the peddler's prices."
+          },
+          {
+            "text": "Can you spare anything?",
+            "once": true,
+            "say": "One draught. I was saving it for my knees.",
+            "do": [
+              {
+                "give": "healing_draught"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "tallow": {
+    "start": "hello",
+    "nodes": {
+      "hello": {
+        "text": "Customer! Welcome, welcome. Tallow has everything. Tallow has most things. Tallow has some things.",
+        "choices": [
+          {
+            "text": "Show me your wares.",
+            "do": [
+              {
+                "shop": "merchant"
+              }
+            ]
+          },
+          {
+            "text": "How do you survive down here?",
+            "once": true,
+            "say": "Nobody eats the peddler. Professional courtesy."
+          },
+          {
+            "text": "What lies ahead?",
+            "say": "The stair down is always the furthest room from the stair up. Old builders' rule. And always, always something is sitting on it."
+          }
+        ]
+      }
+    }
+  },
+  "warden": {
+    "start": "hello",
+    "nodes": {
+      "hello": {
+        "text": "It does not speak. It lowers its halberd across the stair, slowly, the way a gate closes.",
+        "choices": [
+          {
+            "text": "Attack.",
+            "tag": "fight",
+            "do": [
+              {
+                "end_dialogue": true
+              },
+              {
+                "fight": "bone_warden"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "intro": {
+    "text": "Twenty minutes, you told the cryo-nap pod. Just twenty minutes, to get through the end of a long shift.\n\nThe timer on the lid reads three days and four hours. The ship is very quiet.",
+    "show_once": true
+  },
+  "outro_lose": {
+    "text": "Your adventure ends here, in the dark, aboard a ship nobody is coming back for. The Marigold drifts on. Better luck next time.",
+    "show_once": false
+  },
+  "outro_pod": {
+    "text": "The rails fire and the Marigold falls away behind you, small and patient against the stars. The pod is cramped, the rations are older than you are, and the beacon is working.\n\nSix hours later a salvage tug picks you up. Its captain wants to know whether there is anything left aboard worth going back for. You think of a robot, a replicator and a ship with a dry sense of humour, and you say: yes. Quite a lot.",
+    "show_once": false
+  },
+  "outro_rescue": {
+    "text": "The signal goes out, and for a long hour nothing comes back. Then: 'Marigold, this is the shuttle. Is that our tech? We thought you were storage.'\n\nThey come about. The captain's cat inspects you on the dock, unimpressed. Behind you, a tug is already lining up to tow the old ship to a higher orbit. MARIGOLD's last message scrolls across your communicator: 'Complaint upheld. Welcome back.'",
+    "show_once": false
+  },
+  "outro_pilot": {
+    "text": "You sit in the captain's chair. It is too big for you. You point the pointed end where you want to go.\n\nThe Marigold shudders, thinks about it, and climbs - out of the thin air, out of the well, the planet shrinking to a marble behind you. 'Not bad,' says MARIGOLD, 'for someone who was listed as storage.'\n\nThree days later you bring her into dock yourself, scraping only a little paint. The crew are waiting. So is the bill for the paint.",
+    "show_once": false
+  }
+}

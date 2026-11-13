@@ -1,0 +1,13 @@
+@color silver
+@palette
+f = byellow
+@art
+      .
+     /|\
+    ( * )
+   __\|/__
+  |_______|
+@mask
+      f
+     fff
+      f

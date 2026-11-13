@@ -1,0 +1,17 @@
+@color darkgray
+@palette
+f = orange
+c = gold
+@art
+         /\  /\  /\
+        /__\/__\/__\
+         |  ____  |
+    |\   | |    | |   /|
+    | \__|_|____|_|__/ |
+    |__________________|
+@mask
+         cc  cc  cc
+        cccccccccccc
+            ffff
+           f    f
+            ffff

@@ -1,0 +1,20 @@
+@color steel
+@palette
+s = bwhite
+p = teal
+l = amber
+@art
+  .---------------------------.
+ /   *        .          *     \
+|        *         _..._        |
+|   .            .'     '.   *  |
+|_______________/_________\_____|
+ \  [==] [==]  [__]  [==] [==]  /
+  '---------------------------'
+@mask
+
+     s        s          s
+         s         ppppp
+    s            pp     pp   s
+                p         p
+    llll llll  llll  llll llll

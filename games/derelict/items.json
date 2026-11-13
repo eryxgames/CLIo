@@ -1,0 +1,695 @@
+{
+  "bent_wire": {
+    "name": "Bent Wire",
+    "aliases": [
+      "wire",
+      "lockpick"
+    ],
+    "lockpick": true,
+    "tool": true,
+    "description": "A bent length of stiff wire. Useless for its original purpose, whatever that was; promising for picking locks."
+  },
+  "ship_log": {
+    "name": "Ship Log",
+    "aliases": [
+      "log"
+    ],
+    "description": "A scuffed datapad holding the Marigold's log.",
+    "readable_item": "CHX-7 MARIGOLD - LOG, FINAL ENTRIES\n\nDay 211. Bugrats in the vents again. Cook says they will do anything for fruit. Cook would know.\n\nDay 213. Security unit 4 is running hot and has started confiscating things. Yesterday: the chef's knives. Today: the chief's lunch.\n\nDay 214. The Nexus terminal in storage cracked its logic chip and now speaks only in warnings. Shame - it is the only thing aboard that remembers the code to the captain's suitcase, and her spare passcard is inside.\n\nDay 215. Unit 4 has confiscated the reactor's fission relay as 'unregistered nuclear material'. Reactor is down. Captain has ordered everyone to the shuttle. We'll send someone back for the tech in the utility closet. Probably."
+  },
+  "broken_communicator": {
+    "name": "Broken Communicator",
+    "aliases": [
+      "communicator",
+      "comm"
+    ],
+    "description": "A handheld communicator with a dead screen. The power pack has burned out.",
+    "readable_item": "A label on the back reads: IN CASE OF POWER FAILURE, REPLACE ENERGY CELLS. DO NOT LICK."
+  },
+  "rusty_metal_locker": {
+    "name": "Rusty Metal Locker",
+    "description": "A dented locker, more rust than metal. The lock is a cheap one.",
+    "interactive": true,
+    "current_state": "locked",
+    "states": {
+      "locked": {
+        "description": "It is locked.",
+        "action": "unlock",
+        "next_state": "closed"
+      },
+      "closed": {
+        "description": "It is closed.",
+        "action": "open",
+        "next_state": "open",
+        "do": [
+          {
+            "set": "locker_opened"
+          }
+        ]
+      },
+      "open": {
+        "description": "It stands open.",
+        "action": "take",
+        "next_state": "empty"
+      },
+      "empty": {
+        "description": "It is open and empty.",
+        "action": null,
+        "next_state": null
+      }
+    },
+    "contents": [
+      "screwdriver",
+      "red_apple"
+    ],
+    "aliases": [
+      "locker"
+    ],
+    "lock_text": "The locker is locked. The lock looks cheap - something thin and stiff might pick it."
+  },
+  "metal_suitcase": {
+    "name": "Metal Suitcase",
+    "description": "A sturdy metal suitcase with a three-digit combination lock and the captain's initials.",
+    "interactive": true,
+    "current_state": "locked",
+    "states": {
+      "locked": {
+        "description": "It is locked.",
+        "action": "unlock",
+        "next_state": "closed"
+      },
+      "closed": {
+        "description": "It is closed.",
+        "action": "open",
+        "next_state": "open",
+        "do": [
+          {
+            "set": "suitcase_opened"
+          }
+        ]
+      },
+      "open": {
+        "description": "It stands open.",
+        "action": "take",
+        "next_state": "empty"
+      },
+      "empty": {
+        "description": "It is open and empty.",
+        "action": null,
+        "next_state": null
+      }
+    },
+    "contents": [
+      "passcard"
+    ],
+    "aliases": [
+      "suitcase",
+      "case"
+    ],
+    "unlock_required_item": "passcode",
+    "passcode": "735"
+  },
+  "cryo_pod": {
+    "name": "Cryo-Nap Pod",
+    "aliases": [
+      "pod",
+      "cryo pod",
+      "cryo"
+    ],
+    "scenery": true,
+    "takeable": false,
+    "description": "Standard-issue cryo-nap pod, 'for the well-rested technician'. Its timer reads 3 DAYS, 4 HOURS. You set it for twenty minutes.",
+    "actions": {
+      "use": "You have slept quite enough.",
+      "enter": "You have slept quite enough.",
+      "open": "It hisses open. Still cold. Still tempting. No."
+    }
+  },
+  "screwdriver": {
+    "name": "Screwdriver",
+    "equippable": true,
+    "slot": "weapon",
+    "tool": true,
+    "effect": {
+      "attack": 2
+    },
+    "description": "A standard screwdriver. Powered by clean, nuclear energy. Discharged, so you will have to turn it yourself."
+  },
+  "red_apple": {
+    "name": "Red Apple",
+    "aliases": [
+      "apple"
+    ],
+    "usable": true,
+    "effect": {
+      "health": 10
+    },
+    "description": "A vibrant red apple, only slightly wrinkled.",
+    "use_text": "You eat the red apple. Crisp."
+  },
+  "passcard": {
+    "name": "Maintenance Passcard",
+    "aliases": [
+      "passcard",
+      "card"
+    ],
+    "key": true,
+    "description": "Universal access passcard for technical personnel. The photo is of the captain, scowling."
+  },
+  "storage_room_key": {
+    "name": "Storage Room Key",
+    "aliases": [
+      "key"
+    ],
+    "key": true,
+    "description": "An old-fashioned brass key, lightly chewed."
+  },
+  "broken_chip": {
+    "name": "Broken Chip",
+    "aliases": [
+      "chip",
+      "logic chip"
+    ],
+    "repairable": true,
+    "repair_item": "screwdriver",
+    "repaired_item": "fixed_chip",
+    "description": "A logic chip with a cracked housing and one pin bent flat. Nothing a steady hand and a screwdriver couldn't fix.",
+    "repair_text": "You pry the housing straight, ease the bent pin upright and screw it all back together. You now have: {item}Fixed Chip{/}."
+  },
+  "fixed_chip": {
+    "name": "Fixed Chip",
+    "aliases": [
+      "chip",
+      "logic chip"
+    ],
+    "description": "A logic chip, repaired. It would pass inspection from a distance."
+  },
+  "energy_cells": {
+    "name": "Energy Cells",
+    "aliases": [
+      "cells",
+      "batteries",
+      "battery"
+    ],
+    "description": "A sealed pack of high-energy cells for powering small devices."
+  },
+  "first_aid_kit": {
+    "name": "First Aid Kit",
+    "aliases": [
+      "medkit",
+      "kit"
+    ],
+    "usable": true,
+    "effect": {
+      "health": 40
+    },
+    "description": "Medical supplies. The instructions are a single pictogram: thumbs up.",
+    "use_text": "You patch yourself up with the first aid kit."
+  },
+  "torn_spacesuit": {
+    "name": "Torn Spacesuit",
+    "aliases": [
+      "spacesuit",
+      "suit"
+    ],
+    "equippable": true,
+    "slot": "body",
+    "effect": {
+      "defense": 3
+    },
+    "description": "A pressure suit with a hand-long tear along one seam. Decent padding; no good in vacuum until that tear is sealed with something sticky."
+  },
+  "patched_spacesuit": {
+    "name": "Patched Spacesuit",
+    "aliases": [
+      "spacesuit",
+      "suit"
+    ],
+    "equippable": true,
+    "slot": "body",
+    "effect": {
+      "defense": 6
+    },
+    "components": [
+      "torn_spacesuit",
+      "blob_of_goo"
+    ],
+    "combine_text": "You smear the goo along the torn seam. It sets hard in seconds, with a smell you will remember. You now have: {item}Patched Spacesuit{/}.",
+    "description": "A pressure suit, sealed along one seam with something green and unspeakable. It holds air. Wear it before you go anywhere airless."
+  },
+  "supply_crate": {
+    "name": "Supply Crate",
+    "description": "A steel crate stencilled TOOLS - AUTHORIZED PERSONNEL. It has a simple pin lock.",
+    "interactive": true,
+    "current_state": "locked",
+    "states": {
+      "locked": {
+        "description": "It is locked.",
+        "action": "unlock",
+        "next_state": "closed"
+      },
+      "closed": {
+        "description": "It is closed.",
+        "action": "open",
+        "next_state": "open",
+        "do": [
+          {
+            "set": "crate_opened"
+          }
+        ]
+      },
+      "open": {
+        "description": "It stands open.",
+        "action": "take",
+        "next_state": "empty"
+      },
+      "empty": {
+        "description": "It is open and empty.",
+        "action": null,
+        "next_state": null
+      }
+    },
+    "contents": [
+      "plasma_cutter"
+    ],
+    "aliases": [
+      "crate"
+    ],
+    "lock_text": "The crate is locked. The lock is a simple one, if you had something to pick it with."
+  },
+  "plasma_cutter": {
+    "name": "Plasma Cutter",
+    "aliases": [
+      "cutter"
+    ],
+    "equippable": true,
+    "slot": "weapon",
+    "effect": {
+      "attack": 8
+    },
+    "abilities": [
+      "overcharge"
+    ],
+    "description": "A heavy cutting tool with a regulator dial that goes one notch past SAFE."
+  },
+  "coolant_canister": {
+    "name": "Coolant Canister",
+    "aliases": [
+      "coolant",
+      "canister"
+    ],
+    "description": "A frosted canister of reactor-grade coolant. Good for anything that is running too hot."
+  },
+  "minty_coolant": {
+    "name": "Minty Coolant",
+    "aliases": [
+      "coolant",
+      "canister",
+      "mint"
+    ],
+    "description": "A replicated canister of coolant. It is the right temperature and the wrong colour, and it smells of toothpaste."
+  },
+  "blue_apple": {
+    "name": "Blue Apple",
+    "aliases": [
+      "apple"
+    ],
+    "usable": true,
+    "effect": {
+      "health": 15
+    },
+    "description": "A vibrant blue apple, fresh off an experimental tree.",
+    "use_text": "You eat the blue apple. It tastes like blue."
+  },
+  "blue_banana": {
+    "name": "Blue Banana",
+    "aliases": [
+      "banana"
+    ],
+    "usable": true,
+    "effect": {
+      "health": 10
+    },
+    "description": "A vibrant blue banana. It looks like plastic, and probably tastes like it too.",
+    "use_text": "You eat the blue banana. It does."
+  },
+  "red_orange": {
+    "name": "Red Orange",
+    "aliases": [
+      "orange"
+    ],
+    "usable": true,
+    "effect": {
+      "health": 15
+    },
+    "description": "A vibrant red orange. It looks a bit odd, and smells sharply of citrus.",
+    "use_text": "You eat the red orange. Sour enough to power a small appliance."
+  },
+  "glass_container": {
+    "name": "Glass Container",
+    "aliases": [
+      "container",
+      "jar"
+    ],
+    "interactive": true,
+    "description": "A sealed specimen jar on the lab bench.",
+    "current_state": "closed",
+    "states": {
+      "closed": {
+        "description": "Something pale floats inside.",
+        "action": "open",
+        "next_state": "open"
+      },
+      "open": {
+        "description": "The lid is off.",
+        "action": "take",
+        "next_state": "empty"
+      },
+      "empty": {
+        "description": "It is empty.",
+        "action": null,
+        "next_state": null
+      }
+    },
+    "contents": [
+      "specimen"
+    ]
+  },
+  "specimen": {
+    "name": "Specimen",
+    "description": "A mysterious specimen. It may once have been a vegetable. It may have plans."
+  },
+  "blob_of_goo": {
+    "name": "Blob of Goo",
+    "aliases": [
+      "goo",
+      "blob"
+    ],
+    "description": "A mysterious blob of goo. Squishy, sticky, and it sets like epoxy on whatever it touches."
+  },
+  "battered_crowbar": {
+    "name": "Battered Crowbar",
+    "aliases": [
+      "crowbar"
+    ],
+    "equippable": true,
+    "slot": "weapon",
+    "tool": true,
+    "effect": {
+      "attack": 5
+    },
+    "description": "A sturdy but worn crowbar. Feels familiar."
+  },
+  "fission_relay": {
+    "name": "Fission Relay",
+    "aliases": [
+      "relay"
+    ],
+    "description": "A fist-sized fission relay, warm to the touch. The reactor will not start without it."
+  },
+  "reactor": {
+    "name": "Reactor",
+    "aliases": [
+      "relay socket",
+      "socket",
+      "engine"
+    ],
+    "takeable": false,
+    "interactive": true,
+    "description": "The Marigold's reactor.",
+    "current_state": "dead",
+    "states": {
+      "dead": {
+        "description": "It is cold and dark. The relay socket is empty."
+      },
+      "online": {
+        "description": "It is running, relay seated, casting blue light across the room."
+      }
+    },
+    "actions": {
+      "use": [
+        {
+          "if": "reactor_online",
+          "text": "It is already running. Best not to fiddle."
+        },
+        {
+          "text": "Nothing happens. The relay socket is empty."
+        }
+      ]
+    },
+    "use_with": {
+      "fission_relay": {
+        "text": "You seat the relay in its socket and throw the breaker. For a long second nothing happens. Then, deep in the deck, something enormous clears its throat.",
+        "consume": true,
+        "next_state": "online",
+        "sfx": "power",
+        "do": [
+          {
+            "set": "reactor_online"
+          },
+          {
+            "say": "Lights stutter on, deck by deck. The Marigold is awake.",
+            "style": "story",
+            "effect": "glitch"
+          },
+          {
+            "music": "powered"
+          }
+        ]
+      },
+      "coolant_canister": {
+        "if": "reactor_online",
+        "else": "Pouring coolant into a dead reactor would be a waste. Get it running first.",
+        "text": "You hook the canister to the coolant loop. Gauges that have sat in the red for years drift gently into the green.",
+        "consume": true,
+        "sfx": "heal",
+        "do": [
+          {
+            "set": "reactor_stable"
+          },
+          {
+            "say": "The reactor is stable. {hint}The Marigold could fly again - with a pilot.{/}",
+            "style": "success"
+          }
+        ]
+      },
+      "minty_coolant": {
+        "if": "reactor_online",
+        "else": "Pouring coolant into a dead reactor would be a waste. Get it running first.",
+        "text": "You hook the canister to the coolant loop. Gauges that have sat in the red for years drift gently into the green.",
+        "consume": true,
+        "sfx": "heal",
+        "do": [
+          {
+            "set": "reactor_stable"
+          },
+          {
+            "say": "The reactor is stable. {hint}The Marigold could fly again - with a pilot.{/}",
+            "style": "success"
+          }
+        ]
+      }
+    }
+  },
+  "captain_console": {
+    "name": "Captain's Console",
+    "aliases": [
+      "console",
+      "comm array",
+      "panel"
+    ],
+    "takeable": false,
+    "description": "The captain's console. Most of it works. The long-range comm array reads FAULT, but there is a cradle here for a handheld communicator.",
+    "actions": {
+      "use": "The helm is locked to the ship's AI and the comm array is dead. There is a cradle for a handheld communicator, though."
+    },
+    "use_with": {
+      "working_communicator": {
+        "text": "You dock the communicator in the cradle. The console borrows its transmitter, clears its throat with a burst of static, and starts to shout into the dark: MAYDAY, MAYDAY, MAYDAY.",
+        "sfx": "computer",
+        "do": [
+          {
+            "win": "outro_rescue"
+          }
+        ]
+      },
+      "broken_communicator": "You dock the communicator. Nothing. It is still dead - it needs fresh energy cells first."
+    }
+  },
+  "chx_cargo_hauler_manual": {
+    "name": "CHX Cargo Hauler Manual",
+    "aliases": [
+      "manual",
+      "book",
+      "guide"
+    ],
+    "description": "A user guide for the CHX cargo hauler, with numbered illustrations but still heavy reading.",
+    "readable_item": "CHX-SERIES CARGO HAULER - OPERATOR'S MANUAL\n\nChapter 1: Congratulations on your purchase.\n\nChapter 4: Flying. Point the pointed end where you want to go. The ship's mind does the rest, provided the reactor is running COOL and STABLE. Never attempt a burn on a hot reactor.\n\nChapter 9: Landing. See Chapter 4, but slower.\n\nYou read all 312 pages. You feel no wiser, but you could now bluff your way through a conversation about it.",
+    "on_read": [
+      {
+        "set": "manual_read"
+      }
+    ]
+  },
+  "torn_research_paper": {
+    "name": "Torn Research Paper",
+    "aliases": [
+      "paper",
+      "research"
+    ],
+    "description": "A torn research paper on quantum drive travel, stained with an unidentified liquid. Hopefully coffee.",
+    "readable_item": "...the quantum drive does not move the ship so much as persuade the universe that the ship was always somewhere else. Side effects observed in test cargo include fruit of unexpected colours and, in one case, a pest species of unusual size and appetite.\n\nRecommendation: do NOT store the test cargo near hydroponics.\n\n(A note in the margin, in the captain's hand: 'Too late.')"
+  },
+  "captains_photo": {
+    "name": "Captain's Photo",
+    "aliases": [
+      "photo",
+      "picture"
+    ],
+    "description": "A framed photo of a very smug orange cat.",
+    "readable_item": "On the back, in careful handwriting: 'Rosebud, 3rd birthday. Best crew member I ever had.'"
+  },
+  "footlocker": {
+    "name": "Footlocker",
+    "aliases": [
+      "locker",
+      "chest"
+    ],
+    "takeable": false,
+    "interactive": true,
+    "description": "The captain's footlocker.",
+    "current_state": "sealed",
+    "states": {
+      "sealed": {
+        "description": "The lid has rusted shut. It would take leverage to open.",
+        "actions": {
+          "open": "The lid is rusted shut. You strain at it and achieve nothing but a sore thumb. It needs prying."
+        }
+      },
+      "open": {
+        "description": "The lid hangs open on one hinge.",
+        "actions": {
+          "open": "It is already open."
+        }
+      }
+    },
+    "use_with": {
+      "battered_crowbar": {
+        "if": {
+          "item_state": [
+            "footlocker",
+            "sealed"
+          ]
+        },
+        "else": "You have already forced it open.",
+        "text": "You wedge the crowbar under the lid and lean. Rust shrieks, and the lid gives way.",
+        "next_state": "open",
+        "sfx": "open",
+        "do": [
+          {
+            "set": "footlocker_opened"
+          },
+          {
+            "add_item": "data_storage"
+          },
+          {
+            "say": "Inside, under a spare uniform: a {item}Data Storage{/} unit.",
+            "style": "item"
+          }
+        ]
+      }
+    }
+  },
+  "data_storage": {
+    "name": "Data Storage",
+    "aliases": [
+      "data",
+      "black box",
+      "storage unit"
+    ],
+    "description": "A sealed data storage unit marked FLIGHT RECORDER BACKUP. The ship's AI could probably read it."
+  },
+  "escape_pod": {
+    "name": "Escape Pod",
+    "aliases": [
+      "pod"
+    ],
+    "takeable": false,
+    "description": "A one-person escape pod, older than you are. A placard reads: IN EMERGENCY, ENTER POD. IN DOUBT, ALSO ENTER POD.",
+    "actions": {
+      "use": [
+        {
+          "if": "pod_authorized",
+          "text": "You fold yourself into the pod and pull the hatch down. The launch rails begin to hum.",
+          "do": [
+            {
+              "win": "outro_pod"
+            }
+          ]
+        },
+        {
+          "text": "You climb in and press LAUNCH. A polite voice says: 'Launch not authorized. Please consult the ship's mind.' You climb back out."
+        }
+      ],
+      "enter": [
+        {
+          "if": "pod_authorized",
+          "text": "You fold yourself into the pod and pull the hatch down. The launch rails begin to hum.",
+          "do": [
+            {
+              "win": "outro_pod"
+            }
+          ]
+        },
+        {
+          "text": "You climb in and press LAUNCH. A polite voice says: 'Launch not authorized. Please consult the ship's mind.' You climb back out."
+        }
+      ],
+      "launch": [
+        {
+          "if": "pod_authorized",
+          "text": "You fold yourself into the pod and pull the hatch down. The launch rails begin to hum.",
+          "do": [
+            {
+              "win": "outro_pod"
+            }
+          ]
+        },
+        {
+          "text": "A polite voice says: 'Launch not authorized. Please consult the ship's mind.'"
+        }
+      ]
+    }
+  },
+  "working_communicator": {
+    "name": "Working Communicator",
+    "aliases": [
+      "communicator",
+      "comm"
+    ],
+    "components": [
+      "broken_communicator",
+      "energy_cells"
+    ],
+    "combine_text": "You snap the fresh cells into the communicator. The screen blinks, sulks, and lights up. You now have: {item}Working Communicator{/}.",
+    "description": "A handheld communicator, alive again. Short range on its own - but docked in a proper console it could reach much further.",
+    "on_use": {
+      "text": "You thumb the call button. Static. On its own it cannot reach anyone - it needs a console with a real antenna."
+    }
+  },
+  "remote_control": {
+    "name": "Remote Override",
+    "aliases": [
+      "remote",
+      "override",
+      "remote control"
+    ],
+    "abilities": [
+      "override"
+    ],
+    "description": "A sleek remote crafted from salvaged wire and one very sour orange. In a fight it can lock up a machine for a moment (costs focus).",
+    "on_use": {
+      "text": "You press the button. Somewhere, something beeps resentfully. It will work best aimed at a machine in the middle of a fight."
+    }
+  }
+}

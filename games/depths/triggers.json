@@ -1,0 +1,27 @@
+[
+  {
+    "id": "low_health",
+    "once": false,
+    "every": 6,
+    "when": {
+      "all": [
+        {
+          "stat": [
+            "health",
+            "<=",
+            20
+          ]
+        },
+        {
+          "has": "healing_draught"
+        }
+      ]
+    },
+    "do": [
+      {
+        "say": "You are badly hurt. A draught would help: use draught",
+        "style": "hint"
+      }
+    ]
+  }
+]

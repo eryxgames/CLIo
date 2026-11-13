@@ -1,0 +1,490 @@
+{
+  "trap_wise": [
+    "rogue"
+  ],
+  "hint": "Type 'map' to see the floor. The stair down is in the room furthest from where you arrived.",
+  "traps": [
+    {
+      "text": "A flagstone sinks under your boot. Darts hiss from the wall!",
+      "avoid": "You spot a tripwire at ankle height and step neatly over it."
+    },
+    {
+      "text": "The floor gives way and you drop waist-deep into a pit of old spikes.",
+      "avoid": "The dust lies wrong on one flagstone. You walk around it."
+    },
+    {
+      "text": "A blade swings out of the ceiling, low and fast.",
+      "avoid": "You hear the click a heartbeat before the blade and duck under it."
+    }
+  ],
+  "floors": [
+    {
+      "name": "The Crypt",
+      "w": 4,
+      "h": 3,
+      "mood": "dark",
+      "merchant": "merchant",
+      "treasure": 1,
+      "shrine": 1,
+      "monster_chance": 0.5,
+      "trap_chance": 0.12,
+      "loot_chance": 0.22,
+      "trap_damage": [
+        5,
+        9
+      ],
+      "monsters": [
+        [
+          "bone_rat",
+          4
+        ],
+        [
+          "gloom_bat",
+          3
+        ],
+        [
+          "crypt_crawler",
+          3
+        ]
+      ],
+      "elite": "bone_warden",
+      "loot": [
+        [
+          "healing_draught",
+          5
+        ],
+        [
+          "antidote",
+          2
+        ],
+        [
+          "firebomb",
+          2
+        ],
+        [
+          "leather_jerkin",
+          1
+        ],
+        [
+          "focus_incense",
+          1
+        ]
+      ],
+      "chest_loot": [
+        [
+          "steel_blade",
+          3
+        ],
+        [
+          "leather_jerkin",
+          3
+        ],
+        [
+          "lucky_coin",
+          2
+        ],
+        [
+          "whetstone",
+          2
+        ],
+        [
+          "healing_draught",
+          2
+        ]
+      ],
+      "chest_items": 2,
+      "chest_gold": [
+        8,
+        16
+      ],
+      "doors": [
+        "Archway",
+        "Low Passage",
+        "Iron Gate"
+      ],
+      "ambient": [
+        "Dust sifts down from the ceiling.",
+        "Something small scuttles away from your light.",
+        "The silence here has weight."
+      ],
+      "arrival": "The stair ends in cold, dry air and the smell of old stone. The Crypt.",
+      "rooms": {
+        "start": [
+          {
+            "name": "Crypt Stair",
+            "text": "The foot of the stair. Rows of sealed niches march away into the dark.",
+            "art": "crypt"
+          }
+        ],
+        "plain": [
+          {
+            "name": "Burial Niche",
+            "text": "Shelves of bones line the walls, each skull turned to face the door."
+          },
+          {
+            "name": "Ossuary",
+            "text": "Bones are stacked here like firewood, sorted by somebody with a tidy mind."
+          },
+          {
+            "name": "Mourners' Hall",
+            "text": "Stone benches face an empty bier. Dried flowers crumble underfoot."
+          },
+          {
+            "name": "Candle Gallery",
+            "text": "Hundreds of wax stubs cling to the walls. None of them have been lit in your lifetime."
+          },
+          {
+            "name": "Sexton's Store",
+            "text": "Spades, rope and a wheelbarrow with one wheel. Somebody's lunch, a century old."
+          },
+          {
+            "name": "Collapsed Vault",
+            "text": "Half the ceiling has come down. You pick your way between slabs."
+          }
+        ],
+        "stairs": [
+          {
+            "name": "Warden's Gate",
+            "text": "A gatehouse built underground, for reasons the builders took with them. Behind its arch a stair winds further down."
+          }
+        ],
+        "treasure": [
+          {
+            "name": "Reliquary",
+            "text": "A small vaulted room, its walls painted with saints nobody remembers."
+          }
+        ],
+        "shrine": [
+          {
+            "name": "Chapel of the Candle",
+            "text": "A side-chapel no bigger than a cupboard. Somebody still tends it, or something does."
+          }
+        ],
+        "merchant": [
+          {
+            "name": "Peddler's Nook",
+            "text": "An alcove hung with blankets, lit by a green lantern, crammed with merchandise."
+          }
+        ]
+      }
+    },
+    {
+      "name": "The Flooded Vaults",
+      "w": 4,
+      "h": 4,
+      "mood": "mystery",
+      "merchant": "merchant",
+      "treasure": 2,
+      "shrine": 1,
+      "monster_chance": 0.5,
+      "trap_chance": 0.1,
+      "loot_chance": 0.22,
+      "trap_damage": [
+        8,
+        13
+      ],
+      "locked_chance": 0.5,
+      "monsters": [
+        [
+          "drowned_thrall",
+          4
+        ],
+        [
+          "mire_leech",
+          3
+        ],
+        [
+          "rust_knight",
+          3
+        ]
+      ],
+      "elite": "tide_hag",
+      "wanderer": "drowned_thrall",
+      "loot": [
+        [
+          "healing_draught",
+          5
+        ],
+        [
+          "greater_draught",
+          2
+        ],
+        [
+          "antidote",
+          2
+        ],
+        [
+          "firebomb",
+          2
+        ],
+        [
+          "focus_incense",
+          2
+        ]
+      ],
+      "chest_loot": [
+        [
+          "chain_shirt",
+          3
+        ],
+        [
+          "war_axe",
+          2
+        ],
+        [
+          "steel_blade",
+          2
+        ],
+        [
+          "tower_shield",
+          2
+        ],
+        [
+          "grave_charm",
+          2
+        ],
+        [
+          "iron_tonic",
+          2
+        ],
+        [
+          "greater_draught",
+          2
+        ]
+      ],
+      "chest_items": 2,
+      "chest_gold": [
+        15,
+        28
+      ],
+      "doors": [
+        "Dripping Arch",
+        "Flooded Passage",
+        "Sluice Gate"
+      ],
+      "ambient": [
+        "Water drips, drips, drips.",
+        "Something moves under the surface and is gone.",
+        "The cold here gets into your teeth."
+      ],
+      "arrival": "The stair runs out into black water. Somewhere a river is talking to itself. The Flooded Vaults.",
+      "rooms": {
+        "start": [
+          {
+            "name": "Vault Stair",
+            "text": "The last steps are under water. Arches recede in every direction, doubled in the black mirror of the flood.",
+            "art": "vaults"
+          }
+        ],
+        "plain": [
+          {
+            "name": "Flooded Gallery",
+            "text": "Black water stands knee-deep, perfectly still until you step into it."
+          },
+          {
+            "name": "Sunken Archive",
+            "text": "Shelves of ledgers have swollen into a single grey mass. Ink bleeds through the water."
+          },
+          {
+            "name": "Pump Room",
+            "text": "A great brass pump stands seized and green. The river won this argument long ago."
+          },
+          {
+            "name": "Dripping Cistern",
+            "text": "Every surface runs with water. The echo makes it sound as if someone is walking behind you."
+          },
+          {
+            "name": "Miners' Mess",
+            "text": "Tin plates float gently between the tables."
+          },
+          {
+            "name": "Weed-Choked Passage",
+            "text": "Pale weed hangs from the ceiling and strokes your face as you pass."
+          }
+        ],
+        "stairs": [
+          {
+            "name": "Drowned Stair",
+            "text": "A wide stair descends into the flood and, somehow, out the other side of it, dry, into warmer air."
+          }
+        ],
+        "treasure": [
+          {
+            "name": "Strongroom",
+            "text": "The door hangs off its hinges. Whoever broke in did not get out; they are still here, in a corner."
+          },
+          {
+            "name": "Paymaster's Office",
+            "text": "A desk, a ledger, and a floor scattered with a century of unpaid wages."
+          }
+        ],
+        "shrine": [
+          {
+            "name": "Shrine of the Dry Step",
+            "text": "A single stone stands clear of the water, and on it a candle burns."
+          }
+        ],
+        "merchant": [
+          {
+            "name": "Peddler's Raft",
+            "text": "A raft of doors lashed together, piled with merchandise, moored to a pillar under a green lantern."
+          }
+        ]
+      }
+    },
+    {
+      "name": "The Hollow Court",
+      "w": 5,
+      "h": 4,
+      "mood": "tense",
+      "treasure": 2,
+      "shrine": 1,
+      "monster_chance": 0.5,
+      "trap_chance": 0.1,
+      "loot_chance": 0.22,
+      "trap_damage": [
+        10,
+        16
+      ],
+      "locked_chance": 0.5,
+      "monsters": [
+        [
+          "ash_wraith",
+          5
+        ],
+        [
+          "hollow_guard",
+          4
+        ]
+      ],
+      "boss": "hollow_king",
+      "wanderer": "ash_wraith",
+      "loot": [
+        [
+          "greater_draught",
+          4
+        ],
+        [
+          "healing_draught",
+          3
+        ],
+        [
+          "firebomb",
+          2
+        ],
+        [
+          "focus_incense",
+          2
+        ],
+        [
+          "antidote",
+          1
+        ]
+      ],
+      "chest_loot": [
+        [
+          "emberbrand",
+          3
+        ],
+        [
+          "warden_plate",
+          3
+        ],
+        [
+          "heart_root",
+          2
+        ],
+        [
+          "tower_shield",
+          2
+        ],
+        [
+          "greater_draught",
+          3
+        ],
+        [
+          "iron_tonic",
+          2
+        ],
+        [
+          "whetstone",
+          2
+        ]
+      ],
+      "chest_items": 2,
+      "chest_gold": [
+        25,
+        45
+      ],
+      "doors": [
+        "Scorched Arch",
+        "Bronze Doors",
+        "Colonnade"
+      ],
+      "ambient": [
+        "Warm ash drifts across the floor.",
+        "Far off, something breathes like a bellows.",
+        "The stone underfoot is warm."
+      ],
+      "arrival": "It is warm down here. It should not be warm. Ahead, firelight moves on carved stone. The Hollow Court.",
+      "rooms": {
+        "start": [
+          {
+            "name": "Court Stair",
+            "text": "The stair opens onto a colonnade of blackened pillars. Firelight flickers at the far end of everything.",
+            "art": "court"
+          }
+        ],
+        "plain": [
+          {
+            "name": "Hall of Banners",
+            "text": "Banners hang in rows, burned to lace. The crests on them are all the same crown."
+          },
+          {
+            "name": "Scorched Gallery",
+            "text": "The walls are glazed where something very hot went by, many times."
+          },
+          {
+            "name": "Courtiers' Walk",
+            "text": "Suits of court dress stand in the alcoves. They are empty. You count them twice anyway."
+          },
+          {
+            "name": "Cinder Garden",
+            "text": "Stone trees, stone fountain, and a drift of warm ash where the flowerbeds were."
+          },
+          {
+            "name": "Armoury",
+            "text": "Racks of weapons, each rusted to its bracket. The King kept the good ones."
+          },
+          {
+            "name": "Antechamber",
+            "text": "The air tastes of smoke, and from somewhere ahead comes a sound like a slow bellows."
+          }
+        ],
+        "boss": [
+          {
+            "name": "The Throne Room",
+            "text": "A hall of pillars, and at its end a throne of fused iron. Heat beats from it like a forge.",
+            "art": "court"
+          }
+        ],
+        "treasure": [
+          {
+            "name": "Royal Treasury",
+            "text": "Most of it melted long ago into one glittering puddle. Not all of it."
+          },
+          {
+            "name": "The King's Chamber",
+            "text": "A bed of ash, a wardrobe of ash, and one chest that would not burn."
+          }
+        ],
+        "shrine": [
+          {
+            "name": "The Last Candle",
+            "text": "In a niche behind the pillars, far from the throne, a small flame burns cool and steady."
+          }
+        ]
+      }
+    }
+  ]
+}

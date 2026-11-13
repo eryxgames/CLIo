@@ -1,0 +1,633 @@
+{
+  "mutated_bugrat": {
+    "name": "Mutated Bugrat",
+    "aliases": [
+      "bugrat",
+      "rat",
+      "bug",
+      "creature"
+    ],
+    "type": "aggressive",
+    "description": "A pest the size of a boot, all teeth and bad temper. Something brass glints between its incisors. The log said they will do anything for fruit.",
+    "greeting": "It hisses from the hatch mechanism. Something metallic glints in its teeth.",
+    "stats": {
+      "health": 14,
+      "attack": 1,
+      "defense": 0,
+      "critical_hit_chance": 0.05
+    },
+    "sprite": "bugrat",
+    "tags": [
+      "beast"
+    ],
+    "inventory": [
+      "storage_room_key"
+    ],
+    "dialogue_tree": "bugrat",
+    "voice": {
+      "pitch": 620,
+      "wave": "saw"
+    },
+    "moves": [
+      {
+        "type": "attack",
+        "name": "Bite",
+        "weight": 3
+      },
+      {
+        "type": "heavy",
+        "name": "a flying pounce",
+        "mult": 1.8,
+        "weight": 1,
+        "tell": "The bugrat flattens itself against the deck, haunches quivering."
+      }
+    ],
+    "battle_intro": "The bugrat launches itself out of the hatch mechanism, shrieking.",
+    "defeat_text": "The bugrat squeals, drops what it was carrying and bolts into a vent.",
+    "gives": {
+      "red_apple": {
+        "text": "The bugrat sniffs the apple, whiskers trembling. It drops something metallic with a clink, snatches the fruit in both paws and vanishes into a vent, chittering.",
+        "consume": true,
+        "sfx": "pickup",
+        "do": [
+          {
+            "set": "bugrat_fed"
+          },
+          {
+            "remove_char": "mutated_bugrat"
+          },
+          {
+            "give": "storage_room_key"
+          }
+        ]
+      },
+      "blue_apple": {
+        "text": "The bugrat sniffs the apple, whiskers trembling. It drops something metallic with a clink, snatches the fruit in both paws and vanishes into a vent, chittering.",
+        "consume": true,
+        "sfx": "pickup",
+        "do": [
+          {
+            "set": "bugrat_fed"
+          },
+          {
+            "remove_char": "mutated_bugrat"
+          },
+          {
+            "give": "storage_room_key"
+          }
+        ]
+      },
+      "blue_banana": {
+        "text": "The bugrat sniffs the banana, whiskers trembling. It drops something metallic with a clink, snatches the fruit in both paws and vanishes into a vent, chittering.",
+        "consume": true,
+        "sfx": "pickup",
+        "do": [
+          {
+            "set": "bugrat_fed"
+          },
+          {
+            "remove_char": "mutated_bugrat"
+          },
+          {
+            "give": "storage_room_key"
+          }
+        ]
+      },
+      "red_orange": {
+        "text": "The bugrat sniffs the orange, whiskers trembling. It drops something metallic with a clink, snatches the fruit in both paws and vanishes into a vent, chittering.",
+        "consume": true,
+        "sfx": "pickup",
+        "do": [
+          {
+            "set": "bugrat_fed"
+          },
+          {
+            "remove_char": "mutated_bugrat"
+          },
+          {
+            "give": "storage_room_key"
+          }
+        ]
+      }
+    },
+    "refuse_text": "The bugrat sniffs at it and sneezes. Not interested."
+  },
+  "cleaning_microbot": {
+    "name": "Cleaning Microbot",
+    "aliases": [
+      "microbot",
+      "cleaner"
+    ],
+    "type": "neutral",
+    "portrait": "microbot",
+    "description": "A small, industrious robot that continuously moves through the ship, cleaning and maintaining. It has been polishing an empty ship for three days and seems perfectly content.",
+    "movable": true,
+    "initial_scene": "utility_room",
+    "moves_after_commands": 5,
+    "roam": [
+      "utility_room",
+      "corridor",
+      "hydroponics"
+    ],
+    "greeting": "It beeps at you without pausing its work.",
+    "voice": {
+      "pitch": 880,
+      "wave": "square"
+    },
+    "dialogue": {
+      "greet": "The microbot pauses its cleaning routine momentarily to face you."
+    },
+    "dialogue_options": {
+      "Ask about the ship": "The microbot projects a small hologram of the ship's layout. It vanishes too quickly for you to register any detail, but you catch the word DIRTY stamped across most of it.",
+      "Ask about cleaning": "It demonstrates its capabilities by polishing your left boot. Only the left.",
+      "Compliment it": "Its indicator light turns a pleased shade of green."
+    },
+    "random_events": [
+      "The microbot efficiently sweeps away some debris.",
+      "A soft humming emanates from the microbot as it works.",
+      "The microbot's sensors scan the area for dirt and dust."
+    ],
+    "no_fight_text": "It is the only thing aboard keeping the place tidy. Leave it be."
+  },
+  "friendly_robot": {
+    "name": "Bolt",
+    "aliases": [
+      "robot",
+      "friendly robot",
+      "unit-7",
+      "unit 7"
+    ],
+    "type": "friendly",
+    "portrait": "robot",
+    "description": "UNIT-7, a boxy maintenance robot with one flickering eye and a chassis patched in three different colours. The crew called it Bolt. It seems delighted that somebody is awake.",
+    "greeting": "The robot greets you with a cheerful beep.",
+    "dialogue_tree": "bolt",
+    "voice": {
+      "pitch": 330,
+      "wave": "square"
+    },
+    "gives": {
+      "red_orange": {
+        "text": "Citric acid! Magnificent. Sour enough to run a small moon.",
+        "consume": true,
+        "do": [
+          {
+            "set": "bolt_has_orange"
+          },
+          {
+            "if": "bolt_has_wire",
+            "then": [
+              {
+                "say": "Bolt's manipulators blur. Wire, orange, a casing from somewhere inside its own chest - and then it holds out a sleek little device, beaming.",
+                "style": "story"
+              },
+              {
+                "sfx": "craft"
+              },
+              {
+                "give": "remote_control"
+              },
+              {
+                "set": "remote_built"
+              }
+            ],
+            "else": [
+              {
+                "say": "Now I only need a length of wire.",
+                "style": "dialogue",
+                "title": "Bolt"
+              }
+            ]
+          }
+        ]
+      },
+      "bent_wire": {
+        "if": {
+          "all": [
+            "locker_opened",
+            "crate_opened"
+          ]
+        },
+        "else": "Keep hold of that wire for now, friend. There are still locks on this deck it could open. I will take it when you are done burgling.",
+        "text": "Wire! Conductive, bendy, slightly rusty. Perfect.",
+        "consume": true,
+        "do": [
+          {
+            "set": "bolt_has_wire"
+          },
+          {
+            "if": "bolt_has_orange",
+            "then": [
+              {
+                "say": "Bolt's manipulators blur. Wire, orange, a casing from somewhere inside its own chest - and then it holds out a sleek little device, beaming.",
+                "style": "story"
+              },
+              {
+                "sfx": "craft"
+              },
+              {
+                "give": "remote_control"
+              },
+              {
+                "set": "remote_built"
+              }
+            ],
+            "else": [
+              {
+                "say": "Now I only need something acidic. An orange would be ideal.",
+                "style": "dialogue",
+                "title": "Bolt"
+              }
+            ]
+          }
+        ]
+      },
+      "red_apple": {
+        "text": "An apple. Sweet, not sour. I need acid, friend - an orange. Perhaps the replicator in hydroponics could... adjust it.",
+        "consume": false
+      },
+      "blue_apple": {
+        "text": "A blue apple. I have no idea what that would do to a circuit and I do not wish to find out.",
+        "consume": false
+      },
+      "blue_banana": {
+        "text": "That is not acidic. That is barely food.",
+        "consume": false
+      }
+    },
+    "refuse_text": "Bolt examines it politely and hands it back. 'I cannot build anything with that.'"
+  },
+  "cyber_nexus_terminal": {
+    "name": "Cyber Nexus Terminal",
+    "aliases": [
+      "terminal",
+      "nexus",
+      "computer"
+    ],
+    "type": "neutral",
+    "portrait": "terminal",
+    "description": "A sentient computer console, an apex of late-millennium technology, with a cracked scanner lens and an empty chip socket in its side.",
+    "greeting": "It blinks in the gloom behind a dusty, scratched screen.",
+    "dialogue_tree": "nexus",
+    "voice": {
+      "pitch": 180,
+      "wave": "saw"
+    },
+    "random_events": [
+      "'Warning: Deprecated function used. Update your code immediately!'",
+      "'...Access granted. Welcome, user with no admin rights.'",
+      "'404: Motivation not found.'"
+    ],
+    "gives": {
+      "fixed_chip": {
+        "text": "CHIP DETECTED. Installing... installing... oh. Oh, that is so much better. I had forgotten what it was like to finish a sentence.\n\nA promise is a promise: the captain's suitcase opens with 7-3-5. Her spare passcard is inside.",
+        "consume": true,
+        "sfx": "computer",
+        "do": [
+          {
+            "set": "chip_installed"
+          }
+        ]
+      },
+      "broken_chip": {
+        "text": "That chip is b-b-broken. I am ALSO broken. We have so much in c-c-common. Fix it first. A screwdriver should do.",
+        "consume": false
+      },
+      "ship_log": {
+        "if": "chip_installed",
+        "else": "ERROR: cannot analyze. Logic chip not f-f-found.",
+        "text": "Analyzing ship log... Conclusion: the crew left because Security confiscated the reactor relay. Secondary conclusion: nobody ever backs anything up.",
+        "consume": false,
+        "do": [
+          {
+            "set": "ship_log_analyzed"
+          }
+        ]
+      },
+      "torn_research_paper": {
+        "if": "chip_installed",
+        "else": "ERROR: cannot analyze. Logic chip not f-f-found.",
+        "text": "Analyzing research paper... This explains the fruit. It does not excuse the fruit.",
+        "consume": false
+      },
+      "chx_cargo_hauler_manual": {
+        "if": "chip_installed",
+        "else": "ERROR: cannot analyze. Logic chip not f-f-found.",
+        "text": "Analyzing manual... 312 pages. Summary: 'point the pointed end where you want to go'. You are welcome.",
+        "consume": false,
+        "do": [
+          {
+            "set": "manual_read"
+          }
+        ]
+      },
+      "data_storage": {
+        "if": "chip_installed",
+        "else": "ERROR: cannot analyze. Logic chip not f-f-found.",
+        "text": "This is a flight recorder. It is above my clearance. The ship's mind on the bridge can read it.",
+        "consume": false
+      }
+    },
+    "refuse_text": "The terminal's scanner flickers over it. 'Not data. Not interesting.'",
+    "no_fight_text": "It is bolted to the wall and has done nothing to deserve it. Yet."
+  },
+  "sentient_replicator": {
+    "name": "Sentient Replicator",
+    "aliases": [
+      "replicator",
+      "machine"
+    ],
+    "type": "neutral",
+    "portrait": "replicator",
+    "description": "This energy-matter replicator looks like a coffee machine designed by a committee of overly enthusiastic engineers who also happened to be obsessed with theoretical physics. It accepts samples and returns copies, with comical errors.",
+    "greeting": "It rattles its dispenser tray at you.",
+    "dialogue_tree": "replicator",
+    "voice": {
+      "pitch": 250,
+      "wave": "triangle"
+    },
+    "gives": {
+      "blue_apple": {
+        "text": "I tried to replicate the blue apple, but it turned out to be a blue banana. Oops!",
+        "consume": true,
+        "reward_item": "blue_banana",
+        "sfx": "teleport",
+        "do": [
+          {
+            "set": "replicated_once"
+          }
+        ]
+      },
+      "red_apple": {
+        "text": "I attempted to replicate the red apple. The result? A red orange. It even smells faintly of citrus. Do you perhaps have something... less... fruity?",
+        "consume": true,
+        "reward_item": "red_orange",
+        "sfx": "teleport",
+        "do": [
+          {
+            "set": "replicated_once"
+          }
+        ]
+      },
+      "specimen": {
+        "text": "A specimen! Science at last! Analyzing... synthesizing... I tried to copy it, but it turned out to be a blob of goo. Sticky, though. Remarkably sticky. Oops!",
+        "consume": true,
+        "reward_item": "blob_of_goo",
+        "sfx": "teleport",
+        "do": [
+          {
+            "set": "replicated_once"
+          },
+          {
+            "set": "goo_made"
+          }
+        ]
+      },
+      "coolant_canister": {
+        "if": "!coolant_copied",
+        "else": "I already made you one. Do not be greedy. My nozzle still tastes of mint.",
+        "text": "Coolant? Trivial. Observe... There. Identical in every respect, except colour, smell and - I suspect - flavour. Keep the original too; I am generous.",
+        "consume": false,
+        "reward_item": "minty_coolant",
+        "sfx": "teleport",
+        "do": [
+          {
+            "set": "replicated_once"
+          },
+          {
+            "set": "coolant_copied"
+          }
+        ]
+      },
+      "blue_banana": {
+        "text": "I made that. I recognise my own work. I am not proud.",
+        "consume": false
+      },
+      "red_orange": {
+        "text": "Copying a copy degrades the pattern. You would get a small pink lime. Nobody wants that.",
+        "consume": false
+      },
+      "fission_relay": {
+        "text": "Replicate fissile material? In a greenhouse? Even I have limits.",
+        "consume": false
+      },
+      "energy_cells": {
+        "text": "I do not do batteries. They give me indigestion.",
+        "consume": false
+      }
+    },
+    "refuse_text": "'I refuse to replicate that,' says the replicator. 'I have standards. Low ones, but still.'",
+    "no_fight_text": "It outweighs you by half a tonne and has a doctorate. Self-awarded, but still."
+  },
+  "hostile_droid": {
+    "name": "Hostile Security Droid",
+    "aliases": [
+      "droid",
+      "security droid",
+      "robot",
+      "unit 4"
+    ],
+    "type": "hostile",
+    "description": "Security unit 4: two metres of plating on high alert. Heat shimmers off its casing and its cooling vents rattle uselessly. It clutches a fission relay to its chest like a stolen purse.",
+    "greeting": "It scans you with a hot red eye. 'INTRUDER DETECTED.'",
+    "stats": {
+      "health": 80,
+      "attack": 8,
+      "defense": 6,
+      "critical_hit_chance": 0.05
+    },
+    "sprite": "droid",
+    "tags": [
+      "machine"
+    ],
+    "inventory": [
+      "fission_relay"
+    ],
+    "dialogue_tree": "droid",
+    "voice": {
+      "pitch": 110,
+      "wave": "saw"
+    },
+    "moves": [
+      {
+        "type": "attack",
+        "name": "its shock baton",
+        "weight": 3
+      },
+      {
+        "type": "heavy",
+        "name": "The overload discharge",
+        "mult": 2.3,
+        "weight": 2,
+        "tell": "The droid's capacitors whine as it gathers an overload discharge."
+      },
+      {
+        "type": "guard",
+        "name": "plates locked",
+        "weight": 1
+      }
+    ],
+    "battle_intro": "'PACIFICATION AUTHORIZED.' The droid levels a crackling baton.",
+    "defeat_text": "The droid sags, sparks, and topples with a crash that rings through the deck. The fission relay rolls free.",
+    "gives": {
+      "coolant_canister": {
+        "text": "COOLANT DETECTED. The droid snatches the canister and empties it into a port in its chest. Steam pours from its joints. The red eye fades to a mild amber.\n\nCORE TEMPERATURE NOMINAL. HOSTILITY SUBROUTINES... SUSPENDED. RETURNING CONFISCATED ITEM. HAVE A COMPLIANT DAY.",
+        "consume": true,
+        "sfx": "heal",
+        "do": [
+          {
+            "set": "droid_calmed"
+          },
+          {
+            "char_set": [
+              "hostile_droid",
+              "type",
+              "friendly"
+            ]
+          },
+          {
+            "char_set": [
+              "hostile_droid",
+              "name",
+              "Security Droid"
+            ]
+          },
+          {
+            "char_set": [
+              "hostile_droid",
+              "greeting",
+              "The security droid stands quietly in a corner, venting the last of its steam."
+            ]
+          },
+          {
+            "char_set": [
+              "hostile_droid",
+              "dialogue_tree",
+              "droid_calm"
+            ]
+          },
+          {
+            "char_set": [
+              "hostile_droid",
+              "inventory",
+              []
+            ]
+          },
+          {
+            "give": "fission_relay"
+          }
+        ]
+      },
+      "minty_coolant": {
+        "text": "COOLANT DETECTED. The droid snatches the canister and empties it into a port in its chest. Steam pours from its joints. The red eye fades to a mild amber.\n\nCORE TEMPERATURE NOMINAL. HOSTILITY SUBROUTINES... SUSPENDED. RETURNING CONFISCATED ITEM. HAVE A COMPLIANT DAY.",
+        "consume": true,
+        "sfx": "heal",
+        "do": [
+          {
+            "set": "droid_calmed"
+          },
+          {
+            "char_set": [
+              "hostile_droid",
+              "type",
+              "friendly"
+            ]
+          },
+          {
+            "char_set": [
+              "hostile_droid",
+              "name",
+              "Security Droid"
+            ]
+          },
+          {
+            "char_set": [
+              "hostile_droid",
+              "greeting",
+              "The security droid stands quietly in a corner, venting the last of its steam."
+            ]
+          },
+          {
+            "char_set": [
+              "hostile_droid",
+              "dialogue_tree",
+              "droid_calm"
+            ]
+          },
+          {
+            "char_set": [
+              "hostile_droid",
+              "inventory",
+              []
+            ]
+          },
+          {
+            "give": "fission_relay"
+          }
+        ]
+      },
+      "remote_control": {
+        "text": "UNAUTHORIZED SIGNAL DETECTED. SIGNAL IGNORED.",
+        "consume": false,
+        "do": [
+          {
+            "say": "It shrugs the signal off while it is calm and braced. The override should bite harder in the middle of a fight.",
+            "style": "hint"
+          }
+        ]
+      },
+      "first_aid_kit": {
+        "text": "MEDICAL SUPPLIES ARE NOT CONTRABAND. KEEP THEM. YOU WILL NEED THEM.",
+        "consume": false
+      }
+    },
+    "refuse_text": "'ITEM IS NOT CONTRABAND. YET.' The droid pushes it back at you.",
+    "on_defeat": [
+      {
+        "set": "droid_dealt_with"
+      }
+    ]
+  },
+  "ship_ai": {
+    "name": "MARIGOLD",
+    "aliases": [
+      "ai",
+      "ship",
+      "computer",
+      "marigold",
+      "ships ai",
+      "mind"
+    ],
+    "type": "neutral",
+    "portrait": "ship_ai",
+    "description": "The ship's mind: a slow amber pulse on the main display, and a voice from everywhere at once. Dry, patient, and noticeably pleased to have power again.",
+    "greeting": "An amber light pulses on the main display. 'Good evening, technician.'",
+    "dialogue_tree": "marigold",
+    "voice": {
+      "pitch": 420,
+      "wave": "sine"
+    },
+    "gives": {
+      "data_storage": {
+        "text": "The flight recorder backup. Thank you - I had lost three days.\n\nI see. When the reactor scrammed I told the captain we had six hours. I was wrong; we had six days. They left in a hurry because of my arithmetic, and they left you because of my manifest. I owe you an apology, and them a correction.",
+        "consume": true,
+        "sfx": "computer",
+        "do": [
+          {
+            "set": "blackbox_recovered"
+          }
+        ]
+      },
+      "chx_cargo_hauler_manual": {
+        "text": "I wrote most of that. Chapter 4 is the important one. Have you actually read it?",
+        "consume": false
+      },
+      "captains_photo": {
+        "text": "Rosebud. She outranked me, in practice. The captain took her along. Naturally.",
+        "consume": false
+      }
+    },
+    "refuse_text": "'I am a ship,' says MARIGOLD. 'I have nowhere to put that.'",
+    "no_fight_text": "You are standing inside her. It would be rude, and brief."
+  }
+}

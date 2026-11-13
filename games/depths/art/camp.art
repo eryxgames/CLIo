@@ -1,0 +1,20 @@
+@color gray
+@palette
+l = amber
+d = darkgray
+@art
+      _.-'''''-._
+    .'  _______  '.
+   /   |  ___  |   \
+  |  * | |   | |    |
+  |    | |___| |    |
+  |    |/_____\|    |
+  |____/_______\____|
+@mask
+
+
+         ddddd
+     l   d   d
+         ddddd
+        ddddddd
+       ddddddddd

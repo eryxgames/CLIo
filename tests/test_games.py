@@ -137,7 +137,7 @@ class DerelictTests(unittest.TestCase):
         s.do("journal", "stats", "fight droid", *["strike"] * 30)
         for symbol in "♥♪★✔✘⚑◆◈†▸":
             self.assertNotIn(symbol, s.text)
-        self.assertIn("┌", s.text + "╭")                       # frames are still drawn
+        self.assertTrue(any(corner in s.text for corner in "╭┌╔"))     # frames are still drawn
         for line in s.text.splitlines():
             self.assertLessEqual(visible_len(line), 40, repr(line))
 

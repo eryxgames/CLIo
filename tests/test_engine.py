@@ -26,7 +26,7 @@ from engine.ui import UI                                    # noqa: E402
 
 
 def term(color=2, unicode=True, width=60):
-    return Term(out=io.StringIO(), width=width, color=color, unicode=unicode, animate=False)
+    return Term(out=io.StringIO(), width=width, color=color, unicode=unicode, animate=False, env={})
 
 
 class TermTests(unittest.TestCase):
@@ -60,6 +60,17 @@ class TermTests(unittest.TestCase):
     def test_wrap_preserves_paragraphs(self):
         self.assertEqual(wrap_ansi("one\n\ntwo", 20), ["one", "", "two"])
 
+    def test_environment_switches(self):
+        make = lambda env, **kw: Term(out=io.StringIO(), width=40, animate=False, env=env, **kw)    # noqa: E731
+        self.assertEqual(make({}, unicode=True).glyph_mode, "full")
+        self.assertEqual(make({"CLIO_GLYPHS": "safe"}, unicode=True).glyph_mode, "safe")
+        self.assertEqual(make({"CLIO_GLYPHS": "safe"}, unicode=False).glyph_mode, "ascii")
+        self.assertEqual(make({}, unicode=True, glyphs="safe").glyphs["heart"], "HP")
+        self.assertFalse(make({}, unicode=True).limited_glyphs)
+        self.assertTrue(make({"TERM": "linux"}, unicode=True).limited_glyphs)      # kernel console font
+        self.assertEqual(make({"NO_COLOR": "1"}).color_depth, 0)
+        self.assertEqual(make({"CLIO_COLOR": "3"}).color_depth, 3)
+
     def test_ascii_fallback_is_pure_ascii(self):
         self.assertTrue(to_ascii("╭─♥ ▀▄█ … ✔ ·╯").isascii())
 
@@ -84,7 +95,7 @@ class UiTests(unittest.TestCase):
 
     def test_menu_accepts_numbers_text_and_cancel(self):
         answers = iter(["2", "blu", ""])
-        t = Term(out=io.StringIO(), inp=lambda p: next(answers), width=40, color=0, animate=False)
+        t = Term(out=io.StringIO(), inp=lambda p: next(answers), width=40, color=0, animate=False, env={})
         ui = UI(t, load_theme("minimal"))
         self.assertEqual(ui.menu(["red", "green", "blue"]), 1)
         self.assertEqual(ui.menu(["red", "green", "blue"]), 2)

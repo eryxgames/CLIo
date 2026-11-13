@@ -40,8 +40,9 @@ class Session:
     def __init__(self, name, commands=(), seed=1, width=80, color=0, unicode=True, record_audio=False):
         self.out = io.StringIO()
         self.queue = list(commands)
+        # env={}: the result must not depend on the TERM, NO_COLOR... of whoever runs the tests
         self.term = Term(out=self.out, inp=self._next, width=width, height=40, color=color,
-                         unicode=unicode, animate=False)
+                         unicode=unicode, animate=False, env={})
         self.backend = NullBackend(record=record_audio)
         self.audio = Audio(backend=self.backend, enabled=record_audio)
         self.game = Game(game_path(name), term=self.term, audio=self.audio, seed=seed)

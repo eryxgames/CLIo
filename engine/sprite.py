@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
 """Pixel sprites drawn with half-block characters.
 
 A sprite is a small grid of palette letters.  Two pixel rows share one text

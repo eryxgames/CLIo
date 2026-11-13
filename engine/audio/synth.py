@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
 """A tiny chiptune synthesizer in pure Python.
 
 Music and sound effects are *data* (JSON), rendered to 16-bit mono WAV files:

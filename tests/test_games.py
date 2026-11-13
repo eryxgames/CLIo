@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
 """Whole-game tests: every demo can be finished, and old game data still loads."""
 import os
 import sys

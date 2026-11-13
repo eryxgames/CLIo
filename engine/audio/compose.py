@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
 """Generative music: a seed and a mood in, a complete song out.
 
 The composer writes ordinary song data (see :mod:`engine.audio.synth`), so a

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
 """Auto-map: draws the explored part of the world from the scene graph.
 
 Rooms are laid out on a grid.  Scenes may give explicit coordinates

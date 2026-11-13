@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
 """Shared helpers: play a game from a script and capture the transcript."""
 import io
 import os

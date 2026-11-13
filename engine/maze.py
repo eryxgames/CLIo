@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
 """Procedural dungeons: mazes of rooms, stocked from tables in ``dungeon.json``.
 
 A game opts in with a ``"generator"`` block in ``game.json``::

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
 """Conditions and effects: the small JSON "scripting language" of CLIo.
 
 Wherever the data has an ``"if"`` it is a *condition*; wherever it has a

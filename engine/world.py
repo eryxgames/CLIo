@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
 """The mutable state of a game in progress, and saving / loading it."""
 from __future__ import annotations
 

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
 """Everything the player can do: one ``do_<verb>`` method per command."""
 from __future__ import annotations
 
@@ -1416,6 +1418,8 @@ class Actions:
                                       if cfg.get("website") else ""))
         if cfg.get("about"):
             lines.append(cfg["about"])
+        if cfg.get("license"):
+            lines.append("{hint}Licence: %s{/}" % cfg["license"])
         lines.append("{hint}Made with CLIo %s - the stylish command-line game engine.{/}" % __version__)
         lines.append("{hint}CLIo by %s %s %s{/}" % (__author__, self.ui.g("dot"), __url__.split("//")[-1]))
         for l in lines:

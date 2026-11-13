@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
 """Themes: colours, frames and text effects for every kind of message.
 
 Theme files live in ``engine/style/configs/*.json`` (and optionally in a

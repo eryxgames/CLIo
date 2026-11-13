@@ -25,5 +25,6 @@
   "default_hint": "Look at everything, read everything, and talk to anyone who will answer.",
   "help": "Goal: get off the ship. 'journal' shows what you are working on.",
   "about": "A demo adventure for the CLIo engine: puzzles, dialogue trees, quests, one tactical fight and three endings.",
-  "website": "eryxian.com"
+  "website": "eryxian.com",
+  "license": "All rights reserved - see LICENSE.md in this game's folder"
 }

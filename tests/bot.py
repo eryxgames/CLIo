@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
 """A simple automatic player for the dungeon crawler.
 
 It is not clever - it explores, loots, drinks potions and follows the basic

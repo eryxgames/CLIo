@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
 """The command parser: turns what the player typed into a verb and its objects.
 
 It is a table of verbs and their synonyms plus a few sentence shapes

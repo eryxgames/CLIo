@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
 """Tactical turn-based combat.
 
 Each round the enemy *telegraphs* what it is about to do, and the player

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
 """Audio output backends.
 
 CLIo does not link against any audio library.  It renders WAV files and hands

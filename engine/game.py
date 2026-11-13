@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
 """The game: world + renderer + audio + parser, and the turn loop that binds them."""
 from __future__ import annotations
 

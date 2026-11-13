@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
 """ASCII art files.
 
 An ``.art`` file is plain text with optional sections::

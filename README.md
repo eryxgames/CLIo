@@ -153,3 +153,21 @@ python tests/bot.py 30                   # an automatic player runs the dungeon 
 
 The tests play both demo games to every ending from scripts, check that every screen fits
 40 columns in both Unicode and ASCII, round-trip saves, and render every sound effect.
+
+## Licence
+
+CLIo is open source so that anyone can make games with it, including games they sell.
+
+| Part | Licence |
+| --- | --- |
+| The engine: `engine/`, `clio.py`, `tests/`, `utils/`, `docs/` | [Apache-2.0](LICENSE) |
+| Everything the engine ships for games to use: the themes, the built-in sound effects, the music composer, the sprite generator, the CLIo logo art | Apache-2.0 - reuse and edit freely |
+| `templates/starter/` and the sandbox in `game_files/` | Apache-2.0 - copy them as a starting point |
+| The demo games `games/derelict/` and `games/depths/` (story, text, characters, art, sprites, music) | Copyright Daniel Sandner, all rights reserved - see the `LICENSE.md` in each folder |
+
+**What you make is yours.** A game you write for CLIo is your own work under whatever
+terms you choose, and so are the music, sound effects and sprites the engine generates
+for it. If you ship the engine with your game, keep the `LICENSE` and `NOTICE` files with
+it and say if you changed the engine; that is all Apache-2.0 asks.
+
+Copyright 2024-2026 Daniel Sandner.

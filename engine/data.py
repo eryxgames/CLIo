@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
 """Loading game data.
 
 A game is a folder of JSON files.  CLIo 2 reads the original CLIo layout

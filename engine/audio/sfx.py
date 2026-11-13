@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
 """Built-in sound effects, described as synth voices (see synth.render_sfx).
 
 Games can override any of these or add their own in ``sounds.json``.

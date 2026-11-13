@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
 """The sound system: synthesized music and effects, plus ordinary audio files.
 
     audio = Audio(game_dir, songs=..., sounds=...)

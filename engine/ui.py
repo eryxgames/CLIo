@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
 """The renderer: frames, panels, lists, menus, the HUD and text effects.
 
 All game output goes through :class:`UI`.  It lays text out for whatever width

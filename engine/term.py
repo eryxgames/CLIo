@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
 """Terminal layer: capability detection, colour, inline markup, ANSI-aware wrapping.
 
 Everything above this module talks in *markup* (``{red}text{/}``) and plain

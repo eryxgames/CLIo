@@ -15,8 +15,8 @@ import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import (EditorError, advice, archive, balance, check, finish, load, looks, put_texts, save, text_table, texts,
-               views)
+from . import EditorError
+from .service import Unknown, handle
 
 WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
 PAGES = {"/": ("index.html", "text/html; charset=utf-8"), "/index.html": ("index.html", "text/html; charset=utf-8"),
@@ -70,7 +70,7 @@ def make_server(game_dir, port=None):
             if path == "/api/game":
                 if not self.allowed():
                     return self.reply(403, {"error": "This address is missing its key. Start the editor again."})
-                return self.answer(lambda: load(game_dir))
+                return self.answer(path, None)
             self.reply(404, {"error": "Nothing here."})
 
         def do_POST(self):
@@ -84,63 +84,20 @@ def make_server(game_dir, port=None):
                 body = json.loads(self.rfile.read(size).decode("utf-8") or "{}")
             except (ValueError, UnicodeDecodeError):
                 return self.reply(400, {"error": "The request was not valid JSON."})
-            if path == "/api/check":
-                return self.answer(lambda: {"problems": check(game_dir, body.get("pending") or {})})
-            if path == "/api/save":
-                return self.answer(lambda: save(game_dir, str(body.get("file")), body.get("data")))
-            if path == "/api/texts":                        # every line a player can read
-                def table():
-                    found = text_table(game_dir, body.get("pending") or {})
-                    return {"csv": texts.to_csv(found), "count": len(found)} if body.get("csv") else {"rows": found}
-                return self.answer(table)
-            if path == "/api/texts/apply":                  # put texts back: a table from the page, or a CSV file's text
-                def put():
-                    try:
-                        rows = texts.from_csv(body["csv"]) if isinstance(body.get("csv"), str) else body.get("rows") or []
-                    except (ValueError, KeyError) as err:
-                        raise EditorError("That file could not be read as a table of texts: %s" % err)
-                    return put_texts(game_dir, rows, body.get("pending") or {})
-                return self.answer(put)
-            if path == "/api/enemy":                        # a new enemy of a chosen strength, to look at
-                return self.answer(lambda: balance.make_enemy(
-                    game_dir, body.get("like") or None, body.get("floor"), body.get("rank") or "regular",
-                    body.get("lean") or 0.0, body.get("name"), body.get("pending") or {}))
-            if path == "/api/odds":                         # how fights against some characters go
-                return self.answer(lambda: balance.odds(
-                    game_dir, [str(e) for e in body.get("enemies") or []], body.get("pending") or {},
-                    body.get("extra") or None, body.get("level") or 1, body.get("fights") or 30))
-            if path == "/api/advice":                       # not wrong, but perhaps not meant
-                return self.answer(lambda: {"advice": advice(game_dir, body.get("pending") or {})})
-            if path == "/api/walkthrough":                  # the game's known way through: read it, or keep a new one
-                if "text" in body:
-                    return self.answer(lambda: {"saved": finish.write(game_dir, body["text"])})
-                return self.answer(lambda: {"text": finish.read(game_dir)})
-            if path == "/api/finish":                       # play the walkthroughs on the game as it is in the page
-                return self.answer(lambda: finish.play(game_dir, body.get("text"), body.get("pending") or {}))
-            if path == "/api/map":                          # the rooms where the player's map puts them
-                return self.answer(lambda: views.world_map(game_dir, body.get("pending") or {}))
-            if path == "/api/dialogue":                     # how one conversation runs
-                return self.answer(lambda: views.dialogue_graph(body.get("tree")))
-            if path == "/api/sprite":                       # grow a sprite as the game would, or name a palette's colours
-                if "palette" in body:
-                    return self.answer(lambda: {"colours": looks.colours(body.get("palette"))})
-                return self.answer(lambda: looks.grow(body.get("seed") or "nobody", body.get("size") or 12))
-            if path == "/api/archive":
-                try:
-                    with lock:
-                        return self.reply(200, archive(game_dir), "application/zip")
-                except Exception as err:
-                    return self.reply(500, {"error": "%s: %s" % (type(err).__name__, err)})
-            self.reply(404, {"error": "Nothing here."})
+            self.answer(path, body)
 
-        def answer(self, work):
+        def answer(self, path, body):
             try:
                 with lock:                                  # one change at a time
-                    result = work()
+                    result = handle(game_dir, path, body)
+            except Unknown as err:
+                return self.reply(404, {"error": str(err)})
             except EditorError as err:
                 return self.reply(400, {"error": str(err)})
             except Exception as err:
                 return self.reply(500, {"error": "%s: %s" % (type(err).__name__, err)})
+            if isinstance(result, bytes):
+                return self.reply(200, result, "application/zip")
             self.reply(200, result)
 
     try:                                                    # the same address every time, when it is free: the

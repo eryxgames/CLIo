@@ -4,7 +4,11 @@
 // their fields (engine/schema.py) and the problems the engine finds; forms are built from that.
 "use strict";
 
-const KEY = new URLSearchParams(location.search).get("key") || "";
+const PARAMS = new URLSearchParams(location.search);
+const KEY = PARAMS.get("key") || "";
+// Started with `clio.py --edit`, the page talks to that program. Opened from a web address there is nobody to talk
+// to: the page then runs the engine itself (see "the editor without a server", below). ?hosted asks for that anywhere.
+let HOSTED = !KEY && (PARAMS.has("hosted") || !["127.0.0.1", "localhost", "[::1]"].includes(location.hostname));
 const $ = (id) => document.getElementById(id);
 const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const state = { open: new Set(), shown: new Set(), game: null, kind: null, id: null, dirty: new Set(), problems: [], filter: "", checking: 0, found: [], searching: 0 };
@@ -22,6 +26,7 @@ function el(tag, props, ...children) {
 }
 
 async function api(path, body) {
+  if (HOSTED) return hostedApi(path, body);
   const res = await fetch(path, {
     method: body ? "POST" : "GET",
     headers: Object.assign({ "X-CLIo-Token": KEY }, body ? { "Content-Type": "application/json" } : {}),
@@ -90,7 +95,7 @@ async function saveAll() {
       state.problems = out.problems;
       saved.push(out.saved);
     }
-    status("Saved " + saved.join(", ") + ".");
+    status("Saved " + saved.join(", ") + "." + (HOSTED ? await kept() : ""));
   } catch (err) {
     status("Could not save: " + err.message, true);
   }
@@ -1222,9 +1227,15 @@ async function importText(file) {
 async function downloadGame() {
   if (state.dirty.size) return status("Save first, so that the archive has your changes.", true);
   try {
-    const res = await fetch("/api/archive", { method: "POST", headers: { "X-CLIo-Token": KEY, "Content-Type": "application/json" }, body: "{}" });
-    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
-    download(state.game.id + ".zip", await res.blob());
+    let blob;
+    if (HOSTED) blob = await api("/api/archive", {});
+    else {
+      const res = await fetch("/api/archive", { method: "POST", headers: { "X-CLIo-Token": KEY, "Content-Type": "application/json" }, body: "{}" });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
+      blob = await res.blob();
+    }
+    download(state.game.id + ".zip", blob);
+    tab.unkept = false;
     status("The game folder was downloaded as " + state.game.id + ".zip.");
   } catch (err) {
     status("Could not download: " + err.message, true);
@@ -1283,21 +1294,183 @@ $("add").addEventListener("submit", (e) => {
   status("");
   add(kind, id, kind.title ? { [kind.title]: id.replace(/[_.-]+/g, " ").replace(/^./, (c) => c.toUpperCase()) } : {});
 });
-window.addEventListener("beforeunload", (e) => { if (state.dirty.size) { e.preventDefault(); e.returnValue = ""; } });
+window.addEventListener("beforeunload", (e) => { if (state.dirty.size || tab.unkept) { e.preventDefault(); e.returnValue = ""; } });
 window.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); if (state.dirty.size) saveAll(); }
 });
 
-(async function start() {
-  try {
-    state.game = await api("/api/game");
-  } catch (err) {
-    return status("Could not open the game: " + err.message, true);
+// ---------------------------------------------------------------------- the editor without a server
+// Opened from a web address, the page starts a worker that runs Python and the CLIo engine in the browser
+// (worker.js). The game is read from a folder or a zip file on this computer and lives in the worker's memory.
+// Where the browser lets a page write into a folder it was given (Chrome, Edge), Save writes there; elsewhere the
+// changes stay in the page until "Download game".
+const tab = { worker: null, waking: null, next: 0, asked: new Map(), game: null, home: "", folder: null, unkept: false, manifest: null };
+const SKIP = (name) => name === "__pycache__" || name === "saves" || (name.startsWith(".") && name !== ".editor-backup");
+const MOST_FILES = 3000;
+
+function ask(cmd, more, transfer) {
+  return new Promise((resolve, reject) => {
+    const id = tab.next += 1;
+    tab.asked.set(id, { resolve, reject });
+    tab.worker.postMessage(Object.assign({ id, cmd }, more || {}), transfer || []);
+  });
+}
+
+function wake() {                                                    // once; opening a game waits for it
+  if (tab.waking) return tab.waking;
+  const extra = PARAMS.get("pyodide") ? "?pyodide=" + encodeURIComponent(PARAMS.get("pyodide")) : "";
+  tab.worker = new Worker("worker.js" + extra, { type: "module" });
+  tab.worker.onmessage = (event) => {
+    const m = event.data;
+    if (m.type === "status") { if (!state.game) status(m.text); return; }
+    const waiting = tab.asked.get(m.id);
+    if (!waiting) return;
+    tab.asked.delete(m.id);
+    if (m.ok) waiting.resolve(m); else waiting.reject(new Error(m.error));
+  };
+  tab.worker.onerror = (event) => {
+    for (const waiting of tab.asked.values()) waiting.reject(new Error(event.message || "The engine could not be started."));
+    tab.asked.clear();
+  };
+  tab.waking = ask("init");
+  return tab.waking;
+}
+
+async function hostedApi(path, body) {
+  const out = await ask("api", { game: tab.game, path, body: JSON.stringify(body || {}) });
+  if (out.bytes) return new Blob([out.bytes], { type: "application/zip" });
+  const answer = JSON.parse(out.json);
+  if (!answer.ok) throw new Error(answer.error);
+  if (path === "/api/walkthrough" && body && "text" in body) await kept();
+  return answer.data;
+}
+
+// After something was written: put the same files into the folder the game came from, or remember that the changes
+// exist only in this page. Returns what to tell the author.
+async function kept() {
+  if (!tab.folder) {
+    tab.unkept = true;
+    return " The changes are in this page only: use Download game to keep them.";
   }
+  try {
+    const { files } = await ask("changed", { game: tab.game });
+    for (const [path, data] of files) {
+      const parts = (tab.home ? tab.home + "/" + path : path).split("/");         // the game may sit inside the folder that was opened
+      let dir = tab.folder;
+      for (const part of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(part, { create: true });
+      const out = await (await dir.getFileHandle(parts[parts.length - 1], { create: true })).createWritable();
+      await out.write(data);
+      await out.close();
+    }
+    tab.unkept = false;
+    return " Your folder has the changes.";
+  } catch (err) {
+    tab.unkept = true;
+    return ` Your folder could not be written to (${err.message}): use Download game to keep the changes.`;
+  }
+}
+
+async function readFolder(dir, prefix, into) {                       // a folder the browser gave us, as [path, bytes] pairs
+  for await (const [name, handle] of dir.entries()) {
+    if (SKIP(name)) continue;
+    if (handle.kind === "directory") await readFolder(handle, prefix + name + "/", into);
+    else {
+      if (into.length >= MOST_FILES) throw new Error("There are too many files in that folder for it to be a game. Choose the game's own folder.");
+      into.push([prefix + name, new Uint8Array(await (await handle.getFile()).arrayBuffer())]);
+    }
+  }
+  return into;
+}
+
+async function openGame(what, work) {
+  $("open").classList.add("busy");
+  status("Opening " + what + "…");
+  try {
+    await wake();
+    const placed = await work();
+    tab.game = placed.game;
+    tab.home = placed.home || "";
+    await begin();
+    $("open").hidden = true;
+    document.body.classList.remove("opening");
+  } catch (err) {
+    tab.folder = null;
+    status("Could not open " + what + ": " + err.message, true);
+  }
+  $("open").classList.remove("busy");
+}
+
+async function openFolder() {
+  if (!window.showDirectoryPicker) return $("open-dir-input").click();
+  let dir;
+  try { dir = await window.showDirectoryPicker({ id: "clio-game", mode: "readwrite" }); } catch (err) { return; }      // changed their mind
+  await openGame(dir.name, async () => {
+    const files = await readFolder(dir, "", []);
+    tab.folder = dir;
+    return ask("open", { name: dir.name, files }, files.map(([, data]) => data.buffer));
+  });
+}
+
+async function openPicked(list) {                                    // the fallback: a folder as a list of files, read only
+  const files = [];
+  let name = "game";
+  for (const file of list) {
+    const parts = (file.webkitRelativePath || file.name).split("/");
+    if (parts.length > 1) name = parts[0];
+    if (parts.some(SKIP)) continue;
+    if (files.length >= MOST_FILES) return status("There are too many files in that folder for it to be a game. Choose the game's own folder.", true);
+    files.push([parts.slice(parts.length > 1 ? 1 : 0).join("/"), new Uint8Array(await file.arrayBuffer())]);
+  }
+  if (files.length) await openGame(name, () => ask("open", { name, files }, files.map(([, data]) => data.buffer)));
+}
+
+async function openZip(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  await openGame(file.name, () => ask("open-zip", { name: file.name.replace(/\.zip$/i, ""), bytes }, [bytes.buffer]));
+}
+
+async function welcome() {
+  document.body.classList.add("opening");
+  $("open").hidden = false;
+  status("");
+  $("open-note").textContent = window.showDirectoryPicker
+    ? "Opened as a folder, the game is saved straight back into that folder; your browser will ask you to allow it. Opened from a zip file, changes stay in this page until you download the game."
+    : "In this browser a page cannot write into a folder: Save keeps your changes in this page, and Download game gives you the folder back as a zip file. Chrome and Edge can save straight into the folder.";
+  $("open-folder").addEventListener("click", openFolder);
+  $("open-zip").addEventListener("click", () => $("open-zip-input").click());
+  $("open-dir-input").addEventListener("change", (e) => { openPicked([...e.target.files]); e.target.value = ""; });
+  $("open-zip-input").addEventListener("change", (e) => { if (e.target.files[0]) openZip(e.target.files[0]); e.target.value = ""; });
+  wake().then(() => { if (!state.game) status(""); }, (err) => status("The engine could not be started: " + err.message, true));
+  try {
+    tab.manifest = await (await fetch("manifest.json", { cache: "no-cache" })).json();
+  } catch (err) {
+    return;                                                          // no list of games: a folder or a zip still open
+  }
+  const offer = (game, name, label, about) => el("li", {}, el("button", { type: "button", class: "quiet", onclick: () =>
+    openGame(label, () => ask("open", { name, fetch: { folder: game.folder, files: game.files } })) }, label), about ? el("span", { class: "note" }, about) : null);
+  $("open-games").append(offer(tab.manifest.starter, "mygame", "A new game", "The Cellar: two rooms and three items, to turn into your own."),
+    ...tab.manifest.games.map((g) => offer(g, g.id, g.title, g.about)));
+}
+
+// ---------------------------------------------------------------------- start
+async function begin() {
+  state.game = await api("/api/game");
   state.problems = state.game.problems;
   $("title").textContent = state.game.title;
-  $("folder").textContent = state.game.folder;
+  $("folder").textContent = !HOSTED ? state.game.folder
+    : tab.folder ? `${tab.folder.name}${tab.home ? "/" + tab.home : ""} - saved into the folder you opened` : `${state.game.id} - in this page, until you download it`;
   status(state.problems.length ? "" : "The engine finds no problems.");
   renderAll();
   select("game", "game");
+}
+
+(async function start() {
+  if (!HOSTED && !KEY) {                                               // on this computer, but is it clio.py that serves the page?
+    const res = await fetch("/api/game").catch(() => null);           // clio.py says "no key" (403); a plain file server has no such address
+    if (!res || res.status !== 403) HOSTED = true;
+  }
+  $("reopen").hidden = !HOSTED;
+  $("reopen").addEventListener("click", () => location.reload());     // the browser asks first when something is not kept
+  if (HOSTED) welcome();
+  else begin().catch((err) => status("Could not open the game: " + err.message, true));
 })();

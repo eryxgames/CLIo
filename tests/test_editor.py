@@ -18,6 +18,7 @@ from helpers import ROOT                                        # noqa: E402
 
 from engine import conditions, editor, schema                   # noqa: E402
 from engine.data import GameData, find_games                    # noqa: E402
+from engine.editor import hosted, service                       # noqa: E402
 from engine.editor.server import make_server                    # noqa: E402
 
 TYPES = {"text", "long", "number", "bool", "choice", "tags", "ref", "refs", "sprite", "group", "rows", "map",
@@ -577,6 +578,87 @@ class SpriteTests(unittest.TestCase):
         self.assertEqual(len(looks.grow("x", 99)["pixels"]), 32)                # kept to a sensible size
         self.assertEqual(looks.colours({"a": "#2B3340", "b": 202, "c": [1, 2, 3], "d": "none", "e": "no such colour"}),
                          {"a": "#2b3340", "b": "#ff5f00", "c": "#010203", "d": None, "e": None})
+
+
+class HostedTests(unittest.TestCase):
+    """The editor opened from a web address: the same service, a game held in memory, a list of files to fetch."""
+
+    def files(self, name, under=""):
+        folder = os.path.join(ROOT, "games", name)
+        out = []
+        for where, _dirs, names in os.walk(folder):
+            for n in names:
+                path = os.path.join(where, n)
+                with open(path, "rb") as f:
+                    out.append((under + os.path.relpath(path, folder).replace(os.sep, "/"), f.read()))
+        return out
+
+    def test_the_list_of_files_is_current(self):
+        with open(hosted.MANIFEST, encoding="utf-8") as f:
+            listed = json.load(f)
+        self.assertEqual(listed, hosted.manifest(), "run: python -m engine.editor.hosted")
+        for path in listed["engine"] + listed["starter"]["files"] + [p for g in listed["games"] for p in g["files"]]:
+            self.assertTrue(os.path.isfile(os.path.join(ROOT, path)), path)
+        self.assertIn("engine/editor/service.py", listed["engine"])
+        self.assertEqual([g["id"] for g in listed["games"]], ["depths", "derelict"])
+        for game in listed["games"] + [listed["starter"]]:
+            self.assertIn(game["folder"] + "/game.json", game["files"])
+
+    def test_the_site_is_served_as_it_is(self):
+        # GitHub Pages leaves out files that start with an underscore (engine/__init__.py) unless told not to
+        self.assertTrue(os.path.isfile(os.path.join(ROOT, ".nojekyll")))
+        with open(os.path.join(ROOT, "index.html"), encoding="utf-8") as f:
+            self.assertIn('url=engine/editor/web/', f.read())
+        web = os.path.dirname(hosted.MANIFEST)
+        with open(os.path.join(web, "worker.js"), encoding="utf-8") as f:
+            worker = f.read()
+        self.assertIn('new URL("../../../", self.location.href)', worker)      # from the page's folder to the root
+        self.assertIn("service.handle", worker)
+
+    def test_a_game_is_placed_and_asked_about(self):
+        into = tempfile.mkdtemp(prefix="clio-hosted-test-")
+        folder = hosted.place("my game!", self.files("derelict"), into)
+        self.assertEqual(os.path.basename(folder), "my_game")
+        self.assertEqual(hosted.found_in[folder], "")
+        game = service.handle(folder, "/api/game")
+        self.assertEqual((game["title"], game["problems"]), ("Derelict", []))
+        self.assertTrue(service.handle(folder, "/api/finish")["finished"])
+        self.assertTrue(service.handle(folder, "/api/archive").startswith(b"PK"))
+        with self.assertRaises(service.Unknown):
+            service.handle(folder, "/api/nothing")
+
+        # nothing has been written yet; a save writes the file and, the first time that day, its backup
+        self.assertEqual(hosted.changed(folder), [])
+        data = game["files"]["game"]["data"]
+        data["title"] = "Adrift"
+        service.handle(folder, "/api/save", {"file": "game", "data": data})
+        written = dict(hosted.changed(folder))
+        self.assertEqual(sorted(p.split("/")[0] for p in written), [editor.BACKUP, "game.json"])
+        self.assertEqual(json.loads(written["game.json"])["title"], "Adrift")
+        self.assertEqual(hosted.changed(folder), [])
+
+    def test_the_game_is_found_inside_what_was_opened(self):
+        into = tempfile.mkdtemp(prefix="clio-hosted-test-")
+        # an archive of the folder, as "Download game" makes it; and what is not part of a game is left behind
+        extra = [("derelict/.git/HEAD", b"ref"), ("derelict/saves/slot1.json", b"{}"), ("../outside.txt", b"no")]
+        folder = hosted.place("whatever", self.files("derelict", "derelict/") + extra, into)
+        self.assertEqual((os.path.basename(folder), hosted.found_in[folder]), ("derelict", "derelict"))
+        self.assertEqual(sorted(os.listdir(into)), ["derelict"])
+        self.assertFalse(os.path.exists(os.path.join(folder, ".git")))
+        self.assertFalse(os.path.exists(os.path.join(folder, "saves")))
+        self.assertEqual(service.handle(folder, "/api/game")["title"], "Derelict")
+
+        # the same through a zip file
+        packed = editor.archive(os.path.join(ROOT, "games", "depths"))
+        folder = hosted.place("x", hosted.unzip(packed), into)
+        self.assertEqual(service.handle(folder, "/api/game")["title"], "The Hollow")
+        with self.assertRaises(editor.EditorError):
+            hosted.unzip(b"this is not a zip file")
+
+        with self.assertRaisesRegex(editor.EditorError, "no game.json"):
+            hosted.place("x", [("notes/readme.txt", b"hello")], into)
+        with self.assertRaisesRegex(editor.EditorError, "several games"):
+            hosted.place("x", self.files("derelict", "a/") + self.files("depths", "b/"), into)
 
 
 class ServerTests(unittest.TestCase):

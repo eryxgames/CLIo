@@ -48,8 +48,12 @@ python clio.py depths --mode rogue    # ...with one life and no bottom
 - [x] Generative maze, monster packs, endless dungeons that scale with depth
 - [x] Game modes (for example story and rogue), permadeath, scores and a records table
 - [x] Save / load of the *whole* world, named slots
-- [x] Two demo games, a starter template, 71 automated tests
-- [ ] Entity data editor (`utils/entity_editor.py`, Tkinter, desktop only - still alpha and
+- [x] Two demo games, a starter template, over a hundred automated tests
+- [x] Game editor in the browser: `python clio.py mygame --edit`, or
+      [on the web](https://eryxgames.github.io/CLIo/) with nothing installed - forms for
+      everything a game is made of, the map, conversations as graphs, all text as a
+      table, an enemy workshop, a sprite editor, and a check that the game can be finished
+- [ ] The older entity data editor (`utils/entity_editor.py`, Tkinter, desktop only - still alpha and
       still edits the CLIo 1 file layout in `game_files/`; its Project Map needs
       `pip install graphviz pillow` plus the Graphviz program)
 
@@ -143,7 +147,7 @@ erased when you fall. `records` shows the best runs.
 
 A game is a folder under `games/` with a `game.json` and a few data files. The shortest
 useful game is about thirty lines of JSON: copy `templates/starter/` to `games/yourgame/`
-and edit it. See **[docs/AUTHORING.md](docs/AUTHORING.md)** for
+and edit it - by hand, or with `python clio.py yourgame --edit`. See **[docs/AUTHORING.md](docs/AUTHORING.md)** for
 the full reference: scenes, items, characters, dialogue trees, quests, conditions and
 effects, art files, sprites, music notation, themes and the dungeon generator.
 
@@ -171,6 +175,7 @@ templates/starter/   a tiny complete game to copy (Apache-2.0)
 game_files/          the original CLIo 1 sandbox
 tests/               python -m unittest discover -s tests
 utils/               Tkinter data editor (desktop, alpha)
+index.html, .nojekyll   the editor as a web site (GitHub Pages serves the repository as it is)
 legacy/prototypes/   early dialogue / crafting experiments from CLIo 1
 ```
 

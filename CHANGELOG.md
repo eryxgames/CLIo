@@ -53,6 +53,12 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   (branches, several questions at once) stays as written and is edited as JSON. The two
   vocabularies are data in `engine/schema.py`, held equal to `engine/conditions.py` by a
   test. Parts only some things have wait under *Add…* instead of lengthening every form.
+- **The editor on the web.** The repository is its own site: opened from a web address
+  (GitHub Pages; nothing is built), the editor's page runs the engine in the browser
+  (Pyodide) and asks it the same questions it asks the local server
+  (`engine/editor/service.py`). Open a game folder, a zip, a new game from the starter, or
+  a demo game. In Chrome and Edge it saves straight into the opened folder; elsewhere
+  changes stay in the page until *Download game*. The game never leaves the computer.
 - Editor: *Check-up* lists rooms that cannot be reached and things nothing refers to.
 - Editor: a light / dark / system theme switch, and *Download game* (the folder as a zip).
   The editor now opens at the same address each time (port 8420) when that is free.

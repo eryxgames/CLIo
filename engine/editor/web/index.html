@@ -35,11 +35,26 @@
   <button type="button" id="finish" class="quiet" title="Play the game's walkthrough and see whether it still ends in a win">Can it be finished?</button>
   <button type="button" id="checkup" class="quiet" title="Rooms nobody can reach, things nothing refers to">Check-up</button>
   <button type="button" id="download" class="quiet" title="The whole game folder as one zip file">Download game</button>
+  <button type="button" id="reopen" class="quiet" title="Back to the start, to open a different game" hidden>Open another game</button>
   <button type="button" id="theme" class="quiet"></button>
 </div>
 <section id="found" class="found" hidden aria-label="Places found">
   <p id="found-count"></p>
   <ul id="found-list"></ul>
+</section>
+<section id="open" class="open" hidden aria-label="Open a game">
+  <h2>Open a game</h2>
+  <p>The editor runs in this page. Your browser reads the game from your computer and keeps it there: nothing is uploaded.</p>
+  <p class="row">
+    <button type="button" id="open-folder" class="go">Open a game folder</button>
+    <button type="button" id="open-zip" class="quiet">Open a zip file</button>
+    <input id="open-dir-input" type="file" webkitdirectory hidden>
+    <input id="open-zip-input" type="file" accept=".zip,application/zip" hidden>
+  </p>
+  <p id="open-note" class="note"></p>
+  <h3>Or start from one of these</h3>
+  <ul id="open-games"></ul>
+  <p class="note">With CLIo on your computer, <code>python clio.py mygame --edit</code> opens this same editor on the game's own files.</p>
 </section>
 <main>
   <nav id="kinds" aria-label="What the game is made of"></nav>

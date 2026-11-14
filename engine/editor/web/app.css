@@ -222,3 +222,18 @@ pre.tail { max-width: 46rem; overflow: auto; margin: 0 0 1rem; padding: 0.5rem 0
 }
 select.more { justify-self: start; align-self: start; width: auto; padding: 0.3rem 0.45rem; border: 1px solid var(--rule); border-radius: 6px;
   background: var(--sheet); color: var(--ink-2); }
+
+/* opened from a web address: choose a game first */
+body.opening .tools, body.opening main, body.opening #save { display: none; }
+.open { max-width: 44rem; margin: 0 auto; padding: 2.5rem 1.25rem; }
+.open h2 { margin: 0 0 0.5rem; font-size: 1.5rem; }
+.open h3 { margin: 2rem 0 0.5rem; font-size: 1rem; }
+.open .row { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 1.25rem 0 0.75rem; }
+.open .row button { padding: 0.5rem 1rem; }
+.open .note { color: var(--ink-2); font-size: 0.9rem; max-width: 38rem; }
+.open ul { list-style: none; margin: 0 0 1.5rem; padding: 0; display: grid; gap: 0.5rem; }
+.open li { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: 0.75rem; align-items: baseline; }
+.open li button { justify-self: stretch; text-align: left; padding: 0.4rem 0.7rem; }
+.open code { font: 0.85rem var(--mono); }
+.open.busy button { opacity: 0.5; pointer-events: none; }
+@media (max-width: 520px) { .open li { grid-template-columns: minmax(0, 1fr); gap: 0.2rem; } }

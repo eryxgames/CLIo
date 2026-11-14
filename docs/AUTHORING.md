@@ -621,6 +621,30 @@ effects - can be handled as one table, without touching ids, conditions or anyth
   python clio.py mygame --import-text texts.csv      # refuses if the game would then fail --check
   ```
 
+### Making an enemy, and trying it
+
+Under the list of characters, *Make an enemy…* builds a new one of a strength you choose.
+
+- **Strength** is health times hitting power, `max_health * (6 + attack)` - the measure the
+  dungeon generator itself uses to keep floors in step. You pick a floor to measure
+  against (for a game with a dungeon: its floors and a few below the last; otherwise the
+  average of the game's enemies) and a rank: a minion is 0.6 of that floor's average
+  monster, a regular one equal to it, an elite 2.2, a boss 4.
+- **Start from** an existing character and the new one keeps its moves, tags and looks,
+  scaled by the generator's own rule; or from a plain enemy with a blow and a heavy blow.
+- **Build** turns the same strength into more health and softer hits, or the reverse.
+- **Try it** runs real fights - the engine's battle code, forty times for each class the
+  game has - and shows how often the player wins, how much health is left, how long it
+  takes. The player in these fights is at the level you set, carries what a new character
+  starts with, and fights sensibly without flair: guards a wound-up blow, heals when low,
+  uses a skill when there is focus for it. Use the figures to compare enemies with each
+  other; a person will do better or worse than they say.
+- **Add to the characters** puts it in the game (unsaved, like every change). From there
+  it is an ordinary character: put it in a scene, in a floor's monster table, or edit it.
+
+Every character with stats also has *Try in a fight* at the top of its form, alone or two
+or three at once.
+
 What counts as text is a rule of thumb (`engine/editor/texts.py`): names, titles and
 anything called `..._text` always; otherwise a string with a space in it, unless its key
 is known to hold something else. Songs, sounds and sprites are left out. A choice written

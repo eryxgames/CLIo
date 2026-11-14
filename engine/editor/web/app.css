@@ -78,7 +78,24 @@ nav .none { color: var(--ink-2); }
 #add { display: flex; gap: 0.4rem; padding: 0.5rem; border-top: 1px solid var(--rule); }
 #add input { flex: 1; min-width: 0; padding: 0.3rem 0.5rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper); font-family: var(--mono); font-size: 0.85rem; }
 
+.list .wide { margin: 0 0.5rem 0.5rem; }
 .form { padding: 1rem 1.25rem 3rem; }
+.form .lead { max-width: 46rem; color: var(--ink-2); margin: 0 0 1rem; }
+.sheet { max-width: 46rem; margin: 0.4rem 0 1rem; padding: 0.7rem 0.9rem; background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; }
+.sheet h3 { margin: 0 0 0.4rem; font-size: 1rem; }
+.sheet dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 0.3rem 1rem; margin: 0; }
+.sheet dt { color: var(--ink-2); font-size: 0.85rem; }
+.sheet dd { margin: 0; font-variant-numeric: tabular-nums; font-weight: 600; }
+.sheet table { border-collapse: collapse; margin-top: 0.5rem; font-variant-numeric: tabular-nums; }
+.sheet th, .sheet td { text-align: right; padding: 0.2rem 0 0.2rem 1.4rem; }
+.sheet th { color: var(--ink-2); font-weight: 400; font-size: 0.85rem; }
+.sheet th:first-child, .sheet td:first-child { text-align: left; padding-left: 0; }
+.sheet .row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.sheet .row input[type="number"] { width: 4.5rem; padding: 0.25rem 0.4rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--sheet); }
+.sheet .row select { padding: 0.25rem 0.4rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--sheet); }
+.sheet .note { margin: 0.5rem 0 0; font-size: 0.85rem; color: var(--ink-2); }
+.field input[type="range"] { width: 100%; max-width: 20rem; margin-top: 0.5rem; }
+.ends { display: flex; justify-content: space-between; max-width: 20rem; font-size: 0.8rem; color: var(--ink-2); }
 .form .empty { color: var(--ink-2); max-width: 34rem; }
 .head { display: flex; flex-wrap: wrap; align-items: end; gap: 0.6rem; margin-bottom: 1rem; }
 .head h2 { margin: 0 auto 0 0; font-size: 1.3rem; }

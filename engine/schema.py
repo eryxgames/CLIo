@@ -58,8 +58,7 @@ KINDS = [
         F("title"), F("tempo", "number"), F("steps_per_beat", "number"), F("volume", "number")]},
     {"key": "sounds", "file": "sounds", "label": "Sounds", "one": "sound", "shape": "map", "fields": []},
     {"key": "sprites", "file": "sprites", "label": "Sprites", "one": "sprite", "shape": "map", "fields": []},
-    {"key": "dungeon", "file": "dungeon", "label": "Dungeon", "one": "dungeon", "shape": "object", "fields": [
-        F("growth", "number", "Growth per floor")]},
+    {"key": "dungeon", "file": "dungeon", "label": "Dungeon", "one": "dungeon", "shape": "object", "fields": []},
 ]
 
 BY_FILE = {k["file"]: k for k in KINDS}

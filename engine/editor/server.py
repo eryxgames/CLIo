@@ -15,7 +15,7 @@ import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import EditorError, archive, check, load, put_texts, save, text_table, texts
+from . import EditorError, archive, balance, check, load, put_texts, save, text_table, texts
 
 WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
 PAGES = {"/": ("index.html", "text/html; charset=utf-8"), "/index.html": ("index.html", "text/html; charset=utf-8"),
@@ -100,6 +100,14 @@ def make_server(game_dir, port=None):
                         raise EditorError("That file could not be read as a table of texts: %s" % err)
                     return put_texts(game_dir, rows, body.get("pending") or {})
                 return self.answer(put)
+            if path == "/api/enemy":                        # a new enemy of a chosen strength, to look at
+                return self.answer(lambda: balance.make_enemy(
+                    game_dir, body.get("like") or None, body.get("floor"), body.get("rank") or "regular",
+                    body.get("lean") or 0.0, body.get("name"), body.get("pending") or {}))
+            if path == "/api/odds":                         # how fights against some characters go
+                return self.answer(lambda: balance.odds(
+                    game_dir, [str(e) for e in body.get("enemies") or []], body.get("pending") or {},
+                    body.get("extra") or None, body.get("level") or 1, body.get("fights") or 30))
             if path == "/api/archive":
                 try:
                     with lock:

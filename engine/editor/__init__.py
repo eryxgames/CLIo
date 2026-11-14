@@ -7,6 +7,7 @@ the local editor (``python clio.py mygame --edit``, see ``server.py``) and can
 serve any other front end later.  The rules are the engine's own: a check is
 ``GameData.validate()`` on the files as they would be after saving.
 """
+import contextlib
 import json
 import os
 import re
@@ -64,11 +65,9 @@ def _problem(text):
     return {"text": text, "kind": kind, "id": m.group(2)}
 
 
-def check(game_dir, pending=None):
-    """Problems the engine finds - in the files as they are, or as they would be with ``pending`` saved.
-
-    ``pending`` is ``{key: data}`` for files that were changed and not yet written.
-    """
+@contextlib.contextmanager
+def workdir(game_dir, pending=None):
+    """A throwaway copy of the game's data files, with ``pending`` in place of what is on disk."""
     where = paths(game_dir)
     work = tempfile.mkdtemp(prefix="clio-edit-")
     try:
@@ -79,6 +78,17 @@ def check(game_dir, pending=None):
                     json.dump(pending[key], f)
             elif os.path.isfile(path):
                 shutil.copyfile(path, target)
+        yield work
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def check(game_dir, pending=None):
+    """Problems the engine finds - in the files as they are, or as they would be with ``pending`` saved.
+
+    ``pending`` is ``{key: data}`` for files that were changed and not yet written.
+    """
+    with workdir(game_dir, pending) as work:
         try:
             found = GameData(work).validate()
         except GameDataError as err:
@@ -86,8 +96,6 @@ def check(game_dir, pending=None):
         except Exception as err:                            # data too broken to load is a problem to report, not a crash
             found = ["The game cannot be loaded like this: %s: %s" % (type(err).__name__, err)]
         return [_problem(p) for p in found]
-    finally:
-        shutil.rmtree(work, ignore_errors=True)
 
 
 def _files(game_dir):

@@ -225,6 +225,80 @@ class TextTableTests(unittest.TestCase):
             self.assertEqual(clio.main([folder, "--import-text", os.path.join(folder, "missing.csv")]), 2)
 
 
+class EnemyTests(unittest.TestCase):
+    DEPTHS = os.path.join(ROOT, "games", "depths")
+
+    def test_strength_is_the_generators_own_measure(self):
+        from engine import maze
+        from engine.editor import balance
+        data = GameData(self.DEPTHS)
+        holder = balance._Holder(data)
+        levels = balance.floors(data)
+        written = data.dungeon["floors"]
+        self.assertEqual([f["n"] for f in levels], list(range(1, len(written) + 4)))       # and three floors below
+        self.assertEqual(levels[0]["power"], round(maze.floor_power(holder, written[0])))
+        self.assertEqual([f["power"] for f in levels], sorted(f["power"] for f in levels))  # deeper is stronger
+        rat = data.characters["bone_rat"]["stats"]
+        for factor in (1.3, 2.0, 3.5):                                                      # the same rule as the game's
+            want = maze.scaled(holder, "bone_rat", factor)["stats"]
+            got = balance.scale(rat, factor)
+            self.assertEqual({k: got[k] for k in want}, want)
+        self.assertLess(balance.scale(rat, 0.5)["max_health"], rat["max_health"])           # and it works downwards
+        flat = balance.floors(GameData(os.path.join(ROOT, "games", "derelict")))
+        self.assertEqual((len(flat), flat[0]["n"]), (1, 0))                                 # no dungeon: the game's own enemies
+
+    def test_an_enemy_is_made_to_measure(self):
+        from engine.editor import balance
+        plain = balance.make_enemy(self.DEPTHS)
+        self.assertEqual((plain["id"], plain["floor"]["n"], plain["enemy"]["type"]), ("new_enemy", 1, "hostile"))
+        self.assertAlmostEqual(plain["power"] / plain["target"], 1.0, delta=0.08)
+        self.assertEqual([m["type"] for m in plain["enemy"]["moves"]], ["attack", "heavy"])
+        made = balance.make_enemy(self.DEPTHS, like="bone_rat", floor=3, rank="elite", name="Grave Hound")
+        self.assertEqual((made["id"], made["enemy"]["name"]), ("grave_hound", "Grave Hound"))
+        self.assertAlmostEqual(made["power"] / made["target"], 1.0, delta=0.05)
+        self.assertEqual(made["target"], round(made["floor"]["power"] * balance.RANKS["elite"]))
+        rat = GameData(self.DEPTHS).characters["bone_rat"]
+        self.assertEqual(made["enemy"]["moves"], rat["moves"])                              # it fights like the one it came from
+        self.assertGreater(made["enemy"]["xp"], rat["xp"])
+        tough = balance.make_enemy(self.DEPTHS, like="bone_rat", floor=3, rank="elite", lean=-1)
+        sharp = balance.make_enemy(self.DEPTHS, like="bone_rat", floor=3, rank="elite", lean=1)
+        self.assertGreater(tough["enemy"]["stats"]["max_health"], 1.8 * sharp["enemy"]["stats"]["max_health"])
+        self.assertLess(tough["enemy"]["stats"]["attack"], sharp["enemy"]["stats"]["attack"])
+        for one in (tough, sharp):                                                          # the same strength either way
+            self.assertAlmostEqual(one["power"] / one["target"], 1.0, delta=0.06)
+        king = balance.make_enemy(self.DEPTHS, like="hollow_king", name="Bone Rat")
+        self.assertEqual(king["id"], "bone_rat_2")                                          # never an id that is taken
+        self.assertNotIn("dialogue_tree", king["enemy"])
+        with self.assertRaisesRegex(editor.EditorError, "rank"):
+            balance.make_enemy(self.DEPTHS, rank="god")
+        with self.assertRaisesRegex(editor.EditorError, "not a character with stats"):
+            balance.make_enemy(self.DEPTHS, like="maren")
+
+    def test_fights_are_tried_not_calculated(self):
+        from engine.editor import balance
+        folder = copy_of("depths")
+        before = sorted(os.listdir(folder))
+        easy = balance.odds(folder, ["bone_rat"], fights=12)
+        self.assertEqual([r["class"] for r in easy["rows"]], ["warrior", "rogue", "mystic"])
+        self.assertTrue(all(r["wins"] >= 0.9 and r["health_left"] > 0.6 and r["turns"] >= 1 for r in easy["rows"]), easy)
+        self.assertEqual(easy, balance.odds(folder, ["bone_rat"], fights=12))               # the same dice, the same fights
+        king = balance.odds(folder, ["hollow_king"], fights=8)
+        self.assertTrue(all(r["wins"] <= 0.25 for r in king["rows"]), king)                 # at level 1 that is not a fight
+        later = balance.odds(folder, ["hollow_king"], level=12, fights=8)
+        self.assertGreater(sum(r["wins"] for r in later["rows"]), sum(r["wins"] for r in king["rows"]))
+        pack = balance.odds(folder, ["bone_rat"] * 3, fights=12)
+        self.assertLess(sum(r["health_left"] or 0 for r in pack["rows"]), sum(r["health_left"] for r in easy["rows"]))
+        made = balance.make_enemy(folder, like="bone_rat", floor=2, rank="regular")
+        tried = balance.odds(folder, [made["id"]], extra={made["id"]: made["enemy"]}, level=3, fights=8)
+        self.assertEqual(len(tried["rows"]), 3)
+        self.assertNotIn(made["id"], GameData(folder).characters)                           # trying is not adding
+        self.assertEqual(sorted(os.listdir(folder)), before)                                # and nothing was written or saved
+        with self.assertRaisesRegex(editor.EditorError, "cannot be fought"):
+            balance.odds(folder, ["maren"])
+        solo = balance.odds(os.path.join(ROOT, "games", "derelict"), ["mutated_bugrat"], fights=6)
+        self.assertEqual([r["name"] for r in solo["rows"]], ["The player"])                 # a game without classes
+
+
 class ServerTests(unittest.TestCase):
     def setUp(self):
         self.folder = copy_of("derelict")
@@ -300,6 +374,18 @@ class ServerTests(unittest.TestCase):
         code, body = self.ask("/api/archive", {})
         self.assertEqual((code, body[:2]), (200, b"PK"))
         self.assertEqual(self.ask("/api/archive", {}, key="")[0], 403)
+
+    def test_enemies_through_the_server(self):
+        code, body = self.ask("/api/enemy", {"rank": "boss", "name": "Bilge King"})
+        made = json.loads(body)
+        self.assertEqual((code, made["id"]), (200, "bilge_king"))
+        self.assertTrue(made["like"] and made["floors"] and made["ranks"])
+        code, body = self.ask("/api/odds", {"enemies": [made["id"]], "extra": {made["id"]: made["enemy"]}, "fights": 4})
+        self.assertEqual((code, len(json.loads(body)["rows"])), (200, 1))
+        code, body = self.ask("/api/odds", {"enemies": ["nobody"]})
+        self.assertEqual(code, 400)
+        self.assertIn("cannot be fought", json.loads(body)["error"])
+        self.assertEqual(self.ask("/api/enemy", {"rank": "god"})[0], 400)
 
     def test_the_usual_address_is_tried_first(self):
         from engine.editor import server as module

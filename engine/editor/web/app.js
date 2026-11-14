@@ -156,6 +156,7 @@ function renderList() {
   const single = !kind || kind.shape === "object";
   $("filter").hidden = single;
   $("add").hidden = single;
+  $("workshop").hidden = !kind || kind.key !== "characters";
   if (!kind) { $("things").replaceChildren(); return; }
   if (!single) $("add-id").placeholder = `id for a new ${kind.one}`;
   const q = state.filter.trim().toLowerCase();
@@ -172,6 +173,7 @@ function renderList() {
 function select(kindKey, id) {
   state.kind = kindKey;
   state.id = id;
+  state.workshop = null;
   if (kindOf(kindKey).shape !== "object" && id === null) state.filter = $("filter").value = "";
   renderKinds(); renderList(); renderForm();
 }
@@ -242,6 +244,7 @@ function control(kind, f, thing) {
 
 function renderForm() {
   const host = $("form");
+  if (state.workshop) return renderWorkshop(host);
   const kind = state.kind && kindOf(state.kind);
   const hit = kind && state.id !== null ? find(kind, state.id) : null;
   if (!hit) {
@@ -263,6 +266,12 @@ function renderForm() {
       el("button", { type: "button", class: "quiet warn", onclick: () => remove(kind, hit) }, "Delete"));
   }
   parts.push(head);
+  if (kind.key === "characters" && thing.stats && typeof thing.stats === "object") {
+    head.insertBefore(el("button", { type: "button", class: "quiet", onclick: (e) => {
+      e.target.disabled = true;
+      head.after(fightSheet(() => ({ enemies: [hit.id] }), `How a fight with ${titleOf(kind, hit)} goes`));
+    } }, "Try in a fight"), head.children[1]);
+  }
 
   if (!single) {
     const note = el("p", { class: "note" }, "The name the game's files use for this. Changing it does not change what refers to it; see the list at the bottom.");
@@ -306,6 +315,98 @@ function renderForm() {
     parts.push(box);
   }
   host.replaceChildren(...parts);
+}
+
+// ---------------------------------------------------------------------- enemies: make one, try one
+const pct = (x) => Math.round(100 * x) + "%";
+
+// A box that runs fights on the server (the engine's own battle code) and shows how they went.
+function fightSheet(what, title) {
+  const level = el("input", { type: "number", min: "1", max: "60", value: "1", "aria-label": "Player level" });
+  const count = el("select", { "aria-label": "How many of them" },
+    el("option", { value: "1" }, "one of them"), el("option", { value: "2" }, "two of them"), el("option", { value: "3" }, "three of them"));
+  const out = el("div", {});
+  const go = el("button", { type: "button", class: "quiet", onclick: async () => {
+    const ask = what();
+    if (!ask) return;
+    go.disabled = true;
+    out.replaceChildren(el("p", { class: "note" }, "Fighting…"));
+    try {
+      const enemies = Array(Number(count.value)).fill(ask.enemies[0]);
+      const res = await api("/api/odds", { pending: pending(), enemies, extra: ask.extra, level: Number(level.value) || 1, fights: 40 });
+      out.replaceChildren(el("table", {},
+        el("thead", {}, el("tr", {}, el("th", {}, "Player"), el("th", {}, "Wins"), el("th", {}, "Health left after a win"), el("th", {}, "Turns"))),
+        el("tbody", {}, ...res.rows.map((r) => el("tr", {}, el("td", {}, r.name), el("td", {}, pct(r.wins)),
+          el("td", {}, r.health_left === null ? "-" : pct(r.health_left)), el("td", {}, String(r.turns)))))),
+      el("p", { class: "note" }, `${res.fights} fights each at level ${res.level}, with the equipment a new character starts with, by a player who fights sensibly ` +
+        "and without flair. Good for comparing enemies; a person will do better or worse." +
+        (res.rows.some((r) => r.undecided) ? " Some fights did not end and count as not won." : "")));
+    } catch (err) {
+      out.replaceChildren(el("p", { class: "note bad" }, err.message));
+    }
+    go.disabled = false;
+  } }, "Fight");
+  return el("div", { class: "sheet" }, el("h3", {}, title),
+    el("div", { class: "row" }, "A player at level", level, "against", count, go), out);
+}
+
+function renderWorkshop(host) {
+  const w = state.workshop;
+  const preview = el("div", { class: "sheet" }, el("p", { class: "note" }, "Working it out…"));
+  const like = el("select", {}), floor = el("select", {}), rank = el("select", {});
+  const lean = el("input", { type: "range", min: "-1", max: "1", step: "0.25", value: String(w.lean) });
+  const name = el("input", { type: "text", value: w.name, placeholder: "a name for it" });
+  const addButton = el("button", { type: "button", class: "go", disabled: true, onclick: () => {
+    if (!w.result) return;
+    const made = w.result;
+    add(kindOf("characters"), made.id, made.enemy);
+    status(`${made.enemy.name} was added to the characters as ${made.id}. Nothing is written until you save.`);
+  } }, "Add to the characters");
+  let timer = 0, filled = false;
+
+  async function work() {
+    try {
+      const res = await api("/api/enemy", { pending: pending(), like: w.like, floor: w.floor, rank: w.rank, lean: w.lean, name: w.name });
+      if (state.workshop !== w) return;
+      w.result = res;
+      if (!filled) {                                        // the choices come from the game itself, once
+        filled = true;
+        like.replaceChildren(el("option", { value: "" }, "a plain enemy"), ...res.like.map((c) => el("option", { value: c.id, selected: c.id === w.like }, `${c.name} (${c.id})`)));
+        floor.replaceChildren(...res.floors.map((f) => el("option", { value: String(f.n), selected: f.n === res.floor.n },
+          f.n ? `floor ${f.n}, ${f.name} (strength ${f.power})` : `${f.name} (strength ${f.power})`)));
+        rank.replaceChildren(...res.ranks.map((r) => el("option", { value: r, selected: r === w.rank }, r)));
+      }
+      const st = res.enemy.stats;
+      const gold = Array.isArray(res.enemy.gold) ? res.enemy.gold.join(" to ") : String(res.enemy.gold);
+      preview.replaceChildren(el("h3", {}, `${res.enemy.name} `, el("span", { class: "id" }, res.id)),
+        el("dl", {}, ...[["Health", st.max_health], ["Attack", st.attack], ["Defence", st.defense], ["Experience", res.enemy.xp], ["Gold", gold],
+          ["Strength", `${res.power} (aimed at ${res.target})`]].flatMap(([k, v]) => [el("dt", {}, k), el("dd", {}, String(v))])),
+        el("p", { class: "note" }, "Its moves" + (w.like ? ", looks and tags are those of the one it started from" : " are a blow and a heavy blow with a warning") +
+          ". Everything can be changed once it is added."));
+      addButton.disabled = false;
+    } catch (err) {
+      preview.replaceChildren(el("p", { class: "note bad" }, err.message));
+      addButton.disabled = true;
+    }
+  }
+  const again = () => { clearTimeout(timer); timer = setTimeout(work, 150); };
+  like.addEventListener("change", () => { w.like = like.value; again(); });
+  floor.addEventListener("change", () => { w.floor = Number(floor.value); again(); });
+  rank.addEventListener("change", () => { w.rank = rank.value; again(); });
+  lean.addEventListener("input", () => { w.lean = Number(lean.value); again(); });
+  name.addEventListener("input", () => { w.name = name.value; again(); });
+
+  host.replaceChildren(
+    el("div", { class: "head" }, el("h2", {}, "Make an enemy")),
+    el("p", { class: "lead" }, "A new enemy of a strength you choose, on the same curve as the ones the game spawns: strength is health times hitting power, " +
+      "the measure the dungeon generator uses. Nothing is added until you say so."),
+    field("Start from", like), field("As strong as", floor), field("Rank", rank, el("p", { class: "note" }, "Against that floor's average monster: a minion is 0.6 of it, an elite 2.2, a boss 4.")),
+    field("Build", el("div", {}, lean, el("div", { class: "ends" }, el("span", {}, "tough"), el("span", {}, "sharp"))),
+      el("p", { class: "note" }, "The same strength as more health and softer hits, or less health and harder ones.")),
+    field("Name", name), preview,
+    fightSheet(() => (w.result ? { enemies: [w.result.id], extra: { [w.result.id]: w.result.enemy } } : null), "Try it before adding it"),
+    addButton);
+  work();
 }
 
 // ---------------------------------------------------------------------- changing the set of things
@@ -473,6 +574,11 @@ function theme(next) {
 }
 
 // ---------------------------------------------------------------------- start
+$("workshop").addEventListener("click", () => {
+  state.id = null;
+  state.workshop = { like: "", floor: null, rank: "regular", lean: 0, name: "", result: null };
+  renderList(); renderForm();
+});
 $("find").addEventListener("input", () => { clearTimeout(state.searching); state.searching = setTimeout(search, 250); });
 $("match-case").addEventListener("change", search);
 $("replace-all").addEventListener("click", replaceAll);

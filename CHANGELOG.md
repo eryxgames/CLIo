@@ -23,6 +23,11 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   or a translator - with import to put it back. Ids, conditions and structure are never
   touched; rows that no longer match anything are reported. Also from the command line:
   `--export-text FILE`, `--import-text FILE`.
+- **Making an enemy, and trying it.** In the editor: a new enemy of a chosen strength -
+  measured as the dungeon generator measures it, against a floor and a rank - started
+  from an existing character or a plain one, leaning tough or sharp. *Try in a fight*,
+  for a new enemy or any character with stats, runs the engine's own battle code forty
+  times per class and shows wins, health left and turns.
 - Editor: a light / dark / system theme switch, and *Download game* (the folder as a zip).
   The editor now opens at the same address each time (port 8420) when that is free.
 

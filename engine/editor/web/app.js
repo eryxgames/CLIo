@@ -250,7 +250,7 @@ const naming = (row, fallback) => {
 // One entry of a list or of a set of named things: closed until asked for, so a long thing stays short.
 function entry(key, title, tools, body) {
   const where = `${state.kind}/${state.id}/${key}`;
-  return el("details", { class: "entry", open: state.open.has(where), ontoggle: (e) => { if (e.target.open) state.open.add(where); else state.open.delete(where); } },
+  return el("details", { class: "entry", "data-where": where, open: state.open.has(where), ontoggle: (e) => { if (e.target.open) state.open.add(where); else state.open.delete(where); } },
     el("summary", {}, el("span", { class: "entry-title" }, title), el("span", { class: "entry-tools" }, ...tools)), ...body());
 }
 
@@ -352,6 +352,7 @@ function renderForm() {
   if (state.workshop) return renderWorkshop(host);
   const kind = state.kind && kindOf(state.kind);
   const hit = kind && state.id !== null ? find(kind, state.id) : null;
+  if (!hit && kind && kind.key === "scenes" && things(kind).length) return renderMap(host);
   if (!hit) {
     host.replaceChildren(el("p", { class: "empty" }, !kind ? "Choose something on the left to edit it."
       : things(kind).length ? `Choose a ${kind.one} in the list, or add a new one below it.`
@@ -373,6 +374,7 @@ function renderForm() {
       el("button", { type: "button", class: "quiet warn", onclick: () => remove(kind, hit) }, "Delete"));
   }
   parts.push(head);
+  if (kind.key === "dialogues" && isObject(thing.nodes) && Object.keys(thing.nodes).length) parts.push(dialogueSheet(kind, hit));
   if (kind.key === "characters" && thing.stats && typeof thing.stats === "object") {
     head.insertBefore(el("button", { type: "button", class: "quiet", onclick: (e) => {
       e.target.disabled = true;
@@ -407,6 +409,143 @@ function renderForm() {
     parts.push(box);
   }
   host.replaceChildren(...parts);
+}
+
+// ---------------------------------------------------------------------- pictures of the game: rooms, conversations
+function sv(tag, attrs, ...kids) {
+  const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+    else if (v !== null && v !== undefined && v !== false) node.setAttribute(k, v);
+  }
+  node.append(...kids.filter((k) => k !== null && k !== undefined && k !== false));
+  return node;
+}
+const short = (text, n) => (text.length > n ? text.slice(0, n - 1) + "…" : text);
+const arrowHead = (id) => sv("defs", {}, sv("marker", { id, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "7", markerHeight: "7", orient: "auto-start-reverse" },
+  sv("path", { d: "M 0 0 L 10 5 L 0 10 z", class: "head" })));
+
+// Where the rooms are: the grid the player's own map uses, one level at a time. Drag a room to pin it somewhere else.
+async function renderMap(host) {
+  const kind = kindOf("scenes");
+  host.replaceChildren(el("div", { class: "head" }, el("h2", {}, "Map")), el("p", { class: "lead" }, "Drawing the map…"));
+  let map;
+  try { map = await api("/api/map", { pending: pending() }); } catch (err) { host.replaceChildren(el("p", { class: "empty" }, "The map cannot be drawn: " + err.message)); return; }
+  if (state.kind !== "scenes" || state.id !== null || state.workshop) return;
+  const room = Object.fromEntries(map.rooms.map((r) => [r.id, r]));
+  const placed = map.rooms.filter((r) => r.placed);
+  if (!map.levels.includes(state.level)) state.level = room[map.start] && room[map.start].placed ? room[map.start].z : map.levels[0];
+  const here = placed.filter((r) => r.z === state.level);
+  const W = 172, H = 78, BW = 140, BH = 46, PAD = 24;
+  const minX = Math.min(...here.map((r) => r.x)), minY = Math.min(...here.map((r) => r.y));
+  const cx = (r) => (r.x - minX) * W + PAD + BW / 2, cy = (r) => (r.y - minY) * H + PAD + BH / 2;
+  const svg = sv("svg", { class: "picture", role: "img", "aria-label": `Map of level ${state.level}: ${here.length} rooms`,
+    width: (Math.max(...here.map((r) => r.x)) - minX) * W + BW + 2 * PAD, height: (Math.max(...here.map((r) => r.y)) - minY) * H + BH + 2 * PAD + 14 }, arrowHead("way-head"));
+  const drawn = new Set();
+  for (const w of map.ways) {                               // the ways first, so that rooms lie on top of them
+    const a = room[w.from], b = room[w.to];
+    if (!a || !b || !a.placed || !b.placed || a.z !== state.level || b.z !== state.level) continue;
+    const pair = [w.from, w.to].sort().join(" ");
+    if (drawn.has(pair)) continue;
+    drawn.add(pair);
+    const other = map.ways.find((o) => o.from === w.to && o.to === w.from);
+    const barred = w.barred || (other && other.barred) || "";
+    const dx = cx(b) - cx(a), dy = cy(b) - cy(a);
+    const edge = w.one_way ? Math.min(dx ? (BW / 2 + 3) / Math.abs(dx) : 1, dy ? (BH / 2 + 3) / Math.abs(dy) : 1) : 0;   // stop at the room's edge, so the arrow shows
+    svg.append(sv("line", { x1: cx(a), y1: cy(a), x2: cx(b) - dx * edge, y2: cy(b) - dy * edge, class: "way" + (barred ? " barred" : ""), "marker-end": w.one_way ? "url(#way-head)" : null },
+      sv("title", {}, `${w.name || "A way"} from ${a.name} to ${b.name}` + (barred ? `, ${barred}` : "") + (w.one_way ? ", one way" : ""))));
+  }
+  for (const r of here) {
+    const stairs = map.ways.filter((w) => w.from === r.id && (w.generated || w.missing || (room[w.to] && room[w.to].placed && room[w.to].z !== r.z)));
+    const flagged = state.problems.some((p) => p.kind === "scenes" && p.id === r.id);
+    const g = sv("g", { class: "room" + (r.id === map.start ? " first" : "") + (flagged ? " flagged" : "") + (r.reached ? "" : " lost"), transform: `translate(${cx(r) - BW / 2},${cy(r) - BH / 2})`, tabindex: "0", role: "button",
+      "aria-label": `${r.name}. Enter opens it.`, onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select("scenes", r.id); } } },
+    sv("rect", { width: BW, height: BH, rx: "6" }),
+    sv("text", { x: BW / 2, y: 20, class: "name" }, short(r.name, 19)),
+    sv("text", { x: BW / 2, y: 36, class: "sub" }, short(r.id, 22) + (r.id === map.start ? " (start)" : "")),
+    sv("title", {}, `${r.name} (${r.id})` + (r.reached ? "" : ", which no exit leads to") + (r.pinned ? "" : ", placed by the game") + ". Click to open, drag to move."));
+    stairs.forEach((w, i) => {
+      const up = w.level > 0, to = room[w.to];
+      g.append(sv("text", { x: BW - 6 - i * 16, y: BH + 13, class: "stair" + (w.missing ? " bad" : ""), onpointerdown: (e) => e.stopPropagation(),
+        onclick: (e) => { e.stopPropagation(); if (to && to.placed) { state.level = to.z; renderMap(host); } } },
+      w.missing ? "?" : up ? "▲" : "▼", sv("title", {}, w.missing ? `${w.name || "An exit"} leads to "${w.to}", which does not exist` : w.generated ? `${w.name || "An exit"}: leads into rooms the game makes as it is played`
+        : `${w.name || "Stairs"} to ${to.name}, level ${to.z}`)));
+    });
+    let from = null;                                        // a click opens the room; a drag of more than half a cell pins it there
+    g.addEventListener("pointerdown", (e) => { from = [e.clientX, e.clientY]; g.setPointerCapture(e.pointerId); });
+    g.addEventListener("pointermove", (e) => { if (from) g.setAttribute("transform", `translate(${cx(r) - BW / 2 + e.clientX - from[0]},${cy(r) - BH / 2 + e.clientY - from[1]})`); });
+    g.addEventListener("pointerup", (e) => {
+      if (!from) return;
+      const dx = Math.round((e.clientX - from[0]) / W), dy = Math.round((e.clientY - from[1]) / H);
+      from = null;
+      if (!dx && !dy) return select("scenes", r.id);
+      if (here.some((o) => o.x === r.x + dx && o.y === r.y + dy)) { status("There is already a room in that place.", true); return renderMap(host); }
+      find(kind, r.id).thing.map = [r.x + dx, r.y + dy, r.z];
+      touched(kind);
+      status(`${r.name} is pinned to its new place on the map. Nothing is written until you save.`);
+      renderMap(host);
+    });
+    svg.append(g);
+  }
+  const lost = map.rooms.filter((r) => !r.reached);
+  host.replaceChildren(...[
+    el("div", { class: "head" }, el("h2", {}, "Map"),
+      ...(map.levels.length > 1 ? map.levels.map((z) => el("button", { type: "button", class: "quiet" + (z === state.level ? " on" : ""), "aria-pressed": z === state.level ? "true" : "false",
+        onclick: () => { state.level = z; renderMap(host); } }, `Level ${z}`)) : [])),
+    el("p", { class: "lead" }, "The rooms where the player's own map puts them. Click a room to open it; drag one to pin it to another place. " +
+      "A dashed way is locked, blocked or guarded; an arrow is a way with no way back; ▲ and ▼ lead to another level." +
+      (map.generated ? " This game also makes rooms as it is played; those are not here." : "")),
+    el("div", { class: "picture-box" }, svg),
+    lost.length ? el("p", { class: "lead" }, "Drawn with a dashed edge, because no exit leads there from the first scene: ",
+      ...lost.flatMap((r, i) => [i ? ", " : "", el("button", { type: "button", class: "link", onclick: () => select("scenes", r.id) }, r.name)]), ".") : null].filter(Boolean));
+}
+
+// How a conversation runs: nodes from left to right in the order they can be reached, jumps as arrows.
+function dialogueSheet(kind, hit) {
+  const box = el("div", { class: "picture-box" }, el("p", { class: "note" }, "Drawing the conversation…"));
+  const sheet = el("div", { class: "sheet wide" }, el("h3", {}, "How it runs"), box);
+  api("/api/dialogue", { tree: hit.thing }).then((g) => {
+    const BW = 176, BH = 52, CW = 250, RH = 72, PAD = 16;
+    const cols = {};
+    const last = Math.max(0, ...g.nodes.filter((n) => n.reached).map((n) => n.depth));
+    for (const n of g.nodes) { const c = n.reached ? n.depth : last + 1; (cols[c] = cols[c] || []).push(n); n.col = c; n.row = cols[c].length - 1; }
+    const at = Object.fromEntries(g.nodes.map((n) => [n.id, n]));
+    const x = (n) => PAD + n.col * CW, y = (n) => PAD + 18 + n.row * RH;
+    const svg = sv("svg", { class: "picture", role: "img", "aria-label": `The conversation ${hit.id}: ${g.nodes.length} nodes`,
+      width: PAD * 2 + Object.keys(cols).length * CW - (CW - BW), height: PAD * 2 + 18 + Math.max(...Object.values(cols).map((c) => c.length)) * RH }, arrowHead("jump-head"));
+    g.jumps.forEach((j, i) => {
+      const a = at[j.from], b = at[j.to];
+      const forward = b.col > a.col;
+      const x1 = forward ? x(a) + BW : x(a) + BW / 2, y1 = forward ? y(a) + BH / 2 : y(a), x2 = forward ? x(b) : x(b) + BW / 2 + 12, y2 = forward ? y(b) + BH / 2 : y(b);
+      const lift = 18 + (i % 4) * 7;
+      const d = forward ? `M ${x1} ${y1} C ${x1 + 50} ${y1}, ${x2 - 50} ${y2}, ${x2} ${y2}` : `M ${x1} ${y1} C ${x1} ${y1 - lift}, ${x2} ${y2 - lift}, ${x2} ${y2}`;
+      svg.append(sv("path", { d, class: "jump" + (forward ? "" : " back") + (j.kind === "then" ? " then" : ""), "marker-end": "url(#jump-head)" },
+        sv("title", {}, j.kind === "then" ? `${j.from} goes on to ${j.to} by itself` : `"${j.by}" leads from ${j.from} to ${j.to}`)));
+      if (j.by && forward) svg.append(sv("text", { x: (x1 + x2) / 2, y: (y1 + y2) / 2 - 4, class: "by" }, short(j.by, 22)));
+    });
+    for (const n of g.nodes) {
+      const open = () => {
+        const where = `${kind.key}/${hit.id}/nodes/${n.id}`;
+        state.open.add(where);
+        renderForm();
+        const target = document.querySelector(`details[data-where="${CSS.escape(where)}"]`);
+        if (target) target.scrollIntoView({ block: "center" });
+      };
+      svg.append(sv("g", { class: "room" + (n.start ? " first" : "") + (n.reached ? "" : " lost"), transform: `translate(${x(n)},${y(n)})`, tabindex: "0", role: "button", "aria-label": `Node ${n.id}. Enter opens it.`,
+        onclick: open, onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } } },
+      sv("rect", { width: BW, height: BH, rx: "6" }),
+      sv("text", { x: 10, y: 20, class: "name left" }, short(n.id, 20) + (n.start ? " (start)" : "")),
+      sv("text", { x: 10, y: 38, class: "sub left" }, short(n.text.replace(/\s+/g, " "), 27)),
+      n.stays ? sv("text", { x: BW - 8, y: 20, class: "sub right" }, `${n.stays} ↺`) : null,
+      sv("title", {}, (n.reached ? "" : "Never reached. ") + (n.stays ? `${n.stays} answer${n.stays === 1 ? "" : "s"} given without leaving this node. ` : "") + (n.text || "(no text)"))));
+    }
+    const notes = [];
+    if (g.nodes.some((n) => !n.reached)) notes.push("A node with a dashed edge is never reached.");
+    for (const m of g.missing) notes.push(m.from ? `"${m.from}" jumps to "${m.to}", which does not exist.` : `It starts at "${m.to}", which does not exist.`);
+    box.replaceChildren(svg);
+    sheet.append(el("p", { class: "note" + (g.missing.length ? " bad" : "") }, ["Click a node to open it below. A solid arrow is a choice, a dotted one a node going on by itself; ↺ counts answers that stay on the node.", ...notes].join(" ")));
+  }).catch((err) => box.replaceChildren(el("p", { class: "note bad" }, err.message)));
+  return sheet;
 }
 
 // ---------------------------------------------------------------------- pixel sprites

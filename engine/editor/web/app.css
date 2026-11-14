@@ -155,3 +155,31 @@ button.small { padding: 0.05rem 0.45rem; font-size: 0.85rem; }
 button.link { border: 0; background: none; padding: 0 0 0.5rem; color: var(--mark); text-decoration: underline; font-size: 0.85rem; }
 .rows > .row, .rows > form.row { display: flex; gap: 0.4rem; margin-top: 0.3rem; }
 .rows > form.row input { flex: 0 1 14rem; min-width: 0; padding: 0.3rem 0.5rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--sheet); }
+
+/* pictures: the room map and the run of a conversation */
+.picture-box { overflow: auto; max-width: 100%; background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; }
+.sheet .picture-box { border: 0; }
+.sheet.wide { max-width: none; }
+.picture { display: block; font-family: var(--sans); touch-action: none; }
+.picture .room { cursor: pointer; }
+.picture .room rect { fill: var(--paper); stroke: var(--ink-2); stroke-width: 1; }
+.picture .room.first rect { stroke: var(--mark); stroke-width: 2; }
+.picture .room.flagged rect { stroke: var(--bad); stroke-width: 2; }
+.picture .room.lost rect { stroke-dasharray: 5 4; }
+.picture .room:hover rect, .picture .room:focus-visible rect { fill: var(--mark-soft); }
+.picture .room:focus-visible { outline: none; }
+.picture text { fill: var(--ink); font-size: 13px; text-anchor: middle; pointer-events: none; }
+.picture text.left { text-anchor: start; }
+.picture text.right { text-anchor: end; }
+.picture text.name { font-weight: 600; }
+.picture text.sub { fill: var(--ink-2); font-size: 11px; }
+.picture text.by { fill: var(--ink-2); font-size: 11px; paint-order: stroke; stroke: var(--sheet); stroke-width: 4px; }
+.picture text.stair { fill: var(--mark); font-size: 13px; pointer-events: auto; cursor: pointer; }
+.picture text.stair.bad { fill: var(--bad); font-weight: 700; }
+.picture .way { stroke: var(--ink-2); stroke-width: 2; }
+.picture .way.barred { stroke-dasharray: 6 5; }
+.picture .jump { fill: none; stroke: var(--ink-2); stroke-width: 1.5; }
+.picture .jump.then { stroke-dasharray: 2 4; }
+.picture .jump.back { stroke: var(--mark); }
+.picture .head { fill: var(--ink-2); }
+.head button.on { background: var(--mark-soft); border-color: var(--mark); }

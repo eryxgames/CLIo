@@ -328,6 +328,68 @@ class AdviceTests(unittest.TestCase):
         self.assertEqual(editor.advice(folder), [])                                         # and nothing was written
 
 
+class ViewTests(unittest.TestCase):
+    DERELICT = os.path.join(ROOT, "games", "derelict")
+
+    def test_the_map_is_the_players_map(self):
+        from engine import automap
+        from engine.editor import views
+        import copy
+        data = GameData(self.DERELICT)
+        want = automap.layout(copy.deepcopy(data.scenes), data.config.get("initial_scene"))
+        got = views.world_map(self.DERELICT)
+        self.assertEqual({r["id"]: (r["x"], r["y"], r["z"]) for r in got["rooms"]}, {k: tuple(v) for k, v in want.items()})
+        self.assertEqual((got["start"], got["levels"], got["generated"]), (data.config.get("initial_scene"), [1, 0], False))
+        self.assertTrue(all(r["placed"] and r["pinned"] and r["reached"] for r in got["rooms"]))
+        ways = {(w["from"], w["to"]): w for w in got["ways"]}
+        self.assertEqual(ways[("corridor", "storage_bay")]["barred"], "locked")
+        self.assertEqual(ways[("utility_room", "corridor")]["barred"], "guarded")
+        self.assertEqual(ways[("corridor", "bridge")]["level"], 1)                         # a lift up
+        self.assertFalse(any(w["missing"] or w["one_way"] for w in got["ways"]))
+        folder = copy_of("derelict")
+        scenes = editor.current(folder)["scenes"]
+        scenes.append({"id": "attic", "name": "Attic", "description": "Dust.", "exits": [{"door_name": "Ladder", "scene_id": "corridor"}]})
+        scenes[0]["exits"].append({"door_name": "Crack", "scene_id": "nowhere"})
+        changed = views.world_map(folder, {"scenes": scenes})
+        attic = [r for r in changed["rooms"] if r["id"] == "attic"][0]
+        self.assertEqual((attic["placed"], attic["reached"]), (True, False))               # set aside: nothing leads there
+        self.assertEqual(sum(1 for r in changed["rooms"] if not r["reached"]), 1)
+        ways = {(w["from"], w["to"]): w for w in changed["ways"]}
+        self.assertTrue(ways[("attic", "corridor")]["one_way"])
+        self.assertTrue(ways[(scenes[0]["id"], "nowhere")]["missing"])
+        hollow = views.world_map(os.path.join(ROOT, "games", "depths"))                     # most of it is made in play
+        self.assertTrue(hollow["generated"])
+        self.assertEqual([(w["generated"], w["missing"], w["level"]) for w in hollow["ways"]], [(True, False, -1)])
+
+    def test_a_conversation_as_the_engine_runs_it(self):
+        from engine.editor import views
+        with open(os.path.join(self.DERELICT, "dialogues.json"), encoding="utf-8") as f:
+            bolt = json.load(f)["bolt"]
+        g = views.dialogue_graph(bolt)
+        by_id = {n["id"]: n for n in g["nodes"]}
+        self.assertEqual([n["id"] for n in g["nodes"] if n["start"]], ["hello", "again", "after"])   # three ways in, by condition
+        self.assertEqual((by_id["menu"]["depth"], by_id["menu"]["stays"]), (1, 5))
+        self.assertEqual({(j["from"], j["to"], j["kind"]) for j in g["jumps"]},
+                         {("hello", "menu", "then"), ("again", "menu", "then"), ("after", "menu", "then")})
+        self.assertEqual(g["missing"], [])
+        tree = {"start": "a", "nodes": {
+            "a": {"text": "Hello.", "choices": [{"text": "Who are you?", "say": "Nobody."}, {"text": "Trade?", "goto": "shop"},
+                                                {"text": "Bye.", "goto": "end"}, {"text": "Odd.", "goto": "nowhere"}]},
+            "shop": {"text": "Look.", "goto": "a"},
+            "orphan": {"variants": [{"if": "x", "text": "Never said."}]}}}
+        g = views.dialogue_graph(tree)
+        by_id = {n["id"]: n for n in g["nodes"]}
+        self.assertEqual([n["id"] for n in g["nodes"]], ["a", "shop", "orphan"])            # in the order they are reached
+        self.assertEqual((by_id["a"]["stays"], by_id["a"]["ends"], by_id["a"]["depth"]), (1, True, 0))
+        self.assertEqual((by_id["orphan"]["reached"], by_id["orphan"]["ends"], by_id["orphan"]["text"]), (False, True, "Never said."))
+        self.assertEqual([(j["from"], j["to"], j["by"], j["kind"]) for j in g["jumps"]],
+                         [("a", "shop", "Trade?", "choice"), ("shop", "a", "", "then")])
+        self.assertEqual([(m["from"], m["to"]) for m in g["missing"]], [("a", "nowhere")])
+        self.assertEqual(views.dialogue_graph({"start": "gone", "nodes": {"x": {"text": "Hi"}}})["nodes"][0]["start"], True)
+        with self.assertRaisesRegex(editor.EditorError, "no nodes"):
+            views.dialogue_graph({"start": "a"})
+
+
 class SpriteTests(unittest.TestCase):
     def test_a_grown_sprite_is_the_one_the_game_draws(self):
         from engine import sprite
@@ -437,6 +499,13 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(code, 400)
         self.assertIn("cannot be fought", json.loads(body)["error"])
         self.assertEqual(self.ask("/api/enemy", {"rank": "god"})[0], 400)
+
+    def test_views_through_the_server(self):
+        code, body = self.ask("/api/map", {})
+        self.assertEqual((code, len(json.loads(body)["rooms"])), (200, 8))
+        code, body = self.ask("/api/dialogue", {"tree": {"nodes": {"a": {"text": "Hi", "goto": "b"}, "b": {"text": "Bye"}}}})
+        self.assertEqual((code, [n["depth"] for n in json.loads(body)["nodes"]]), (200, [0, 1]))
+        self.assertEqual(self.ask("/api/dialogue", {"tree": {}})[0], 400)
 
     def test_advice_through_the_server(self):
         items = json.loads(self.ask("/api/game")[1])["files"]["items"]["data"]

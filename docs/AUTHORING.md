@@ -595,6 +595,21 @@ that one game. Ctrl+C in the terminal ends it.
 The forms are built from `engine/schema.py`, which describes the data files. To give a
 field a control, add a line there.
 
+### The map and the conversations
+
+Choosing *Scenes* on the left shows the **map**: the rooms where the player's own map puts
+them, one level at a time. A dashed way is locked, blocked or guarded; an arrow is a way
+with no way back; ▲ and ▼ lead to another level. Click a room to open it. Drag a room to
+pin it to another place (that writes its `"map": [x, y, level]`). Rooms that no exit leads
+to have a dashed edge and are listed under the picture. Rooms a game makes as it is played - a generated
+dungeon - are not on it.
+
+A **dialogue** opens with a picture of how it runs: its nodes from left to right in the
+order they can be reached, the jumps between them as arrows - solid for a choice, dotted
+for a node that goes on by itself - and a count of the answers that stay on a node. A
+node that is never reached has a dashed edge; a jump to a node that does not exist is
+named. Click a node to open it in the form below.
+
 ### All the text at once
 
 Everything a player can read - names, descriptions, dialogue, quest steps, the lines of

@@ -15,7 +15,7 @@ import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import EditorError, advice, archive, balance, check, load, looks, put_texts, save, text_table, texts
+from . import EditorError, advice, archive, balance, check, load, looks, put_texts, save, text_table, texts, views
 
 WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
 PAGES = {"/": ("index.html", "text/html; charset=utf-8"), "/index.html": ("index.html", "text/html; charset=utf-8"),
@@ -110,6 +110,10 @@ def make_server(game_dir, port=None):
                     body.get("extra") or None, body.get("level") or 1, body.get("fights") or 30))
             if path == "/api/advice":                       # not wrong, but perhaps not meant
                 return self.answer(lambda: {"advice": advice(game_dir, body.get("pending") or {})})
+            if path == "/api/map":                          # the rooms where the player's map puts them
+                return self.answer(lambda: views.world_map(game_dir, body.get("pending") or {}))
+            if path == "/api/dialogue":                     # how one conversation runs
+                return self.answer(lambda: views.dialogue_graph(body.get("tree")))
             if path == "/api/sprite":                       # grow a sprite as the game would, or name a palette's colours
                 if "palette" in body:
                     return self.answer(lambda: {"colours": looks.colours(body.get("palette"))})

@@ -35,6 +35,11 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 - **Forms for the parts of things.** Exits, stats, moves, quest stages, dialogue nodes and
   choices, item states and effects are edited as forms - add, remove, reorder - instead
   of JSON. Described, like everything else, in `engine/schema.py` (`group`, `rows`, `map`).
+- **The map and the conversations.** The editor draws the rooms where the player's own map
+  puts them (`automap.layout`), level by level, with locked ways, one-way ways and stairs
+  marked; drag a room to pin it elsewhere. A dialogue is drawn as it runs: nodes in the
+  order they are reached, choices and automatic jumps as arrows, unreachable nodes and
+  jumps to nowhere pointed out.
 - Editor: *Check-up* lists rooms that cannot be reached and things nothing refers to.
 - Editor: a light / dark / system theme switch, and *Download game* (the folder as a zip).
   The editor now opens at the same address each time (port 8420) when that is free.

@@ -71,6 +71,7 @@ python clio.py [game] [options]
   --seed N        reproducible random numbers (same seed, same dungeon)
   --mode NAME     game mode, for games that have several (depths: story, rogue)
   --check         validate a game's data files and exit
+  --edit          open the game in the editor, a page in your browser
 ```
 
 `python main.py` still works, as in CLIo 1.

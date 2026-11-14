@@ -11,6 +11,13 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   make risers, falls and swells. Levels also work on chords and drum hits, slides on the
   `noise` wave. Songs written for 2.0 sound exactly as before.
 - `synth.tone(..., glide=True)` slides evenly in pitch over the held part of a note.
+- **An editor in the browser.** `python clio.py mygame --edit` opens the game as a page
+  served by CLIo itself: forms for scenes, items, characters, quests and texts, built from
+  a description of the data files (`engine/schema.py`); the engine's own check as you
+  type; saving that changes only the lines you changed; a list of where each thing is
+  used, and renaming that carries those places along. Standard library only. It is the
+  first step towards replacing the tkinter entity editor in `utils/`, which still edits
+  CLIo 1 games only.
 
 ### Changed
 

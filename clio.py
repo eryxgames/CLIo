@@ -123,6 +123,9 @@ def main(argv=None):
     ap.add_argument("game", nargs="?", help="game folder name or path")
     ap.add_argument("--list", action="store_true", help="list available games and exit")
     ap.add_argument("--check", action="store_true", help="validate the game's data files and exit")
+    ap.add_argument("--edit", action="store_true", help="open the game in the editor (a page in your browser)")
+    ap.add_argument("--port", type=int, default=0, help="port for the editor (default: any free one)")
+    ap.add_argument("--no-browser", action="store_true", help="with --edit: print the address, do not open it")
     ap.add_argument("--style", help="visual style (%s)" % ", ".join(available_themes()))
     ap.add_argument("--no-sound", action="store_true", help="run silently")
     ap.add_argument("--no-color", action="store_true", help="plain text, no colours")
@@ -162,6 +165,9 @@ def main(argv=None):
             return 2
         return 0
 
+    if args.edit:
+        from engine.editor.server import serve
+        return serve(game_dir, args.port, not args.no_browser)
     try:
         if args.check:
             data = GameData(game_dir)

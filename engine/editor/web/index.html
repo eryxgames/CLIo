@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CLIo editor</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="bar">
+  <div class="what">
+    <h1 id="title">CLIo editor</h1>
+    <p id="folder"></p>
+  </div>
+  <p id="status" role="status" aria-live="polite">Opening the game…</p>
+  <button type="button" id="problems-toggle" class="quiet" hidden></button>
+  <button type="button" id="save" class="go" disabled>Save</button>
+</header>
+<section id="problems" class="problems" hidden aria-label="Problems the engine found">
+  <ul id="problem-list"></ul>
+</section>
+<main>
+  <nav id="kinds" aria-label="What the game is made of"></nav>
+  <section class="list" aria-label="Things of this kind">
+    <input id="filter" type="search" placeholder="Filter by name or id" aria-label="Filter by name or id">
+    <ul id="things"></ul>
+    <form id="add" hidden>
+      <input id="add-id" type="text" placeholder="id for a new one" aria-label="Id for a new one" autocomplete="off" spellcheck="false">
+      <button type="submit" class="quiet">Add</button>
+    </form>
+  </section>
+  <section id="form" class="form" aria-label="Details">
+    <p class="empty">Choose something on the left to edit it.</p>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

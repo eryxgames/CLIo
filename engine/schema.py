@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
+"""What a game's data files hold, described as data.
+
+The editor builds its forms from this list, so the description of a field is
+written once, here.  It is deliberately incomplete: a field that is not listed
+is still loaded, kept and shown (as JSON) - nothing is lost by not knowing it.
+
+A kind has a ``shape``:
+
+``map``     the file is ``{id: thing, ...}``
+``list``    the file is ``[thing, ...]`` and each thing carries its own ``id``
+``object``  the whole file is one thing (``game.json``, ``dungeon.json``)
+
+A field has a ``type``: ``text``, ``long`` (several lines), ``number``,
+``bool``, ``choice`` (one of ``options``), ``tags`` (a list of words), ``ref``
+(the id of a thing of kind ``of``), ``refs`` (a list of such ids).  Anything
+else - exits, dialogue nodes, effects - is edited as JSON for now.
+"""
+
+
+def F(key, type="text", label=None, **more):
+    return dict({"key": key, "type": type, "label": label or key.replace("_", " ").capitalize()}, **more)
+
+
+KINDS = [
+    {"key": "game", "file": "game", "label": "Game", "one": "game", "shape": "object", "title": "title", "fields": [
+        F("title"), F("subtitle"), F("description", "long"), F("author"), F("version"),
+        F("initial_scene", "ref", "First scene", of="scenes"), F("style"), F("currency"),
+        F("max_hints", "number")]},
+    {"key": "scenes", "file": "scenes", "label": "Scenes", "one": "scene", "shape": "list", "title": "name", "fields": [
+        F("name"), F("area"), F("description", "long"), F("first_visit", "long"), F("art"),
+        F("music", "ref", of="music"), F("enter_sfx", label="Sound on entering"),
+        F("items", "refs", of="items"), F("passive_items", "refs", "Scenery (items that cannot be taken)", of="items"),
+        F("characters", "refs", of="characters")]},
+    {"key": "items", "file": "items", "label": "Items", "one": "item", "shape": "map", "title": "name", "fields": [
+        F("name"), F("short", label="Short name"), F("description", "long"), F("aliases", "tags"),
+        F("value", "number"), F("takeable", "bool"), F("usable", "bool"), F("use_text", "long"),
+        F("equippable", "bool"), F("slot"), F("interactive", "bool"), F("current_state"),
+        F("tool", "bool"), F("lockpick", "bool"), F("contents", "refs", of="items"),
+        F("components", "refs", "Made from", of="items")]},
+    {"key": "characters", "file": "characters", "label": "Characters", "one": "character", "shape": "map",
+     "title": "name", "fields": [
+        F("name"), F("aliases", "tags"),
+        F("type", "choice", "Attitude", options=["friendly", "neutral", "hostile", "aggressive"]),
+        F("description", "long"), F("greeting", "long"), F("dialogue_tree", "ref", "Dialogue", of="dialogues"),
+        F("sprite"), F("portrait"), F("tags", "tags"), F("inventory", "refs", of="items"),
+        F("xp", "number"), F("show_hostile", "bool"), F("battle_intro", "long"), F("defeat_text", "long"),
+        F("refuse_text", "long"), F("no_fight_text", "long"), F("immune", "tags")]},
+    {"key": "dialogues", "file": "dialogues", "label": "Dialogues", "one": "dialogue", "shape": "map", "fields": []},
+    {"key": "quests", "file": "quests", "label": "Quests", "one": "quest", "shape": "map", "title": "title", "fields": [
+        F("title"), F("description", "long"), F("complete_on_win", "bool")]},
+    {"key": "triggers", "file": "triggers", "label": "Triggers", "one": "trigger", "shape": "list", "fields": [
+        F("once", "bool"), F("every", "number", "Every N turns")]},
+    {"key": "texts", "file": "texts", "label": "Texts", "one": "text", "shape": "map", "fields": [
+        F("text", "long"), F("show_once", "bool")]},
+    {"key": "music", "file": "music", "label": "Music", "one": "song", "shape": "map", "title": "title", "fields": [
+        F("title"), F("tempo", "number"), F("steps_per_beat", "number"), F("volume", "number")]},
+    {"key": "sounds", "file": "sounds", "label": "Sounds", "one": "sound", "shape": "map", "fields": []},
+    {"key": "sprites", "file": "sprites", "label": "Sprites", "one": "sprite", "shape": "map", "fields": []},
+    {"key": "dungeon", "file": "dungeon", "label": "Dungeon", "one": "dungeon", "shape": "object", "fields": [
+        F("growth", "number", "Growth per floor")]},
+]
+
+BY_FILE = {k["file"]: k for k in KINDS}

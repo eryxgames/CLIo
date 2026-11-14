@@ -560,6 +560,34 @@ when set); the number is its weight.
 best runs of every mode. `records` shows the table. It lives next to the saved games, in
 `records.dat`.
 
+## The editor
+
+```
+python clio.py mygame --edit
+```
+
+opens the game in your browser. Nothing is installed and nothing leaves your machine: the
+page is served by CLIo itself, on this computer only, and it writes only the data files of
+that one game. Ctrl+C in the terminal ends it.
+
+- On the left, what the game is made of - scenes, items, characters, dialogues and so on -
+  then the things of that kind, then a form for the one you chose.
+- Fields the editor knows have a control of their own: text, a number, a tick box, a list
+  of items picked from the game's items. Everything else about a thing - exits, dialogue
+  nodes, effects - is shown as JSON under *Everything else* and kept exactly as written.
+  Nothing is hidden and nothing is dropped.
+- The engine checks the game as you type, with the same rules as `--check`, on the files
+  as they would be after saving. Problems are listed at the top; choosing one takes you
+  to the thing it is about.
+- *Save* writes the changed files. A file keeps its layout, so a version-control diff
+  shows only the lines you changed. The first save of a day keeps the previous version of
+  each file in `.editor-backup` inside the game folder.
+- Under each thing is the list of places that refer to it. Change an id and the editor
+  offers to change those places too.
+
+The forms are built from `engine/schema.py`, which describes the data files. To give a
+field a control, add a line there.
+
 ## Coming from CLIo 1
 
 CLIo 1 game folders load unchanged. What behaves differently:

@@ -12,6 +12,11 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   `noise` wave. Songs written for 2.0 sound exactly as before.
 - `synth.tone(..., glide=True)` slides evenly in pitch over the held part of a note.
 
+### Changed
+
+- The dungeon demo is now called *The Hollow* (it was *The Hollow Depths*). Its folder is
+  still `games/depths`, so saves, records and commands are unchanged.
+
 ## 2.0.0 - 2026-11-13
 
 A rebuild of the engine. Games written for CLIo 1 still load.

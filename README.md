@@ -24,7 +24,7 @@ python clio.py depths --mode rogue    # ...with one life and no bottom
 | Game | What it shows |
 | --- | --- |
 | **Derelict** (`games/derelict`) | A complete short adventure aboard an abandoned cargo hauler. Puzzles, dialogue trees, quests, a wandering NPC, one tactical fight that can also be talked around, and three endings. |
-| **The Hollow Depths** (`games/depths`) | A dungeon crawler that is different on every run: three generated floors, three character classes, tactical combat against single monsters and packs, loot, shrines, a peddler, generated monster sprites and generated music. `--seed 7` replays the same dungeon. **Rogue mode** gives you one life and a dungeon that keeps going down, with a table of the best runs. |
+| **The Hollow** (`games/depths`) | A dungeon crawler that is different on every run: three generated floors, three character classes, tactical combat against single monsters and packs, loot, shrines, a peddler, generated monster sprites and generated music. `--seed 7` replays the same dungeon. **Rogue mode** gives you one life and a dungeon that keeps going down, with a table of the best runs. |
 | **Sandbox** (`game_files`) | The original CLIo 1 test bed, loaded unchanged by the new engine. |
 
 ## Features
@@ -131,7 +131,7 @@ In a fight the enemy shows what it is about to do. **Guard** when a heavy blow i
 **strike** while it winds up, **focus** while it braces. Against a group, add a number to
 aim: `strike 2`. Ctrl-C skips an animation.
 
-A game can offer several modes. In The Hollow Depths, **Story** is three floors with a save
+A game can offer several modes. In The Hollow, **Story** is three floors with a save
 at every stair; **Rogue** is one life in a dungeon without a bottom. A rogue run is saved
 as you go and waits for you when you quit, but there is no loading back, and the save is
 erased when you fall. `records` shows the best runs.

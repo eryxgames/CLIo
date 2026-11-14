@@ -1,8 +1,8 @@
-# The Hollow Depths - licence
+# The Hollow - licence
 
 Copyright (c) 2026 Daniel Sandner (https://eryxian.com). All rights reserved.
 
-*The Hollow Depths* is a demonstration game for the CLIo engine. The engine is open source under
+*The Hollow* is a demonstration game for the CLIo engine. The engine is open source under
 the Apache License 2.0; **this game is not**. Its setting, text, characters, dialogue, room and monster descriptions, ASCII art, sprites and music in this folder
 belong to the author.
 

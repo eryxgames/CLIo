@@ -115,6 +115,7 @@ def load(game_dir):
     return {"id": cfg.get("id") or os.path.basename(os.path.abspath(game_dir)),
             "title": cfg.get("title") or os.path.basename(os.path.abspath(game_dir)),
             "folder": os.path.abspath(game_dir), "files": files, "schema": schema.KINDS,
+            "effects": schema.EFFECTS, "conditions": schema.CONDITIONS,
             "problems": check(game_dir)}
 
 

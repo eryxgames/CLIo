@@ -578,6 +578,8 @@ that one game. Ctrl+C in the terminal ends it.
   choices, an item's states - open as small forms: add, remove, reorder. Whatever the
   editor has no form for is shown as JSON, under *Everything else* or *Other fields*, and
   kept exactly as written. Nothing is hidden and nothing is dropped.
+- What only some things have - what happens on entering a room, what a character does
+  when given something - waits under *Add…* at the end of a form until it is wanted.
 - The engine checks the game as you type, with the same rules as `--check`, on the files
   as they would be after saving. Problems are listed at the top; choosing one takes you
   to the thing it is about.
@@ -594,6 +596,28 @@ that one game. Ctrl+C in the terminal ends it.
 
 The forms are built from `engine/schema.py`, which describes the data files. To give a
 field a control, add a line there.
+
+### What happens, and when
+
+Effects and conditions are forms too. Wherever something happens - a choice's *And then*,
+a trigger's *Then*, a room's *On entering*, a quest's *When it is completed*, what an
+item answers when it is used - each effect is a line: what happens, chosen from a list
+of everything the engine can do, and what it happens to, chosen from the game's own
+scenes, items, characters, quests and texts. Lines can be moved up and down.
+
+A condition - *Offered when*, *When*, *Done when*, *Unblocked when* - is one question,
+chosen from a list of everything the engine can ask, with a tick for *not*. The editor
+writes the short form where there is one (`"has:key"`, `"!met_robot"`,
+`"quest:main:done"`) and the long form where it is needed (`{"turns": [">=", 50]}`).
+
+Not everything fits on a line. An effect with a branch (`if` / `then` / `else`), several
+questions at once (`all`, `any`), or more settings than the line shows (a line's
+`style`, an effect's own `if`) appear as they are written in the file, and can be edited
+there. Nothing is rewritten by being shown: a file changes only where you change it.
+
+The two lists are `EFFECTS` and `CONDITIONS` in `engine/schema.py`; a test keeps them
+equal to what `engine/conditions.py` understands, so the editor cannot offer a word the
+engine does not know, or miss one that it does.
 
 ### The map and the conversations
 

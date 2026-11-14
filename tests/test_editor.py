@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2024-2026 Daniel Sandner
 """The editor: reading, checking and writing a game's files, and the local server."""
+import inspect
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -14,11 +16,12 @@ import urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from helpers import ROOT                                        # noqa: E402
 
-from engine import editor, schema                               # noqa: E402
+from engine import conditions, editor, schema                   # noqa: E402
 from engine.data import GameData, find_games                    # noqa: E402
 from engine.editor.server import make_server                    # noqa: E402
 
-TYPES = {"text", "long", "number", "bool", "choice", "tags", "ref", "refs", "sprite", "group", "rows", "map"}
+TYPES = {"text", "long", "number", "bool", "choice", "tags", "ref", "refs", "sprite", "group", "rows", "map",
+         "effects", "condition"}
 
 
 def copy_of(name):
@@ -52,6 +55,108 @@ class SchemaTests(unittest.TestCase):
             if kind.get("title"):
                 self.assertIn(kind["title"], seen)
         json.dumps(schema.KINDS)                                        # it is sent to the page as it is
+
+    def test_the_vocabularies_are_the_engines(self):
+        """What the editor offers as effects and conditions is exactly what engine/conditions.py understands."""
+        self.assertEqual(sorted(e["key"] for e in schema.EFFECTS), sorted(conditions._EFFECTS))
+        source = inspect.getsource(conditions._check_one)
+        asked = set(re.findall(r'key == "(\w+)"', source))
+        for group in re.findall(r"key in \(([^)]*)\)", source):
+            asked |= {k.strip().strip('"') for k in group.split(",")}
+        self.assertEqual({c["key"] for c in schema.CONDITIONS}, asked)
+        kinds = {k["key"] for k in schema.KINDS}
+
+        def arg_ok(arg, word):
+            if isinstance(arg, str):
+                self.assertIn(arg, ("text", "long", "number", "flag", "none", "json"), word)
+                return
+            self.assertEqual(len([k for k in ("ref", "words", "choice", "pair", "way", "measure") if k in arg]), 1, word)
+            if "ref" in arg:
+                self.assertIn(arg["ref"], kinds, word)
+            for part in arg.get("pair", []) + arg.get("measure", []):
+                arg_ok(part, word)
+            if "measure" in arg:
+                self.assertTrue(arg["ops"], word)
+                self.assertLessEqual(len(arg["measure"]), 1, word)
+
+        for word in schema.EFFECTS + schema.CONDITIONS:
+            self.assertTrue(word["label"], word)
+            arg_ok(word["arg"], word)
+        for words in (schema.EFFECTS, schema.CONDITIONS):
+            self.assertEqual(len(words), len({w["key"] for w in words}))
+        json.dumps([schema.EFFECTS, schema.CONDITIONS])
+
+    def test_the_games_speak_the_vocabulary(self):
+        """Every effect and condition of the demo games, in the places the schema names, is made of known words."""
+        effects = {e["key"] for e in schema.EFFECTS} | {"if", "then", "else", "style", "effect", "title", "quiet",
+                                                         "fixture", "copy", "can_flee"}
+        asked = {c["key"] for c in schema.CONDITIONS}
+        seen = {"effects": 0, "condition": 0}
+
+        def condition_ok(cond, where):
+            if isinstance(cond, str):
+                text = cond[1:] if cond.startswith("!") else cond
+                if ":" in text:
+                    self.assertIn(text.partition(":")[0].strip(), asked, where)
+            elif isinstance(cond, list):
+                for c in cond:
+                    condition_ok(c, where)
+            elif isinstance(cond, dict):
+                for key, arg in cond.items():
+                    self.assertIn(key, asked, where)
+                    if key in ("all", "any"):
+                        condition_ok(list(arg), where)
+                    elif key == "not":
+                        condition_ok(arg, where)
+
+        def effects_ok(effs, where):
+            for eff in effs if isinstance(effs, list) else [effs]:
+                if isinstance(eff, list):
+                    effects_ok(eff, where)
+                elif isinstance(eff, dict):
+                    self.assertFalse(set(eff) - effects, "%s: %s" % (where, sorted(set(eff) - effects)))
+                    if "if" in eff:
+                        condition_ok(eff["if"], where)
+                    for key in ("then", "else", "do"):
+                        effects_ok(eff.get(key) or [], where)
+                    for branch in eff.get("random") or []:
+                        effects_ok(branch, where)
+
+        def walk(fields, obj, where):
+            for f in fields:
+                value = obj.get(f["key"])
+                if value is None:
+                    continue
+                here = "%s/%s" % (where, f["key"])
+                if f["type"] == "effects":
+                    seen["effects"] += 1
+                    effects_ok(value, here)
+                elif f["type"] == "condition":
+                    seen["condition"] += 1
+                    condition_ok(value, here)
+                elif f["type"] == "group" and isinstance(value, dict):
+                    walk(f["fields"], value, here)
+                elif f["type"] == "rows" and isinstance(value, list):
+                    for i, row in enumerate(value):
+                        if isinstance(row, dict):
+                            walk(f["fields"], row, "%s/%d" % (here, i))
+                elif f["type"] == "map" and isinstance(value, dict):
+                    for name, row in value.items():
+                        if isinstance(row, dict):
+                            walk(f["fields"], row, "%s/%s" % (here, name))
+
+        for name in ("derelict", "depths"):
+            game = editor.load(os.path.join(ROOT, "games", name))
+            for key, file in game["files"].items():
+                kind = schema.BY_FILE[key]
+                data = file["data"]
+                things = [(None, data)] if kind["shape"] == "object" else (
+                    data.items() if kind["shape"] == "map" else [(t.get("id"), t) for t in data])
+                for tid, thing in things:
+                    if isinstance(thing, dict):
+                        walk(kind["fields"], thing, "%s %s/%s" % (name, key, tid))
+        self.assertGreater(seen["effects"], 50)
+        self.assertGreater(seen["condition"], 60)
 
     def test_it_fits_the_games_that_exist(self):
         """Every data file of every game has a kind, in the shape the schema says, and typed fields hold that type."""

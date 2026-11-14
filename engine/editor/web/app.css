@@ -189,3 +189,36 @@ textarea.walk { width: 100%; max-width: 46rem; padding: 0.5rem 0.6rem; border: 1
 .row.gap { display: flex; gap: 0.5rem; margin: 0.6rem 0 1rem; }
 .form p.bad { color: var(--bad); }
 pre.tail { max-width: 46rem; overflow: auto; margin: 0 0 1rem; padding: 0.5rem 0.7rem; background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px; font: 0.8rem/1.45 var(--mono); }
+
+/* effects and conditions: one line each - what, with what, and the row's tools */
+.effects { display: grid; gap: 0.45rem; }
+.effect { display: grid; grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr) auto; gap: 0.35rem 0.5rem; align-items: start; }
+.effect select, .effects > select, .effect input[type="text"], .effect input[type="number"], .effect textarea {
+  width: 100%; min-width: 0; padding: 0.3rem 0.45rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--sheet); }
+.effect > .entry-tools, .effect > .tick { grid-column: 3; grid-row: 1; white-space: nowrap; }
+.effect > .extra { grid-column: 2; }
+.effect.written > input { grid-column: 1 / 3; }
+.effect > .note { grid-column: 1 / -1; font-size: 0.85rem; color: var(--ink-2); }
+.effect input.code { font: 0.82rem var(--mono); }
+.effect input.wrong { border-color: var(--bad); }
+.effect .pair { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; color: var(--ink-2); }
+.effect .pair > * { flex: 1 1 5rem; width: auto; }
+.effect .pair > select.op { flex: 0 0 3.7rem; padding-inline: 0.25rem; font: 0.85rem var(--mono); }
+.effect .pair > input[type="number"] { flex: 0 1 4.5rem; }
+.effect .pair > .pair { flex: 1 1 9rem; }
+.effect .tick { display: inline-flex; align-items: center; gap: 0.25rem; padding-top: 0.3rem; color: var(--ink-2); }
+.effects > select { justify-self: start; width: auto; color: var(--ink-2); }
+/* inside an exit, a choice, a state there is less room: the label goes on top, and a tight row stacks */
+.entry .field.wide, .group .field.wide { grid-template-columns: minmax(0, 1fr); }
+.entry .field.wide > label, .group .field.wide > label { padding-top: 0; }
+.effects { container-type: inline-size; }
+@container (max-width: 27rem) {
+  .effect { grid-template-columns: minmax(0, 1fr) auto; }
+  .effect > :first-child { grid-column: 1; }
+  .effect > :nth-child(2):not(.entry-tools):not(.tick) { grid-column: 1 / -1; grid-row: 2; }
+  .effect > .entry-tools, .effect > .tick { grid-column: 2; }
+  .effect > .extra { grid-column: 1 / -1; grid-row: 3; }
+  .effect.written > input { grid-column: 1; }
+}
+select.more { justify-self: start; align-self: start; width: auto; padding: 0.3rem 0.45rem; border: 1px solid var(--rule); border-radius: 6px;
+  background: var(--sheet); color: var(--ink-2); }

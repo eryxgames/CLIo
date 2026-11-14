@@ -45,6 +45,14 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   real engine, on the game as it is in the page, and says how each ends, where it stops,
   which lines were refused, and what no walkthrough reaches. `python clio.py mygame
   --walkthrough` does the same for scripts. Derelict has one for each of its three endings.
+- **Effects and conditions as forms.** In the editor, what happens (`do`, `on_enter`,
+  `on_complete`, what an item answers to being used, what a character does when given
+  something...) is a list of lines - an effect chosen from all the engine knows, and its
+  target chosen from the game's own things - and a condition (`if`, `when`, `done_when`...)
+  is a question chosen the same way, with a tick for *not*. What is richer than a line
+  (branches, several questions at once) stays as written and is edited as JSON. The two
+  vocabularies are data in `engine/schema.py`, held equal to `engine/conditions.py` by a
+  test. Parts only some things have wait under *Add…* instead of lengthening every form.
 - Editor: *Check-up* lists rooms that cannot be reached and things nothing refers to.
 - Editor: a light / dark / system theme switch, and *Download game* (the folder as a zip).
   The editor now opens at the same address each time (port 8420) when that is free.

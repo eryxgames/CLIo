@@ -7,7 +7,7 @@
 const KEY = new URLSearchParams(location.search).get("key") || "";
 const $ = (id) => document.getElementById(id);
 const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
-const state = { open: new Set(), game: null, kind: null, id: null, dirty: new Set(), problems: [], filter: "", checking: 0, found: [], searching: 0 };
+const state = { open: new Set(), shown: new Set(), game: null, kind: null, id: null, dirty: new Set(), problems: [], filter: "", checking: 0, found: [], searching: 0 };
 
 function el(tag, props, ...children) {
   const node = document.createElement(tag);
@@ -183,7 +183,7 @@ function select(kindKey, id) {
 function field(label, control, note) {
   const id = "f-" + Math.random().toString(36).slice(2, 9);
   if (control.tagName === "INPUT" || control.tagName === "SELECT" || control.tagName === "TEXTAREA") control.id = id;
-  return el("div", { class: "field" }, el("label", { for: control.id || null }, label), control, note || null);
+  return el("div", { class: control.classList.contains("effects") ? "field wide" : "field" }, el("label", { for: control.id || null }, label), control, note || null);
 }
 
 // A form control is only offered for a value of the kind it expects; anything else stays in the JSON below.
@@ -193,6 +193,8 @@ function fits(f, value) {
   if (f.type === "bool") return typeof value === "boolean";
   if (f.type === "tags" || f.type === "refs") return Array.isArray(value) && value.every((v) => typeof v === "string");
   if (f.type === "sprite") return typeof value === "string";
+  if (f.type === "effects") return Array.isArray(value) || isObject(value);
+  if (f.type === "condition") return typeof value === "string" || Array.isArray(value) || isObject(value);
   if (f.type === "group") return isObject(value);
   if (f.type === "map") return isObject(value) && Object.values(value).every(isObject);
   if (f.type === "rows") return Array.isArray(value) && value.every(isObject);
@@ -202,6 +204,181 @@ function fits(f, value) {
 function put(thing, key, value) {
   if (value === "" || value === null || value === undefined || (Array.isArray(value) && value.length === 0)) delete thing[key];
   else thing[key] = value;
+}
+
+// ---------------------------------------------------------------------- what happens, and when: effects and conditions
+// Both are built from the engine's own vocabularies (engine/schema.py). Whatever is richer than a form can say stays
+// as it was written, and is edited as JSON: nothing is reshaped by being shown.
+const wordOf = (list, key) => list.find((v) => v.key === key);
+
+function fitsArg(arg, value) {
+  if (arg === "json") return true;
+  if (arg === "none") return value === true;
+  if (arg === "number") return typeof value === "number";
+  if (typeof arg === "string" || arg.ref || arg.choice || arg.words) return typeof value === "string";
+  if (arg.pair) return Array.isArray(value) && value.length === 2 && fitsArg(arg.pair[0], value[0]) && fitsArg(arg.pair[1], value[1]);
+  if (arg.way) return typeof value === "string" || (Array.isArray(value) && value.length === 2 && value.every((v) => typeof v === "string"));
+  if (arg.measure) {
+    const n = arg.measure.length;
+    return Array.isArray(value) && value.length === n + 2 && (n === 0 || typeof value[0] === "string") &&
+      arg.ops.includes(value[n]) && typeof value[n + 1] === "number";
+  }
+  return false;
+}
+
+function blank(arg) {
+  if (arg === "number") return 0;
+  if (arg === "none") return true;
+  if (arg === "json") return null;
+  if (arg.pair) return arg.pair.map(blank);
+  if (arg.measure) return [...arg.measure.map(blank), arg.ops[0], 0];
+  return "";
+}
+
+function jsonInput(value, set) {
+  return el("input", { type: "text", class: "code", value: value === undefined ? "" : JSON.stringify(value), spellcheck: "false", title: "As written in the file (JSON)",
+    oninput: (e) => {
+      try { set(e.target.value.trim() === "" ? undefined : JSON.parse(e.target.value)); e.target.classList.remove("wrong"); } catch (err) { e.target.classList.add("wrong"); }
+    } });
+}
+
+let listCount = 0;
+
+function argControl(arg, value, set) {
+  if (arg === "none") return null;
+  if (arg === "json") return jsonInput(value, set);
+  if (arg === "number") return el("input", { type: "number", step: "any", value: typeof value === "number" ? String(value) : "", oninput: (e) => set(e.target.value === "" ? 0 : Number(e.target.value)) });
+  if (arg === "long") { const area = el("textarea", { rows: "2", oninput: (e) => set(e.target.value) }); area.value = value || ""; return area; }
+  if (arg.ref || arg.choice) {
+    const options = arg.choice || idsOf(arg.ref);
+    return el("select", { onchange: (e) => set(e.target.value) }, el("option", { value: "", selected: !value }, arg.none || "-"),
+      ...options.map((o) => el("option", { value: o, selected: o === value }, o)),
+      !value || options.includes(value) ? null : el("option", { value, selected: true }, arg.choice ? value : `${value} (not found)`));
+  }
+  if (arg.words) {
+    const id = `words-${listCount += 1}`;
+    return el("span", { class: "pair" }, el("input", { type: "text", class: "short", list: id, value: value || "", oninput: (e) => set(e.target.value) }),
+      el("datalist", { id }, ...arg.words.map((w) => el("option", { value: w }))));
+  }
+  if (arg.pair) {
+    const both = Array.isArray(value) ? value.slice() : arg.pair.map(blank);
+    return el("span", { class: "pair" }, ...arg.pair.map((part, i) => argControl(part, both[i], (v) => { both[i] = v; set(both.slice()); })));
+  }
+  if (arg.way) {                                                       // "to", or ["from", "to"]; from this room when no room is named
+    let from = Array.isArray(value) ? value[0] : "", to = Array.isArray(value) ? value[1] : value || "";
+    const write = () => set(from ? [from, to] : to);
+    return el("span", { class: "pair" }, "from", argControl({ ref: "scenes", none: "this room" }, from, (v) => { from = v; write(); }),
+      "to", argControl({ ref: "scenes" }, to, (v) => { to = v; write(); }));
+  }
+  if (arg.measure) {
+    const parts = Array.isArray(value) ? value.slice() : blank(arg);
+    const n = arg.measure.length;
+    const write = () => set(parts.slice());
+    return el("span", { class: "pair" },
+      n ? argControl(arg.measure[0], parts[0], (v) => { parts[0] = v; write(); }) : null,
+      el("select", { class: "op", "aria-label": "How", onchange: (e) => { parts[n] = e.target.value; write(); } }, ...arg.ops.map((o) => el("option", { value: o, selected: o === parts[n] }, o))),
+      argControl("number", parts[n + 1], (v) => { parts[n + 1] = v; write(); }));
+  }
+  return el("input", { type: "text", class: arg === "flag" ? "code" : "", value: value || "", placeholder: arg === "flag" ? "a flag's name" : "", oninput: (e) => set(e.target.value) });
+}
+
+function effectsControl(kind, f, thing) {
+  const words = state.game.effects;
+  const raw = thing[f.key];
+  const list = Array.isArray(raw) ? raw : isObject(raw) ? [raw] : [];
+  const commit = () => { if (list.length) thing[f.key] = list; else delete thing[f.key]; touched(kind); };
+  const again = () => { commit(); renderForm(); };
+  const tool = (label, title, act, off) => el("button", { type: "button", class: "quiet small", title, disabled: !!off, onclick: () => { act(); again(); } }, label);
+  const rows = list.map((eff, i) => {
+    const tools = el("span", { class: "entry-tools" },
+      tool("↑", "Earlier", () => { list.splice(i - 1, 0, list.splice(i, 1)[0]); }, i === 0),
+      tool("↓", "Later", () => { list.splice(i + 1, 0, list.splice(i, 1)[0]); }, i === list.length - 1),
+      tool("Remove", "Remove this effect", () => { list.splice(i, 1); }));
+    const verbs = isObject(eff) ? Object.keys(eff).filter((k) => wordOf(words, k)) : [];
+    const spec = verbs.length === 1 && !("then" in eff) && !("else" in eff) ? wordOf(words, verbs[0]) : null;
+    if (!spec || !fitsArg(spec.arg, eff[spec.key])) {                // several things at once, or richer than a form: as written
+      return el("div", { class: "effect written" }, jsonInput(eff, (v) => { if (v !== undefined) { list[i] = v; commit(); } }), tools);
+    }
+    const others = Object.keys(eff).filter((k) => k !== spec.key);
+    const pick = el("select", { "aria-label": "What happens", onchange: (e) => {
+      const next = wordOf(words, e.target.value);
+      const rest = Object.fromEntries(others.map((k) => [k, eff[k]]));
+      list[i] = Object.assign({ [next.key]: blank(next.arg) }, rest);
+      again();
+    } }, ...words.map((w) => el("option", { value: w.key, selected: w.key === spec.key }, w.label)));
+    const extra = others.length ? jsonInput(Object.fromEntries(others.map((k) => [k, eff[k]])), (v) => {
+      if (!isObject(v)) return;
+      for (const k of others) delete eff[k];
+      Object.assign(eff, v);
+      commit();
+    }) : null;
+    if (extra) extra.classList.add("extra");
+    if (extra) extra.title = "More about this effect, as written in the file (JSON): its style, a condition (\"if\"), quiet…";
+    return el("div", { class: "effect" }, pick, argControl(spec.arg, eff[spec.key], (v) => { eff[spec.key] = v; commit(); }), extra, tools);
+  });
+  const add = el("select", { "aria-label": "Add an effect", onchange: (e) => {
+    const w = wordOf(words, e.target.value);
+    if (!w) return;
+    list.push({ [w.key]: blank(w.arg) });
+    again();
+  } }, el("option", { value: "" }, list.length ? "and then…" : "nothing; add…"), ...words.map((w) => el("option", { value: w.key }, w.label)));
+  return el("div", { class: "effects" }, ...rows, add);
+}
+
+// One question as the form sees it: {not, key, arg}, or null when the condition is richer than one question.
+function readCondition(value, words) {
+  if (typeof value === "string") {
+    const not = value.startsWith("!");
+    const text = not ? value.slice(1) : value;
+    const cut = text.indexOf(":");
+    if (cut < 0) return { not, key: "flag", arg: text };
+    const word = wordOf(words, text.slice(0, cut).trim());
+    if (!word) return null;
+    const rest = text.slice(cut + 1).trim();
+    const arg = word.arg.pair ? rest.split(":") : word.arg === "number" ? Number(rest) : rest;
+    return fitsArg(word.arg, arg) ? { not, key: word.key, arg } : null;
+  }
+  if (!isObject(value) || Object.keys(value).length !== 1) return null;
+  const key = Object.keys(value)[0];
+  if (key === "not") {
+    const inner = readCondition(value.not, words);
+    return inner && !inner.not ? Object.assign(inner, { not: true }) : null;
+  }
+  const word = wordOf(words, key);
+  return word && word.arg !== "json" && fitsArg(word.arg, value[key]) ? { not: false, key, arg: value[key] } : null;
+}
+
+// ...and written back: the short form ("has:key", "!flag") where the engine reads one, the long form otherwise.
+function writeCondition({ not, key, arg }, words) {
+  if (!key) return undefined;
+  const spec = wordOf(words, key).arg;
+  const plain = (v) => typeof v === "string" && v !== "" && !v.includes(":") && !v.startsWith("!");
+  const short = spec.measure || spec === "number" ? false : Array.isArray(arg) ? ["quest", "item_state", "state"].includes(key) && arg.every(plain) : plain(arg);
+  if (short) return (not ? "!" : "") + (key === "flag" ? arg : `${key}:${Array.isArray(arg) ? arg.join(":") : arg}`);
+  return not ? { not: { [key]: arg } } : { [key]: arg };
+}
+
+function conditionControl(kind, f, thing) {
+  const all = state.game.conditions;
+  const value = thing[f.key];
+  const put = (v) => { if (v === undefined || v === "") delete thing[f.key]; else thing[f.key] = v; touched(kind); };
+  const empty = value === undefined || value === "";
+  const now = empty ? { not: false, key: "", arg: "" } : readCondition(value, all);
+  if (!now) {                                                          // richer than one question: as written
+    return el("div", { class: "effects" }, el("div", { class: "effect written" }, jsonInput(value, put), el("span", { class: "note" }, "More than one question; it is edited as written in the file.")));
+  }
+  const offered = all.filter((w) => w.arg !== "json" && (!w.short || w.key === now.key));
+  const write = () => put(writeCondition(now, all));
+  const pick = el("select", { "aria-label": "Condition", onchange: (e) => {
+    now.key = e.target.value;
+    now.arg = now.key ? blank(wordOf(all, now.key).arg) : "";
+    write();
+    renderForm();
+  } }, el("option", { value: "", selected: !now.key }, "always"), ...offered.map((w) => el("option", { value: w.key, selected: w.key === now.key }, w.label)));
+  if (!now.key) return el("div", { class: "effects" }, el("div", { class: "effect" }, pick));
+  const no = el("input", { type: "checkbox", checked: now.not, onchange: (e) => { now.not = e.target.checked; write(); } });
+  return el("div", { class: "effects" }, el("div", { class: "effect" }, pick, argControl(wordOf(all, now.key).arg, now.arg, (v) => { now.arg = v; write(); }),
+    el("label", { class: "tick", title: "Holds when this is not so" }, no, " not")));
 }
 
 // What is not covered by a form: the other keys of an object, as JSON. Nothing is hidden, nothing dropped.
@@ -228,11 +405,27 @@ function restArea(kind, thing, known, plain) {
   return { area, note, empty: Object.keys(rest).length === 0 };
 }
 
+// Fields marked "rare" in the schema are shown where a thing has them; elsewhere they wait in one "Add…" list,
+// so that a form is as long as the thing and not as long as everything a thing could have.
+function offered(fields, obj, path) {
+  const at = (f) => `${state.kind}/${state.id}/${path}/${f.key}`;
+  const now = fields.filter((f) => !f.rare || obj[f.key] !== undefined || state.shown.has(at(f)));
+  const later = fields.filter((f) => !now.includes(f));
+  if (!later.length) return { now, more: null };
+  const more = el("select", { class: "more", "aria-label": "Add a part", onchange: (e) => {
+    const f = later.find((x) => x.key === e.target.value);
+    if (f) { state.shown.add(at(f)); renderForm(); }
+  } }, el("option", { value: "" }, "Add…"), ...later.map((f) => el("option", { value: f.key }, f.label)));
+  return { now, more };
+}
+
 // The fields of an object that is part of a thing (an exit, a move, a dialogue node), with its other keys as JSON.
 function subform(kind, fields, obj, path) {
   const fit = fields.filter((f) => fits(f, obj[f.key]));
   const known = new Set(fit.map((f) => f.key));
-  const parts = fit.map((f) => field(f.label, control(kind, f, obj, `${path}/${f.key}`)));
+  const laid = offered(fit, obj, path);
+  const parts = laid.now.map((f) => field(f.label, control(kind, f, obj, `${path}/${f.key}`)));
+  if (laid.more) parts.push(laid.more);
   const rest = restArea(kind, obj, known);
   const other = field("Other fields", rest.area, rest.note);
   if (!rest.empty) parts.push(other);
@@ -261,6 +454,8 @@ function control(kind, f, thing, path) {
   path = path || f.key;
   const again = () => { touched(kind); renderForm(); };
   const tool = (label, title, act, off) => el("button", { type: "button", class: "quiet small", title, disabled: !!off, onclick: (e) => { e.preventDefault(); act(); again(); } }, label);
+  if (f.type === "effects") return effectsControl(kind, f, thing);
+  if (f.type === "condition") return conditionControl(kind, f, thing);
   if (f.type === "group") {
     if (!isObject(value)) return el("button", { type: "button", class: "quiet", onclick: () => { thing[f.key] = {}; state.open.add(`${state.kind}/${state.id}/${path}`); again(); } }, `Add ${f.label.toLowerCase()}`);
     return el("div", { class: "group" }, ...subform(kind, f.fields, value, path));
@@ -392,7 +587,9 @@ function renderForm() {
     } });
     parts.push(field("Id", input, note));
   }
-  for (const f of fields) parts.push(field(f.label, control(kind, f, thing)));
+  const laid = offered(fields, thing, "");
+  for (const f of laid.now) parts.push(field(f.label, control(kind, f, thing)));
+  if (laid.more) parts.push(laid.more);
   if (drawn) parts.push(spriteEditor(kind, thing));
 
   // everything the schema does not describe is still here, as JSON

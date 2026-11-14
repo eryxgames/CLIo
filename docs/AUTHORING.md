@@ -644,9 +644,15 @@ the same: the check as you type, the map, the fights, the walkthroughs.
 - *Open a game folder* reads the game from your computer. In Chrome and Edge the editor
   then saves straight back into that folder, backups included, after the browser has
   asked you to allow it. In Firefox and Safari a page cannot write into a folder: *Save*
-  keeps the changes in the page and *Download game* gives the folder back as a zip.
+  keeps the game in the browser and *Download game* gives the folder back as a zip.
 - *Open a zip file* takes a game as *Download game* makes it.
 - *A new game* starts from the starter template; the two demo games can be opened too.
+
+A game opened without a folder to save into - a zip, a new game, a demo, or any game in
+Firefox or Safari - is **kept by the browser** each time you save, and waits under
+*Carry on with* on your next visit, on that computer and in that browser. *Forget it*
+deletes that copy. It is a convenience, not a backup: clearing the browser's data removes
+it, so download the game when a session's work matters.
 
 The game never leaves your computer: the site is only files, and has nowhere to send
 anything. The one thing fetched from elsewhere is Python itself (Pyodide, from the
@@ -657,6 +663,22 @@ branch*, branch `main`, folder `/ (root)`. Nothing is built. The page fetches th
 engine's files by name from `engine/editor/web/manifest.json`; after adding or removing
 a module run `python -m engine.editor.hosted` to renew that list (a test says so when it
 is out of date).
+
+**On itch.io, or any host that takes an upload.**
+
+```
+python -m engine.editor.hosted --pack clio-editor.zip
+```
+
+writes the site as one zip - the page, the engine, the starter and the demo games, about
+a hundred files - with `index.html` at the top, which is what an itch.io HTML project
+wants (*Kind of project: HTML*, upload the zip, *This file will be played in the
+browser*). There the editor is shown inside itch.io's page, and a page inside another
+site's page may not ask for a folder to write into; so games are kept in the browser as
+above, and the start screen offers to open the editor in a tab of its own, where saving
+into a folder works again. itch.io serves every project from one shared address, so the
+games the browser keeps there are not walled off from other projects' scripts: fine for
+game data, and one more reason to download what matters.
 
 ### Can it be finished?
 

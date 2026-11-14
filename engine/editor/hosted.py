@@ -12,7 +12,11 @@ demo games and the starter game are listed in ``web/manifest.json``::
 
     python -m engine.editor.hosted        # after adding or removing a file
 
-A test fails when that list is out of date.
+A test fails when that list is out of date.  For a host that takes an upload
+instead of a repository (itch.io: an HTML project is a zip with ``index.html``
+at the top)::
+
+    python -m engine.editor.hosted --pack clio-editor.zip
 """
 import hashlib
 import io
@@ -55,6 +59,22 @@ def manifest():
     return {"engine": _files(os.path.join(ROOT, "engine"), lambda name: name.endswith(".py")),
             "starter": _game("templates/starter"),
             "games": [_game("games/" + g) for g in DEMOS]}
+
+
+def pack(path):
+    """The site as one zip file: the page, the engine, the starter and the demo games. Returns the file count."""
+    listed = manifest()
+    web = os.path.relpath(os.path.dirname(MANIFEST), ROOT).replace(os.sep, "/")
+    names = ["index.html", "LICENSE", "NOTICE"] + ["%s/%s" % (web, n) for n in sorted(os.listdir(os.path.dirname(MANIFEST)))]
+    names += listed["engine"] + listed["starter"]["files"] + [f for g in listed["games"] for f in g["files"]]
+    names = sorted(set(n for n in names if os.path.isfile(os.path.join(ROOT, n))))
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        for name in names:
+            if name == web + "/manifest.json":              # the list as it is now, whatever the file on disk says
+                z.writestr(name, json.dumps(listed, indent=1) + "\n")
+            else:
+                z.write(os.path.join(ROOT, name), name)
+    return len(names)
 
 
 def write():
@@ -122,6 +142,17 @@ _seen = {}
 found_in = {}                           # game folder -> where in what was opened the game was found ("" for the top)
 
 
+def files(game_dir):
+    """Every file of the game as it is now, ``[(path, bytes), ...]``: what the page keeps between visits."""
+    out = []
+    for where, _dirs, names in os.walk(game_dir):
+        for name in sorted(names):
+            path = os.path.join(where, name)
+            with open(path, "rb") as f:
+                out.append((os.path.relpath(path, game_dir).replace(os.sep, "/"), f.read()))
+    return out
+
+
 def changed(game_dir):
     """The files of the game that differ from the last time this was asked: ``[(path, bytes), ...]``.
 
@@ -144,4 +175,10 @@ def changed(game_dir):
 
 
 if __name__ == "__main__":
-    print("wrote %s" % os.path.relpath(write(), ROOT))
+    import sys
+    if len(sys.argv) == 3 and sys.argv[1] == "--pack":
+        print("wrote %s (%d files)" % (sys.argv[2], pack(sys.argv[2])))
+    elif len(sys.argv) == 1:
+        print("wrote %s" % os.path.relpath(write(), ROOT))
+    else:
+        sys.exit("usage: python -m engine.editor.hosted [--pack FILE.zip]")

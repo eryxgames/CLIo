@@ -39,6 +39,9 @@ def _open_zip(name, data):
 def _changed(game):
     return hosted.changed(game)
 
+def _files(game):
+    return hosted.files(game)
+
 def _api(game, path, body):
     try:
         out = service.handle(game, path, json.loads(body))
@@ -68,7 +71,7 @@ async function init() {
     pyodide.FS.writeFile(to, sources[i]);
   });
   pyodide.runPython(BOOT);
-  py = { open: pyodide.globals.get("_open"), openZip: pyodide.globals.get("_open_zip"), changed: pyodide.globals.get("_changed"),
+  py = { open: pyodide.globals.get("_open"), openZip: pyodide.globals.get("_open_zip"), changed: pyodide.globals.get("_changed"), files: pyodide.globals.get("_files"),
          api: pyodide.globals.get("_api") };
   return { version: pyodide.globals.get("VERSION"), python: pyodide.version };
 }
@@ -100,8 +103,8 @@ self.onmessage = async (event) => {
       return postMessage(Object.assign({ id, ok: true }, JSON.parse(py.open(event.data.name, files))));
     }
     if (cmd === "open-zip") return postMessage(Object.assign({ id, ok: true }, JSON.parse(py.openZip(event.data.name, event.data.bytes))));
-    if (cmd === "changed") {
-      const files = pairs(py.changed(event.data.game));
+    if (cmd === "changed" || cmd === "files") {     // what a save wrote; or the whole game, to keep between visits
+      const files = pairs(py[cmd](event.data.game));
       return postMessage({ id, ok: true, files }, files.map(([, data]) => data.buffer));
     }
     if (cmd === "api") {

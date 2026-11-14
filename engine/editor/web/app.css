@@ -237,3 +237,4 @@ body.opening .tools, body.opening main, body.opening #save { display: none; }
 .open code { font: 0.85rem var(--mono); }
 .open.busy button { opacity: 0.5; pointer-events: none; }
 @media (max-width: 520px) { .open li { grid-template-columns: minmax(0, 1fr); gap: 0.2rem; } }
+.open button.link { padding: 0; font-size: inherit; }

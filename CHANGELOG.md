@@ -58,7 +58,10 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   (Pyodide) and asks it the same questions it asks the local server
   (`engine/editor/service.py`). Open a game folder, a zip, a new game from the starter, or
   a demo game. In Chrome and Edge it saves straight into the opened folder; elsewhere
-  changes stay in the page until *Download game*. The game never leaves the computer.
+  a game is kept by the browser on every save and offered again on the next visit
+  (*Carry on with*). The game never leaves the computer. `python -m engine.editor.hosted
+  --pack FILE.zip` writes the site as one zip for hosts that take an upload (itch.io);
+  shown inside another site's page the editor says so and works without folder access.
 - Editor: *Check-up* lists rooms that cannot be reached and things nothing refers to.
 - Editor: a light / dark / system theme switch, and *Download game* (the folder as a zip).
   The editor now opens at the same address each time (port 8420) when that is free.

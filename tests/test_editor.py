@@ -608,7 +608,7 @@ class HostedTests(unittest.TestCase):
         # GitHub Pages leaves out files that start with an underscore (engine/__init__.py) unless told not to
         self.assertTrue(os.path.isfile(os.path.join(ROOT, ".nojekyll")))
         with open(os.path.join(ROOT, "index.html"), encoding="utf-8") as f:
-            self.assertIn('url=engine/editor/web/', f.read())
+            self.assertIn('url=engine/editor/web/index.html', f.read())   # by name: not every host finds a folder's page
         web = os.path.dirname(hosted.MANIFEST)
         with open(os.path.join(web, "worker.js"), encoding="utf-8") as f:
             worker = f.read()
@@ -636,6 +636,30 @@ class HostedTests(unittest.TestCase):
         self.assertEqual(sorted(p.split("/")[0] for p in written), [editor.BACKUP, "game.json"])
         self.assertEqual(json.loads(written["game.json"])["title"], "Adrift")
         self.assertEqual(hosted.changed(folder), [])
+
+        # the whole game, as the page keeps it between visits: placing it again gives the same game
+        kept = hosted.files(folder)
+        self.assertIn("art/title.art", [path for path, _data in kept])
+        again = hosted.place("again", kept, into)
+        self.assertEqual(service.handle(again, "/api/game")["title"], "Adrift")
+        self.assertTrue(os.path.isdir(os.path.join(again, editor.BACKUP)))
+
+    def test_the_site_packs_into_one_file(self):
+        import zipfile
+        path = os.path.join(tempfile.mkdtemp(prefix="clio-hosted-test-"), "site.zip")
+        count = hosted.pack(path)
+        with zipfile.ZipFile(path) as z:
+            names = z.namelist()
+            listed = json.loads(z.read("engine/editor/web/manifest.json"))
+        self.assertEqual(count, len(names))
+        self.assertLess(count, 1000)                                     # itch.io takes no more files than that
+        self.assertEqual(listed, hosted.manifest())
+        for name in ["index.html", "engine/__init__.py", "engine/editor/web/index.html", "engine/editor/web/worker.js",
+                     "engine/editor/web/app.js", "games/derelict/game.json", "templates/starter/game.json"]:
+            self.assertIn(name, names)
+        for name in listed["engine"] + listed["starter"]["files"] + [f for g in listed["games"] for f in g["files"]]:
+            self.assertIn(name, names)
+        self.assertFalse([n for n in names if n.startswith(("tests/", "utils/", "docs/")) or "__pycache__" in n])
 
     def test_the_game_is_found_inside_what_was_opened(self):
         into = tempfile.mkdtemp(prefix="clio-hosted-test-")

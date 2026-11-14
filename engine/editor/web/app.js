@@ -1345,12 +1345,40 @@ async function hostedApi(path, body) {
   return answer.data;
 }
 
-// After something was written: put the same files into the folder the game came from, or remember that the changes
-// exist only in this page. Returns what to tell the author.
+// A game without a folder to save into is kept by the browser between visits (IndexedDB), whole, under its id.
+const KEPT = "clio-editor";
+
+function shelf(mode, work) {
+  return new Promise((resolve, reject) => {
+    const opening = indexedDB.open(KEPT, 1);
+    opening.onupgradeneeded = () => opening.result.createObjectStore("games", { keyPath: "id" });
+    opening.onerror = () => reject(opening.error);
+    opening.onsuccess = () => {
+      const tx = opening.result.transaction("games", mode);
+      const request = work(tx.objectStore("games"));
+      tx.oncomplete = () => { opening.result.close(); resolve(request && request.result); };
+      tx.onabort = tx.onerror = () => { opening.result.close(); reject(tx.error); };
+    };
+  });
+}
+
+async function keepInBrowser() {
+  const { files } = await ask("files", { game: tab.game });
+  await shelf("readwrite", (games) => games.put({ id: state.game.id, title: (state.game.files.game && state.game.files.game.data.title) || state.game.title, when: Date.now(), files }));
+}
+
+// After something was written: put the same files into the folder the game came from; without one, keep the game in
+// the browser. Returns what to tell the author.
 async function kept() {
   if (!tab.folder) {
-    tab.unkept = true;
-    return " The changes are in this page only: use Download game to keep them.";
+    try {
+      await keepInBrowser();
+      tab.unkept = false;
+      return " The game is kept in this browser; Download game gives you its files.";
+    } catch (err) {
+      tab.unkept = true;
+      return " The changes are in this page only: use Download game to keep them.";
+    }
   }
   try {
     const { files } = await ask("changed", { game: tab.game });
@@ -1400,10 +1428,17 @@ async function openGame(what, work) {
   $("open").classList.remove("busy");
 }
 
+// A page shown inside another site's page (an itch.io project) is not allowed to ask for a folder to write into.
+const EMBEDDED = (() => { try { return window.top !== window.self && !window.top.location.href; } catch (err) { return true; } })();
+const CAN_WRITE = !!window.showDirectoryPicker && !EMBEDDED;
+
 async function openFolder() {
-  if (!window.showDirectoryPicker) return $("open-dir-input").click();
+  if (!CAN_WRITE) return $("open-dir-input").click();
   let dir;
-  try { dir = await window.showDirectoryPicker({ id: "clio-game", mode: "readwrite" }); } catch (err) { return; }      // changed their mind
+  try { dir = await window.showDirectoryPicker({ id: "clio-game", mode: "readwrite" }); } catch (err) {
+    if (err.name !== "AbortError") $("open-dir-input").click();     // not allowed here after all: the folder as a list of files
+    return;                                                          // or they changed their mind
+  }
   await openGame(dir.name, async () => {
     const files = await readFolder(dir, "", []);
     tab.folder = dir;
@@ -1433,9 +1468,13 @@ async function welcome() {
   document.body.classList.add("opening");
   $("open").hidden = false;
   status("");
-  $("open-note").textContent = window.showDirectoryPicker
-    ? "Opened as a folder, the game is saved straight back into that folder; your browser will ask you to allow it. Opened from a zip file, changes stay in this page until you download the game."
-    : "In this browser a page cannot write into a folder: Save keeps your changes in this page, and Download game gives you the folder back as a zip file. Chrome and Edge can save straight into the folder.";
+  const stays = "Save keeps the game in this browser, where you find it again next time, and Download game gives you the folder back as a zip file.";
+  $("open-note").replaceChildren(...(CAN_WRITE
+    ? ["Opened as a folder, the game is saved straight back into that folder; your browser will ask you to allow it. Opened any other way, " + stays[0].toLowerCase() + stays.slice(1)]
+    : EMBEDDED && window.showDirectoryPicker
+      ? ["Inside another page the editor cannot write into your folder: " + stays + " ", el("a", { href: location.href, target: "_blank", rel: "noopener" }, "Open the editor in a tab of its own"), " to save straight into the folder."]
+      : ["In this browser a page cannot write into a folder: " + stays + " Chrome and Edge can save straight into the folder."]));
+  showKept();
   $("open-folder").addEventListener("click", openFolder);
   $("open-zip").addEventListener("click", () => $("open-zip-input").click());
   $("open-dir-input").addEventListener("change", (e) => { openPicked([...e.target.files]); e.target.value = ""; });
@@ -1452,13 +1491,28 @@ async function welcome() {
     ...tab.manifest.games.map((g) => offer(g, g.id, g.title, g.about)));
 }
 
+async function showKept() {                                         // games this browser kept from earlier visits
+  let games = [];
+  try { games = (await shelf("readonly", (store) => store.getAll())) || []; } catch (err) { /* no storage here: nothing was kept */ }
+  games.sort((a, b) => b.when - a.when);
+  $("open-kept").hidden = !games.length;
+  $("open-kept-list").replaceChildren(...games.map((g) => el("li", {},
+    el("button", { type: "button", class: "quiet", onclick: () => openGame(g.title, () => ask("open", { name: g.id, files: g.files })) }, g.title),
+    el("span", { class: "note" }, `Kept in this browser. Last saved ${new Date(g.when).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}. `,
+      el("button", { type: "button", class: "link", onclick: async () => {
+        if (!confirm(`Forget "${g.title}"? The copy in this browser is deleted. Files you downloaded stay.`)) return;
+        try { await shelf("readwrite", (store) => store.delete(g.id)); } catch (err) { /* nothing to forget */ }
+        showKept();
+      } }, "Forget it")))));
+}
+
 // ---------------------------------------------------------------------- start
 async function begin() {
   state.game = await api("/api/game");
   state.problems = state.game.problems;
   $("title").textContent = state.game.title;
   $("folder").textContent = !HOSTED ? state.game.folder
-    : tab.folder ? `${tab.folder.name}${tab.home ? "/" + tab.home : ""} - saved into the folder you opened` : `${state.game.id} - in this page, until you download it`;
+    : tab.folder ? `${tab.folder.name}${tab.home ? "/" + tab.home : ""} - saved into the folder you opened` : `${state.game.id} - kept in this browser when you save`;
   status(state.problems.length ? "" : "The engine finds no problems.");
   renderAll();
   select("game", "game");

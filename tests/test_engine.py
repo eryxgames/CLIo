@@ -176,6 +176,53 @@ class AudioTests(unittest.TestCase):
         self.assertEqual(events[0], (0, 3, ["c4"]))
         self.assertEqual(events[1], (4, 4, ["c4", "e4", "g4"]))
 
+    def test_slides_and_levels_in_track_notation(self):
+        self.assertEqual(synth.split_note("c4"), ("c4", None, 1.0, 1.0))
+        name, target, start, end = synth.split_note("c3>c5@3>9")
+        self.assertEqual((name, target, end), ("c3", "c5", 1.0))
+        self.assertAlmostEqual(start, 3 / 9.0)
+        self.assertEqual(synth.split_note("k@0")[2:], (0.0, 0.0))
+        self.assertEqual(synth.split_note("c4@loud")[2:], (1.0, 1.0))      # nonsense is ignored, not fatal
+        events, length = synth.parse_track("c4@5:2 - [c4 e4 g4]@6:4 | c3>c5:8")
+        self.assertEqual(length, 15)
+        self.assertEqual(events, [(0, 3, ["c4@5"]), (3, 4, ["c4@6", "e4@6", "g4@6"]), (7, 8, ["c3>c5"])])
+        # a glide is even in pitch: from c4 to c5 in a second there are (f2 - f1) / ln 2 cycles
+        s = synth.tone(261.63, 1.0, "sine", attack=0, decay=0, sustain=1, release=0, tail=False,
+                       slide_to=523.25, glide=True)
+        crossings = sum(1 for a, b in zip(s, s[1:]) if a < 0 <= b)
+        self.assertTrue(374 <= crossings <= 380, crossings)
+        half = sum(1 for a, b in zip(s[:len(s) // 2], s[1:len(s) // 2]) if a < 0 <= b)
+        self.assertTrue(153 <= half <= 159, half)                         # f# after half the time, not g
+
+        def song(track, wave="square"):
+            return {"tempo": 120, "steps_per_beat": 4, "loop": False, "sequence": ["p"], "patterns": {"p": {"a": track}},
+                    "instruments": {"a": {"wave": wave, "volume": 0.5, "attack": 0.001, "decay": 0.01,
+                                          "sustain": 1.0, "release": 0.01}}}
+
+        step = int(60.0 / 120 / 4 * synth.RATE)
+
+        def peak(samples, at):
+            return max(abs(v) for v in samples[int(at * step) + 60:int((at + 1) * step) - 60])
+
+        plain = synth.render_song(song("c4:4 c4:4"))
+        self.assertEqual(synth.render_song(song("c4@9:4 c4:4")), plain)   # full level is the old sound
+        soft = synth.render_song(song("c4:4 c4@3:4"))
+        self.assertAlmostEqual(peak(soft, 5) / peak(soft, 1), 3 / 9.0, delta=0.02)
+        swell = synth.render_song(song("c4@1>9:16"))
+        self.assertLess(peak(swell, 1), 0.3 * peak(swell, 14))
+        self.assertGreater(peak(swell, 8), peak(swell, 2))
+        riser = synth.render_song(song("c3>c5@2>9:16 .:2", "sine"))
+        early = sum(1 for a, b in zip(riser[:4 * step], riser[1:4 * step]) if a < 0 <= b)
+        late = sum(1 for a, b in zip(riser[10 * step:14 * step], riser[10 * step + 1:14 * step]) if a < 0 <= b)
+        self.assertGreater(late, 2.3 * early)                             # two octaves up by the end
+        hiss = synth.render_song(song("c3>c6:8", "noise"))
+        self.assertGreater(max(abs(v) for v in hiss), 0.05)
+        kit = dict(song("k k@3"), instruments={"a": {"wave": "drums", "volume": 0.6}})
+        hits = synth.render_song(kit)
+        self.assertLess(max(abs(v) for v in hits[step:2 * step]), 0.5 * max(abs(v) for v in hits[:step]))
+        chord = synth.render_song(song("[c4 e4 g4]@4:4"))
+        self.assertLess(max(abs(v) for v in chord), 0.6 * max(abs(v) for v in synth.render_song(song("[c4 e4 g4]:4"))))
+
     def test_every_builtin_sfx_renders(self):
         for name, spec in SFX.items():
             samples = synth.render_sfx(spec)

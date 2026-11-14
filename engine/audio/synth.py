@@ -28,6 +28,16 @@ steps), ``.`` or ``r`` (rest), ``-`` (hold the previous note one more step),
 ``|`` (bar line, ignored).  Drum tracks use ``k`` kick, ``s`` snare, ``h``
 closed hat, ``o`` open hat, ``t`` tom, ``c`` clap.
 
+Two things can be added to a note (since 2.1); a song without them plays exactly
+as before:
+
+``c3>c5:16``     a slide: the pitch travels from ``c3`` to ``c5`` over the note
+``c4@5:4``       a level from ``@0`` (silent) to ``@9`` (full, the default)
+``c4@2>9:16``    a swell: the level travels from 2 to 9 over the note
+``c3>c5@2>9:16`` both at once: a riser
+
+A level also works on a chord (``[c4 e4 g4]@6:8``) and on a drum hit (``k@4``).
+
 Rendering is done with list comprehensions over wavetables and a note cache,
 which keeps a 30-second song to well under a second on a laptop and a few
 seconds on a phone; results are cached on disk by the audio system.
@@ -150,8 +160,13 @@ def _envelope(n, attack, decay, sustain, release, hold):
 
 def tone(freq, seconds, wave_name="square", duty=0.5, attack=0.005, decay=0.05,
          sustain=0.7, release=0.05, volume=1.0, vibrato=None, slide_to=None,
-         noise_rate=None, tail=True, **_ignored):
-    """Render one note. Returns a list of floats in roughly [-1, 1]."""
+         noise_rate=None, tail=True, glide=False, **_ignored):
+    """Render one note. Returns a list of floats in roughly [-1, 1].
+
+    ``slide_to`` bends the pitch towards another frequency: by default evenly in
+    Hz over the whole sound (good for zaps), with ``glide`` evenly in pitch over
+    the held part of the note (a musical slide: every octave takes as long).
+    """
     hold = max(1, int(seconds * RATE))
     n = hold + (int(release * RATE) if tail else 0)
     env = _envelope(n, attack, decay, sustain, release, hold)
@@ -159,7 +174,10 @@ def tone(freq, seconds, wave_name="square", duty=0.5, attack=0.005, decay=0.05,
         tbl = _noise()
         rate = (noise_rate if noise_rate else max(200.0, freq * 8.0)) / RATE
         m = len(tbl) - 1
-        if slide_to:
+        if slide_to and glide:
+            rate2 = max(200.0, float(slide_to) * 8.0) / RATE
+            raw = [tbl[int(ph) & m] for ph in _glide(rate, rate2, hold, n)]
+        elif slide_to:
             rate2 = max(200.0, float(slide_to) * 8.0) / RATE
             k = (rate2 - rate) / (2.0 * n)
             raw = [tbl[int(i * rate + i * i * k) & m] for i in range(n)]
@@ -168,7 +186,9 @@ def tone(freq, seconds, wave_name="square", duty=0.5, attack=0.005, decay=0.05,
     else:
         tbl = _table(wave_name, duty)
         inc = freq * TABLE / RATE
-        if slide_to:
+        if slide_to and glide and freq > 0:
+            raw = [tbl[int(ph) & MASK] for ph in _glide(inc, float(slide_to) * TABLE / RATE, hold, n)]
+        elif slide_to:
             inc2 = float(slide_to) * TABLE / RATE
             k = (inc2 - inc) / (2.0 * n)
             raw = [tbl[int(i * inc + i * i * k) & MASK] for i in range(n)]
@@ -233,6 +253,41 @@ def mix_into(buf, pos, samples, gain=1.0):
         buf[pos:end] = [a + b for a, b in zip(seg, samples[:n])]
     else:
         buf[pos:end] = [a + b * gain for a, b in zip(seg, samples[:n])]
+
+
+def _glide(inc, inc2, hold, n):
+    """Phase of an oscillator whose step goes from ``inc`` to ``inc2`` evenly in pitch over ``hold`` samples."""
+    if inc <= 0 or inc2 <= 0 or abs(inc2 / inc - 1.0) < 1e-6:
+        return [i * inc for i in range(n)]
+    ratio = inc2 / inc
+    k = inc * hold / math.log(ratio)
+    head = [k * (ratio ** (i / float(hold)) - 1.0) for i in range(min(hold, n))]
+    last = k * (ratio - 1.0)
+    return head + [last + (i - hold) * inc2 for i in range(hold, n)]
+
+
+def split_note(text):
+    """``"c3>c5@2>9"`` -> ``("c3", "c5", 2/9, 1.0)``: note, slide target or None, level at start and end."""
+    body, _, level = str(text).partition("@")
+    name, _, target = body.partition(">")
+    start = end = 1.0
+    if level:
+        a, _, b = level.partition(">")
+        try:
+            start = min(9.0, max(0.0, float(a))) / 9.0
+            end = min(9.0, max(0.0, float(b))) / 9.0 if b else start
+        except ValueError:
+            start = end = 1.0
+    return name, (target or None), start, end
+
+
+def _levelled(samples, start, end, hold):
+    """``samples`` with a level going from ``start`` to ``end`` over the first ``hold`` of them."""
+    if start == end:
+        return samples if start == 1.0 else [s * start for s in samples]
+    hold = max(1, min(hold, len(samples)))
+    step = (end - start) / hold
+    return [s * (start + step * i) for i, s in enumerate(samples[:hold])] + [s * end for s in samples[hold:]]
 
 
 def echo(buf, seconds=0.25, gain=0.3, taps=2):
@@ -307,8 +362,9 @@ def parse_track(text):
         if body in (".", "r", "_"):
             pos += length
             continue
-        if body.startswith("[") and body.endswith("]"):
-            notes = body[1:-1].split()
+        if body.startswith("[") and "]" in body:                # a chord, perhaps with a level: [c4 e4]@5
+            chord, _, level = body.partition("]")
+            notes = [n + level for n in chord[1:].split()]
         else:
             notes = [body]
         events.append((pos, length, notes))
@@ -370,11 +426,12 @@ def render_song(song, max_seconds=180.0):
                     continue
                 if wave_name == "drums":
                     for nname in notes:
+                        nname, _to, level, _end = split_note(nname)
                         key = ("drum", nname, vol)
                         smp = cache.get(key)
                         if smp is None:
                             smp = cache[key] = drum(nname, vol)
-                        mix_into(buf, at, smp)
+                        mix_into(buf, at, smp, level)
                     continue
                 gate = float(inst.get("gate", 0.9))
                 dur = max(0.02, length * step * gate)
@@ -384,24 +441,32 @@ def render_song(song, max_seconds=180.0):
                     astep = max(0.03, float(arp) * step)
                     count = max(1, int(round(length * step / astep)))
                     for i in range(count):
-                        f = note_freq(notes[i % len(notes)])
+                        nname, _to, level, _end = split_note(notes[i % len(notes)])
+                        f = note_freq(nname)
                         if f <= 0:
                             continue
                         key = (tname, round(f, 2), round(astep, 4))
                         smp = cache.get(key)
                         if smp is None:
                             smp = cache[key] = tone(f, astep * 0.9, wave_name, **_inst_args(inst, vol))
-                        mix_into(buf, at + int(i * astep * RATE), smp)
+                        mix_into(buf, at + int(i * astep * RATE), smp, level)
                     continue
                 chord_gain = 1.0 / math.sqrt(len(notes)) if len(notes) > 1 else 1.0
                 for nname in notes:
+                    nname, target, level, level_end = split_note(nname)
                     f = note_freq(nname)
                     if f <= 0:
                         continue
-                    key = (tname, round(f, 2), round(dur, 4))
+                    f2 = note_freq(target) if target else 0.0
+                    key = (tname, round(f, 2), round(dur, 4), round(f2, 2))
                     smp = cache.get(key)
                     if smp is None:
-                        smp = cache[key] = tone(f, dur, wave_name, **_inst_args(inst, vol))
+                        args = _inst_args(inst, vol)
+                        if f2 > 0:
+                            args.update(slide_to=f2, glide=True, vibrato=None)
+                        smp = cache[key] = tone(f, dur, wave_name, **args)
+                    if level != 1.0 or level_end != 1.0:
+                        smp = _levelled(smp, level, level_end, int(dur * RATE))
                     mix_into(buf, at, smp, chord_gain)
         cursor += plen.get(pname, 0)
 

@@ -447,6 +447,12 @@ Notes: `c4`, `d#4`, `eb3`; `:4` lasts four steps; `.` rests; `-` holds; `[c4 e4 
 chord (arpeggiated if the instrument has `arp`); `|` is ignored. Waves: `square` (with
 `duty`), `triangle`, `saw`, `sine`, `soft`, `organ`, `noise`, `drums` (`k s h o t c`).
 
+A note can also move (since 2.1). `c3>c5:16` slides from one pitch to the other over its
+length; `c4@5` plays at a level between `@0` (silent) and `@9` (full, the default);
+`c4@2>9:16` swells from level 2 to level 9; `c3>c5@2>9:16` does both and is a riser. Levels
+work on chords (`[c4 e4 g4]@6:8`) and drum hits (`k@4`) too. On the `noise` wave a slide
+sweeps the hiss. Songs that use none of this sound exactly as they did.
+
 Sound effects are played by name (`{"sfx": "unlock"}`). Built in: `select back error save
 step door airlock locked unlock pickup drop open use craft read computer power teleport
 secret coin quest quest_done levelup heal trap alarm encounter hit crit miss hurt guard

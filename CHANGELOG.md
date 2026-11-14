@@ -2,6 +2,16 @@
 
 Notable changes to CLIo. Versions follow [semantic versioning](https://semver.org).
 
+## Unreleased
+
+### Added
+
+- **Slides and levels in songs.** A note can slide (`c3>c5:16`), be played at a level
+  (`c4@5`, from `@0` to `@9`), or change level as it sounds (`c4@2>9:16`); together they
+  make risers, falls and swells. Levels also work on chords and drum hits, slides on the
+  `noise` wave. Songs written for 2.0 sound exactly as before.
+- `synth.tone(..., glide=True)` slides evenly in pitch over the held part of a note.
+
 ## 2.0.0 - 2026-11-13
 
 A rebuild of the engine. Games written for CLIo 1 still load.

@@ -14,8 +14,10 @@ A kind has a ``shape``:
 
 A field has a ``type``: ``text``, ``long`` (several lines), ``number``,
 ``bool``, ``choice`` (one of ``options``), ``tags`` (a list of words), ``ref``
-(the id of a thing of kind ``of``), ``refs`` (a list of such ids).  Anything
-else - exits, dialogue nodes, effects - is edited as JSON for now.
+(the id of a thing of kind ``of``), ``refs`` (a list of such ids), ``sprite``
+(the name of a pixel sprite, or ``auto``).  Anything else - exits, dialogue
+nodes, effects - is edited as JSON for now.  A kind with ``"editor"`` gets a
+tool of its own in the page (``sprite``: the pixel editor).
 """
 
 
@@ -44,7 +46,8 @@ KINDS = [
         F("name"), F("aliases", "tags"),
         F("type", "choice", "Attitude", options=["friendly", "neutral", "hostile", "aggressive"]),
         F("description", "long"), F("greeting", "long"), F("dialogue_tree", "ref", "Dialogue", of="dialogues"),
-        F("sprite"), F("portrait"), F("tags", "tags"), F("inventory", "refs", of="items"),
+        F("sprite", "sprite", "Sprite"), F("sprite_seed", label="Sprite grown from"), F("sprite_size", "number"),
+        F("portrait"), F("tags", "tags"), F("inventory", "refs", of="items"),
         F("xp", "number"), F("show_hostile", "bool"), F("battle_intro", "long"), F("defeat_text", "long"),
         F("refuse_text", "long"), F("no_fight_text", "long"), F("immune", "tags")]},
     {"key": "dialogues", "file": "dialogues", "label": "Dialogues", "one": "dialogue", "shape": "map", "fields": []},
@@ -57,7 +60,8 @@ KINDS = [
     {"key": "music", "file": "music", "label": "Music", "one": "song", "shape": "map", "title": "title", "fields": [
         F("title"), F("tempo", "number"), F("steps_per_beat", "number"), F("volume", "number")]},
     {"key": "sounds", "file": "sounds", "label": "Sounds", "one": "sound", "shape": "map", "fields": []},
-    {"key": "sprites", "file": "sprites", "label": "Sprites", "one": "sprite", "shape": "map", "fields": []},
+    {"key": "sprites", "file": "sprites", "label": "Sprites", "one": "sprite", "shape": "map", "editor": "sprite",
+     "fields": []},
     {"key": "dungeon", "file": "dungeon", "label": "Dungeon", "one": "dungeon", "shape": "object", "fields": []},
 ]
 

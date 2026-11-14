@@ -18,7 +18,7 @@ from engine import editor, schema                               # noqa: E402
 from engine.data import GameData, find_games                    # noqa: E402
 from engine.editor.server import make_server                    # noqa: E402
 
-TYPES = {"text", "long", "number", "bool", "choice", "tags", "ref", "refs"}
+TYPES = {"text", "long", "number", "bool", "choice", "tags", "ref", "refs", "sprite"}
 
 
 def copy_of(name):
@@ -299,6 +299,28 @@ class EnemyTests(unittest.TestCase):
         self.assertEqual([r["name"] for r in solo["rows"]], ["The player"])                 # a game without classes
 
 
+class SpriteTests(unittest.TestCase):
+    def test_a_grown_sprite_is_the_one_the_game_draws(self):
+        from engine import sprite
+        from engine.editor import looks
+        made = looks.grow("Bone Rat", 10)
+        game = sprite.generate("Bone Rat", 10)
+        self.assertEqual(made["pixels"], list(game.pixels))
+        self.assertEqual(looks.grow("Bone Rat", 10), made)                      # the same words, the same creature
+        self.assertNotEqual(looks.grow("Bone Rat 2", 10)["pixels"], made["pixels"])
+        used = set("".join(made["pixels"])) - {"."}
+        self.assertEqual(set(made["palette"]), used)                            # only the colours it uses, as hex
+        for colour in made["palette"].values():
+            self.assertRegex(colour, r"^#[0-9a-f]{6}$")
+        again = sprite.Sprite.from_data(made, "copy")                           # and the engine reads it back the same
+        self.assertEqual(again.pixels, game.pixels)
+        for letter in used:
+            self.assertEqual(sprite._rgb(made["palette"][letter]), tuple(game.palette[letter]))
+        self.assertEqual(len(looks.grow("x", 99)["pixels"]), 32)                # kept to a sensible size
+        self.assertEqual(looks.colours({"a": "#2B3340", "b": 202, "c": [1, 2, 3], "d": "none", "e": "no such colour"}),
+                         {"a": "#2b3340", "b": "#ff5f00", "c": "#010203", "d": None, "e": None})
+
+
 class ServerTests(unittest.TestCase):
     def setUp(self):
         self.folder = copy_of("derelict")
@@ -386,6 +408,14 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(code, 400)
         self.assertIn("cannot be fought", json.loads(body)["error"])
         self.assertEqual(self.ask("/api/enemy", {"rank": "god"})[0], 400)
+
+    def test_sprites_through_the_server(self):
+        code, body = self.ask("/api/sprite", {"seed": "Bugrat", "size": 8})
+        made = json.loads(body)
+        self.assertEqual((code, len(made["pixels"]), sorted(made)), (200, 8, ["palette", "pixels"]))
+        code, body = self.ask("/api/sprite", {"palette": {"r": "red", "x": "#010203"}})
+        self.assertEqual((code, json.loads(body)["colours"]["x"]), (200, "#010203"))
+        self.assertRegex(json.loads(body)["colours"]["r"], r"^#[0-9a-f]{6}$")
 
     def test_the_usual_address_is_tried_first(self):
         from engine.editor import server as module

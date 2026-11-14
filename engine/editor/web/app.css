@@ -94,6 +94,18 @@ nav .none { color: var(--ink-2); }
 .sheet .row input[type="number"] { width: 4.5rem; padding: 0.25rem 0.4rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--sheet); }
 .sheet .row select { padding: 0.25rem 0.4rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--sheet); }
 .sheet .note { margin: 0.5rem 0 0; font-size: 0.85rem; color: var(--ink-2); }
+.sprite-row { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; margin-top: 0.4rem; }
+.sprite-grid { border: 1px solid var(--rule); border-radius: 4px; cursor: crosshair; touch-action: none; max-width: 100%; image-rendering: pixelated; }
+.sprite-small { border-radius: 4px; background: #0f1724; padding: 6px; image-rendering: pixelated; }
+.sheet.sprite { max-width: 56rem; }
+.sheet.sprite h3 { margin: 0.7rem 0 0.3rem; font-size: 0.9rem; color: var(--ink-2); font-weight: 600; }
+.sheet.sprite h3:first-child { margin-top: 0; }
+.swatches { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; max-width: 22rem; }
+.swatch { width: 1.7rem; height: 1.7rem; padding: 0; border-radius: 4px; border: 1px solid var(--rule); }
+.swatch.clear { background: repeating-conic-gradient(#c9ced6 0% 25%, #e7eaee 0% 50%) 50% / 10px 10px; }
+.swatch.on { outline: 2px solid var(--mark); outline-offset: 1px; }
+.sheet .row input[type="color"] { width: 2.4rem; height: 1.9rem; padding: 0; border: 1px solid var(--rule); border-radius: 4px; background: none; }
+.sheet .row input[type="text"] { padding: 0.25rem 0.4rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--sheet); min-width: 0; width: 11rem; }
 .field input[type="range"] { width: 100%; max-width: 20rem; margin-top: 0.5rem; }
 .ends { display: flex; justify-content: space-between; max-width: 20rem; font-size: 0.8rem; color: var(--ink-2); }
 .form .empty { color: var(--ink-2); max-width: 34rem; }
@@ -128,3 +140,4 @@ nav .none { color: var(--ink-2); }
   .field { grid-template-columns: 1fr; }
   .field .note { grid-column: 1; }
 }
+.sprite-row .row { display: inline-flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.3rem; }

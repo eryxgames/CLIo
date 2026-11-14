@@ -28,6 +28,10 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   from an existing character or a plain one, leaning tough or sharp. *Try in a fight*,
   for a new enemy or any character with stats, runs the engine's own battle code forty
   times per class and shows wins, health left and turns.
+- **Pictures.** The editor shows the sprite a character will be drawn with, can grow a
+  different creature for it, and has a pixel editor for sprites: paint with mouse or
+  keyboard, mirrored or not, change colours and size, or grow one from any words. *Draw
+  over it* turns a grown creature into a drawing of your own.
 - Editor: a light / dark / system theme switch, and *Download game* (the folder as a zip).
   The editor now opens at the same address each time (port 8420) when that is free.
 

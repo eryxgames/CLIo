@@ -645,6 +645,19 @@ Under the list of characters, *Make an enemy…* builds a new one of a strength 
 Every character with stats also has *Try in a fight* at the top of its form, alone or two
 or three at once.
 
+### Pictures
+
+A character's *Sprite* field shows what the game will draw in a fight. With `auto` that is
+a creature grown from the character's name - the same words always grow the same one.
+
+- *Another one* grows a different creature (it sets `sprite_seed`, the words to grow from).
+- *Draw over it* keeps the creature as a drawing in `sprites.json`, points the character
+  at it, and opens it in the pixel editor.
+- The pixel editor - also for any sprite under *Sprites* - paints with the mouse (right
+  button rubs out) or the keyboard (arrow keys, Space, Delete), mirrors left and right
+  unless you switch that off, changes the colours and the size, and can grow a fresh
+  creature from any words. A small picture shows it as the game will, on a dark screen.
+
 What counts as text is a rule of thumb (`engine/editor/texts.py`): names, titles and
 anything called `..._text` always; otherwise a string with a space in it, unless its key
 is known to hold something else. Songs, sounds and sprites are left out. A choice written

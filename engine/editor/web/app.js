@@ -190,6 +190,7 @@ function fits(f, value) {
   if (f.type === "number") return typeof value === "number";
   if (f.type === "bool") return typeof value === "boolean";
   if (f.type === "tags" || f.type === "refs") return Array.isArray(value) && value.every((v) => typeof v === "string");
+  if (f.type === "sprite") return typeof value === "string";
   return typeof value === "string";
 }
 
@@ -228,6 +229,7 @@ function control(kind, f, thing) {
       ...options.map((o) => el("option", { value: o, selected: o === value }, o)),
       known ? null : el("option", { value: String(value), selected: true }, `${value} (not found)`));
   }
+  if (f.type === "sprite") return spriteField(kind, f, thing, change);
   if (f.type === "refs") {
     const list = Array.isArray(value) ? value : [];
     const all = idsOf(f.of);
@@ -256,7 +258,9 @@ function renderForm() {
   const { thing } = hit;
   const single = kind.shape === "object";
   const fields = kind.fields.filter((f) => fits(f, thing[f.key]));
-  const known = new Set(fields.map((f) => f.key).concat(kind.shape === "list" ? ["id"] : []));
+  const drawn = kind.editor === "sprite" && (thing.pixels === undefined || (Array.isArray(thing.pixels) && thing.pixels.every((r) => typeof r === "string")))
+    && (thing.palette === undefined || (thing.palette && typeof thing.palette === "object" && !Array.isArray(thing.palette)));
+  const known = new Set(fields.map((f) => f.key).concat(kind.shape === "list" ? ["id"] : [], drawn ? ["palette", "pixels"] : []));
   const parts = [];
 
   const head = el("div", { class: "head" }, el("h2", {}, single ? kind.label : titleOf(kind, hit)));
@@ -282,11 +286,12 @@ function renderForm() {
     parts.push(field("Id", input, note));
   }
   for (const f of fields) parts.push(field(f.label, control(kind, f, thing)));
+  if (drawn) parts.push(spriteEditor(kind, thing));
 
   // everything the schema does not describe is still here, as JSON
   const rest = {};
   for (const [k, v] of Object.entries(thing)) if (!known.has(k)) rest[k] = v;
-  const note = el("p", { class: "note" }, kind.fields.length ? "Fields without a form of their own yet, as JSON. They are kept exactly as written."
+  const note = el("p", { class: "note" }, kind.fields.length || drawn ? "Fields without a form of their own yet, as JSON. They are kept exactly as written."
     : "This kind has no form yet: edit it as JSON.");
   const area = el("textarea", { class: "code", spellcheck: "false", rows: String(Math.min(28, Math.max(6, JSON.stringify(rest, null, 2).split("\n").length + 1))),
     oninput: (e) => {
@@ -301,7 +306,7 @@ function renderForm() {
       touched(kind);
     } });
   area.value = JSON.stringify(rest, null, 2);
-  parts.push(field(kind.fields.length ? "Everything else" : "Content", area, note));
+  parts.push(field(kind.fields.length || drawn ? "Everything else" : "Content", area, note));
 
   if (!single) {
     const places = uses(hit.id);
@@ -315,6 +320,201 @@ function renderForm() {
     parts.push(box);
   }
   host.replaceChildren(...parts);
+}
+
+// ---------------------------------------------------------------------- pixel sprites
+const LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const CLEAR = ".";
+
+// Colours of a palette as #rrggbb. Hex is read here; names and numbers are the engine's to translate.
+async function coloursOf(palette) {
+  const out = {};
+  const ask = {};
+  for (const [k, v] of Object.entries(palette || {})) {
+    if (typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v.trim())) out[k] = v.trim().toLowerCase();
+    else ask[k] = v;
+  }
+  if (Object.keys(ask).length) {
+    try { Object.assign(out, (await api("/api/sprite", { palette: ask })).colours); } catch (err) { /* drawn without those colours */ }
+  }
+  return out;
+}
+
+function paintSprite(canvas, pixels, colours, cell, screen) {
+  const h = pixels.length, w = Math.max(1, ...pixels.map((r) => r.length));
+  canvas.width = w * cell;
+  canvas.height = h * cell;
+  const c = canvas.getContext("2d");
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const colour = colours[pixels[y][x]];
+      if (colour) c.fillStyle = colour;
+      else if (screen) c.fillStyle = screen;
+      else c.fillStyle = (x + y) % 2 ? "#c9ced6" : "#e7eaee";                  // nothing there: a checkerboard
+      c.fillRect(x * cell, y * cell, cell, cell);
+    }
+  }
+}
+
+// The sprite a character will be drawn with: its own from sprites.json, or the one the game grows from its name.
+function spriteField(kind, f, thing, change) {
+  const input = el("input", { type: "text", class: "code", value: thing[f.key] || "", placeholder: "auto, none, or the name of a sprite",
+    oninput: (e) => { change(e.target.value.trim()); show(); } });
+  const canvas = el("canvas", { class: "sprite-small", "aria-hidden": "true" });
+  const buttons = el("span", { class: "row" });
+  const note = el("p", { class: "note" });
+  const sprites = kindOf("sprites");
+  const me = () => (state.id !== null ? state.id : "");
+  const seed = () => thing.sprite_seed || thing.template || thing.name || me();
+
+  async function show() {
+    const ref = thing[f.key];
+    const own = ref && sprites && fileOf(sprites) && fileOf(sprites).data[ref];
+    buttons.replaceChildren();
+    canvas.hidden = false;
+    if (!ref || ref === "none") {
+      canvas.hidden = true;
+      note.textContent = ref === "none" ? "No picture in a fight." : "No sprite named: the game shows none unless this says auto.";
+      buttons.append(el("button", { type: "button", class: "quiet", onclick: () => { input.value = "auto"; change("auto"); show(); } }, "Grow one"));
+      return;
+    }
+    if (own && Array.isArray(own.pixels)) {
+      paintSprite(canvas, own.pixels, await coloursOf(own.palette), 5, "#0f1724");
+      note.textContent = "Drawn by hand, in the game's sprites.";
+      buttons.append(el("button", { type: "button", class: "quiet", onclick: () => select("sprites", ref) }, "Edit the drawing"));
+      return;
+    }
+    let grown;
+    try { grown = await api("/api/sprite", { seed: seed(), size: thing.sprite_size || 12 }); } catch (err) { note.textContent = err.message; return; }
+    paintSprite(canvas, grown.pixels, grown.palette, 5, "#0f1724");
+    note.textContent = ref === "auto" ? `Grown by the game from "${seed()}". The same words always grow the same creature.`
+      : `There is no sprite called "${ref}", so the game grows one from "${seed()}".`;
+    buttons.append(
+      el("button", { type: "button", class: "quiet", title: "Grow a different creature", onclick: () => {
+        thing.sprite_seed = `${thing.name || me()} ${Math.random().toString(36).slice(2, 6)}`;
+        touched(kind);
+        renderForm();
+      } }, "Another one"),
+      el("button", { type: "button", class: "quiet", title: "Keep this creature as a drawing you can change", onclick: () => {
+        let id = me() || "sprite", n = 2;
+        while (fileOf(sprites).data[id]) { id = `${me()}_${n}`; n += 1; }
+        fileOf(sprites).data[id] = grown;
+        thing[f.key] = id;
+        delete thing.sprite_seed;
+        touched(sprites);
+        touched(kind);
+        select("sprites", id);
+        status(`The creature is now the drawing "${id}", and ${thing.name || "the character"} uses it. Nothing is written until you save.`);
+      } }, "Draw over it"));
+  }
+  show();
+  return el("div", {}, input, el("div", { class: "sprite-row" }, canvas, el("div", {}, note, buttons)));
+}
+
+// Drawing a sprite: a grid of palette letters, painted with the mouse (or the arrow keys and Space).
+function spriteEditor(kind, thing) {
+  if (!Array.isArray(thing.pixels)) thing.pixels = Array(12).fill(CLEAR.repeat(12));
+  if (!thing.palette || typeof thing.palette !== "object") thing.palette = {};
+  let colours = {};
+  let pen = Object.keys(thing.palette)[0] || CLEAR;
+  let mirror = true, cursor = [0, 0], painting = false;
+  const cell = () => Math.max(8, Math.min(26, Math.floor(416 / Math.max(width(), thing.pixels.length))));
+  const width = () => Math.max(1, ...thing.pixels.map((r) => r.length));
+  const grid = el("canvas", { class: "sprite-grid", tabindex: "0", role: "img", "aria-label": "The sprite. Arrow keys move, Space paints." });
+  const small = el("canvas", { class: "sprite-small", "aria-hidden": "true" });
+  const swatches = el("div", { class: "swatches" });
+  const picker = el("input", { type: "color", "aria-label": "Colour of the chosen paint" });
+  const size = el("span", { class: "row" });
+
+  function even() {                                          // every row the same length
+    const w = width();
+    thing.pixels = thing.pixels.map((r) => r.padEnd(w, CLEAR));
+  }
+  function draw() {
+    paintSprite(grid, thing.pixels, colours, cell());
+    const c = grid.getContext("2d");
+    c.strokeStyle = "rgba(0,0,0,0.12)";
+    for (let x = 0; x <= width(); x++) { c.beginPath(); c.moveTo(x * cell() + 0.5, 0); c.lineTo(x * cell() + 0.5, grid.height); c.stroke(); }
+    for (let y = 0; y <= thing.pixels.length; y++) { c.beginPath(); c.moveTo(0, y * cell() + 0.5); c.lineTo(grid.width, y * cell() + 0.5); c.stroke(); }
+    if (document.activeElement === grid) { c.strokeStyle = "#2447d6"; c.lineWidth = 2; c.strokeRect(cursor[0] * cell() + 1, cursor[1] * cell() + 1, cell() - 2, cell() - 2); c.lineWidth = 1; }
+    paintSprite(small, thing.pixels, colours, 4, "#0f1724");
+  }
+  function set(x, y, letter) {
+    const put = (cx) => { if (cx >= 0 && cx < width() && y >= 0 && y < thing.pixels.length) thing.pixels[y] = thing.pixels[y].slice(0, cx) + letter + thing.pixels[y].slice(cx + 1); };
+    put(x);
+    if (mirror) put(width() - 1 - x);
+    touched(kind);
+    palette();                                              // which colours are in use may have changed
+    draw();
+  }
+  function palette() {
+    const used = new Set(thing.pixels.join(""));
+    swatches.replaceChildren(
+      el("button", { type: "button", class: "swatch clear" + (pen === CLEAR ? " on" : ""), title: "Nothing (rub out)", "aria-label": "Rub out", onclick: () => { pen = CLEAR; palette(); } }),
+      ...Object.keys(thing.palette).map((k) => el("button", { type: "button", class: "swatch" + (pen === k ? " on" : ""), style: `background:${colours[k] || "transparent"}`,
+        title: `Paint "${k}"${used.has(k) ? "" : " (not used)"}`, "aria-label": `Paint ${k}`, onclick: () => { pen = k; palette(); } })),
+      el("button", { type: "button", class: "quiet", onclick: () => {
+        const k = [...LETTERS].find((l) => !(l in thing.palette));
+        if (!k) return;
+        thing.palette[k] = colours[k] = "#8a96a8";
+        pen = k;
+        touched(kind); palette(); draw();
+      } }, "Add a colour"));
+    const mine = pen !== CLEAR;
+    picker.hidden = !mine;
+    if (mine) picker.value = colours[pen] || "#000000";
+    if (mine && !used.has(pen)) swatches.append(el("button", { type: "button", class: "quiet", onclick: () => { delete thing.palette[pen]; delete colours[pen]; pen = CLEAR; touched(kind); palette(); } }, "Remove this colour"));
+  }
+  function resize(w, h) {
+    w = Math.max(4, Math.min(32, w)); h = Math.max(4, Math.min(32, h));
+    const now = width(), left = Math.floor((w - now) / 2);        // grow and shrink evenly on both sides, so it stays centred
+    thing.pixels = thing.pixels.map((r) => (left >= 0 ? CLEAR.repeat(left) + r : r.slice(-left)).padEnd(w, CLEAR).slice(0, w));
+    while (thing.pixels.length < h) thing.pixels.push(CLEAR.repeat(w));
+    thing.pixels.length = h;
+    touched(kind); sizes(); draw();
+  }
+  function sizes() {
+    size.replaceChildren("Width", el("input", { type: "number", min: "4", max: "32", value: String(width()), onchange: (e) => resize(Number(e.target.value) || width(), thing.pixels.length) }),
+      "Height", el("input", { type: "number", min: "4", max: "32", value: String(thing.pixels.length), onchange: (e) => resize(width(), Number(e.target.value) || thing.pixels.length) }));
+  }
+  const at = (e) => { const box = grid.getBoundingClientRect(); return [Math.floor((e.clientX - box.left) / (box.width / width())), Math.floor((e.clientY - box.top) / (box.height / thing.pixels.length))]; };
+  grid.addEventListener("pointerdown", (e) => { painting = true; grid.setPointerCapture(e.pointerId); cursor = at(e); set(cursor[0], cursor[1], e.button === 2 ? CLEAR : pen); });
+  grid.addEventListener("pointermove", (e) => { if (painting) { cursor = at(e); set(cursor[0], cursor[1], e.buttons === 2 ? CLEAR : pen); } });
+  grid.addEventListener("pointerup", () => { painting = false; });
+  grid.addEventListener("contextmenu", (e) => e.preventDefault());
+  grid.addEventListener("focus", draw);
+  grid.addEventListener("blur", draw);
+  grid.addEventListener("keydown", (e) => {
+    const step = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (step) { cursor = [Math.max(0, Math.min(width() - 1, cursor[0] + step[0])), Math.max(0, Math.min(thing.pixels.length - 1, cursor[1] + step[1]))]; draw(); e.preventDefault(); }
+    else if (e.key === " " || e.key === "Enter") { set(cursor[0], cursor[1], pen); e.preventDefault(); }
+    else if (e.key === "Backspace" || e.key === "Delete") { set(cursor[0], cursor[1], CLEAR); e.preventDefault(); }
+  });
+  picker.addEventListener("input", () => { if (pen !== CLEAR) { thing.palette[pen] = colours[pen] = picker.value; touched(kind); palette(); draw(); } });
+
+  const seed = el("input", { type: "text", placeholder: "any words", value: state.id || "", "aria-label": "Words to grow a creature from" });
+  const grow = el("button", { type: "button", class: "quiet", onclick: async () => {
+    if (thing.pixels.join("").replace(/\./g, "") && !confirm("Replace this drawing with a grown one?")) return;
+    try {
+      const made = await api("/api/sprite", { seed: seed.value || "nobody", size: thing.pixels.length });
+      thing.palette = made.palette; thing.pixels = made.pixels; colours = Object.assign({}, made.palette);
+      pen = Object.keys(thing.palette)[0] || CLEAR;
+      touched(kind); sizes(); palette(); draw();
+    } catch (err) { status("Could not grow a sprite: " + err.message, true); }
+  } }, "Grow");
+  const tick = el("input", { type: "checkbox", checked: true, onchange: (e) => { mirror = e.target.checked; } });
+
+  even();
+  coloursOf(thing.palette).then((c) => { colours = c; palette(); draw(); });
+  sizes();
+  return el("div", { class: "sheet sprite" },
+    el("div", { class: "sprite-row" }, grid, el("div", {},
+      el("h3", {}, "Paint"), swatches, el("div", { class: "row" }, picker, el("label", { class: "tick" }, tick, " Mirror left and right")),
+      el("h3", {}, "Size"), size,
+      el("h3", {}, "In the game"), small,
+      el("h3", {}, "Grow one from words"), el("div", { class: "row" }, seed, grow))),
+    el("p", { class: "note" }, "Click or drag to paint, right button to rub out. With the keyboard: arrow keys move, Space paints, Delete rubs out. " +
+      "The game draws two pixel rows in one line of text, so pixels come out about square."));
 }
 
 // ---------------------------------------------------------------------- enemies: make one, try one

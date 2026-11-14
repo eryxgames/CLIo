@@ -29,6 +29,38 @@ from engine.theme import available_themes, load_theme           # noqa: E402
 from engine.ui import UI                                        # noqa: E402
 
 
+def text_table(game_dir, out_file=None, in_file=None):
+    """--export-text / --import-text: the game's texts as a CSV file, out or back in."""
+    from engine import editor
+    from engine.editor import texts
+    if out_file:
+        table = editor.text_table(game_dir)
+        with open(out_file, "w", encoding="utf-8-sig", newline="") as f:      # with a mark so spreadsheets read it as UTF-8
+            f.write(texts.to_csv(table))
+        print("%d texts written to %s" % (len(table), out_file))
+        return 0
+    try:
+        with open(in_file, encoding="utf-8-sig", newline="") as f:
+            table = texts.from_csv(f.read())
+    except (OSError, ValueError) as err:
+        print("Cannot read %s: %s" % (in_file, err))
+        return 2
+    result = editor.put_texts(game_dir, table)
+    report = result["report"]
+    problems = editor.check(game_dir, result["files"])
+    if problems:
+        print("Nothing was changed: with these texts the game would have problems.")
+        for p in problems:
+            print("  ! " + p["text"])
+        return 1
+    for key, data in result["files"].items():
+        editor.save(game_dir, key, data)
+    print("%d texts changed in %d file(s), %d unchanged." % (report["changed"], len(report["files"]), report["same"]))
+    for where in report["missing"]:
+        print("  ? no text at %s" % where)
+    return 0
+
+
 def resolve_game(name):
     """A game folder from a name, a path, or None."""
     if not name:
@@ -124,7 +156,9 @@ def main(argv=None):
     ap.add_argument("--list", action="store_true", help="list available games and exit")
     ap.add_argument("--check", action="store_true", help="validate the game's data files and exit")
     ap.add_argument("--edit", action="store_true", help="open the game in the editor (a page in your browser)")
-    ap.add_argument("--port", type=int, default=0, help="port for the editor (default: any free one)")
+    ap.add_argument("--port", type=int, help="port for the editor (default: 8420, or any free one)")
+    ap.add_argument("--export-text", metavar="FILE", help="write every line a player can read to a CSV file and exit")
+    ap.add_argument("--import-text", metavar="FILE", help="put the texts of such a CSV file back into the game and exit")
     ap.add_argument("--no-browser", action="store_true", help="with --edit: print the address, do not open it")
     ap.add_argument("--style", help="visual style (%s)" % ", ".join(available_themes()))
     ap.add_argument("--no-sound", action="store_true", help="run silently")
@@ -168,6 +202,8 @@ def main(argv=None):
     if args.edit:
         from engine.editor.server import serve
         return serve(game_dir, args.port, not args.no_browser)
+    if args.export_text or args.import_text:
+        return text_table(game_dir, args.export_text, args.import_text)
     try:
         if args.check:
             data = GameData(game_dir)

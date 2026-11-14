@@ -15,16 +15,26 @@ import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import EditorError, check, load, save
+from . import EditorError, archive, check, load, put_texts, save, text_table, texts
 
 WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
 PAGES = {"/": ("index.html", "text/html; charset=utf-8"), "/index.html": ("index.html", "text/html; charset=utf-8"),
          "/app.js": ("app.js", "text/javascript; charset=utf-8"), "/app.css": ("app.css", "text/css; charset=utf-8")}
 LIMIT = 16 * 1024 * 1024
+DEFAULT_PORT = 8420
 
 
-def make_server(game_dir, port=0):
-    """``(server, address)``; call ``server.serve_forever()``. The address carries the token."""
+class _Server(ThreadingHTTPServer):
+    daemon_threads = True
+    # Windows would let a second editor share a port that is in use; elsewhere reuse only skips the wait after a restart
+    allow_reuse_address = os.name != "nt"
+
+
+def make_server(game_dir, port=None):
+    """``(server, address)``; call ``server.serve_forever()``. The address carries the token.
+
+    Without a ``port`` the usual one is tried first and any free one after it; ``0`` asks for any.
+    """
     token = secrets.token_urlsafe(18)
     lock = threading.Lock()
 
@@ -77,6 +87,25 @@ def make_server(game_dir, port=0):
                 return self.answer(lambda: {"problems": check(game_dir, body.get("pending") or {})})
             if path == "/api/save":
                 return self.answer(lambda: save(game_dir, str(body.get("file")), body.get("data")))
+            if path == "/api/texts":                        # every line a player can read
+                def table():
+                    found = text_table(game_dir, body.get("pending") or {})
+                    return {"csv": texts.to_csv(found), "count": len(found)} if body.get("csv") else {"rows": found}
+                return self.answer(table)
+            if path == "/api/texts/apply":                  # put texts back: a table from the page, or a CSV file's text
+                def put():
+                    try:
+                        rows = texts.from_csv(body["csv"]) if isinstance(body.get("csv"), str) else body.get("rows") or []
+                    except (ValueError, KeyError) as err:
+                        raise EditorError("That file could not be read as a table of texts: %s" % err)
+                    return put_texts(game_dir, rows, body.get("pending") or {})
+                return self.answer(put)
+            if path == "/api/archive":
+                try:
+                    with lock:
+                        return self.reply(200, archive(game_dir), "application/zip")
+                except Exception as err:
+                    return self.reply(500, {"error": "%s: %s" % (type(err).__name__, err)})
             self.reply(404, {"error": "Nothing here."})
 
         def answer(self, work):
@@ -89,12 +118,16 @@ def make_server(game_dir, port=0):
                 return self.reply(500, {"error": "%s: %s" % (type(err).__name__, err)})
             self.reply(200, result)
 
-    server = ThreadingHTTPServer(("127.0.0.1", int(port or 0)), Handler)
-    server.daemon_threads = True
+    try:                                                    # the same address every time, when it is free: the
+        server = _Server(("127.0.0.1", DEFAULT_PORT if port is None else int(port)), Handler)
+    except OSError:                                         # browser then remembers the page's settings
+        if port is not None:
+            raise
+        server = _Server(("127.0.0.1", 0), Handler)
     return server, "http://127.0.0.1:%d/?key=%s" % (server.server_address[1], token)
 
 
-def serve(game_dir, port=0, open_browser=True, say=print):
+def serve(game_dir, port=None, open_browser=True, say=print):
     """Run the editor until Ctrl+C."""
     server, address = make_server(game_dir, port)
     say("Editing %s" % os.path.abspath(game_dir))

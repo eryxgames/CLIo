@@ -90,20 +90,69 @@ def check(game_dir, pending=None):
         shutil.rmtree(work, ignore_errors=True)
 
 
-def load(game_dir):
-    """Everything the editor shows: the files, the schema to build forms from, and the current problems."""
-    where = paths(game_dir)
+def _files(game_dir):
     files = {}
-    for key, path in where.items():
+    for key, path in paths(game_dir).items():
         exists = os.path.isfile(path)
         kind = schema.BY_FILE[key]
         files[key] = {"name": os.path.basename(path), "exists": exists,
                       "data": _read(path) if exists else ([] if kind["shape"] == "list" else {})}
+    return files
+
+
+def load(game_dir):
+    """Everything the editor shows: the files, the schema to build forms from, and the current problems."""
+    files = _files(game_dir)
     cfg = files["game"]["data"]
     return {"id": cfg.get("id") or os.path.basename(os.path.abspath(game_dir)),
             "title": cfg.get("title") or os.path.basename(os.path.abspath(game_dir)),
             "folder": os.path.abspath(game_dir), "files": files, "schema": schema.KINDS,
             "problems": check(game_dir)}
+
+
+def current(game_dir, pending=None):
+    """``{key: data}`` of the game as it would be with ``pending`` saved."""
+    files = {key: file["data"] for key, file in _files(game_dir).items()}
+    for key, data in (pending or {}).items():
+        if key in files:
+            files[key] = data
+    return files
+
+
+def text_table(game_dir, pending=None):
+    """Every line a player can read (see ``texts.py``), from the files as they would be with ``pending``."""
+    from . import texts
+    return texts.rows(current(game_dir, pending))
+
+
+def put_texts(game_dir, table, pending=None):
+    """Put a table of texts back into the game's data without writing anything.
+
+    Returns ``{"files": {key: data}, "report": {...}}`` - only the files that changed, for the
+    caller to check and save.
+    """
+    from . import texts
+    files = current(game_dir, pending)
+    report = texts.apply(files, table)
+    return {"files": {key: files[key] for key in report["files"]}, "report": report}
+
+
+def archive(game_dir):
+    """The game folder as the bytes of a zip file (backups and caches left out)."""
+    import io
+    import zipfile
+    game_dir = os.path.abspath(game_dir)
+    name = os.path.basename(game_dir)
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+        for folder, dirs, names in os.walk(game_dir):
+            dirs[:] = sorted(d for d in dirs if d != BACKUP and d != "__pycache__" and not d.startswith("."))
+            for n in sorted(names):
+                if n.startswith(".") or n.endswith(".pyc"):
+                    continue
+                path = os.path.join(folder, n)
+                z.write(path, os.path.join(name, os.path.relpath(path, game_dir)).replace(os.sep, "/"))
+    return out.getvalue()
 
 
 def save(game_dir, key, data):

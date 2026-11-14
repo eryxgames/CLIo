@@ -1,13 +1,23 @@
 /* CLIo editor. A plain working table: cool paper, dark ink, ids set like the words a player types. */
 :root {
+  color-scheme: light;
   --paper: #eef1f4; --sheet: #ffffff; --ink: #1b2230; --ink-2: #566070; --rule: #cfd6de;
-  --mark: #2447d6; --mark-soft: #e3e9fd; --bad: #b3261e; --bad-soft: #fbe9e7; --changed: #9a5b00;
+  --mark: #2447d6; --mark-soft: #e3e9fd; --bad: #b3261e; --bad-soft: #fbe9e7; --changed: #9a5b00; --hit: #ffe28a;
   --mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas, monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
+/* Dark: when chosen, or when the system asks for it and light was not chosen. Kept in step by hand. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #12161d; --sheet: #1a2029; --ink: #e6eaf0; --ink-2: #9aa5b5; --rule: #313a47;
+  --mark: #8ea6ff; --mark-soft: #232d4d; --bad: #ff8a80; --bad-soft: #3a1d1b; --changed: #e0a040; --hit: #6b5200;
+}
 @media (prefers-color-scheme: dark) {
-  :root { --paper: #12161d; --sheet: #1a2029; --ink: #e6eaf0; --ink-2: #9aa5b5; --rule: #313a47;
-          --mark: #8ea6ff; --mark-soft: #232d4d; --bad: #ff8a80; --bad-soft: #3a1d1b; --changed: #e0a040; }
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #12161d; --sheet: #1a2029; --ink: #e6eaf0; --ink-2: #9aa5b5; --rule: #313a47;
+    --mark: #8ea6ff; --mark-soft: #232d4d; --bad: #ff8a80; --bad-soft: #3a1d1b; --changed: #e0a040; --hit: #6b5200;
+  }
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -33,6 +43,21 @@ button.warn { color: var(--bad); }
 .problems ul { margin: 0; padding: 0.4rem 1rem; list-style: none; }
 .problems button { border: 0; background: none; padding: 0.15rem 0; text-align: left; color: var(--ink); }
 .problems button:hover { text-decoration: underline; }
+
+.tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.45rem 1rem; border-bottom: 1px solid var(--rule); }
+.tools input[type="search"], .tools input[type="text"] { padding: 0.3rem 0.5rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--sheet); }
+.tools #find { flex: 1 1 16rem; min-width: 10rem; max-width: 26rem; }
+.tools #replace { flex: 0 1 12rem; min-width: 8rem; }
+.tools .tick { color: var(--ink-2); white-space: nowrap; }
+.tools .gap { flex: 1; }
+.tools button { padding: 0.25rem 0.65rem; }
+.found { max-height: 32vh; overflow: auto; background: var(--sheet); border-bottom: 1px solid var(--rule); padding: 0.4rem 1rem 0.6rem; }
+.found p { margin: 0 0 0.3rem; color: var(--ink-2); }
+.found ul { margin: 0; padding: 0; list-style: none; }
+.found button { display: block; width: 100%; border: 0; background: none; padding: 0.2rem 0; text-align: left; }
+.found button:hover .snippet { text-decoration: underline; }
+.found .snippet { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.found mark { background: var(--hit); color: inherit; border-radius: 2px; padding: 0 1px; }
 
 main { flex: 1; min-height: 0; display: grid; grid-template-columns: 11.5rem 17rem minmax(0, 1fr); }
 nav, .list, .form { overflow: auto; min-height: 0; }

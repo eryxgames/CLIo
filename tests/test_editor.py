@@ -124,10 +124,111 @@ class ServiceTests(unittest.TestCase):
         self.assertTrue(os.path.isfile(os.path.join(folder, "sounds.json")))
 
 
+class TextTableTests(unittest.TestCase):
+    def files(self, name="derelict"):
+        return {key: file["data"] for key, file in editor.load(os.path.join(ROOT, "games", name))["files"].items()}
+
+    def test_what_counts_as_text(self):
+        from engine.editor import texts
+        for key, value in (("name", "Hatch"), ("lock_text", "Locked."), ("description", "A room."), ("say", "It is cold here"),
+                           ("name_prompt", "Name?"), ("aliases", "bot")):
+            self.assertTrue(texts.is_text(key, value), (key, value))
+        for key, value in (("if", "has:lamp"), ("scene_id", "corridor"), ("author", "Daniel Sandner"), ("set", "door open"),
+                           ("description", "  "), ("give", "red_apple"), ("intro", "intro")):
+            self.assertFalse(texts.is_text(key, value), (key, value))
+
+    def test_out_and_back_in(self):
+        from engine.editor import texts
+        files = self.files()
+        table = texts.rows(files)
+        self.assertGreater(len(table), 400)
+        places = [r["where"] for r in table]
+        self.assertEqual(len(places), len(set(places)))
+        self.assertIn("game/title", places)
+        self.assertIn("scenes/utility_room/description", places)                # a list file is addressed by id, not position
+        self.assertTrue(any(w.startswith("scenes/utility_room/exits/0/") for w in places))
+        self.assertTrue(any(w.startswith("dialogues/") and w.endswith("/text") for w in places))
+        self.assertFalse(any(w.split("/")[0] in texts.SKIP_FILES for w in places))
+        self.assertTrue(all(r["kind"] in files for r in table))
+        csv_text = texts.to_csv(table)
+        self.assertTrue(csv_text.startswith("where,text\n"))
+        again = texts.from_csv("\ufeff" + csv_text.replace("\n", "\r\n"))    # as a spreadsheet on Windows writes it
+        self.assertEqual([(r["where"], r["text"]) for r in again], [(r["where"], r["text"]) for r in table])
+        before = json.dumps(files, sort_keys=True)
+        report = texts.apply(files, again)
+        self.assertEqual((report["changed"], report["same"], report["missing"]), (0, len(table), []))
+        self.assertEqual(json.dumps(files, sort_keys=True), before)             # untouched texts change nothing
+        report = texts.apply(files, [
+            {"where": "scenes/utility_room/description", "text": "Une pièce.\nDeux lignes."},
+            {"where": "scenes/nowhere/description", "text": "Lost"},
+            {"where": "scenes/utility_room/exits", "text": "not a text"},
+            {"where": "music/theme/title", "text": "Not offered, not accepted"},
+            {"where": "items", "text": "too short"}, {"where": "", "text": "skipped"}])
+        self.assertEqual((report["changed"], report["files"]), (1, ["scenes"]))
+        self.assertEqual(len(report["missing"]), 4)
+        self.assertEqual(files["scenes"][0]["description"], "Une pièce.\nDeux lignes.")
+        semicolons = texts.from_csv("where;text\ngame/title;\"A; B\"\n")       # a spreadsheet in a comma-decimal locale
+        self.assertEqual(semicolons, [{"where": "game/title", "text": "A; B"}])
+        with self.assertRaisesRegex(ValueError, "no text column"):
+            texts.from_csv("where,text\ngame/title\n")
+
+    def test_keys_with_slashes_survive(self):
+        from engine.editor import texts
+        files = {"items": {"a/b~c": {"name": "Odd one", "states": {"open/shut": {"text": "It is open now"}}}}}
+        table = texts.rows(files)
+        self.assertEqual([r["where"] for r in table], ["items/a~1b~0c/name", "items/a~1b~0c/states/open~1shut/text"])
+        self.assertEqual(table[0]["id"], "a/b~c")
+        texts.apply(files, [{"where": table[1]["where"], "text": "Open."}])
+        self.assertEqual(files["items"]["a/b~c"]["states"]["open/shut"]["text"], "Open.")
+
+    def test_the_service_changes_nothing_on_disk(self):
+        folder = copy_of("depths")
+        table = editor.text_table(folder)
+        self.assertGreater(len(table), 300)
+        result = editor.put_texts(folder, [{"where": "game/title", "text": "The Hollow, Deeper"}])
+        self.assertEqual((list(result["files"]), result["report"]["changed"]), (["game"], 1))
+        self.assertEqual(GameData(folder).title, "The Hollow")                  # for the caller to check and save
+        seen = editor.text_table(folder, {"game": result["files"]["game"]})
+        self.assertEqual([r["text"] for r in seen if r["where"] == "game/title"], ["The Hollow, Deeper"])
+
+    def test_archive(self):
+        import io
+        import zipfile
+        folder = copy_of("derelict")
+        editor.save(folder, "texts", editor.load(folder)["files"]["texts"]["data"])    # leaves a backup behind
+        names = zipfile.ZipFile(io.BytesIO(editor.archive(folder))).namelist()
+        self.assertIn("derelict/game.json", names)
+        self.assertTrue(any(n.startswith("derelict/art/") for n in names))
+        self.assertFalse(any(editor.BACKUP in n or "__pycache__" in n for n in names))
+
+    def test_command_line(self):
+        import io
+        from contextlib import redirect_stdout
+        import clio
+        folder = copy_of("derelict")
+        table = os.path.join(os.path.dirname(folder), "texts.csv")
+        out = io.StringIO()
+        with redirect_stdout(out):
+            self.assertEqual(clio.main([folder, "--export-text", table]), 0)
+        with open(table, "rb") as f:
+            raw = f.read()
+        self.assertTrue(raw.startswith(b"\xef\xbb\xbfwhere,text"))             # marked, so a spreadsheet reads it as UTF-8
+        text = raw.decode("utf-8-sig").replace("game/title,Derelict", "game/title,Wreck") + "scenes/gone/name,Gone\n"
+        with open(table, "w", encoding="utf-8-sig", newline="") as f:
+            f.write(text)
+        with redirect_stdout(out):
+            self.assertEqual(clio.main([folder, "--import-text", table]), 0)
+        self.assertIn("1 texts changed in 1 file(s)", out.getvalue())
+        self.assertIn("no text at scenes/gone/name", out.getvalue())
+        self.assertEqual(GameData(folder).title, "Wreck")
+        with redirect_stdout(out):
+            self.assertEqual(clio.main([folder, "--import-text", os.path.join(folder, "missing.csv")]), 2)
+
+
 class ServerTests(unittest.TestCase):
     def setUp(self):
         self.folder = copy_of("derelict")
-        self.server, self.address = make_server(self.folder)
+        self.server, self.address = make_server(self.folder, 0)
         self.base, self.key = self.address.split("/?key=")
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
 
@@ -180,6 +281,42 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(code, 400)
         self.assertIn("JSON list", json.loads(body)["error"])
         self.assertEqual(self.ask("/api/nothing", {})[0], 404)
+
+    def test_texts_and_archive_through_the_server(self):
+        code, body = self.ask("/api/texts", {})
+        rows = json.loads(body)["rows"]
+        self.assertEqual(code, 200)
+        self.assertGreater(len(rows), 400)
+        code, body = self.ask("/api/texts", {"csv": True, "pending": {"game": {"title": "Unsaved title"}}})
+        out = json.loads(body)
+        self.assertIn("game/title,Unsaved title\n", out["csv"])                 # what is in the page, not only what is on disk
+        code, body = self.ask("/api/texts/apply", {"rows": [{"where": "game/title", "text": "Renamed"}]})
+        result = json.loads(body)
+        self.assertEqual((code, result["report"]["changed"], result["files"]["game"]["title"]), (200, 1, "Renamed"))
+        self.assertEqual(GameData(self.folder).title, "Derelict")               # applying does not save
+        code, body = self.ask("/api/texts/apply", {"csv": "where,text\ngame/title\n"})
+        self.assertEqual(code, 400)
+        self.assertIn("could not be read", json.loads(body)["error"])
+        code, body = self.ask("/api/archive", {})
+        self.assertEqual((code, body[:2]), (200, b"PK"))
+        self.assertEqual(self.ask("/api/archive", {}, key="")[0], 403)
+
+    def test_the_usual_address_is_tried_first(self):
+        from engine.editor import server as module
+        usual, address = make_server(self.folder)                               # 8420 when free, any port when not
+        try:
+            port = usual.server_address[1]
+            self.assertTrue(address.startswith("http://127.0.0.1:%d/?key=" % port))
+            other, _ = make_server(self.folder)                                 # the usual one is now taken
+            try:
+                self.assertNotEqual(other.server_address[1], port)
+            finally:
+                other.server_close()
+            if port == module.DEFAULT_PORT:
+                with self.assertRaises(OSError):
+                    make_server(self.folder, port)                              # asked for by number: say so, do not move
+        finally:
+            usual.server_close()
 
 
 if __name__ == "__main__":

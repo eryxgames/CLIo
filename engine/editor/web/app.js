@@ -6,7 +6,7 @@
 
 const KEY = new URLSearchParams(location.search).get("key") || "";
 const $ = (id) => document.getElementById(id);
-const state = { game: null, kind: null, id: null, dirty: new Set(), problems: [], filter: "", checking: 0 };
+const state = { game: null, kind: null, id: null, dirty: new Set(), problems: [], filter: "", checking: 0, found: [], searching: 0 };
 
 function el(tag, props, ...children) {
   const node = document.createElement(tag);
@@ -60,11 +60,16 @@ function touched(kind) {
   state.checking = setTimeout(check, 500);
 }
 
+// the changed files as they are now in the page, for anything the server should look at before saving
+function pending() {
+  const out = {};
+  for (const key of state.dirty) out[key] = state.game.files[key].data;
+  return out;
+}
+
 async function check() {
-  const pending = {};
-  for (const key of state.dirty) pending[key] = state.game.files[key].data;
   try {
-    state.problems = (await api("/api/check", { pending })).problems;
+    state.problems = (await api("/api/check", { pending: pending() })).problems;
     renderProblems();
     renderKinds();
     renderList();
@@ -352,7 +357,131 @@ function remove(kind, hit) {
   select(kind.key, null);
 }
 
+// ---------------------------------------------------------------------- all the text at once
+function download(name, blob) {
+  const link = el("a", { href: URL.createObjectURL(blob), download: name });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(link.href), 5000);
+}
+
+// Texts that came back changed (from a file, or from replacing): take them into the page, unsaved.
+function adopt(result) {
+  for (const [key, data] of Object.entries(result.files)) {
+    state.game.files[key].data = data;
+    state.dirty.add(key);
+  }
+  renderAll();
+  clearTimeout(state.checking);
+  state.checking = setTimeout(check, 100);
+}
+
+const escaped = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const needle = () => new RegExp(escaped($("find").value), $("match-case").checked ? "g" : "gi");
+const place = (row) => { const kind = kindOf(row.kind); return [kind.label, row.id].filter(Boolean).join(" › ") + " › " + row.where.split("/").slice(row.id ? 2 : 1).join(" › "); };
+
+async function search() {
+  const query = $("find").value;
+  if (!query) { state.found = []; $("found").hidden = true; $("replace-all").disabled = true; return; }
+  let rows;
+  try { rows = (await api("/api/texts", { pending: pending() })).rows; } catch (err) { return status("Could not search: " + err.message, true); }
+  if (query !== $("find").value) return;                   // typed on since
+  const find = needle();
+  state.found = rows.filter((r) => { find.lastIndex = 0; return find.test(r.text); });
+  const times = state.found.reduce((n, r) => n + (r.text.match(needle()) || []).length, 0);
+  $("found").hidden = false;
+  $("replace-all").disabled = state.found.length === 0;
+  $("found-count").textContent = state.found.length === 0 ? `Nothing the player reads contains "${query}".`
+    : `"${query}" appears ${times === 1 ? "once" : times + " times"} in ${state.found.length} text${state.found.length === 1 ? "" : "s"}.` +
+      (state.found.length > 200 ? " The first 200 are listed." : "");
+  $("found-list").replaceChildren(...state.found.slice(0, 200).map((r) => {
+    find.lastIndex = 0;
+    const at = find.exec(r.text);
+    const from = Math.max(0, at.index - 40);
+    const snippet = el("span", { class: "snippet" }, (from ? "…" : "") + r.text.slice(from, at.index),
+      el("mark", {}, at[0]), r.text.slice(at.index + at[0].length, at.index + at[0].length + 90));
+    return el("li", {}, el("button", { type: "button", onclick: () => select(r.kind, r.id || kindOf(r.kind).one) },
+      el("span", { class: "id" }, place(r)), snippet));
+  }));
+}
+
+async function replaceAll() {
+  const query = $("find").value, by = $("replace").value;
+  if (!query || !state.found.length) return;
+  const rows = state.found.map((r) => ({ where: r.where, text: r.text.replace(needle(), () => by) }));
+  try {
+    const result = await api("/api/texts/apply", { pending: pending(), rows });
+    adopt(result);
+    status(`Replaced in ${result.report.changed} text${result.report.changed === 1 ? "" : "s"}. Nothing is written until you save.`);
+    search();
+  } catch (err) {
+    status("Could not replace: " + err.message, true);
+  }
+}
+
+async function exportText() {
+  try {
+    const out = await api("/api/texts", { pending: pending(), csv: true });
+    download(state.game.id + "-texts.csv", new Blob(["\ufeff" + out.csv], { type: "text/csv;charset=utf-8" }));
+    status(`${out.count} texts exported. Edit the second column; keep the first as it is.`);
+  } catch (err) {
+    status("Could not export: " + err.message, true);
+  }
+}
+
+async function importText(file) {
+  try {
+    const result = await api("/api/texts/apply", { pending: pending(), csv: await file.text() });
+    const r = result.report;
+    adopt(result);
+    status(`${r.changed} text${r.changed === 1 ? "" : "s"} changed in ${r.files.length} file${r.files.length === 1 ? "" : "s"}, ${r.same} the same` +
+      (r.missing.length ? `, ${r.missing.length} row${r.missing.length === 1 ? "" : "s"} matched nothing (listed below)` : "") + ". Nothing is written until you save.",
+    r.missing.length > 0);
+    $("found").hidden = r.missing.length === 0;
+    if (r.missing.length) {
+      $("found-count").textContent = "These places in the file are not in the game (any more), so their texts were left out:";
+      $("found-list").replaceChildren(...r.missing.slice(0, 200).map((w) => el("li", {}, el("span", { class: "id" }, w))));
+    }
+  } catch (err) {
+    status("Could not import: " + err.message, true);
+  }
+}
+
+async function downloadGame() {
+  if (state.dirty.size) return status("Save first, so that the archive has your changes.", true);
+  try {
+    const res = await fetch("/api/archive", { method: "POST", headers: { "X-CLIo-Token": KEY, "Content-Type": "application/json" }, body: "{}" });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
+    download(state.game.id + ".zip", await res.blob());
+    status("The game folder was downloaded as " + state.game.id + ".zip.");
+  } catch (err) {
+    status("Could not download: " + err.message, true);
+  }
+}
+
+const THEMES = { system: "Theme: as the system", light: "Theme: light", dark: "Theme: dark" };
+function theme(next) {
+  let now = "system";
+  try { now = next || localStorage.getItem("clio-editor-theme") || "system"; } catch (e) { now = next || "system"; }
+  if (!(now in THEMES)) now = "system";
+  if (now === "system") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", now);
+  $("theme").textContent = THEMES[now];
+  $("theme").dataset.now = now;
+  if (next) { try { localStorage.setItem("clio-editor-theme", now); } catch (e) { /* private window: for this visit only */ } }
+}
+
 // ---------------------------------------------------------------------- start
+$("find").addEventListener("input", () => { clearTimeout(state.searching); state.searching = setTimeout(search, 250); });
+$("match-case").addEventListener("change", search);
+$("replace-all").addEventListener("click", replaceAll);
+$("export-text").addEventListener("click", exportText);
+$("import-text").addEventListener("click", () => $("import-file").click());
+$("import-file").addEventListener("change", (e) => { if (e.target.files[0]) importText(e.target.files[0]); e.target.value = ""; });
+$("download").addEventListener("click", downloadGame);
+$("theme").addEventListener("click", () => { const order = Object.keys(THEMES); theme(order[(order.indexOf($("theme").dataset.now) + 1) % order.length]); });
+theme();
 $("filter").addEventListener("input", (e) => { state.filter = e.target.value; renderList(); });
 $("save").addEventListener("click", saveAll);
 $("problems-toggle").addEventListener("click", () => { $("problems").hidden = !$("problems").hidden; });

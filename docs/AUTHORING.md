@@ -585,8 +585,47 @@ that one game. Ctrl+C in the terminal ends it.
 - Under each thing is the list of places that refer to it. Change an id and the editor
   offers to change those places too.
 
+- *Theme* switches between light, dark and whatever your system uses; the choice is
+  remembered. *Download game* gives you the whole game folder as one zip file.
+
 The forms are built from `engine/schema.py`, which describes the data files. To give a
 field a control, add a line there.
+
+### All the text at once
+
+Everything a player can read - names, descriptions, dialogue, quest steps, the lines of
+effects - can be handled as one table, without touching ids, conditions or anything else.
+
+- **Find and replace.** Type in *Find in everything the player reads*: the places are
+  listed, and choosing one takes you there. *Replace all* changes them in the page; as
+  always, nothing is written until you save, and the engine checks the result first.
+- **Export and import.** *Export text* downloads a CSV file with two columns, the place
+  and the text:
+
+  ```
+  where,text
+  scenes/utility_room/description,"A cramped maintenance closet: two dented lockers, ..."
+  scenes/utility_room/exits/0/guard_text,The bugrat has nested in the hatch mechanism. ...
+  dialogues/bolt/nodes/hello/text,...
+  ```
+
+  Open it in a spreadsheet or send it to a proofreader or translator; change the second
+  column and leave the first alone. *Import text* puts it back. A row whose place no
+  longer exists - the game changed in the meantime - is listed and left out; nothing is
+  guessed. Markup such as `{item}...{/}` and `$player` is ordinary text here: keep it.
+
+  The same from the command line, for scripts:
+
+  ```
+  python clio.py mygame --export-text texts.csv
+  python clio.py mygame --import-text texts.csv      # refuses if the game would then fail --check
+  ```
+
+What counts as text is a rule of thumb (`engine/editor/texts.py`): names, titles and
+anything called `..._text` always; otherwise a string with a space in it, unless its key
+is known to hold something else. Songs, sounds and sprites are left out. A choice written
+as a key - `{"Ask about the ship": "..."}` - has its answer in the table but not the
+question, since a key cannot be changed without changing what refers to it.
 
 ## Coming from CLIo 1
 

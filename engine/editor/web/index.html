@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CLIo editor</title>
 <link rel="stylesheet" href="app.css">
+<script>
+  // before anything is drawn, so a chosen theme does not flash the other one first
+  try { var t = localStorage.getItem("clio-editor-theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+</script>
 </head>
 <body>
 <header class="bar">
@@ -18,6 +22,22 @@
 </header>
 <section id="problems" class="problems" hidden aria-label="Problems the engine found">
   <ul id="problem-list"></ul>
+</section>
+<div class="tools">
+  <input id="find" type="search" placeholder="Find in everything the player reads" aria-label="Find in everything the player reads">
+  <input id="replace" type="text" placeholder="Replace with" aria-label="Replace with">
+  <label class="tick"><input id="match-case" type="checkbox"> Match case</label>
+  <button type="button" id="replace-all" class="quiet" disabled>Replace all</button>
+  <span class="gap"></span>
+  <button type="button" id="export-text" class="quiet" title="Every line a player can read, as one CSV file for a spreadsheet or a translator">Export text</button>
+  <button type="button" id="import-text" class="quiet" title="Put the texts of such a file back into the game">Import text</button>
+  <input id="import-file" type="file" accept=".csv,text/csv" hidden>
+  <button type="button" id="download" class="quiet" title="The whole game folder as one zip file">Download game</button>
+  <button type="button" id="theme" class="quiet"></button>
+</div>
+<section id="found" class="found" hidden aria-label="Places found">
+  <p id="found-count"></p>
+  <ul id="found-list"></ul>
 </section>
 <main>
   <nav id="kinds" aria-label="What the game is made of"></nav>

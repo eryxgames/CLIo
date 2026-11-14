@@ -18,6 +18,13 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   used, and renaming that carries those places along. Standard library only. It is the
   first step towards replacing the tkinter entity editor in `utils/`, which still edits
   CLIo 1 games only.
+- **All the text at once.** In the editor: find and replace across everything a player
+  reads, and export of every such line to a CSV file - for a spreadsheet, a proofreader
+  or a translator - with import to put it back. Ids, conditions and structure are never
+  touched; rows that no longer match anything are reported. Also from the command line:
+  `--export-text FILE`, `--import-text FILE`.
+- Editor: a light / dark / system theme switch, and *Download game* (the folder as a zip).
+  The editor now opens at the same address each time (port 8420) when that is free.
 
 ### Changed
 

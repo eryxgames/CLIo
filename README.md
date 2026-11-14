@@ -72,6 +72,8 @@ python clio.py [game] [options]
   --mode NAME     game mode, for games that have several (depths: story, rogue)
   --check         validate a game's data files and exit
   --edit          open the game in the editor, a page in your browser
+  --export-text F write every line a player can read to a CSV file
+  --import-text F put the texts of such a file back into the game
 ```
 
 `python main.py` still works, as in CLIo 1.

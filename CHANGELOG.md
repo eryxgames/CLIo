@@ -2,6 +2,84 @@
 
 Notable changes to CLIo. Versions follow [semantic versioning](https://semver.org).
 
+## Unreleased
+
+### Added
+
+- **Slides and levels in songs.** A note can slide (`c3>c5:16`), be played at a level
+  (`c4@5`, from `@0` to `@9`), or change level as it sounds (`c4@2>9:16`); together they
+  make risers, falls and swells. Levels also work on chords and drum hits, slides on the
+  `noise` wave. Songs written for 2.0 sound exactly as before.
+- `synth.tone(..., glide=True)` slides evenly in pitch over the held part of a note.
+- **An editor in the browser.** `python clio.py mygame --edit` opens the game as a page
+  served by CLIo itself: forms for scenes, items, characters, quests and texts, built from
+  a description of the data files (`engine/schema.py`); the engine's own check as you
+  type; saving that changes only the lines you changed; a list of where each thing is
+  used, and renaming that carries those places along. Standard library only. It is the
+  first step towards replacing the tkinter entity editor in `utils/`, which still edits
+  CLIo 1 games only.
+- **All the text at once.** In the editor: find and replace across everything a player
+  reads, and export of every such line to a CSV file - for a spreadsheet, a proofreader
+  or a translator - with import to put it back. Ids, conditions and structure are never
+  touched; rows that no longer match anything are reported. Also from the command line:
+  `--export-text FILE`, `--import-text FILE`.
+- **Making an enemy, and trying it.** In the editor: a new enemy of a chosen strength -
+  measured as the dungeon generator measures it, against a floor and a rank - started
+  from an existing character or a plain one, leaning tough or sharp. *Try in a fight*,
+  for a new enemy or any character with stats, runs the engine's own battle code forty
+  times per class and shows wins, health left and turns.
+- **Pictures.** The editor shows the sprite a character will be drawn with, can grow a
+  different creature for it, and has a pixel editor for sprites: paint with mouse or
+  keyboard, mirrored or not, change colours and size, or grow one from any words. *Draw
+  over it* turns a grown creature into a drawing of your own.
+- **Forms for the parts of things.** Exits, stats, moves, quest stages, dialogue nodes and
+  choices, item states and effects are edited as forms - add, remove, reorder - instead
+  of JSON. Described, like everything else, in `engine/schema.py` (`group`, `rows`, `map`).
+- **The map and the conversations.** The editor draws the rooms where the player's own map
+  puts them (`automap.layout`), level by level, with locked ways, one-way ways and stairs
+  marked; drag a room to pin it elsewhere. A dialogue is drawn as it runs: nodes in the
+  order they are reached, choices and automatic jumps as arrows, unreachable nodes and
+  jumps to nowhere pointed out.
+- **Can it be finished?** A game can keep its way through in `walkthrough.txt` - commands
+  as a player types them, `== name` for each further way. The editor plays them on the
+  real engine, on the game as it is in the page, and says how each ends, where it stops,
+  which lines were refused, and what no walkthrough reaches. `python clio.py mygame
+  --walkthrough` does the same for scripts. Derelict has one for each of its three endings.
+- **Effects and conditions as forms.** In the editor, what happens (`do`, `on_enter`,
+  `on_complete`, what an item answers to being used, what a character does when given
+  something...) is a list of lines - an effect chosen from all the engine knows, and its
+  target chosen from the game's own things - and a condition (`if`, `when`, `done_when`...)
+  is a question chosen the same way, with a tick for *not*. What is richer than a line
+  (branches, several questions at once) stays as written and is edited as JSON. The two
+  vocabularies are data in `engine/schema.py`, held equal to `engine/conditions.py` by a
+  test. Parts only some things have wait under *Add…* instead of lengthening every form.
+- **The editor on the web.** The repository is its own site: opened from a web address
+  (GitHub Pages; nothing is built), the editor's page runs the engine in the browser
+  (Pyodide) and asks it the same questions it asks the local server
+  (`engine/editor/service.py`). Open a game folder, a zip, a new game from the starter, or
+  a demo game. In Chrome and Edge it saves straight into the opened folder; elsewhere
+  a game is kept by the browser on every save and offered again on the next visit
+  (*Carry on with*). The game never leaves the computer. `python -m engine.editor.hosted
+  --pack FILE.zip` writes the site as one zip for hosts that take an upload (itch.io);
+  shown inside another site's page the editor says so and works without folder access.
+- Editor: *Check-up* lists rooms that cannot be reached and things nothing refers to.
+- Editor: a light / dark / system theme switch, and *Download game* (the folder as a zip).
+  The editor now opens at the same address each time (port 8420) when that is free.
+
+### Changed
+
+- The dungeon demo is now called *The Hollow* (it was *The Hollow Depths*). Its folder is
+  still `games/depths`, so saves, records and commands are unchanged.
+
+### Fixed
+
+- The condition `talked:<character>` never held: the conversation was recorded, but the
+  question was read as an unknown kind and answered no. So a conversation never opened
+  with its "we have met" line a second time, and hints that should move on after a talk
+  stayed. It is a condition of its own now (`"talked:robot"`, `{"talked": "robot"}`). In
+  the demo games Bolt, Marigold, the replicator and Maren now greet you differently the
+  second time, as they were written to.
+
 ## 2.0.0 - 2026-11-13
 
 A rebuild of the engine. Games written for CLIo 1 still load.

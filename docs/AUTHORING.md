@@ -214,7 +214,7 @@ Conditions:
 | Form | True when |
 | --- | --- |
 | `"flag"` / `"!flag"` | the flag is set / not set |
-| `"has:item"`, `"visited:scene"`, `"defeated:char"`, `"here:char"`, `"quest:id:done"` | shorthand |
+| `"has:item"`, `"visited:scene"`, `"defeated:char"`, `"here:char"`, `"talked:char"`, `"quest:id:done"` | shorthand |
 | `{"has": "x"}`, `{"lacks": "x"}`, `{"equipped": "x"}` | inventory |
 | `{"stat": ["attack", ">=", 15]}`, `{"var": ["n", ">=", 3]}`, `{"gold": 20}`, `{"level": 3}`, `{"turns": [">=", 40]}` | numbers |
 | `{"in_scene": "x"}`, `{"item_state": ["locker", "open"]}`, `{"class": "rogue"}`, `{"chance": 0.3}` | world |
@@ -260,8 +260,8 @@ Effects (one dict may hold several; they run in order):
 
 A choice answers inline with `say` (and stays put), or jumps with `goto` (a node, `"end"`
 or `"back"`). `if` hides it, `once` removes it after use, `do` runs effects. A node may
-offer `variants` (`[{"if", "text"}]`) for its line. The flag `talked:<character id>` is
-set after any conversation.
+offer `variants` (`[{"if", "text"}]`) for its line. After any conversation the condition
+`"talked:<character id>"` holds.
 
 The original flat format still works and is turned into a one-node tree:
 
@@ -447,6 +447,12 @@ Notes: `c4`, `d#4`, `eb3`; `:4` lasts four steps; `.` rests; `-` holds; `[c4 e4 
 chord (arpeggiated if the instrument has `arp`); `|` is ignored. Waves: `square` (with
 `duty`), `triangle`, `saw`, `sine`, `soft`, `organ`, `noise`, `drums` (`k s h o t c`).
 
+A note can also move (since 2.1). `c3>c5:16` slides from one pitch to the other over its
+length; `c4@5` plays at a level between `@0` (silent) and `@9` (full, the default);
+`c4@2>9:16` swells from level 2 to level 9; `c3>c5@2>9:16` does both and is a riser. Levels
+work on chords (`[c4 e4 g4]@6:8`) and drum hits (`k@4`) too. On the `noise` wave a slide
+sweeps the hiss. Songs that use none of this sound exactly as they did.
+
 Sound effects are played by name (`{"sfx": "unlock"}`). Built in: `select back error save
 step door airlock locked unlock pickup drop open use craft read computer power teleport
 secret coin quest quest_done levelup heal trap alarm encounter hit crit miss hurt guard
@@ -553,6 +559,234 @@ when set); the number is its weight.
 `score`, the game shows the points in `stats` and at the end of a run, and keeps the ten
 best runs of every mode. `records` shows the table. It lives next to the saved games, in
 `records.dat`.
+
+## The editor
+
+```
+python clio.py mygame --edit
+```
+
+opens the game in your browser. Nothing is installed and nothing leaves your machine: the
+page is served by CLIo itself, on this computer only, and it writes only the data files of
+that one game. Ctrl+C in the terminal ends it.
+
+- On the left, what the game is made of - scenes, items, characters, dialogues and so on -
+  then the things of that kind, then a form for the one you chose.
+- Fields the editor knows have a control of their own: text, a number, a tick box, a list
+  of items picked from the game's items. Parts with fields of their own - a scene's
+  exits, a character's stats and moves, a quest's stages, a dialogue's nodes and their
+  choices, an item's states - open as small forms: add, remove, reorder. Whatever the
+  editor has no form for is shown as JSON, under *Everything else* or *Other fields*, and
+  kept exactly as written. Nothing is hidden and nothing is dropped.
+- What only some things have - what happens on entering a room, what a character does
+  when given something - waits under *Add…* at the end of a form until it is wanted.
+- The engine checks the game as you type, with the same rules as `--check`, on the files
+  as they would be after saving. Problems are listed at the top; choosing one takes you
+  to the thing it is about.
+- *Save* writes the changed files. A file keeps its layout, so a version-control diff
+  shows only the lines you changed. The first save of a day keeps the previous version of
+  each file in `.editor-backup` inside the game folder.
+- Under each thing is the list of places that refer to it. Change an id and the editor
+  offers to change those places too.
+
+- *Check-up* lists what is not wrong but may not be meant: a room that cannot be reached
+  from the first scene, a thing nothing else in the game refers to.
+- *Theme* switches between light, dark and whatever your system uses; the choice is
+  remembered. *Download game* gives you the whole game folder as one zip file.
+
+The forms are built from `engine/schema.py`, which describes the data files. To give a
+field a control, add a line there.
+
+### What happens, and when
+
+Effects and conditions are forms too. Wherever something happens - a choice's *And then*,
+a trigger's *Then*, a room's *On entering*, a quest's *When it is completed*, what an
+item answers when it is used - each effect is a line: what happens, chosen from a list
+of everything the engine can do, and what it happens to, chosen from the game's own
+scenes, items, characters, quests and texts. Lines can be moved up and down.
+
+A condition - *Offered when*, *When*, *Done when*, *Unblocked when* - is one question,
+chosen from a list of everything the engine can ask, with a tick for *not*. The editor
+writes the short form where there is one (`"has:key"`, `"!met_robot"`,
+`"quest:main:done"`) and the long form where it is needed (`{"turns": [">=", 50]}`).
+
+Not everything fits on a line. An effect with a branch (`if` / `then` / `else`), several
+questions at once (`all`, `any`), or more settings than the line shows (a line's
+`style`, an effect's own `if`) appear as they are written in the file, and can be edited
+there. Nothing is rewritten by being shown: a file changes only where you change it.
+
+The two lists are `EFFECTS` and `CONDITIONS` in `engine/schema.py`; a test keeps them
+equal to what `engine/conditions.py` understands, so the editor cannot offer a word the
+engine does not know, or miss one that it does.
+
+### The map and the conversations
+
+Choosing *Scenes* on the left shows the **map**: the rooms where the player's own map puts
+them, one level at a time. A dashed way is locked, blocked or guarded; an arrow is a way
+with no way back; ▲ and ▼ lead to another level. Click a room to open it. Drag a room to
+pin it to another place (that writes its `"map": [x, y, level]`). Rooms that no exit leads
+to have a dashed edge and are listed under the picture. Rooms a game makes as it is played - a generated
+dungeon - are not on it.
+
+A **dialogue** opens with a picture of how it runs: its nodes from left to right in the
+order they can be reached, the jumps between them as arrows - solid for a choice, dotted
+for a node that goes on by itself - and a count of the answers that stay on a node. A
+node that is never reached has a dashed edge; a jump to a node that does not exist is
+named. Click a node to open it in the form below.
+
+### On the web
+
+The same editor runs without CLIo installed, from a web address: the repository itself
+is the site (<https://eryxgames.github.io/CLIo/>). There the page has no program to talk
+to, so it runs the engine itself - Python in the browser - and everything above works
+the same: the check as you type, the map, the fights, the walkthroughs.
+
+- *Open a game folder* reads the game from your computer. In Chrome and Edge the editor
+  then saves straight back into that folder, backups included, after the browser has
+  asked you to allow it. In Firefox and Safari a page cannot write into a folder: *Save*
+  keeps the game in the browser and *Download game* gives the folder back as a zip.
+- *Open a zip file* takes a game as *Download game* makes it.
+- *A new game* starts from the starter template; the two demo games can be opened too.
+
+A game opened without a folder to save into - a zip, a new game, a demo, or any game in
+Firefox or Safari - is **kept by the browser** each time you save, and waits under
+*Carry on with* on your next visit, on that computer and in that browser. *Forget it*
+deletes that copy. It is a convenience, not a backup: clearing the browser's data removes
+it, so download the game when a session's work matters.
+
+The game never leaves your computer: the site is only files, and has nowhere to send
+anything. The one thing fetched from elsewhere is Python itself (Pyodide, from the
+jsDelivr CDN), the first time.
+
+To have the site for your own copy of CLIo: on GitHub, *Settings - Pages - Deploy from a
+branch*, branch `main`, folder `/ (root)`. Nothing is built. The page fetches the
+engine's files by name from `engine/editor/web/manifest.json`; after adding or removing
+a module run `python -m engine.editor.hosted` to renew that list (a test says so when it
+is out of date).
+
+**On itch.io, or any host that takes an upload.**
+
+```
+python -m engine.editor.hosted --pack clio-editor.zip
+```
+
+writes the site as one zip - the page, the engine, the starter and the demo games, about
+a hundred files - with `index.html` at the top, which is what an itch.io HTML project
+wants (*Kind of project: HTML*, upload the zip, *This file will be played in the
+browser*). There the editor is shown inside itch.io's page, and a page inside another
+site's page may not ask for a folder to write into; so games are kept in the browser as
+above, and the start screen offers to open the editor in a tab of its own, where saving
+into a folder works again. itch.io serves every project from one shared address, so the
+games the browser keeps there are not walled off from other projects' scripts: fine for
+game data, and one more reason to download what matters.
+
+### Can it be finished?
+
+No program can tell in general whether an adventure can be won - a case with its code on a
+note three rooms away defeats any blind search. What can be checked, exactly and after
+every change, is that a known way through still works. A game keeps that way in
+`walkthrough.txt`, in its folder:
+
+```
+# one command per line, as a player would type them; answers to questions too
+== the quiet way out
+take wire
+unlock locker
+...
+== the loud way out
+seed 11
+fight bugrat
+strike
+```
+
+`== name` starts another walkthrough, played from a fresh start - one for each ending,
+say. `seed 7`, as the first line of a walkthrough, sets the dice where fights could go
+either way. `#` starts a comment.
+
+*Can it be finished?* in the editor plays them on the real engine, on the game as it is
+in the page - unsaved changes included - and says for each how it ended, at which line it
+stopped, and which lines the game refused. It also names the rooms no walkthrough enters
+and the quests none completes. From the command line, for a test or a release script:
+
+```
+python clio.py mygame --walkthrough        # exit code 0 when every walkthrough is won
+```
+
+A game whose rooms are made in play (a generated dungeon) has no fixed way through; this
+check is for games that are written.
+
+### All the text at once
+
+Everything a player can read - names, descriptions, dialogue, quest steps, the lines of
+effects - can be handled as one table, without touching ids, conditions or anything else.
+
+- **Find and replace.** Type in *Find in everything the player reads*: the places are
+  listed, and choosing one takes you there. *Replace all* changes them in the page; as
+  always, nothing is written until you save, and the engine checks the result first.
+- **Export and import.** *Export text* downloads a CSV file with two columns, the place
+  and the text:
+
+  ```
+  where,text
+  scenes/utility_room/description,"A cramped maintenance closet: two dented lockers, ..."
+  scenes/utility_room/exits/0/guard_text,The bugrat has nested in the hatch mechanism. ...
+  dialogues/bolt/nodes/hello/text,...
+  ```
+
+  Open it in a spreadsheet or send it to a proofreader or translator; change the second
+  column and leave the first alone. *Import text* puts it back. A row whose place no
+  longer exists - the game changed in the meantime - is listed and left out; nothing is
+  guessed. Markup such as `{item}...{/}` and `$player` is ordinary text here: keep it.
+
+  The same from the command line, for scripts:
+
+  ```
+  python clio.py mygame --export-text texts.csv
+  python clio.py mygame --import-text texts.csv      # refuses if the game would then fail --check
+  ```
+
+### Making an enemy, and trying it
+
+Under the list of characters, *Make an enemy…* builds a new one of a strength you choose.
+
+- **Strength** is health times hitting power, `max_health * (6 + attack)` - the measure the
+  dungeon generator itself uses to keep floors in step. You pick a floor to measure
+  against (for a game with a dungeon: its floors and a few below the last; otherwise the
+  average of the game's enemies) and a rank: a minion is 0.6 of that floor's average
+  monster, a regular one equal to it, an elite 2.2, a boss 4.
+- **Start from** an existing character and the new one keeps its moves, tags and looks,
+  scaled by the generator's own rule; or from a plain enemy with a blow and a heavy blow.
+- **Build** turns the same strength into more health and softer hits, or the reverse.
+- **Try it** runs real fights - the engine's battle code, forty times for each class the
+  game has - and shows how often the player wins, how much health is left, how long it
+  takes. The player in these fights is at the level you set, carries what a new character
+  starts with, and fights sensibly without flair: guards a wound-up blow, heals when low,
+  uses a skill when there is focus for it. Use the figures to compare enemies with each
+  other; a person will do better or worse than they say.
+- **Add to the characters** puts it in the game (unsaved, like every change). From there
+  it is an ordinary character: put it in a scene, in a floor's monster table, or edit it.
+
+Every character with stats also has *Try in a fight* at the top of its form, alone or two
+or three at once.
+
+### Pictures
+
+A character's *Sprite* field shows what the game will draw in a fight. With `auto` that is
+a creature grown from the character's name - the same words always grow the same one.
+
+- *Another one* grows a different creature (it sets `sprite_seed`, the words to grow from).
+- *Draw over it* keeps the creature as a drawing in `sprites.json`, points the character
+  at it, and opens it in the pixel editor.
+- The pixel editor - also for any sprite under *Sprites* - paints with the mouse (right
+  button rubs out) or the keyboard (arrow keys, Space, Delete), mirrors left and right
+  unless you switch that off, changes the colours and the size, and can grow a fresh
+  creature from any words. A small picture shows it as the game will, on a dark screen.
+
+What counts as text is a rule of thumb (`engine/editor/texts.py`): names, titles and
+anything called `..._text` always; otherwise a string with a space in it, unless its key
+is known to hold something else. Songs, sounds and sprites are left out. A choice written
+as a key - `{"Ask about the ship": "..."}` - has its answer in the table but not the
+question, since a key cannot be changed without changing what refers to it.
 
 ## Coming from CLIo 1
 

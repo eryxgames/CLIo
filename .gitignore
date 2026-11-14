@@ -168,3 +168,6 @@ utils/editor_settings.json
 saves/
 savegame.json
 *.tmp
+
+# Editor backups (the previous version of a data file, kept on the first save of a day)
+.editor-backup/

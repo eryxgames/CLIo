@@ -1,0 +1,136 @@
+# Derelict: three ways out. Played by `python clio.py derelict --walkthrough` and by the editor.
+
+== the escape pod
+take wire
+unlock locker
+take screwdriver
+take apple
+take log
+take communicator
+give apple to bugrat
+e
+s
+take chip
+repair chip
+give chip to terminal
+unlock crate
+take cutter
+equip cutter
+take all
+n
+w
+unlock suitcase
+735
+take passcard
+e
+e
+take all
+open container
+take specimen
+give specimen to replicator
+give coolant to replicator
+w
+s
+w
+give coolant canister to droid
+use relay on reactor
+e
+n
+u
+combine goo with suit
+equip suit
+talk to marigold
+authorize
+0
+e
+use pod
+
+== the rescue call
+take wire
+unlock locker
+take screwdriver
+take apple
+take log
+take communicator
+give apple to bugrat
+e
+s
+take chip
+repair chip
+give chip to terminal
+unlock crate
+take cutter
+equip cutter
+take all
+n
+w
+unlock suitcase
+735
+take passcard
+e
+e
+take all
+open container
+take specimen
+give specimen to replicator
+give coolant to replicator
+w
+s
+w
+give coolant canister to droid
+use relay on reactor
+e
+n
+u
+combine communicator with cells
+use communicator on console
+
+== the captain's chair
+take wire
+unlock locker
+take screwdriver
+take apple
+take log
+take communicator
+give apple to bugrat
+e
+s
+take chip
+repair chip
+give chip to terminal
+unlock crate
+take cutter
+equip cutter
+take all
+n
+w
+unlock suitcase
+735
+take passcard
+e
+e
+take all
+open container
+take specimen
+give specimen to replicator
+give coolant to replicator
+w
+s
+w
+give coolant canister to droid
+use relay on reactor
+e
+n
+u
+w
+read manual
+e
+d
+s
+w
+use minty coolant on reactor
+e
+n
+u
+talk to marigold
+fly

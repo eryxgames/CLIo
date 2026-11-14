@@ -18,7 +18,7 @@ from engine import editor, schema                               # noqa: E402
 from engine.data import GameData, find_games                    # noqa: E402
 from engine.editor.server import make_server                    # noqa: E402
 
-TYPES = {"text", "long", "number", "bool", "choice", "tags", "ref", "refs", "sprite"}
+TYPES = {"text", "long", "number", "bool", "choice", "tags", "ref", "refs", "sprite", "group", "rows", "map"}
 
 
 def copy_of(name):
@@ -32,19 +32,26 @@ class SchemaTests(unittest.TestCase):
     def test_the_description_is_well_formed(self):
         keys = [k["key"] for k in schema.KINDS]
         self.assertEqual(len(keys), len(set(keys)))
-        for kind in schema.KINDS:
-            self.assertIn(kind["shape"], ("map", "list", "object"))
+        def fields_ok(fields, where):
             seen = set()
-            for f in kind["fields"]:
+            for f in fields:
                 self.assertIn(f["type"], TYPES, f)
-                self.assertNotIn(f["key"], seen, "%s.%s is listed twice" % (kind["key"], f["key"]))
+                self.assertNotIn(f["key"], seen, "%s.%s is listed twice" % (where, f["key"]))
                 seen.add(f["key"])
                 if f["type"] in ("ref", "refs"):
                     self.assertIn(f["of"], keys, f)
                 if f["type"] == "choice":
                     self.assertTrue(f["options"])
+                if f["type"] in ("group", "rows", "map"):                # parts with fields of their own
+                    fields_ok(f["fields"], "%s.%s" % (where, f["key"]))
+            return seen
+
+        for kind in schema.KINDS:
+            self.assertIn(kind["shape"], ("map", "list", "object"))
+            seen = fields_ok(kind["fields"], kind["key"])
             if kind.get("title"):
                 self.assertIn(kind["title"], seen)
+        json.dumps(schema.KINDS)                                        # it is sent to the page as it is
 
     def test_it_fits_the_games_that_exist(self):
         """Every data file of every game has a kind, in the shape the schema says, and typed fields hold that type."""
@@ -299,6 +306,28 @@ class EnemyTests(unittest.TestCase):
         self.assertEqual([r["name"] for r in solo["rows"]], ["The player"])                 # a game without classes
 
 
+class AdviceTests(unittest.TestCase):
+    def test_the_demo_games_need_none(self):
+        for name in ("derelict", "depths"):
+            self.assertEqual(editor.advice(os.path.join(ROOT, "games", name)), [], name)
+
+    def test_unreachable_rooms_and_unused_things(self):
+        folder = copy_of("derelict")
+        files = editor.current(folder)
+        scenes, items = files["scenes"], files["items"]
+        scenes.append({"id": "attic", "name": "Attic", "description": "Dust.", "exits": [{"door_name": "Ladder", "scene_id": scenes[0]["id"]}]})
+        items["orphan_spoon"] = {"name": "Spoon", "description": "A spoon."}
+        found = editor.advice(folder, {"scenes": scenes, "items": items})
+        self.assertEqual(sorted((a["kind"], a["id"]) for a in found), [("items", "orphan_spoon"), ("scenes", "attic")])
+        self.assertIn("cannot be reached", [a["text"] for a in found if a["kind"] == "scenes"][0])
+        self.assertEqual(editor.check(folder, {"scenes": scenes, "items": items}), [])      # advice, not a problem
+        scenes[0]["exits"].append({"door_name": "Hatch up", "scene_id": "attic"})           # a way in
+        scenes[1].setdefault("hint", [])
+        scenes[1]["hint"] = [{"if": "has:orphan_spoon", "text": "You have a spoon."}]       # named inside a condition
+        self.assertEqual(editor.advice(folder, {"scenes": scenes, "items": items}), [])
+        self.assertEqual(editor.advice(folder), [])                                         # and nothing was written
+
+
 class SpriteTests(unittest.TestCase):
     def test_a_grown_sprite_is_the_one_the_game_draws(self):
         from engine import sprite
@@ -408,6 +437,12 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(code, 400)
         self.assertIn("cannot be fought", json.loads(body)["error"])
         self.assertEqual(self.ask("/api/enemy", {"rank": "god"})[0], 400)
+
+    def test_advice_through_the_server(self):
+        items = json.loads(self.ask("/api/game")[1])["files"]["items"]["data"]
+        items["orphan_spoon"] = {"name": "Spoon"}
+        code, body = self.ask("/api/advice", {"pending": {"items": items}})
+        self.assertEqual((code, [a["id"] for a in json.loads(body)["advice"]]), (200, ["orphan_spoon"]))
 
     def test_sprites_through_the_server(self):
         code, body = self.ask("/api/sprite", {"seed": "Bugrat", "size": 8})

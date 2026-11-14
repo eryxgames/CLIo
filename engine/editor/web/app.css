@@ -141,3 +141,17 @@ nav .none { color: var(--ink-2); }
   .field .note { grid-column: 1; }
 }
 .sprite-row .row { display: inline-flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.3rem; }
+
+/* parts of a thing that have fields of their own: an object (group), a list (rows), named things (map) */
+.group, .rows { border-left: 2px solid var(--rule); padding-left: 0.8rem; }
+.group .field, .entry .field { grid-template-columns: 9rem minmax(0, 1fr); margin-bottom: 0.5rem; }
+.entry { border: 1px solid var(--rule); border-radius: 6px; background: var(--sheet); margin-bottom: 0.4rem; }
+.entry > summary { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.6rem; cursor: pointer; list-style-position: inside; }
+.entry[open] > summary { border-bottom: 1px solid var(--rule); margin-bottom: 0.6rem; }
+.entry > :not(summary) { margin-left: 0.7rem; margin-right: 0.7rem; }
+.entry-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entry-tools { display: inline-flex; gap: 0.25rem; }
+button.small { padding: 0.05rem 0.45rem; font-size: 0.85rem; }
+button.link { border: 0; background: none; padding: 0 0 0.5rem; color: var(--mark); text-decoration: underline; font-size: 0.85rem; }
+.rows > .row, .rows > form.row { display: flex; gap: 0.4rem; margin-top: 0.3rem; }
+.rows > form.row input { flex: 0 1 14rem; min-width: 0; padding: 0.3rem 0.5rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--sheet); }

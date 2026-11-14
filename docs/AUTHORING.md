@@ -573,9 +573,11 @@ that one game. Ctrl+C in the terminal ends it.
 - On the left, what the game is made of - scenes, items, characters, dialogues and so on -
   then the things of that kind, then a form for the one you chose.
 - Fields the editor knows have a control of their own: text, a number, a tick box, a list
-  of items picked from the game's items. Everything else about a thing - exits, dialogue
-  nodes, effects - is shown as JSON under *Everything else* and kept exactly as written.
-  Nothing is hidden and nothing is dropped.
+  of items picked from the game's items. Parts with fields of their own - a scene's
+  exits, a character's stats and moves, a quest's stages, a dialogue's nodes and their
+  choices, an item's states - open as small forms: add, remove, reorder. Whatever the
+  editor has no form for is shown as JSON, under *Everything else* or *Other fields*, and
+  kept exactly as written. Nothing is hidden and nothing is dropped.
 - The engine checks the game as you type, with the same rules as `--check`, on the files
   as they would be after saving. Problems are listed at the top; choosing one takes you
   to the thing it is about.
@@ -585,6 +587,8 @@ that one game. Ctrl+C in the terminal ends it.
 - Under each thing is the list of places that refer to it. Change an id and the editor
   offers to change those places too.
 
+- *Check-up* lists what is not wrong but may not be meant: a room that cannot be reached
+  from the first scene, a thing nothing else in the game refers to.
 - *Theme* switches between light, dark and whatever your system uses; the choice is
   remembered. *Download game* gives you the whole game folder as one zip file.
 

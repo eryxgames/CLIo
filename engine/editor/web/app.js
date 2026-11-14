@@ -6,7 +6,8 @@
 
 const KEY = new URLSearchParams(location.search).get("key") || "";
 const $ = (id) => document.getElementById(id);
-const state = { game: null, kind: null, id: null, dirty: new Set(), problems: [], filter: "", checking: 0, found: [], searching: 0 };
+const isObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+const state = { open: new Set(), game: null, kind: null, id: null, dirty: new Set(), problems: [], filter: "", checking: 0, found: [], searching: 0 };
 
 function el(tag, props, ...children) {
   const node = document.createElement(tag);
@@ -191,6 +192,9 @@ function fits(f, value) {
   if (f.type === "bool") return typeof value === "boolean";
   if (f.type === "tags" || f.type === "refs") return Array.isArray(value) && value.every((v) => typeof v === "string");
   if (f.type === "sprite") return typeof value === "string";
+  if (f.type === "group") return isObject(value);
+  if (f.type === "map") return isObject(value) && Object.values(value).every(isObject);
+  if (f.type === "rows") return Array.isArray(value) && value.every(isObject);
   return typeof value === "string";
 }
 
@@ -199,9 +203,108 @@ function put(thing, key, value) {
   else thing[key] = value;
 }
 
-function control(kind, f, thing) {
+// What is not covered by a form: the other keys of an object, as JSON. Nothing is hidden, nothing dropped.
+function restArea(kind, thing, known, plain) {
+  const rest = {};
+  for (const [k, v] of Object.entries(thing)) if (!known.has(k)) rest[k] = v;
+  const usual = plain || "Fields without a form of their own yet, as JSON. They are kept exactly as written.";
+  const note = el("p", { class: "note" }, usual);
+  const text = JSON.stringify(rest, null, 2);
+  const area = el("textarea", { class: "code", spellcheck: "false", rows: String(Math.min(28, Math.max(3, text.split("\n").length + 1))),
+    oninput: (e) => {
+      let parsed;
+      const bad = (why) => { note.textContent = why; note.classList.add("bad"); };
+      try { parsed = JSON.parse(e.target.value || "{}"); } catch (err) { return bad("Not valid JSON yet: " + err.message); }
+      if (!isObject(parsed)) return bad("This must be a JSON object: { … }");
+      const clash = Object.keys(parsed).find((k) => known.has(k));
+      if (clash) return bad(`"${clash}" has its own field above.`);
+      note.textContent = usual; note.classList.remove("bad");
+      for (const k of Object.keys(thing)) if (!known.has(k) && !(k in parsed)) delete thing[k];      // keep the order the file had
+      for (const [k, v] of Object.entries(parsed)) thing[k] = v;
+      touched(kind);
+    } });
+  area.value = text;
+  return { area, note, empty: Object.keys(rest).length === 0 };
+}
+
+// The fields of an object that is part of a thing (an exit, a move, a dialogue node), with its other keys as JSON.
+function subform(kind, fields, obj, path) {
+  const fit = fields.filter((f) => fits(f, obj[f.key]));
+  const known = new Set(fit.map((f) => f.key));
+  const parts = fit.map((f) => field(f.label, control(kind, f, obj, `${path}/${f.key}`)));
+  const rest = restArea(kind, obj, known);
+  const other = field("Other fields", rest.area, rest.note);
+  if (!rest.empty) parts.push(other);
+  else {
+    other.hidden = true;
+    parts.push(other, el("button", { type: "button", class: "link", onclick: (e) => { other.hidden = false; e.target.remove(); } }, "Other fields…"));
+  }
+  return parts;
+}
+
+const naming = (row, fallback) => {
+  const said = [row.name, row.door_name, row.text, row.id, row.type].find((v) => typeof v === "string" && v.trim());
+  return said ? (said.length > 64 ? said.slice(0, 61) + "…" : said) : fallback;
+};
+
+// One entry of a list or of a set of named things: closed until asked for, so a long thing stays short.
+function entry(key, title, tools, body) {
+  const where = `${state.kind}/${state.id}/${key}`;
+  return el("details", { class: "entry", open: state.open.has(where), ontoggle: (e) => { if (e.target.open) state.open.add(where); else state.open.delete(where); } },
+    el("summary", {}, el("span", { class: "entry-title" }, title), el("span", { class: "entry-tools" }, ...tools)), ...body());
+}
+
+function control(kind, f, thing, path) {
   const change = (value) => { put(thing, f.key, value); touched(kind); renderList(); };
   const value = thing[f.key];
+  path = path || f.key;
+  const again = () => { touched(kind); renderForm(); };
+  const tool = (label, title, act, off) => el("button", { type: "button", class: "quiet small", title, disabled: !!off, onclick: (e) => { e.preventDefault(); act(); again(); } }, label);
+  if (f.type === "group") {
+    if (!isObject(value)) return el("button", { type: "button", class: "quiet", onclick: () => { thing[f.key] = {}; state.open.add(`${state.kind}/${state.id}/${path}`); again(); } }, `Add ${f.label.toLowerCase()}`);
+    return el("div", { class: "group" }, ...subform(kind, f.fields, value, path));
+  }
+  if (f.type === "rows") {
+    const list = Array.isArray(value) ? value : [];
+    const one = f.one || "row";
+    return el("div", { class: "rows" },
+      ...list.map((row, i) => entry(`${path}/${i}`, naming(row, `${one} ${i + 1}`), [
+        tool("↑", "Move up", () => { list.splice(i - 1, 0, list.splice(i, 1)[0]); }, i === 0),
+        tool("↓", "Move down", () => { list.splice(i + 1, 0, list.splice(i, 1)[0]); }, i === list.length - 1),
+        tool("Remove", `Remove this ${one}`, () => { list.splice(i, 1); if (!list.length) delete thing[f.key]; })],
+      () => subform(kind, f.fields, row, `${path}/${i}`))),
+      el("button", { type: "button", class: "quiet", onclick: () => {
+        if (!Array.isArray(thing[f.key])) thing[f.key] = [];
+        thing[f.key].push({});
+        state.open.add(`${state.kind}/${state.id}/${path}/${thing[f.key].length - 1}`);
+        again();
+      } }, `Add ${/^[aeiou]/.test(one) ? "an" : "a"} ${one}`));
+  }
+  if (f.type === "map") {
+    const map = isObject(value) ? value : {};
+    const one = f.one || "entry";
+    const name = el("input", { type: "text", class: "code", placeholder: `name for a new ${one}`, "aria-label": `Name for a new ${one}`, spellcheck: "false" });
+    const rename = (old) => {
+      const next = (prompt(`A new name for "${old}":`, old) || "").trim();
+      if (!next || next === old || next in map) return false;
+      thing[f.key] = Object.fromEntries(Object.entries(map).map(([k, v]) => [k === old ? next : k, v]));
+      return true;
+    };
+    return el("div", { class: "rows" },
+      ...Object.entries(map).map(([k, row]) => entry(`${path}/${k}`, k, [
+        el("button", { type: "button", class: "quiet small", title: "Change its name. What refers to it is not changed.", onclick: (e) => { e.preventDefault(); if (rename(k)) again(); } }, "Rename"),
+        tool("Remove", `Remove this ${one}`, () => { delete map[k]; if (!Object.keys(map).length) delete thing[f.key]; })],
+      () => subform(kind, f.fields, row, `${path}/${k}`))),
+      el("form", { class: "row", onsubmit: (e) => {
+        e.preventDefault();
+        const k = name.value.trim();
+        if (!k || k in map) return;
+        if (!isObject(thing[f.key])) thing[f.key] = {};
+        thing[f.key][k] = {};
+        state.open.add(`${state.kind}/${state.id}/${path}/${k}`);
+        again();
+      } }, name, el("button", { type: "submit", class: "quiet" }, `Add ${/^[aeiou]/.test(one) ? "an" : "a"} ${one}`)));
+  }
   if (f.type === "bool") {
     return el("input", { type: "checkbox", checked: value === true, onchange: (e) => {
       if (e.target.checked) thing[f.key] = true; else if (f.key in thing) thing[f.key] = false;
@@ -289,24 +392,8 @@ function renderForm() {
   if (drawn) parts.push(spriteEditor(kind, thing));
 
   // everything the schema does not describe is still here, as JSON
-  const rest = {};
-  for (const [k, v] of Object.entries(thing)) if (!known.has(k)) rest[k] = v;
-  const note = el("p", { class: "note" }, kind.fields.length || drawn ? "Fields without a form of their own yet, as JSON. They are kept exactly as written."
-    : "This kind has no form yet: edit it as JSON.");
-  const area = el("textarea", { class: "code", spellcheck: "false", rows: String(Math.min(28, Math.max(6, JSON.stringify(rest, null, 2).split("\n").length + 1))),
-    oninput: (e) => {
-      let parsed;
-      try { parsed = JSON.parse(e.target.value || "{}"); } catch (err) { note.textContent = "Not valid JSON yet: " + err.message; note.classList.add("bad"); return; }
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) { note.textContent = "This must be a JSON object: { … }"; note.classList.add("bad"); return; }
-      const clash = Object.keys(parsed).find((k) => known.has(k));
-      if (clash) { note.textContent = `"${clash}" has its own field above.`; note.classList.add("bad"); return; }
-      note.textContent = "Fields without a form of their own yet, as JSON."; note.classList.remove("bad");
-      for (const k of Object.keys(thing)) if (!known.has(k) && !(k in parsed)) delete thing[k];      // keep the order the file had
-      for (const [k, v] of Object.entries(parsed)) thing[k] = v;
-      touched(kind);
-    } });
-  area.value = JSON.stringify(rest, null, 2);
-  parts.push(field(kind.fields.length || drawn ? "Everything else" : "Content", area, note));
+  const rest = restArea(kind, thing, known, kind.fields.length || drawn ? "" : "This kind has no form yet: edit it as JSON.");
+  parts.push(field(kind.fields.length || drawn ? "Everything else" : "Content", rest.area, rest.note));
 
   if (!single) {
     const places = uses(hit.id);
@@ -786,6 +873,17 @@ $("export-text").addEventListener("click", exportText);
 $("import-text").addEventListener("click", () => $("import-file").click());
 $("import-file").addEventListener("change", (e) => { if (e.target.files[0]) importText(e.target.files[0]); e.target.value = ""; });
 $("download").addEventListener("click", downloadGame);
+$("checkup").addEventListener("click", async () => {
+  try {
+    const found = (await api("/api/advice", { pending: pending() })).advice;
+    $("found").hidden = false;
+    $("found-count").textContent = found.length === 0 ? "Check-up: every room can be reached and everything is referred to by something."
+      : `Check-up: ${found.length} thing${found.length === 1 ? "" : "s"} that may not be meant. These are not errors; the game runs.`;
+    $("found-list").replaceChildren(...found.map((p) => el("li", {}, el("button", { type: "button", onclick: () => select(p.kind, p.id) }, el("span", { class: "snippet" }, p.text)))));
+  } catch (err) {
+    status("Could not run the check-up: " + err.message, true);
+  }
+});
 $("theme").addEventListener("click", () => { const order = Object.keys(THEMES); theme(order[(order.indexOf($("theme").dataset.now) + 1) % order.length]); });
 theme();
 $("filter").addEventListener("input", (e) => { state.filter = e.target.value; renderList(); });

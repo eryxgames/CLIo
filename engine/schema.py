@@ -15,8 +15,10 @@ A kind has a ``shape``:
 A field has a ``type``: ``text``, ``long`` (several lines), ``number``,
 ``bool``, ``choice`` (one of ``options``), ``tags`` (a list of words), ``ref``
 (the id of a thing of kind ``of``), ``refs`` (a list of such ids), ``sprite``
-(the name of a pixel sprite, or ``auto``).  Anything else - exits, dialogue
-nodes, effects - is edited as JSON for now.  A kind with ``"editor"`` gets a
+(the name of a pixel sprite, or ``auto``).  Three types hold fields of their
+own, in ``fields``: ``group`` (an object: stats), ``rows`` (a list of objects:
+exits, moves, quest stages) and ``map`` (objects by name: dialogue nodes, item
+states).  Anything else is edited as JSON.  A kind with ``"editor"`` gets a
 tool of its own in the page (``sprite``: the pixel editor).
 """
 
@@ -25,22 +27,43 @@ def F(key, type="text", label=None, **more):
     return dict({"key": key, "type": type, "label": label or key.replace("_", " ").capitalize()}, **more)
 
 
+STATS = [F("health", "number"), F("max_health", "number"), F("attack", "number"), F("defense", "number"),
+         F("critical_hit_chance", "number", "Critical hit chance (0 to 1)")]
+
+EXIT = [F("door_name", label="Called"), F("dir", label="Direction (n, s, e, w, u, d)"), F("scene_id", "ref", "Leads to", of="scenes"),
+        F("locked", "bool"), F("required_item", "ref", "Opened with", of="items"), F("lock_text", "long", "Said while locked"),
+        F("unlock_text", "long", "Said on unlocking"), F("blocked", "bool"), F("block_text", "long", "Said while blocked"),
+        F("unblock_if", label="Unblocked when"), F("unblock_text", "long", "Said on unblocking"),
+        F("guard", "ref", "Guarded by", of="characters"), F("guard_text", "long", "Said while guarded"),
+        F("leave_if", label="May be used when"), F("leave_text", "long", "Said when it may not")]
+
+MOVE = [F("type", "choice", options=["attack", "heavy", "guard", "status", "drain", "heal"]), F("name"),
+        F("weight", "number", "How often (weight)"), F("mult", "number", "Damage multiplier"),
+        F("tell", "long", "Warning shown the turn before"), F("status"), F("turns", "number"), F("power", "number"),
+        F("amount", "number"), F("below", "number", "Only below this share of health")]
+
+CHOICE = [F("text", label="The player says"), F("say", "long", "The answer"), F("goto", label="Then go to node"),
+          F("once", "bool"), F("if", label="Offered when"), F("tag")]
+
 KINDS = [
     {"key": "game", "file": "game", "label": "Game", "one": "game", "shape": "object", "title": "title", "fields": [
         F("title"), F("subtitle"), F("description", "long"), F("author"), F("version"),
         F("initial_scene", "ref", "First scene", of="scenes"), F("style"), F("currency"),
-        F("max_hints", "number")]},
+        F("max_hints", "number"), F("player_stats", "group", "The player's stats", fields=STATS)]},
     {"key": "scenes", "file": "scenes", "label": "Scenes", "one": "scene", "shape": "list", "title": "name", "fields": [
         F("name"), F("area"), F("description", "long"), F("first_visit", "long"), F("art"),
         F("music", "ref", of="music"), F("enter_sfx", label="Sound on entering"),
         F("items", "refs", of="items"), F("passive_items", "refs", "Scenery (items that cannot be taken)", of="items"),
-        F("characters", "refs", of="characters")]},
+        F("characters", "refs", of="characters"), F("exits", "rows", fields=EXIT, one="exit")]},
     {"key": "items", "file": "items", "label": "Items", "one": "item", "shape": "map", "title": "name", "fields": [
         F("name"), F("short", label="Short name"), F("description", "long"), F("aliases", "tags"),
         F("value", "number"), F("takeable", "bool"), F("usable", "bool"), F("use_text", "long"),
         F("equippable", "bool"), F("slot"), F("interactive", "bool"), F("current_state"),
         F("tool", "bool"), F("lockpick", "bool"), F("contents", "refs", of="items"),
-        F("components", "refs", "Made from", of="items")]},
+        F("components", "refs", "Made from", of="items"),
+        F("effect", "group", "Effect when used or worn", fields=STATS),
+        F("states", "map", one="state", fields=[F("description", "long"), F("action", label="Changed by the word"),
+                                                F("next_state", label="Becomes")])]},
     {"key": "characters", "file": "characters", "label": "Characters", "one": "character", "shape": "map",
      "title": "name", "fields": [
         F("name"), F("aliases", "tags"),
@@ -49,10 +72,15 @@ KINDS = [
         F("sprite", "sprite", "Sprite"), F("sprite_seed", label="Sprite grown from"), F("sprite_size", "number"),
         F("portrait"), F("tags", "tags"), F("inventory", "refs", of="items"),
         F("xp", "number"), F("show_hostile", "bool"), F("battle_intro", "long"), F("defeat_text", "long"),
-        F("refuse_text", "long"), F("no_fight_text", "long"), F("immune", "tags")]},
-    {"key": "dialogues", "file": "dialogues", "label": "Dialogues", "one": "dialogue", "shape": "map", "fields": []},
+        F("refuse_text", "long"), F("no_fight_text", "long"), F("immune", "tags"),
+        F("stats", "group", fields=STATS), F("moves", "rows", "Moves in a fight", fields=MOVE, one="move")]},
+    {"key": "dialogues", "file": "dialogues", "label": "Dialogues", "one": "dialogue", "shape": "map", "fields": [
+        F("start", label="Starts at node"),
+        F("nodes", "map", one="node", fields=[F("text", "long", "What is said"), F("speaker"), F("goto", label="Then go to node"),
+                                              F("choices", "rows", fields=CHOICE, one="choice")])]},
     {"key": "quests", "file": "quests", "label": "Quests", "one": "quest", "shape": "map", "title": "title", "fields": [
-        F("title"), F("description", "long"), F("complete_on_win", "bool")]},
+        F("title"), F("description", "long"), F("complete_on_win", "bool"),
+        F("stages", "rows", one="stage", fields=[F("id"), F("text", "long", "Shown in the journal"), F("done_when")])]},
     {"key": "triggers", "file": "triggers", "label": "Triggers", "one": "trigger", "shape": "list", "fields": [
         F("once", "bool"), F("every", "number", "Every N turns")]},
     {"key": "texts", "file": "texts", "label": "Texts", "one": "text", "shape": "map", "fields": [

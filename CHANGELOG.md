@@ -32,6 +32,10 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   different creature for it, and has a pixel editor for sprites: paint with mouse or
   keyboard, mirrored or not, change colours and size, or grow one from any words. *Draw
   over it* turns a grown creature into a drawing of your own.
+- **Forms for the parts of things.** Exits, stats, moves, quest stages, dialogue nodes and
+  choices, item states and effects are edited as forms - add, remove, reorder - instead
+  of JSON. Described, like everything else, in `engine/schema.py` (`group`, `rows`, `map`).
+- Editor: *Check-up* lists rooms that cannot be reached and things nothing refers to.
 - Editor: a light / dark / system theme switch, and *Download game* (the folder as a zip).
   The editor now opens at the same address each time (port 8420) when that is free.
 

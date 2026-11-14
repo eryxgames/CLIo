@@ -145,6 +145,57 @@ def put_texts(game_dir, table, pending=None):
     return {"files": {key: files[key] for key in report["files"]}, "report": report}
 
 
+def advice(game_dir, pending=None):
+    """Things that are not wrong but may not be meant: rooms nobody can reach, things nothing refers to.
+
+    The same shape as ``check``.  A thing counts as referred to when its id
+    appears anywhere else in the data - as a value, inside a condition such as
+    ``has:lamp``, or as a key - so this errs on the side of saying nothing.
+    """
+    files = current(game_dir, pending)
+    out = []
+    scenes = [s for s in files.get("scenes", []) if isinstance(s, dict) and "id" in s]
+    first = files["game"].get("initial_scene") or (scenes[0]["id"] if scenes else None)
+    if scenes and first:
+        doors = {s["id"]: [e.get("scene_id") for e in s.get("exits", []) if isinstance(e, dict)] for s in scenes}
+        seen, todo = {first}, [first]
+        while todo:
+            for nxt in doors.get(todo.pop(), []):
+                if nxt in doors and nxt not in seen:
+                    seen.add(nxt)
+                    todo.append(nxt)
+        for s in scenes:
+            if s["id"] not in seen:
+                out.append({"text": "scene '%s' cannot be reached through exits from the first scene, '%s'" % (s["id"], first),
+                            "kind": "scenes", "id": s["id"]})
+    words = {}                                              # every word in the data -> the things it appears in
+
+    def walk(value, owner):
+        if isinstance(value, str):
+            for word in re.split(r"[^A-Za-z0-9_.\-]+", value):
+                if word:
+                    words.setdefault(word, set()).add(owner)
+        elif isinstance(value, list):
+            for v in value:
+                walk(v, owner)
+        elif isinstance(value, dict):
+            for k, v in value.items():
+                walk(str(k), owner)
+                walk(v, owner)
+
+    from . import texts
+    for key, data in files.items():
+        for thing_id, thing in texts._things(key, data):
+            walk(thing, (key, thing_id))
+    for kind in ("items", "characters", "dialogues", "sprites", "music", "sounds"):
+        one = schema.BY_FILE[kind]["one"]
+        for thing_id, _thing in texts._things(kind, files.get(kind, {})):
+            if not (words.get(str(thing_id), set()) - {(kind, thing_id)}):
+                out.append({"text": "%s '%s': nothing else in the game refers to it" % (one, thing_id),
+                            "kind": kind, "id": thing_id})
+    return out
+
+
 def archive(game_dir):
     """The game folder as the bytes of a zip file (backups and caches left out)."""
     import io

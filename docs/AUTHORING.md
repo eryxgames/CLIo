@@ -610,6 +610,41 @@ for a node that goes on by itself - and a count of the answers that stay on a no
 node that is never reached has a dashed edge; a jump to a node that does not exist is
 named. Click a node to open it in the form below.
 
+### Can it be finished?
+
+No program can tell in general whether an adventure can be won - a case with its code on a
+note three rooms away defeats any blind search. What can be checked, exactly and after
+every change, is that a known way through still works. A game keeps that way in
+`walkthrough.txt`, in its folder:
+
+```
+# one command per line, as a player would type them; answers to questions too
+== the quiet way out
+take wire
+unlock locker
+...
+== the loud way out
+seed 11
+fight bugrat
+strike
+```
+
+`== name` starts another walkthrough, played from a fresh start - one for each ending,
+say. `seed 7`, as the first line of a walkthrough, sets the dice where fights could go
+either way. `#` starts a comment.
+
+*Can it be finished?* in the editor plays them on the real engine, on the game as it is
+in the page - unsaved changes included - and says for each how it ended, at which line it
+stopped, and which lines the game refused. It also names the rooms no walkthrough enters
+and the quests none completes. From the command line, for a test or a release script:
+
+```
+python clio.py mygame --walkthrough        # exit code 0 when every walkthrough is won
+```
+
+A game whose rooms are made in play (a generated dungeon) has no fixed way through; this
+check is for games that are written.
+
 ### All the text at once
 
 Everything a player can read - names, descriptions, dialogue, quest steps, the lines of

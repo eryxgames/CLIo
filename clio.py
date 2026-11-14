@@ -29,6 +29,25 @@ from engine.theme import available_themes, load_theme           # noqa: E402
 from engine.ui import UI                                        # noqa: E402
 
 
+def walkthrough(game_dir):
+    """--walkthrough: play walkthrough.txt; 0 when every walkthrough is won."""
+    from engine.editor import finish
+    result = finish.play(game_dir)
+    if not result["walkthroughs"]:
+        print("This game has no %s yet. One command per line; '== name' starts another way through." % finish.FILE)
+        return 2
+    for w in result["walkthroughs"]:
+        print("%s %s: %s in %d turns" % ("ok  " if w["won"] else "FAIL", w["name"], w["result"] or "not finished", w["turns"]))
+        if w["stopped"]:
+            print("     line %s, '%s': %s" % (w["stopped"]["line"], w["stopped"]["command"], w["stopped"]["why"]))
+        for r in w["refused"]:
+            print("     line %d, '%s' was refused: %s" % (r["line"], r["command"], r["said"]))
+    for what, cover in result["coverage"].items():
+        if cover["missing"]:
+            print("No walkthrough reaches these %s: %s" % (what, ", ".join(cover["missing"])))
+    return 0 if result["finished"] else 1
+
+
 def text_table(game_dir, out_file=None, in_file=None):
     """--export-text / --import-text: the game's texts as a CSV file, out or back in."""
     from engine import editor
@@ -157,6 +176,8 @@ def main(argv=None):
     ap.add_argument("--check", action="store_true", help="validate the game's data files and exit")
     ap.add_argument("--edit", action="store_true", help="open the game in the editor (a page in your browser)")
     ap.add_argument("--port", type=int, help="port for the editor (default: 8420, or any free one)")
+    ap.add_argument("--walkthrough", action="store_true",
+                    help="play the game's walkthrough.txt and say whether every way through still ends in a win")
     ap.add_argument("--export-text", metavar="FILE", help="write every line a player can read to a CSV file and exit")
     ap.add_argument("--import-text", metavar="FILE", help="put the texts of such a CSV file back into the game and exit")
     ap.add_argument("--no-browser", action="store_true", help="with --edit: print the address, do not open it")
@@ -202,6 +223,8 @@ def main(argv=None):
     if args.edit:
         from engine.editor.server import serve
         return serve(game_dir, args.port, not args.no_browser)
+    if args.walkthrough:
+        return walkthrough(game_dir)
     if args.export_text or args.import_text:
         return text_table(game_dir, args.export_text, args.import_text)
     try:

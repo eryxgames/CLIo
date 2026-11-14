@@ -40,6 +40,11 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   marked; drag a room to pin it elsewhere. A dialogue is drawn as it runs: nodes in the
   order they are reached, choices and automatic jumps as arrows, unreachable nodes and
   jumps to nowhere pointed out.
+- **Can it be finished?** A game can keep its way through in `walkthrough.txt` - commands
+  as a player types them, `== name` for each further way. The editor plays them on the
+  real engine, on the game as it is in the page, and says how each ends, where it stops,
+  which lines were refused, and what no walkthrough reaches. `python clio.py mygame
+  --walkthrough` does the same for scripts. Derelict has one for each of its three endings.
 - Editor: *Check-up* lists rooms that cannot be reached and things nothing refers to.
 - Editor: a light / dark / system theme switch, and *Download game* (the folder as a zip).
   The editor now opens at the same address each time (port 8420) when that is free.

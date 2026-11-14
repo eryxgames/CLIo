@@ -15,7 +15,8 @@ import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import EditorError, advice, archive, balance, check, load, looks, put_texts, save, text_table, texts, views
+from . import (EditorError, advice, archive, balance, check, finish, load, looks, put_texts, save, text_table, texts,
+               views)
 
 WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
 PAGES = {"/": ("index.html", "text/html; charset=utf-8"), "/index.html": ("index.html", "text/html; charset=utf-8"),
@@ -110,6 +111,12 @@ def make_server(game_dir, port=None):
                     body.get("extra") or None, body.get("level") or 1, body.get("fights") or 30))
             if path == "/api/advice":                       # not wrong, but perhaps not meant
                 return self.answer(lambda: {"advice": advice(game_dir, body.get("pending") or {})})
+            if path == "/api/walkthrough":                  # the game's known way through: read it, or keep a new one
+                if "text" in body:
+                    return self.answer(lambda: {"saved": finish.write(game_dir, body["text"])})
+                return self.answer(lambda: {"text": finish.read(game_dir)})
+            if path == "/api/finish":                       # play the walkthroughs on the game as it is in the page
+                return self.answer(lambda: finish.play(game_dir, body.get("text"), body.get("pending") or {}))
             if path == "/api/map":                          # the rooms where the player's map puts them
                 return self.answer(lambda: views.world_map(game_dir, body.get("pending") or {}))
             if path == "/api/dialogue":                     # how one conversation runs

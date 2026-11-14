@@ -390,6 +390,68 @@ class ViewTests(unittest.TestCase):
             views.dialogue_graph({"start": "a"})
 
 
+class FinishTests(unittest.TestCase):
+    DERELICT = os.path.join(ROOT, "games", "derelict")
+
+    def test_reading_a_walkthrough(self):
+        from engine.editor import finish
+        walks = finish.parse("# a note\n\ntake wire   # why not\n== second way\nseed 7\nGo North\nseed 9\n==\nlook\n")
+        self.assertEqual([(w["name"], w["seed"]) for w in walks], [("walkthrough", 1), ("second way", 7), ("walkthrough 3", 1)])
+        self.assertEqual(walks[0]["lines"], [(3, "take wire")])                 # with the line it stands on
+        self.assertEqual(walks[1]["lines"], [(6, "Go North"), (7, "seed 9")])   # only a first line sets the dice
+        self.assertEqual(finish.parse(""), [])
+
+    def test_derelict_can_be_finished_three_ways(self):
+        from engine.editor import finish
+        result = finish.play(self.DERELICT)
+        self.assertTrue(result["finished"])
+        self.assertEqual([(w["name"], w["result"], w["left"], w["refused"], w["stopped"]) for w in result["walkthroughs"]],
+                         [("the escape pod", "win", 0, [], None), ("the rescue call", "win", 0, [], None),
+                          ("the captain's chair", "win", 0, [], None)])
+        self.assertEqual(result["coverage"]["scenes"], {"total": 8, "missing": []})
+        self.assertEqual(result["coverage"]["quests"]["missing"], ["chip", "remote", "fruit"])   # side quests no route needs
+
+    def test_a_change_that_breaks_the_game_is_noticed(self):
+        from engine.editor import finish
+        folder = copy_of("derelict")
+        scenes = editor.current(folder)["scenes"]
+        for s in scenes:
+            if s["id"] == "storage_bay":
+                s["exits"] = []                                                 # walk in, never out
+        result = finish.play(folder, pending={"scenes": scenes})
+        self.assertFalse(result["finished"])
+        first = result["walkthroughs"][0]
+        self.assertEqual((first["won"], first["result"]), (False, None))
+        self.assertIn("not over", first["stopped"]["why"])
+        self.assertTrue(first["refused"] and first["tail"])
+        self.assertTrue(finish.play(folder)["finished"])                        # the files themselves were not touched
+        short = finish.play(folder, "take wire\nfly to the moon\nunlock locker\n")
+        self.assertEqual([(r["line"], r["command"]) for r in short["walkthroughs"][0]["refused"]], [(2, "fly to the moon")])
+        self.assertEqual(short["walkthroughs"][0]["stopped"]["line"], 3)
+        self.assertEqual(finish.play(folder, "")["walkthroughs"], [])
+        self.assertFalse(finish.play(folder, "")["finished"])                   # nothing played is nothing shown
+
+    def test_keeping_and_the_command_line(self):
+        import io
+        from contextlib import redirect_stdout
+        import clio
+        from engine.editor import finish
+        folder = copy_of("derelict")
+        out = io.StringIO()
+        with redirect_stdout(out):
+            self.assertEqual(clio.main([folder, "--walkthrough"]), 0)
+        self.assertIn("ok   the rescue call: win", out.getvalue())
+        self.assertEqual(finish.write(folder, "take wire"), "walkthrough.txt")
+        self.assertEqual(finish.read(folder), "take wire\n")
+        with redirect_stdout(out):
+            self.assertEqual(clio.main([folder, "--walkthrough"]), 1)
+        self.assertIn("FAIL walkthrough: not finished", out.getvalue())
+        os.remove(os.path.join(folder, "walkthrough.txt"))
+        with redirect_stdout(out):
+            self.assertEqual(clio.main([folder, "--walkthrough"]), 2)
+        self.assertEqual(finish.read(folder), "")
+
+
 class SpriteTests(unittest.TestCase):
     def test_a_grown_sprite_is_the_one_the_game_draws(self):
         from engine import sprite
@@ -506,6 +568,17 @@ class ServerTests(unittest.TestCase):
         code, body = self.ask("/api/dialogue", {"tree": {"nodes": {"a": {"text": "Hi", "goto": "b"}, "b": {"text": "Bye"}}}})
         self.assertEqual((code, [n["depth"] for n in json.loads(body)["nodes"]]), (200, [0, 1]))
         self.assertEqual(self.ask("/api/dialogue", {"tree": {}})[0], 400)
+
+    def test_walkthrough_through_the_server(self):
+        code, body = self.ask("/api/walkthrough", {})
+        self.assertEqual(code, 200)
+        self.assertIn("== the escape pod", json.loads(body)["text"])
+        code, body = self.ask("/api/finish", {"text": "take wire\n"})
+        self.assertEqual((code, json.loads(body)["finished"]), (200, False))
+        code, body = self.ask("/api/walkthrough", {"text": "look"})
+        self.assertEqual((code, json.loads(body)), (200, {"saved": "walkthrough.txt"}))
+        with open(os.path.join(self.folder, "walkthrough.txt"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "look\n")
 
     def test_advice_through_the_server(self):
         items = json.loads(self.ask("/api/game")[1])["files"]["items"]["data"]

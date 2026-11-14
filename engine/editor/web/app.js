@@ -175,6 +175,7 @@ function select(kindKey, id) {
   state.kind = kindKey;
   state.id = id;
   state.workshop = null;
+  state.finish = false;
   if (kindOf(kindKey).shape !== "object" && id === null) state.filter = $("filter").value = "";
   renderKinds(); renderList(); renderForm();
 }
@@ -350,6 +351,7 @@ function control(kind, f, thing, path) {
 function renderForm() {
   const host = $("form");
   if (state.workshop) return renderWorkshop(host);
+  if (state.finish) return renderFinish(host);
   const kind = state.kind && kindOf(state.kind);
   const hit = kind && state.id !== null ? find(kind, state.id) : null;
   if (!hit && kind && kind.key === "scenes" && things(kind).length) return renderMap(host);
@@ -546,6 +548,51 @@ function dialogueSheet(kind, hit) {
     sheet.append(el("p", { class: "note" + (g.missing.length ? " bad" : "") }, ["Click a node to open it below. A solid arrow is a choice, a dotted one a node going on by itself; ↺ counts answers that stay on the node.", ...notes].join(" ")));
   }).catch((err) => box.replaceChildren(el("p", { class: "note bad" }, err.message)));
   return sheet;
+}
+
+// ---------------------------------------------------------------------- can it be finished?
+// The game's walkthrough, played by the real engine on the game as it is in the page.
+async function renderFinish(host) {
+  const area = el("textarea", { class: "code walk", spellcheck: "false", rows: "16", "aria-label": "The walkthrough" });
+  const out = el("div", {});
+  const keep = el("button", { type: "button", class: "quiet", onclick: async () => {
+    try { status(`Kept as ${(await api("/api/walkthrough", { text: area.value })).saved} in the game's folder.`); } catch (err) { status("Could not keep the walkthrough: " + err.message, true); }
+  } }, "Keep this walkthrough");
+  const go = el("button", { type: "button", class: "go", onclick: async () => {
+    go.disabled = true;
+    out.replaceChildren(el("p", { class: "note" }, "Playing…"));
+    try {
+      const res = await api("/api/finish", { pending: pending(), text: area.value });
+      const parts = [];
+      if (!res.walkthroughs.length) parts.push(el("p", { class: "note bad" }, "There is nothing to play yet: write the commands a player would type, one per line."));
+      else parts.push(el("h3", {}, res.finished ? "Yes: every way through ends in a win." : "Not as it stands."));
+      for (const w of res.walkthroughs) {
+        parts.push(el("p", { class: w.won ? "" : "bad" }, el("b", {}, (w.won ? "✓ " : "✗ ") + w.name), w.won ? `: won in ${w.turns} turns.`
+          : `: ${w.result ? "ended with “" + w.result + "”" : "not finished"}. At line ${w.stopped.line}, “${w.stopped.command}”, ${w.stopped.why}.`));
+        for (const r of w.refused) parts.push(el("p", { class: "note" }, `Line ${r.line}, “${r.command}”, was refused: ${r.said}`));
+        if (!w.won) parts.push(el("pre", { class: "tail" }, w.tail.join("\n")));
+      }
+      for (const [what, kindKey] of [["scenes", "scenes"], ["quests", "quests"]]) {
+        const cover = (res.coverage || {})[what];
+        if (cover && cover.missing.length) {
+          parts.push(el("p", { class: "note" }, `No walkthrough ${what === "scenes" ? "enters" : "completes"} ${cover.missing.length} of the ${cover.total} ${what}: `,
+            ...cover.missing.flatMap((id, i) => [i ? ", " : "", el("button", { type: "button", class: "link", onclick: () => select(kindKey, id) }, id)]), "."));
+        }
+      }
+      out.replaceChildren(...parts);
+    } catch (err) {
+      out.replaceChildren(el("p", { class: "note bad" }, err.message));
+    }
+    go.disabled = false;
+  } }, "Play it");
+  host.replaceChildren(
+    el("div", { class: "head" }, el("h2", {}, "Can it be finished?")),
+    el("p", { class: "lead" }, "No program can tell in general whether an adventure can be won. What can be checked, exactly and every time, is that a known way through still works - " +
+      "after every change you make. Write that way here: one command per line, as a player would type them, answers to the game's questions included. " +
+      "A line “== name” starts another way through, played from a fresh start; “#” starts a comment; “seed 7” sets the dice."),
+    area, el("div", { class: "row gap" }, go, keep), out);
+  try { area.value = (await api("/api/walkthrough", {})).text; } catch (err) { status("Could not read the walkthrough: " + err.message, true); }
+  if (area.value.trim()) go.click();
 }
 
 // ---------------------------------------------------------------------- pixel sprites
@@ -1012,6 +1059,7 @@ $("export-text").addEventListener("click", exportText);
 $("import-text").addEventListener("click", () => $("import-file").click());
 $("import-file").addEventListener("change", (e) => { if (e.target.files[0]) importText(e.target.files[0]); e.target.value = ""; });
 $("download").addEventListener("click", downloadGame);
+$("finish").addEventListener("click", () => { state.finish = true; state.workshop = null; state.id = null; renderList(); renderForm(); });
 $("checkup").addEventListener("click", async () => {
   try {
     const found = (await api("/api/advice", { pending: pending() })).advice;

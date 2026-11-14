@@ -375,6 +375,20 @@ class ConditionTests(unittest.TestCase):
         conditions.run({"if": "nope", "then": [{"stat": {"health": -5}}], "else": [{"heal": "full"}]}, g)
         self.assertEqual(w.stats["health"], 55)
 
+    def test_talked_is_a_condition(self):
+        # the dialogue runner records a conversation as the flag "talked:<character>"; it has to be askable
+        from engine import dialogue
+        s = Session("derelict").start()
+        g = s.game
+        self.assertFalse(conditions.check("talked:friendly_robot", g))
+        self.assertTrue(conditions.check("!talked:friendly_robot", g))
+        self.assertEqual(dialogue._start_node(g.data.dialogues["bolt"], g), "hello")
+        g.world.flags["talked:friendly_robot"] = True
+        self.assertTrue(conditions.check("talked:friendly_robot", g))
+        self.assertTrue(conditions.check({"talked": ["friendly_robot"]}, g))
+        self.assertFalse(conditions.check({"talked": ["friendly_robot", "ship_ai"]}, g))
+        self.assertEqual(dialogue._start_node(g.data.dialogues["bolt"], g), "again")
+
 
 if __name__ == "__main__":
     unittest.main()

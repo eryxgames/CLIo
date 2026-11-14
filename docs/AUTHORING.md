@@ -214,7 +214,7 @@ Conditions:
 | Form | True when |
 | --- | --- |
 | `"flag"` / `"!flag"` | the flag is set / not set |
-| `"has:item"`, `"visited:scene"`, `"defeated:char"`, `"here:char"`, `"quest:id:done"` | shorthand |
+| `"has:item"`, `"visited:scene"`, `"defeated:char"`, `"here:char"`, `"talked:char"`, `"quest:id:done"` | shorthand |
 | `{"has": "x"}`, `{"lacks": "x"}`, `{"equipped": "x"}` | inventory |
 | `{"stat": ["attack", ">=", 15]}`, `{"var": ["n", ">=", 3]}`, `{"gold": 20}`, `{"level": 3}`, `{"turns": [">=", 40]}` | numbers |
 | `{"in_scene": "x"}`, `{"item_state": ["locker", "open"]}`, `{"class": "rogue"}`, `{"chance": 0.3}` | world |
@@ -260,8 +260,8 @@ Effects (one dict may hold several; they run in order):
 
 A choice answers inline with `say` (and stays put), or jumps with `goto` (a node, `"end"`
 or `"back"`). `if` hides it, `once` removes it after use, `do` runs effects. A node may
-offer `variants` (`[{"if", "text"}]`) for its line. The flag `talked:<character id>` is
-set after any conversation.
+offer `variants` (`[{"if", "text"}]`) for its line. After any conversation the condition
+`"talked:<character id>"` holds.
 
 The original flat format still works and is turned into a one-node tree:
 

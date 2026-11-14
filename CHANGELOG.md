@@ -54,6 +54,15 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 - The dungeon demo is now called *The Hollow* (it was *The Hollow Depths*). Its folder is
   still `games/depths`, so saves, records and commands are unchanged.
 
+### Fixed
+
+- The condition `talked:<character>` never held: the conversation was recorded, but the
+  question was read as an unknown kind and answered no. So a conversation never opened
+  with its "we have met" line a second time, and hints that should move on after a talk
+  stayed. It is a condition of its own now (`"talked:robot"`, `{"talked": "robot"}`). In
+  the demo games Bolt, Marigold, the replicator and Maren now greet you differently the
+  second time, as they were written to.
+
 ## 2.0.0 - 2026-11-13
 
 A rebuild of the engine. Games written for CLIo 1 still load.

@@ -9,6 +9,7 @@ Conditions::
 
     "met_robot"                      flag is set          "!met_robot"   not set
     "has:keycard"   "visited:lab"    "defeated:droid"     "here:robot"
+    "talked:robot"                   a conversation with this character has been had
     {"flag": "x"}   {"has": "item"}  {"lacks": "item"}    {"equipped": "item"}
     {"stat": ["attack", ">=", 15]}   {"var": ["scrap", ">=", 3]}
     {"quest": ["power", "done"]}     {"item_state": ["locker", "open"]}
@@ -102,6 +103,8 @@ def _check_one(key, arg, g):
         return not any(g.is_defeated(c) for c in _aslist(arg))
     if key == "here":
         return all(g.char_here(c) for c in _aslist(arg))
+    if key == "talked":                         # set by the dialogue runner when a conversation ends
+        return all(bool(w.flags.get("talked:%s" % c)) for c in _aslist(arg))
     if key == "item_here":
         sc = w.scene
         return all(i in sc.get("items", []) or i in sc.get("passive_items", []) for i in _aslist(arg))

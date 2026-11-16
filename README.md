@@ -195,6 +195,16 @@ The tests play both demo games to every ending from scripts, check that every sc
 40 columns in both Unicode and ASCII (and down to 24), fight packs, run rogue mode until
 the bot falls, round-trip saves, and render every sound effect. They write nothing into the repository: saves and audio go to temporary folders.
 
+## Releasing
+
+Raise `__version__` in `engine/__init__.py`, add a `## x.y.z - date` section to
+`CHANGELOG.md`, then push a tag: `git tag -a vx.y.z -m "CLIo x.y.z" && git push origin vx.y.z`.
+The release workflow (`.github/workflows/release.yml`) runs the tests, makes the GitHub release
+with those notes, the engine as a zip and the editor's web pack, and pushes both to itch.io
+(channels `win-linux-mac` and `html5`). It needs the repository secret `BUTLER_API_KEY`
+(itch.io → Settings → API keys, the key whose source is wharf); without it the itch.io step is
+skipped.
+
 ## Licence
 
 CLIo is open source so that anyone can make games with it, including games they sell.

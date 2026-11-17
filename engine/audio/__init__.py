@@ -21,10 +21,10 @@ import threading
 
 from . import synth
 from .backends import INSTALL_HINTS, NullBackend, detect, platform_name
-from .compose import MOODS, compose
+from .compose import MOODS, SOUNDS, compose
 from .sfx import SFX, voice_blip
 
-SYNTH_VERSION = "3"
+SYNTH_VERSION = "4"
 AUDIO_EXTS = (".wav", ".mp3", ".ogg", ".oga", ".flac", ".m4a", ".aac", ".opus", ".aiff", ".wma")
 
 
@@ -61,6 +61,8 @@ class Audio:
         self.sfx_on = True
         self.music_volume = 0.6
         self.sfx_volume = 0.8
+        self.music_sound = "chip"       # what generated music is played on, unless a track says: "chip" or "rich"
+        self.music_form = None          # how generated music is laid out, unless a track says: "long", "(A) A B- A+"
         self.env = env
         self._backend = backend
         self.note = "" if backend is None else getattr(backend, "description", "")
@@ -187,9 +189,8 @@ class Audio:
         if isinstance(track, dict):
             if "generate" in track:
                 g = track["generate"] or {}
-                payload = {"mood": g.get("mood", "mystery"), "seed": g.get("seed", 0),
-                           "bars": g.get("bars", 16)}
-                return ("gen:%(mood)s:%(seed)s:%(bars)s" % payload, "gen", payload)
+                return self._generated(g.get("mood", "mystery"), g.get("seed", 0), g.get("bars", 16),
+                                       g.get("sound"), g["form"] if "form" in g else self.music_form)
             if "patterns" in track:
                 return ("song:" + hashlib.sha1(json.dumps(track, sort_keys=True).encode()).hexdigest()[:12],
                         "song", track)
@@ -209,12 +210,26 @@ class Audio:
             return ("file:" + f, "file", f)
         if name.startswith("gen:"):
             parts = name.split(":")
-            payload = {"mood": parts[1] if len(parts) > 1 else "mystery",
-                       "seed": parts[2] if len(parts) > 2 else 0, "bars": 16}
-            return ("gen:%(mood)s:%(seed)s:%(bars)s" % payload, "gen", payload)
+            return self._generated(parts[1] if len(parts) > 1 else "mystery", parts[2] if len(parts) > 2 else 0, 16,
+                                   None, self.music_form)
         if name in MOODS:
-            return ("gen:%s:0:16" % name, "gen", {"mood": name, "seed": 0, "bars": 16})
+            return self._generated(name, 0, 16, None, self.music_form)
         return None
+
+    def _generated(self, mood, seed, bars, sound=None, form=None):
+        """A generated track as ``(key, "gen", payload)``.  Its sound and its form are the track's own, else the
+        ones set for the game or the scene (``music_sound``, ``music_form``); plain chip and no form leave key
+        and payload as they have always been."""
+        payload = {"mood": mood, "seed": seed, "bars": bars}
+        key = "gen:%(mood)s:%(seed)s:%(bars)s" % payload
+        sound = sound or self.music_sound
+        if sound in SOUNDS and sound != "chip":
+            payload["sound"] = sound
+            key += ":" + sound
+        if form:
+            payload["form"] = str(form)
+            key += ":" + str(form)
+        return (key, "gen", payload)
 
     def music(self, track, fallback=None):
         """Start looping a track (no-op if it is already the current one)."""
@@ -254,7 +269,8 @@ class Audio:
                 if kind == "file":
                     path, vol = payload, self.music_volume
                 else:
-                    song = compose(payload["seed"], payload["mood"], payload.get("bars", 16)) \
+                    song = compose(payload["seed"], payload["mood"], payload.get("bars", 16),
+                                   sound=payload.get("sound", "chip"), form=payload.get("form")) \
                         if kind == "gen" else payload
                     path = self._cached("music", song if kind == "song" else payload,
                                         self.music_volume, lambda: synth.render_song(song))

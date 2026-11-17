@@ -230,6 +230,8 @@ def build_floor(game, n, fl, last=False, factor=1.0, rank=0, endless=None, hazar
 
     music = fl.get("music") or {"generate": {"mood": fl.get("mood", "dark"),
                                              "seed": "%s-f%d-%d" % (game.data.id, n, w.seed % 5)}}
+    if not fl.get("music"):                                 # a floor may have its own sound and form for its music
+        music["generate"].update({key: fl["music_" + key] for key in ("sound", "form") if fl.get("music_" + key)})
     area = "Floor %d %s %s" % (n, "-", fl.get("name", "")) if fl.get("name") else "Floor %d" % n
     texts = fl.get("rooms", {})
     decks = {}                                       # deal room texts without repeats

@@ -568,6 +568,24 @@ A track is:
 - or generated: `{"generate": {"mood": "dark", "seed": 7}}`.
   Moods: `calm mystery dark tense battle heroic shop space victory defeat`.
 
+Generated music can be shaped in two ways without changing its notes (since 2.2.2), so
+that a game, a level or a scene keeps one sound:
+
+- **`sound`**: `"chip"` (the default - CLIo as it has always sounded) or `"rich"`, the same
+  tune on other instruments: strings, a horn or a trumpet, a clarinet, plucked strings, an
+  overdriven guitar, a synthesizer in a large room, as the mood has them.
+- **`form`**: how the tune's two halves, `A` and `B`, are laid out; without it `A A B A`. A
+  mark says how a half is played: `(A)` without the tune, `A-` quietly (no bass, no drums),
+  `A+` a tone higher. `"long"` is `(A) A A B A B- A A+` - an introduction, the tune, a quiet
+  stretch, the tune again and once more a tone higher: more than twice as long before it
+  comes round.
+
+Say it in the track - `{"generate": {"mood": "dark", "seed": 7, "sound": "rich", "form":
+"long"}}` - or once for the whole game with `"music_sound"` and `"music_form"` in
+`game.json`; a scene, or a floor of a generated dungeon, can have its own with the same two
+keys. A track's own word comes first, then the scene's, then the game's. Music heard while
+in a scene - a fight there, too - takes that scene's choice.
+
 A written song (`music.json`):
 
 ```json
@@ -596,7 +614,7 @@ chord (arpeggiated if the instrument has `arp`); `|` is ignored. Waves: `square`
 
 Besides its wave and its envelope (`attack`, `decay`, `sustain`, `release`) an instrument
 can have `gate` (how much of a note's length it sounds, 0.9 by default), `lowpass` (0 to
-1, darker), `echo` (`[seconds, gain]`) and, since 2.3, `drive` (0 to 1): overdrive, as of
+1, darker), `echo` (`[seconds, gain]`) and, since 2.2.2, `drive` (0 to 1): overdrive, as of
 a guitar amplifier. The whole track goes through it, so a root and its fifth on a `saw`
 wave - `[e2 b2]:8` - growl as a power chord does; a `lowpass` after it takes the fizz off:
 
@@ -604,7 +622,7 @@ wave - `[e2 b2]:8` - growl as a power chord does; a `lowpass` after it takes the
 "guitar": {"wave": "saw", "drive": 0.7, "lowpass": 0.45, "sustain": 0.8, "volume": 0.3}
 ```
 
-Three more, also since 2.3:
+Three more, also since 2.2.2:
 
 - `detune` (cents, try 6 to 12): two more oscillators a little above and below. They beat
   slowly against the first - a string section, a fat synthesizer.

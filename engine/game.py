@@ -38,6 +38,8 @@ class Game(Actions):
         self.ui = UI(self.term, load_theme(self.data.theme, self.data.dir))
         self.audio = audio if audio is not None else Audio(self.data.dir, self.data.songs, self.data.sounds)
         self.audio.game_dir = self.data.dir
+        self.audio.music_sound = self.data.config.get("music_sound") or "chip"
+        self.audio.music_form = self.data.config.get("music_form") or None
         if not self.audio.songs:
             self.audio.songs = dict(self.data.songs)
         if not self.audio.sounds:
@@ -647,6 +649,9 @@ class Game(Actions):
 
     def resume_music(self):
         sc = self.world.scene
+        # what generated music is played on and how it is laid out: the scene's choice, else the game's
+        self.audio.music_sound = sc.get("music_sound") or self.cfg.get("music_sound") or "chip"
+        self.audio.music_form = sc.get("music_form") or self.cfg.get("music_form") or None
         default = self.cfg.get("music") or {"generate": {"mood": sc.get("mood") or self.cfg.get("mood", "mystery"),
                                                          "seed": self.data.id}}
         track = self.scene_variant(sc, "music") or default

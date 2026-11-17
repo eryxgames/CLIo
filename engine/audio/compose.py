@@ -5,10 +5,25 @@
 The composer writes ordinary song data (see :mod:`engine.audio.synth`), so a
 generated tune can be dumped to JSON and edited by hand afterwards.  The same
 seed always gives the same tune - a dungeon floor can have *its* music.
+
+Two things are for a game's designer to choose, and neither changes the notes:
+
+``sound``   ``"chip"`` (the default: square, triangle and soft waves, as CLIo has
+            always sounded) or ``"rich"`` - the same tune on instruments made with
+            the synthesizer's newer settings: strings, a horn or a trumpet, a
+            clarinet, plucked strings, an overdriven guitar, a synthesizer in a
+            large room, as the mood has them (``RICH``).
+``form``    how the tune's two halves, ``A`` and ``B``, are laid out.  Without it
+            they are played ``A A B A``.  A mark says how a half is played:
+            ``(A)`` without the tune, ``A-`` quietly (no bass, no drums), ``A+`` a
+            tone higher.  ``"long"`` is ``(A) A A B A B- A A+``: an introduction,
+            the tune, a quiet stretch, the tune again and once more a tone
+            higher - more than twice as long before it comes round.
 """
 from __future__ import annotations
 
 import random
+import re
 
 _NAMES = ["c", "c#", "d", "d#", "e", "f", "f#", "g", "g#", "a", "a#", "b"]
 
@@ -36,6 +51,101 @@ MOODS = {
     "defeat":  (["minor", "phrygian"], (60, 72), [[0, 5, 3, 0]], "none", "triangle", 0.4),
 }
 
+# The same tunes on other instruments (``sound="rich"``), mood by mood.  The volumes are set so that each voice is
+# as loud as its chip counterpart: what a designer balanced by ear stays balanced.
+_STRINGS = {"wave": "saw", "detune": 9, "attack": 0.3, "decay": 0.2, "sustain": 0.85, "release": 0.6, "gate": 1.0,
+            "filter": [500, 2400, 0.1, 0.6], "room": [0.5, 1.5]}
+_CHOIR = {"wave": "saw", "detune": 12, "attack": 0.4, "decay": 0.3, "sustain": 0.85, "release": 1.0, "gate": 1.0,
+          "filter": [700, 1000, 0.5, 0.5], "room": [0.7, 2.0]}
+_SYNTH = {"wave": "saw", "detune": 10, "attack": 0.35, "decay": 0.3, "sustain": 0.85, "release": 1.2, "gate": 1.0,
+          "filter": [350, 2200, 0.25, 0.7], "room": [0.6, 2.0]}
+_SPICCATO = {"wave": "saw", "detune": 7, "attack": 0.008, "decay": 0.12, "sustain": 0.3, "release": 0.08, "gate": 0.7,
+             "filter": [2400, 700, 0.1, 0.1], "room": 0.4}
+_PIZZ = {"wave": "saw", "detune": 5, "attack": 0.003, "decay": 0.16, "sustain": 0.0, "release": 0.1, "gate": 1.0,
+         "filter": [2600, 500, 0.1, 0.08], "room": 0.4}
+_CHUG = {"wave": "saw", "attack": 0.004, "decay": 0.12, "sustain": 0.6, "release": 0.05, "gate": 0.7, "drive": 0.8,
+         "lowpass": 0.45}
+_FLUTE = {"wave": "sine", "attack": 0.05, "decay": 0.1, "sustain": 0.8, "release": 0.3, "vibrato": [5, 0.005],
+          "room": 0.4, "echo": [0.28, 0.3]}
+_GLASS = {"wave": "soft", "attack": 0.02, "decay": 0.15, "sustain": 0.6, "release": 0.4, "vibrato": [5, 0.004],
+          "room": [0.5, 1.5], "echo": [0.28, 0.35]}
+_HORN = {"wave": "saw", "attack": 0.06, "decay": 0.15, "sustain": 0.8, "release": 0.3, "vibrato": [4.5, 0.003],
+         "filter": [300, 1500, 0.15, 0.25], "room": [0.5, 1.5]}
+_OBOE = {"wave": "square", "duty": 0.2, "attack": 0.03, "decay": 0.1, "sustain": 0.8, "release": 0.3, "lowpass": 0.4,
+         "vibrato": [5.5, 0.004], "room": 0.4, "echo": [0.28, 0.3]}
+_CLARINET = {"wave": "square", "duty": 0.5, "attack": 0.04, "decay": 0.1, "sustain": 0.8, "release": 0.2,
+             "lowpass": 0.45, "vibrato": [5, 0.003], "room": 0.4}
+_TRUMPET = {"wave": "saw", "attack": 0.02, "decay": 0.1, "sustain": 0.8, "release": 0.15, "vibrato": [5.5, 0.004],
+            "filter": [700, 3000, 0.2, 0.08], "room": [0.5, 1.5]}
+_BRASSY = {"wave": "saw", "attack": 0.01, "decay": 0.1, "sustain": 0.7, "release": 0.12,
+           "filter": [900, 2600, 0.2, 0.1], "room": 0.3}
+_SOLO = {"wave": "saw", "attack": 0.01, "decay": 0.1, "sustain": 0.8, "release": 0.12, "vibrato": [5.5, 0.006],
+         "drive": 0.5, "lowpass": 0.3}
+_AIRY = {"wave": "sine", "attack": 0.1, "decay": 0.2, "sustain": 0.7, "release": 0.9, "vibrato": [4, 0.004],
+         "room": [0.6, 2.0], "echo": [0.45, 0.4]}
+_LOW = {"wave": "triangle", "attack": 0.05, "decay": 0.1, "sustain": 0.9, "release": 0.3, "room": 0.3}
+_LOW_STRINGS = {"wave": "saw", "detune": 7, "attack": 0.05, "decay": 0.15, "sustain": 0.8, "release": 0.25,
+                "filter": [200, 900, 0.1, 0.3], "room": 0.4}
+_LOW_BRASS = {"wave": "saw", "attack": 0.04, "decay": 0.15, "sustain": 0.85, "release": 0.25,
+              "filter": [250, 1100, 0.15, 0.15], "room": [0.5, 1.5]}
+_GROWL = {"wave": "saw", "attack": 0.005, "decay": 0.1, "sustain": 0.8, "release": 0.06, "drive": 0.4, "lowpass": 0.6}
+_HALL = {"room": [0.6, 2.0]}
+# mood -> (lead, arp or pad, bass, what the drums gain), each with the volume that makes it as loud as the chip's
+RICH = {
+    "calm":    (dict(_FLUTE, volume=0.20), dict(_STRINGS, volume=0.15), dict(_LOW, volume=0.42), {"room": 0.3}),
+    "mystery": (dict(_GLASS, volume=0.29), dict(_CHOIR, volume=0.18), dict(_LOW, volume=0.45), _HALL),
+    "dark":    (dict(_HORN, volume=0.72), dict(_STRINGS, volume=0.15), dict(_LOW_STRINGS, volume=0.68), _HALL),
+    "tense":   (dict(_BRASSY, volume=0.76), dict(_SPICCATO, volume=0.40), dict(_LOW_STRINGS, volume=0.80), {"room": 0.3}),
+    "battle":  (dict(_SOLO, volume=0.19), dict(_CHUG, volume=0.13), dict(_GROWL, volume=0.21), {}),
+    "heroic":  (dict(_TRUMPET, volume=0.66), dict(_SPICCATO, volume=0.40), dict(_LOW_BRASS, volume=0.48), {"room": [0.5, 1.5]}),
+    "shop":    (dict(_CLARINET, volume=0.16), dict(_PIZZ, volume=0.40), dict(_PIZZ, volume=1.25), {"room": 0.3}),
+    "space":   (dict(_AIRY, volume=0.29), dict(_SYNTH, volume=0.16), dict(_LOW, volume=0.40), {}),
+    "victory": (dict(_TRUMPET, volume=0.64), dict(_SPICCATO, volume=0.40), dict(_LOW_BRASS, volume=0.58), {"room": [0.5, 1.5]}),
+    "defeat":  (dict(_OBOE, volume=0.09), dict(_STRINGS, volume=0.15), dict(_LOW, volume=0.47), {}),
+}
+SOUNDS = ("chip", "rich")
+LONG = "(A) A A B A B- A A+"                              # form="long"
+_PART = re.compile(r"(\()?\s*([ABab])\s*(\))?\s*([+-]*)")
+_PITCH = re.compile(r"(?<![a-z])([a-g])(#?)(-?\d)")
+LIFT = 2                                                    # semitones: a tone
+
+
+def _plan(form):
+    """'(A) A B- A+' -> ``[("A", "t"), ("A", ""), ("B", "q"), ("A", "l")]``; None for a form that cannot be read."""
+    text = LONG if str(form).strip().lower() == "long" else str(form).strip()
+    out, at = [], 0
+    for found in _PART.finditer(text):
+        opened, letter, closed, signs = found.groups()
+        if text[at:found.start()].strip(" ,|") or bool(opened) != bool(closed):
+            return None
+        out.append((letter.upper(), ("t" if opened else "") + ("q" if "-" in signs else "") + ("l" if "+" in signs else "")))
+        at = found.end()
+    return out if out and not text[at:].strip(" ,|") and len(out) <= 64 else None
+
+
+def _lifted(text, semitones=LIFT):
+    """A track's notes moved up: 'c4:2 [a3 c4]:8 .' -> 'd4:2 [b3 d4]:8 .'."""
+    def up(found):
+        midi = 12 * (int(found.group(3)) + 1) + _NAMES.index(found.group(1) + found.group(2)) + semitones
+        return "%s%d" % (_NAMES[midi % 12], midi // 12 - 1)
+    return _PITCH.sub(up, text)
+
+
+def _played(pattern, how):
+    """A pattern as a part of the form plays it: without the tune, quietly, a tone higher."""
+    out = dict(pattern)
+    if "t" in how:
+        out.pop("lead", None)
+    if "q" in how:
+        out.pop("bass", None)
+        out.pop("kit", None)
+    if "l" in how:
+        out = {name: text if name == "kit" else _lifted(text) for name, text in out.items()}
+    if not out:                                             # nothing left to play: the stretch still takes its time
+        out = {"lead": ".:64"}
+    return out
+
+
 _DRUMS = {
     "none": ". . . . . . . . . . . . . . . .",
     "soft": "k . . . h . . . k . . . h . h .",
@@ -54,8 +164,11 @@ def _note(root, scale, degree, octave):
     return "%s%d" % (_NAMES[semi % 12], octave)
 
 
-def compose(seed=0, mood="mystery", bars=8, length=None):
-    """Return a song dict for the given seed and mood."""
+def compose(seed=0, mood="mystery", bars=8, length=None, sound="chip", form=None):
+    """Return a song dict for the given seed and mood.
+
+    ``sound``: ``"chip"`` or ``"rich"`` - the same notes on other instruments.  ``form``: how the two halves of the
+    tune are laid out, such as ``"(A) A B- A+"``, or ``"long"``; one that cannot be read is ignored."""
     if mood not in MOODS:
         mood = "mystery"
     scales, (t_lo, t_hi), progressions, drum_kind, lead_wave, density = MOODS[mood]
@@ -140,6 +253,20 @@ def compose(seed=0, mood="mystery", bars=8, length=None):
         for p in song["patterns"].values():
             p.pop("kit", None)
         song["instruments"].pop("kit", None)
+    if sound == "rich" and mood in RICH:
+        lead, arp, bass, kit = RICH[mood]
+        made = song["instruments"]
+        made["lead"], made["arp"], made["bass"] = dict(lead), dict(arp), dict(bass)
+        if "kit" in made:
+            made["kit"] = dict(made["kit"], **kit)
+    plan = _plan(form) if form else None
+    if plan:                                                # the same two halves, laid out and played as the form says
+        halves = song["patterns"]
+        song["patterns"], song["sequence"] = {}, []
+        for letter, how in plan:
+            name = ("(%s)" % letter if "t" in how else letter) + ("-" if "q" in how else "") + ("+" if "l" in how else "")
+            song["patterns"].setdefault(name, _played(halves[letter], how))
+            song["sequence"].append(name)
     if length:
         song["sequence"] = list(length)
     return song

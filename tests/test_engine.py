@@ -303,6 +303,98 @@ class AudioTests(unittest.TestCase):
             self.assertGreater(max(abs(x) for x in samples), 0.05, mood)
         self.assertNotEqual(compose(1, "dark"), compose(2, "dark"))
 
+    def test_composer_sound_and_form_are_the_designers_choice(self):
+        from engine.audio.compose import LONG, RICH
+        self.assertEqual(set(RICH), set(MOODS))
+        shaped = ("drive", "detune", "filter", "room")
+        for mood in MOODS:
+            chip = compose(7, mood)
+            self.assertEqual(compose(7, mood, sound="chip", form=None), chip, mood)          # the default: as ever
+            self.assertFalse([k for inst in chip["instruments"].values() for k in inst if k in shaped], mood)
+            rich = compose(7, mood, sound="rich")
+            self.assertEqual((rich["patterns"], rich["sequence"], rich["tempo"]),
+                             (chip["patterns"], chip["sequence"], chip["tempo"]), mood)      # the same notes
+            self.assertTrue(any(k in inst for inst in rich["instruments"].values() for k in shaped), mood)
+            self.assertEqual(set(rich["instruments"]), set(chip["instruments"]), mood)
+        self.assertEqual(compose(7, "dark", sound="brass band"), compose(7, "dark"))          # unknown: the chip
+        # each rich voice is about as loud as its chip counterpart
+        loud = lambda samples: (sum(v * v for v in samples) / len(samples)) ** 0.5
+        chip, rich = synth.render_tracks(compose(1, "dark")), synth.render_tracks(compose(1, "dark", sound="rich"))
+        for name in ("lead", "arp", "bass"):
+            self.assertTrue(0.7 < loud(rich[name]) / loud(chip[name]) < 1.4, name)
+        # a form: how the two halves are laid out, and how each is played
+        plain = compose(7, "battle")
+        long = compose(7, "battle", form="long")
+        self.assertEqual(" ".join(long["sequence"]), LONG)
+        self.assertEqual((long["patterns"]["A"], long["patterns"]["B"]), (plain["patterns"]["A"], plain["patterns"]["B"]))
+        self.assertEqual(sorted(long["patterns"]["(A)"]), ["arp", "bass", "kit"])           # without the tune
+        self.assertEqual(sorted(long["patterns"]["B-"]), ["arp", "lead"])                    # quiet: no bass, no drums
+        self.assertEqual(long["patterns"]["A+"]["kit"], plain["patterns"]["A"]["kit"])       # drums are not notes
+        first = lambda text: synth.note_freq(text.replace("[", "").split(":")[0].split()[0])
+        for name in ("lead", "arp", "bass"):                                                  # a tone higher
+            self.assertAlmostEqual(first(long["patterns"]["A+"][name]) / first(plain["patterns"]["A"][name]),
+                                   2 ** (2 / 12.0), places=4)
+        self.assertGreater(len(synth.render_song(long)), 1.9 * len(synth.render_song(plain)))
+        own = compose(7, "battle", form="(a) b-+ A")
+        self.assertEqual(own["sequence"], ["(A)", "B-+", "A"])
+        self.assertEqual(sorted(own["patterns"]["B-+"]), ["arp", "lead"])
+        for unreadable in ("A C", "(A B", "A * B", ""):
+            self.assertEqual(compose(7, "battle", form=unreadable), plain, unreadable)       # ignored, never fatal
+        quiet = compose(7, "space", form="(A)- A")                                           # space has no drums
+        self.assertEqual(sorted(quiet["patterns"]["(A)-"]), ["arp"])
+
+    def test_generated_music_takes_the_sound_and_form_set_for_the_game(self):
+        audio = Audio(backend=NullBackend(record=True))
+        spec = {"generate": {"mood": "dark", "seed": 7}}
+        self.assertEqual(audio.resolve_track(spec), ("gen:dark:7:16", "gen", {"mood": "dark", "seed": 7, "bars": 16}))
+        self.assertEqual(audio.resolve_track("battle")[0], "gen:battle:0:16")                 # as it has always been
+        audio.music_sound, audio.music_form = "rich", "long"
+        key, _kind, payload = audio.resolve_track(spec)
+        self.assertEqual((key, payload["sound"], payload["form"]), ("gen:dark:7:16:rich:long", "rich", "long"))
+        self.assertEqual(audio.resolve_track("battle")[0], "gen:battle:0:16:rich:long")
+        own = {"generate": {"mood": "dark", "seed": 7, "sound": "chip", "form": None}}       # a track's own word wins
+        self.assertEqual(audio.resolve_track(own)[0], "gen:dark:7:16")
+        audio.music(spec)
+        self.assertEqual(audio.playing, "gen:dark:7:16:rich:long")
+        audio.music_sound = "kazoo"                                                           # nonsense: the chip
+        self.assertEqual(audio.resolve_track(spec)[0], "gen:dark:7:16:long")
+
+    def test_a_game_and_a_scene_choose_the_sound_of_their_music(self):
+        session = Session("derelict", record_audio=True)
+        game = session.game
+        scene = game.world.scene
+        saved = {key: scene.get(key) for key in ("music", "music_sound", "music_form")}
+        try:
+            scene.pop("music", None)                                # the scene's default: generated from its mood
+            game.resume_music()
+            self.assertEqual((game.audio.music_sound, game.audio.music_form), ("chip", None))
+            plain = game.audio.wanted
+            self.assertTrue(plain.startswith("gen:") and not plain.endswith(":rich"))
+            game.cfg["music_sound"], game.cfg["music_form"] = "rich", "long"      # the game's designer
+            game.resume_music()
+            self.assertEqual(game.audio.wanted, plain + ":rich:long")
+            scene["music_sound"], scene["music_form"] = "chip", "(A) A"           # this scene's designer
+            game.resume_music()
+            self.assertEqual(game.audio.wanted, plain + ":(A) A")
+            self.assertEqual(game.audio.resolve_track("battle")[0], "gen:battle:0:16:(A) A")   # a fight here sounds alike
+        finally:
+            game.cfg.pop("music_sound", None)
+            game.cfg.pop("music_form", None)
+            for key, value in saved.items():
+                if value is None:
+                    scene.pop(key, None)
+                else:
+                    scene[key] = value
+
+    def test_a_song_track_by_track(self):
+        song = compose(3, "battle")
+        whole, tracks = synth.render_song(song), synth.render_tracks(song)
+        self.assertEqual(list(tracks), ["lead", "arp", "bass", "kit"])
+        self.assertEqual({len(samples) for samples in tracks.values()}, {len(whole)})
+        together = [sum(values) for values in zip(*tracks.values())]
+        self.assertLess(max(abs(a - b) for a, b in zip(whole, together)), 1e-9)              # they add up to the song
+        self.assertEqual(synth.render_tracks({"patterns": {}}), {})
+
     def test_wav_file_is_valid(self):
         import tempfile
         path = os.path.join(tempfile.mkdtemp(), "t.wav")

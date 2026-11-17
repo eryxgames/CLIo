@@ -15,6 +15,21 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   `detune` (two more oscillators a few cents above and below), `filter` (a resonant
   low-pass whose cutoff moves over every note: `[from Hz, to Hz, resonance, seconds]`)
   and `room` (a cluster of early echoes). Songs without them sound exactly as they did.
+- **Generated music: a sound and a form to choose.** `"sound": "rich"` plays the same
+  generated tune on other instruments - strings, a horn or a trumpet, a clarinet, plucked
+  strings, an overdriven guitar, as the mood has them - each as loud as its chip
+  counterpart; `"chip"`, the default, is CLIo as it has always sounded. `"form"` lays the
+  tune's two halves out: `(A)` without the tune, `A-` quietly, `A+` a tone higher;
+  `"long"` is `(A) A A B A B- A A+`, more than twice as long before it comes round. Both
+  can be said in a track, or once with `music_sound` and `music_form` for the game, a
+  scene or a dungeon floor - also in the editor - so a game keeps one sound.
+- `synth.render_tracks(song)`: a song track by track, for a player that lets voices be
+  switched on and off.
+
+### Changed
+
+- Rendered music and sounds are cached anew once, so that a song written with the new
+  instrument settings is not played from an older, plainer render.
 
 ## 2.2.1 - 2026-11-17
 

@@ -150,6 +150,8 @@ KINDS = [
         F("max_hints", "number"), F("player_stats", "group", "The player's stats", fields=STATS),
         R("title_banner", "banner", "The title drawn in a graphic style", fields=BANNER),
         R("title_effect", "choice", "Animation of the title picture", options=list(_fx.NAMES)),
+        R("music_sound", "choice", "Generated music is played on", options=["chip", "rich"]),
+        R("music_form", "text", "Form of generated music (long, or as (A) A B- A+)"),
         R("logo", "choice", "CLIo logo on the title screen", options=_logo_names()),
         R("win_banner", "banner", "Banner when the player wins", fields=BANNER),
         R("lose_banner", "banner", "Banner when the player loses", fields=BANNER),
@@ -163,6 +165,8 @@ KINDS = [
         F("characters", "refs", of="characters"), F("exits", "rows", fields=EXIT, one="exit"),
         R("hint", "rows", "Hints", fields=HINT, one="hint"),
         R("extra", "rows", "More to the description", one="line", fields=[F("if", "condition", "When"), F("text", "long")]),
+        R("music_sound", "choice", "Generated music is played on", options=["chip", "rich"]),
+        R("music_form", "text", "Form of generated music (long, or as (A) A B- A+)"),
         R("on_first_enter", "effects", "On entering for the first time"), R("on_enter", "effects", "On entering")]},
     {"key": "items", "file": "items", "label": "Items", "one": "item", "shape": "map", "title": "name", "fields": [
         F("name"), F("short", label="Short name"), F("description", "long"), F("aliases", "tags"),

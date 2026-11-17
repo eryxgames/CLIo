@@ -38,13 +38,13 @@ as before:
 
 A level also works on a chord (``[c4 e4 g4]@6:8``) and on a drum hit (``k@4``).
 
-An instrument can be overdriven (since 2.3): ``"drive": 0.6`` (0 is clean, 1 is hard)
+An instrument can be overdriven (since 2.2.2): ``"drive": 0.6`` (0 is clean, 1 is hard)
 flattens the loud parts of its track as a guitar amplifier does.  The whole track goes
 through it, so the notes of a chord grind against each other: a root and its fifth on a
 ``saw`` wave is a power chord.  ``"lowpass"`` after it is the loudspeaker that takes the
 fizz off.  A song without ``drive`` plays exactly as before.
 
-Three more settings shape an instrument (since 2.3), and again a song without them is
+Three more settings shape an instrument (since 2.2.2), and again a song without them is
 unchanged:
 
 ``"detune": 8``                     two more oscillators, 8 cents above and below: the
@@ -464,6 +464,41 @@ def parse_track(text):
 
 def render_song(song, max_seconds=180.0):
     """Render a song dict to a list of float samples (one loop of the sequence)."""
+    bufs, total_n = _tracks(song, max_seconds)
+    if total_n <= 0:
+        return []
+    master = [0.0] * (total_n + _TAIL)
+    for buf in bufs.values():
+        master = [a + b for a, b in zip(master, buf)]
+    return _finish(master, total_n, song)
+
+
+def render_tracks(song, max_seconds=180.0):
+    """The same, one list of samples for each track of the song, by its name: every track as it sounds in the song,
+    so that together they add up to ``render_song`` - for a player that lets voices be switched on and off."""
+    bufs, total_n = _tracks(song, max_seconds)
+    return {name: _finish(buf, total_n, song) for name, buf in bufs.items()} if total_n > 0 else {}
+
+
+_TAIL = int(0.6 * RATE)                                 # room after the last step for releases and echoes
+
+
+def _finish(samples, total_n, song):
+    """Fold the tail back to the start, so that a loop is seamless, and apply the song's volume."""
+    head = samples[:total_n]
+    extra = samples[total_n:]
+    if song.get("loop", True) and extra:
+        head[:len(extra)] = [a + b for a, b in zip(head, extra)]
+        samples = head
+    gain = float(song.get("volume", 0.7))
+    if gain != 1.0:
+        samples = [s * gain for s in samples]
+    return samples
+
+
+def _tracks(song, max_seconds=180.0):
+    """``(tracks, length)``: every track of the song rendered with its own effects - name -> samples, the song's
+    length and a tail - and the song's length in samples (0 for a song without notes)."""
     tempo = float(song.get("tempo", 100))
     spb = int(song.get("steps_per_beat", 4))
     step = 60.0 / tempo / spb                       # seconds per step
@@ -489,8 +524,8 @@ def render_song(song, max_seconds=180.0):
     total_steps = sum(plen.get(p, 0) for p in sequence)
     total_n = int(min(max_seconds, total_steps * step) * RATE)
     if total_n <= 0:
-        return []
-    tail = int(0.6 * RATE)
+        return {}, 0
+    tail = _TAIL
     track_bufs = {}
     cache = {}
 
@@ -560,7 +595,7 @@ def render_song(song, max_seconds=180.0):
                     mix_into(buf, at, smp, chord_gain)
         cursor += plen.get(pname, 0)
 
-    master = [0.0] * (total_n + tail)
+    out = {}
     for tname, buf in track_bufs.items():
         inst = instruments.get(tname, {})
         if inst.get("drive"):
@@ -575,17 +610,8 @@ def render_song(song, max_seconds=180.0):
             if isinstance(e, (int, float)):
                 e = [float(e) * step, 0.3]
             buf = echo(buf, float(e[0]), float(e[1]) if len(e) > 1 else 0.3)
-        master = [a + b for a, b in zip(master, buf)]
-    # fold the tail back to the start so loops are seamless
-    head = master[:total_n]
-    extra = master[total_n:]
-    if song.get("loop", True) and extra:
-        head[:len(extra)] = [a + b for a, b in zip(head, extra)]
-        master = head
-    gain = float(song.get("volume", 0.7))
-    if gain != 1.0:
-        master = [s * gain for s in master]
-    return master
+        out[tname] = buf
+    return out, total_n
 
 
 def _inst_args(inst, vol):

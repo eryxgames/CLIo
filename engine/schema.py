@@ -25,7 +25,7 @@ and ``CONDITIONS`` below.  Anything else is edited as JSON.  A kind with ``"edit
 tool of its own in the page (``sprite``: the pixel editor).
 """
 
-from . import banner as _banner, fx as _fx
+from . import banner as _banner, fx as _fx, pixels as _pixels
 from .art import logo_names as _logo_names
 
 
@@ -215,7 +215,9 @@ KINDS = [
         F("title"), F("tempo", "number"), F("steps_per_beat", "number"), F("volume", "number")]},
     {"key": "sounds", "file": "sounds", "label": "Sounds", "one": "sound", "shape": "map", "fields": []},
     {"key": "sprites", "file": "sprites", "label": "Sprites", "one": "sprite", "shape": "map", "editor": "sprite",
-     "fields": []},
+     "fields": [F("style", "choice", "Drawn as", options=list(_pixels.STYLES)),
+                F("effect", "choice", "Animation when it is shown", options=list(_fx.NAMES)),
+                F("fps", "number", "Drawings a second"), F("loops", "number", "Times the drawings play")]},
     {"key": "dungeon", "file": "dungeon", "label": "Dungeon", "one": "dungeon", "shape": "object", "fields": []},
 ]
 

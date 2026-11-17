@@ -605,6 +605,18 @@ class BannerTests(unittest.TestCase):
         with self.assertRaises(Exception):
             service.handle(folder, "/api/banner", {"key": "description"})
 
+    def test_a_sprite_is_drawn_in_its_style(self):
+        folder = os.path.join(tempfile.mkdtemp(prefix="clio-editor-test-"), "starter")
+        shutil.copytree(os.path.join(ROOT, "templates", "starter"), folder)
+        torch = {"pixels": ["..yy..", ".yrry.", "yrbbry", ".yrry."], "palette": {"y": "#ffd23f", "r": "#ff5533", "b": "#ffffff"},
+                 "frames": [[".yy...", ".yrry.", "yrbbry", ".yrry."]], "style": "led", "fps": 4}
+        drawn = service.handle(folder, "/api/picture", {"name": "torch", "pending": {"sprites": {"torch": torch}}})
+        self.assertEqual((drawn["style"], drawn["effect"], drawn["size"], drawn["small"]), ("led", "frames", [11, 4], [3, 1]))
+        self.assertEqual([secs for _rows, secs in drawn["frames"]], [0.25, 0.25])
+        self.assertIn("\u25cf", json.dumps(drawn["rows"], ensure_ascii=False))
+        with self.assertRaises(Exception):
+            service.handle(folder, "/api/picture", {"name": "nothing", "pending": {"sprites": {"torch": torch}}})
+
     def test_terminal_output_to_cells(self):
         from engine.editor import looks
         self.assertEqual(looks.cells("\x1b[38;2;1;2;3;48;2;4;5;6m\u2580\u2580\x1b[0m x"),

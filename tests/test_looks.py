@@ -12,7 +12,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from helpers import ROOT                                    # noqa: E402
 
-from engine import banner, fx                               # noqa: E402
+from engine import banner, fx, pixels                       # noqa: E402
 from engine.art import LOGO_DIR, LOGOS, Art, load_logo, logo_names   # noqa: E402
 from engine.audio import Audio                              # noqa: E402
 from engine.audio.backends import NullBackend               # noqa: E402
@@ -249,6 +249,49 @@ class BannerTests(unittest.TestCase):
         self.assertEqual(again.palette, art.palette)
 
 
+TORCH = {"pixels": ["..yy..", ".yrry.", "yrbbry", ".yrry.", "..ss..", "..ss.."],
+         "palette": {"y": "#ffd23f", "r": "#ff5533", "b": "#ffffff", "s": "#8a5a2b"},
+         "frames": [[".yy...", ".yrry.", "yrbbry", ".yrry.", "..ss..", "..ss.."]], "fps": 5}
+
+
+class PictureTests(unittest.TestCase):
+    def test_every_style(self):
+        for style in pixels.STYLES:
+            art = pixels.picture(dict(TORCH, style=style), "torch")
+            w, h = art.size("art")
+            self.assertLessEqual(w, pixels.cols(6, style), style)
+            self.assertEqual(h, {"dots": 2, "pixel": 3}.get(style, 6), style)
+            self.assertTrue(all(l.isascii() for l in art.variants["ascii"][0]), style)
+            self.assertEqual(len(art.frames), 1)
+            self.assertEqual(len(art.frames[0][0]), h)
+            self.assertEqual("small" in art.variants, style != "dots")
+            for colour in (0, 3):
+                for uni in (True, False):
+                    for l in art.render(term(colour, uni, 40), 36):
+                        self.assertLessEqual(visible_len(l), 36)
+
+    def test_drawings_play_in_turn(self):
+        art = pixels.picture(dict(TORCH, loops=3), "torch")
+        frames, reveals = art.animation(term())
+        self.assertEqual(len(frames), 6)                            # (the second drawing, the first) three times
+        self.assertEqual(frames[0][1], 0.2)
+        self.assertEqual(frames[-1][0], art.render(term()))
+        still = pixels.picture(dict(TORCH, frames=None), "torch")
+        self.assertEqual(still.animation(term()), ([], False))
+        lit = pixels.picture(dict(TORCH, frames=None, effect="twinkle"), "torch")
+        self.assertTrue(lit.animation(term())[0])
+
+    def test_a_sprite_in_combat_takes_its_columns(self):
+        from engine.sprite import Sprite
+        for style, cols in (("pixel", 6), ("blocks", 12), ("dots", 3), ("led", 12), ("ascii", 12)):
+            sp = Sprite.from_data(dict(TORCH, style=style))
+            self.assertEqual(sp.cols, cols)
+            for tint in (None, "flash", "hurt"):
+                lines = sp.render(term(), tint=tint)
+                self.assertTrue(all(visible_len(l) <= cols for l in lines), style)
+            self.assertTrue(all(strip_ansi(l).isascii() for l in sp.render(term(unicode=False))))
+
+
 class GameLooksTests(unittest.TestCase):
     def game(self, extra, width=40, uni=True, animate=True):
         folder = tempfile.mkdtemp(prefix="clio-looks-")
@@ -296,6 +339,33 @@ class GameLooksTests(unittest.TestCase):
         g.begin_story()
         self.assertGreater(getattr(g.term, "slept", 0), 0)  # it animated
         self.assertIn("●", g.term.out.getvalue())
+
+    def test_a_sprite_is_a_picture(self):
+        g = self.game({}, 78, animate=False)
+        g.data.sprites["torch"] = dict(TORCH, style="dots")
+        g.data.sprites["title"] = dict(TORCH, style="blocks")
+        g.art._cache.clear()
+        self.assertEqual(strip_ansi(g.art_lines("torch")[0]).strip(), strip_ansi(
+            pixels.picture(dict(TORCH, style="dots")).render(g.term)[0]).strip())
+        lines, frames, reveals, kind = g.title_picture()
+        self.assertEqual(kind, "title")
+        self.assertIn("█", strip_ansi(lines[0]))
+        art_file = os.path.join(g.data.dir, "art", "torch.art")    # a file of the same name comes first
+        os.makedirs(os.path.dirname(art_file), exist_ok=True)
+        with open(art_file, "w", encoding="utf-8") as f:
+            f.write("@art\n(torch)\n")
+        g.art._cache.clear()
+        self.assertEqual(strip_ansi(g.art_lines("torch")[0]).strip(), "(torch)")
+
+    def test_bad_pictures_are_reported(self):
+        g = self.game({})
+        path = os.path.join(g.data.dir, "sprites.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"a": dict(TORCH, style="mosaic"), "b": dict(TORCH, effect="wobble"),
+                       "c": dict(TORCH, frames=["no"]), "d": dict(TORCH, frames=[["..zz.."]])}, f)
+        problems = " ".join(GameData(g.data.dir).validate())
+        for word in ("mosaic", "wobble", "frames should be drawings", "letters with no colour: z"):
+            self.assertIn(word, problems)
 
     def test_bad_looks_are_reported(self):
         g = self.game({"logo": "nope", "title_effect": "sparkle",

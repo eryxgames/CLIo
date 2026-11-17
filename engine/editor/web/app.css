@@ -246,3 +246,5 @@ body.opening .tools, body.opening main, body.opening #save { display: none; }
 .banner-preview .row { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
 .banner-preview .note { grid-column: 1; margin: 0; font-size: 0.85rem; color: var(--ink-2); max-width: 44rem; }
 .banner-preview button[aria-pressed="true"] { border-color: var(--ink); font-weight: 600; }
+.frames button[aria-pressed="true"] { border-color: var(--ink); font-weight: 600; }
+.sheet.sprite .banner-preview { margin-top: 0.3rem; }

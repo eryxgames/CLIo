@@ -266,6 +266,26 @@ class GameData:
             if not banner.own_palette(value):
                 problems.append("game.json: palette '%s' has no colours (a list of #rrggbb, or "
                                 "{\"colors\": [...], \"accent\": [...]})" % name)
+        from .pixels import STYLES as PICTURE_STYLES
+        for name, sp in (self.sprites or {}).items():
+            if not isinstance(sp, dict):
+                continue
+            where = "sprites.json: %s" % name
+            if sp.get("style") and sp["style"] not in PICTURE_STYLES:
+                problems.append("%s has an unknown style '%s' (there are: %s)"
+                                % (where, sp["style"], ", ".join(PICTURE_STYLES)))
+            if not fx.known(sp.get("effect")):
+                problems.append("%s has an unknown effect '%s'" % (where, sp.get("effect")))
+            frames = sp.get("frames")
+            if frames is not None and not (isinstance(frames, list)
+                                           and all(isinstance(f, list) and all(isinstance(r, str) for r in f)
+                                                   for f in frames)):
+                problems.append("%s: frames should be drawings like pixels (lists of rows)" % where)
+            elif frames:
+                letters = set("".join(sp.get("pixels") or [])) | set(sp.get("palette") or {}) | {".", " "}
+                odd = sorted(set("".join(r for f in frames for r in f)) - letters)
+                if odd:
+                    problems.append("%s: frames use letters with no colour: %s" % (where, " ".join(odd)))
         for key in ("banner_defaults", "title_banner", "win_banner", "lose_banner"):
             spec = cfg.get(key)
             if not spec or isinstance(spec, str):

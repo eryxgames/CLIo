@@ -39,18 +39,26 @@ def _rgb(spec):
 
 
 class Sprite:
-    def __init__(self, pixels, palette=None, name=""):
+    def __init__(self, pixels, palette=None, name="", style="pixel"):
         self.name = name
+        self.style = style if style in ("pixel", "blocks", "dots", "led", "ascii") else "pixel"
         self.pixels = [str(r) for r in pixels]
         self.width = max((len(r) for r in self.pixels), default=0)
         self.pixels = [r.ljust(self.width, ".") for r in self.pixels]
+        self.source = dict(palette or {})
         self.palette = {k: _rgb(v) for k, v in (palette or {}).items()}
         self.palette.setdefault(".", None)
         self.palette.setdefault(" ", None)
 
     @classmethod
     def from_data(cls, data, name=""):
-        return cls(data.get("pixels", []), data.get("palette", {}), name)
+        return cls(data.get("pixels", []), data.get("palette", {}), name, data.get("style") or "pixel")
+
+    @property
+    def cols(self):
+        """Columns the sprite takes on screen, in its style."""
+        from .pixels import cols
+        return cols(self.width, self.style) if self.style != "pixel" else self.width
 
     @property
     def height(self):
@@ -71,6 +79,9 @@ class Sprite:
     def render(self, term, tint=None, scale=1, flip=False):
         """Lines of text for this sprite on the given terminal."""
         rows = [r[::-1] for r in self.pixels] if flip else list(self.pixels)
+        if self.style != "pixel" and term.unicode:
+            from . import pixels
+            return pixels.draw(pixels.image(rows, self.source, tint), self.style).lines(term)
         if len(rows) % 2:
             rows.append("." * self.width)
         out = []

@@ -565,9 +565,11 @@ function renderForm() {
   const { thing } = hit;
   const single = kind.shape === "object";
   const fields = kind.fields.filter((f) => fits(f, thing[f.key]));
-  const drawn = kind.editor === "sprite" && (thing.pixels === undefined || (Array.isArray(thing.pixels) && thing.pixels.every((r) => typeof r === "string")))
-    && (thing.palette === undefined || (thing.palette && typeof thing.palette === "object" && !Array.isArray(thing.palette)));
-  const known = new Set(fields.map((f) => f.key).concat(kind.shape === "list" ? ["id"] : [], drawn ? ["palette", "pixels"] : []));
+  const rowsOk = (d) => Array.isArray(d) && d.every((r) => typeof r === "string");
+  const drawn = kind.editor === "sprite" && (thing.pixels === undefined || rowsOk(thing.pixels))
+    && (thing.palette === undefined || (thing.palette && typeof thing.palette === "object" && !Array.isArray(thing.palette)))
+    && (thing.frames === undefined || (Array.isArray(thing.frames) && thing.frames.every(rowsOk)));
+  const known = new Set(fields.map((f) => f.key).concat(kind.shape === "list" ? ["id"] : [], drawn ? ["palette", "pixels", "frames"] : []));
   const parts = [];
 
   const head = el("div", { class: "head" }, el("h2", {}, single ? kind.label : titleOf(kind, hit)));
@@ -1002,40 +1004,85 @@ function bannerField(kind, f, thing, path) {
 function spriteEditor(kind, thing) {
   if (!Array.isArray(thing.pixels)) thing.pixels = Array(12).fill(CLEAR.repeat(12));
   if (!thing.palette || typeof thing.palette !== "object") thing.palette = {};
+  if (thing.frames !== undefined && !Array.isArray(thing.frames)) delete thing.frames;
+  const MAX = 64;
   let colours = {};
   let pen = Object.keys(thing.palette)[0] || CLEAR;
-  let mirror = true, cursor = [0, 0], painting = false;
-  const cell = () => Math.max(8, Math.min(26, Math.floor(416 / Math.max(width(), thing.pixels.length))));
-  const width = () => Math.max(1, ...thing.pixels.map((r) => r.length));
-  const grid = el("canvas", { class: "sprite-grid", tabindex: "0", role: "img", "aria-label": "The sprite. Arrow keys move, Space paints." });
-  const small = el("canvas", { class: "sprite-small", "aria-hidden": "true" });
+  let mirror = true, cursor = [0, 0], painting = false, at = 0, drawn = null, timer = null, wait = null;
+  // drawing 0 is "pixels"; the others are "frames", played in turn after it
+  const all = () => [thing.pixels].concat(thing.frames || []);
+  const cur = () => all()[at] || thing.pixels;
+  const cell = () => Math.max(6, Math.min(26, Math.floor(416 / Math.max(width(), thing.pixels.length))));
+  const width = () => Math.max(1, ...all().flatMap((d) => d.map((r) => r.length)));
+  const grid = el("canvas", { class: "sprite-grid", tabindex: "0", role: "img", "aria-label": "The drawing. Arrow keys move, Space paints." });
+  const shown = el("canvas", { class: "banner-canvas", role: "img", "aria-label": "The sprite as the game draws it" });
+  const shownNote = el("p", { class: "note" });
+  const play = el("button", { type: "button", class: "quiet small", onclick: () => animate() }, "Play the animation");
   const swatches = el("div", { class: "swatches" });
   const picker = el("input", { type: "color", "aria-label": "Colour of the chosen paint" });
   const size = el("span", { class: "row" });
+  const tabs = el("div", { class: "row frames" });
 
-  function even() {                                          // every row the same length
-    const w = width();
+  function even() {                                          // every row of every drawing the same length and height
+    const w = width(), h = thing.pixels.length;
     thing.pixels = thing.pixels.map((r) => r.padEnd(w, CLEAR));
+    if (thing.frames) thing.frames = thing.frames.map((d) => { const out = d.map((r) => r.padEnd(w, CLEAR)).slice(0, h); while (out.length < h) out.push(CLEAR.repeat(w)); return out; });
   }
   function draw() {
-    paintSprite(grid, thing.pixels, colours, cell());
+    const rows = cur();
+    paintSprite(grid, rows, colours, cell());
     const c = grid.getContext("2d");
+    if (at > 0) {                                            // onion skin: the drawing before, faintly, where this one is empty
+      const before = all()[at - 1];
+      c.globalAlpha = 0.28;
+      for (let y = 0; y < rows.length; y++) for (let x = 0; x < rows[y].length; x++) {
+        const k = before[y] && before[y][x];
+        if (rows[y][x] === CLEAR && colours[k]) { c.fillStyle = colours[k]; c.fillRect(x * cell(), y * cell(), cell(), cell()); }
+      }
+      c.globalAlpha = 1;
+    }
     c.strokeStyle = "rgba(0,0,0,0.12)";
     for (let x = 0; x <= width(); x++) { c.beginPath(); c.moveTo(x * cell() + 0.5, 0); c.lineTo(x * cell() + 0.5, grid.height); c.stroke(); }
-    for (let y = 0; y <= thing.pixels.length; y++) { c.beginPath(); c.moveTo(0, y * cell() + 0.5); c.lineTo(grid.width, y * cell() + 0.5); c.stroke(); }
+    for (let y = 0; y <= rows.length; y++) { c.beginPath(); c.moveTo(0, y * cell() + 0.5); c.lineTo(grid.width, y * cell() + 0.5); c.stroke(); }
     if (document.activeElement === grid) { c.strokeStyle = "#2447d6"; c.lineWidth = 2; c.strokeRect(cursor[0] * cell() + 1, cursor[1] * cell() + 1, cell() - 2, cell() - 2); c.lineWidth = 1; }
-    paintSprite(small, thing.pixels, colours, 4, "#0f1724");
   }
+  // the sprite as the engine draws it, in its style: asked again a moment after each change
+  async function show() {
+    clearTimeout(timer);
+    try { drawn = await api("/api/picture", { pending: pending(), name: state.id }); } catch (err) { shownNote.textContent = "It cannot be drawn: " + err.message; return; }
+    const [w, h] = drawn.size;
+    paintCells(shown, drawn.rows, w + 4, h + 2);
+    const frames = (thing.frames || []).length;
+    shownNote.textContent = `${drawn.style}, ${w}×${h} characters` + (drawn.small ? `; ${drawn.small[0]}×${drawn.small[1]} in dots where that is too wide` : "") +
+      (drawn.effect && drawn.effect !== "none" ? `. Animation: ${drawn.effect}` : "") + (frames ? `, ${frames + 1} drawings` : "") + ".";
+    play.disabled = !drawn.frames.length;
+  }
+  function later() { clearTimeout(wait); wait = setTimeout(show, 300); }
+  function animate() {
+    if (!drawn || !drawn.frames.length) return;
+    clearTimeout(timer);
+    const [w, h] = drawn.size;
+    let i = 0;
+    const step = () => {
+      if (i >= drawn.frames.length) { paintCells(shown, drawn.rows, w + 4, h + 2); return; }
+      const [rows, secs] = drawn.frames[i++];
+      paintCells(shown, rows, w + 4, h + 2);
+      timer = setTimeout(step, Math.max(16, secs * 1000));
+    };
+    step();
+  }
+  function changed() { touched(kind); later(); }
   function set(x, y, letter) {
-    const put = (cx) => { if (cx >= 0 && cx < width() && y >= 0 && y < thing.pixels.length) thing.pixels[y] = thing.pixels[y].slice(0, cx) + letter + thing.pixels[y].slice(cx + 1); };
+    const rows = cur();
+    const put = (cx) => { if (cx >= 0 && cx < width() && y >= 0 && y < rows.length) rows[y] = rows[y].slice(0, cx) + letter + rows[y].slice(cx + 1); };
     put(x);
     if (mirror) put(width() - 1 - x);
-    touched(kind);
+    changed();
     palette();                                              // which colours are in use may have changed
     draw();
   }
   function palette() {
-    const used = new Set(thing.pixels.join(""));
+    const used = new Set(all().map((d) => d.join("")).join(""));
     swatches.replaceChildren(
       el("button", { type: "button", class: "swatch clear" + (pen === CLEAR ? " on" : ""), title: "Nothing (rub out)", "aria-label": "Rub out", onclick: () => { pen = CLEAR; palette(); } }),
       ...Object.keys(thing.palette).map((k) => el("button", { type: "button", class: "swatch" + (pen === k ? " on" : ""), style: `background:${colours[k] || "transparent"}`,
@@ -1045,28 +1092,51 @@ function spriteEditor(kind, thing) {
         if (!k) return;
         thing.palette[k] = colours[k] = "#8a96a8";
         pen = k;
-        touched(kind); palette(); draw();
+        changed(); palette(); draw();
       } }, "Add a colour"));
     const mine = pen !== CLEAR;
     picker.hidden = !mine;
     if (mine) picker.value = colours[pen] || "#000000";
-    if (mine && !used.has(pen)) swatches.append(el("button", { type: "button", class: "quiet", onclick: () => { delete thing.palette[pen]; delete colours[pen]; pen = CLEAR; touched(kind); palette(); } }, "Remove this colour"));
+    if (mine && !used.has(pen)) swatches.append(el("button", { type: "button", class: "quiet", onclick: () => { delete thing.palette[pen]; delete colours[pen]; pen = CLEAR; changed(); palette(); } }, "Remove this colour"));
   }
   function resize(w, h) {
-    w = Math.max(4, Math.min(32, w)); h = Math.max(4, Math.min(32, h));
+    w = Math.max(4, Math.min(MAX, w)); h = Math.max(4, Math.min(MAX, h));
     const now = width(), left = Math.floor((w - now) / 2);        // grow and shrink evenly on both sides, so it stays centred
-    thing.pixels = thing.pixels.map((r) => (left >= 0 ? CLEAR.repeat(left) + r : r.slice(-left)).padEnd(w, CLEAR).slice(0, w));
-    while (thing.pixels.length < h) thing.pixels.push(CLEAR.repeat(w));
-    thing.pixels.length = h;
-    touched(kind); sizes(); draw();
+    const fit = (d) => {
+      const out = d.map((r) => (left >= 0 ? CLEAR.repeat(left) + r : r.slice(-left)).padEnd(w, CLEAR).slice(0, w));
+      while (out.length < h) out.push(CLEAR.repeat(w));
+      out.length = h;
+      return out;
+    };
+    thing.pixels = fit(thing.pixels);
+    if (thing.frames) thing.frames = thing.frames.map(fit);
+    changed(); sizes(); draw();
   }
   function sizes() {
-    size.replaceChildren("Width", el("input", { type: "number", min: "4", max: "32", value: String(width()), onchange: (e) => resize(Number(e.target.value) || width(), thing.pixels.length) }),
-      "Height", el("input", { type: "number", min: "4", max: "32", value: String(thing.pixels.length), onchange: (e) => resize(width(), Number(e.target.value) || thing.pixels.length) }));
+    size.replaceChildren("Width", el("input", { type: "number", min: "4", max: String(MAX), value: String(width()), onchange: (e) => resize(Number(e.target.value) || width(), thing.pixels.length) }),
+      "Height", el("input", { type: "number", min: "4", max: String(MAX), value: String(thing.pixels.length), onchange: (e) => resize(width(), Number(e.target.value) || thing.pixels.length) }));
   }
-  const at = (e) => { const box = grid.getBoundingClientRect(); return [Math.floor((e.clientX - box.left) / (box.width / width())), Math.floor((e.clientY - box.top) / (box.height / thing.pixels.length))]; };
-  grid.addEventListener("pointerdown", (e) => { painting = true; grid.setPointerCapture(e.pointerId); cursor = at(e); set(cursor[0], cursor[1], e.button === 2 ? CLEAR : pen); });
-  grid.addEventListener("pointermove", (e) => { if (painting) { cursor = at(e); set(cursor[0], cursor[1], e.buttons === 2 ? CLEAR : pen); } });
+  function frameTabs() {
+    const n = all().length;
+    tabs.replaceChildren(
+      ...all().map((_, i) => el("button", { type: "button", class: "quiet small", "aria-pressed": String(i === at), title: i ? `Drawing ${i + 1}, played after the one before` : "The sprite itself",
+        onclick: () => { at = i; frameTabs(); draw(); } }, String(i + 1))),
+      el("button", { type: "button", class: "quiet small", onclick: () => {
+        thing.frames = (thing.frames || []).slice();
+        thing.frames.splice(at, 0, cur().slice());
+        at += 1;
+        changed(); frameTabs(); draw();
+      } }, "Copy this drawing"),
+      n > 1 && at > 0 ? el("button", { type: "button", class: "quiet small warn", onclick: () => {
+        thing.frames.splice(at - 1, 1);
+        if (!thing.frames.length) delete thing.frames;
+        at = Math.max(0, at - 1);
+        changed(); frameTabs(); palette(); draw();
+      } }, "Remove this drawing") : "");
+  }
+  const at_ = (e) => { const box = grid.getBoundingClientRect(); return [Math.floor((e.clientX - box.left) / (box.width / width())), Math.floor((e.clientY - box.top) / (box.height / thing.pixels.length))]; };
+  grid.addEventListener("pointerdown", (e) => { painting = true; grid.setPointerCapture(e.pointerId); cursor = at_(e); set(cursor[0], cursor[1], e.button === 2 ? CLEAR : pen); });
+  grid.addEventListener("pointermove", (e) => { if (painting) { cursor = at_(e); set(cursor[0], cursor[1], e.buttons === 2 ? CLEAR : pen); } });
   grid.addEventListener("pointerup", () => { painting = false; });
   grid.addEventListener("contextmenu", (e) => e.preventDefault());
   grid.addEventListener("focus", draw);
@@ -1077,16 +1147,18 @@ function spriteEditor(kind, thing) {
     else if (e.key === " " || e.key === "Enter") { set(cursor[0], cursor[1], pen); e.preventDefault(); }
     else if (e.key === "Backspace" || e.key === "Delete") { set(cursor[0], cursor[1], CLEAR); e.preventDefault(); }
   });
-  picker.addEventListener("input", () => { if (pen !== CLEAR) { thing.palette[pen] = colours[pen] = picker.value; touched(kind); palette(); draw(); } });
+  picker.addEventListener("input", () => { if (pen !== CLEAR) { thing.palette[pen] = colours[pen] = picker.value; changed(); palette(); draw(); } });
 
   const seed = el("input", { type: "text", placeholder: "any words", value: state.id || "", "aria-label": "Words to grow a creature from" });
   const grow = el("button", { type: "button", class: "quiet", onclick: async () => {
-    if (thing.pixels.join("").replace(/\./g, "") && !confirm("Replace this drawing with a grown one?")) return;
+    if (thing.pixels.join("").replace(/\./g, "") && !confirm("Replace this drawing (and its colours) with a grown one?")) return;
     try {
-      const made = await api("/api/sprite", { seed: seed.value || "nobody", size: thing.pixels.length });
+      const made = await api("/api/sprite", { seed: seed.value || "nobody", size: Math.min(32, thing.pixels.length) });
       thing.palette = made.palette; thing.pixels = made.pixels; colours = Object.assign({}, made.palette);
+      delete thing.frames;
+      at = 0;
       pen = Object.keys(thing.palette)[0] || CLEAR;
-      touched(kind); sizes(); palette(); draw();
+      changed(); sizes(); frameTabs(); palette(); draw();
     } catch (err) { status("Could not grow a sprite: " + err.message, true); }
   } }, "Grow");
   const tick = el("input", { type: "checkbox", checked: true, onchange: (e) => { mirror = e.target.checked; } });
@@ -1094,14 +1166,25 @@ function spriteEditor(kind, thing) {
   even();
   coloursOf(thing.palette).then((c) => { colours = c; palette(); draw(); });
   sizes();
+  frameTabs();
+  show();
+  // the fields below the drawing (style, animation...) change the picture too
+  setTimeout(() => {
+    const form = grid.closest(".sheet") && grid.closest(".sheet").parentElement;
+    if (form) { form.addEventListener("change", (e) => { if (!grid.contains(e.target)) later(); }); form.addEventListener("input", (e) => { if (e.target.type === "number") later(); }); }
+  }, 0);
   return el("div", { class: "sheet sprite" },
     el("div", { class: "sprite-row" }, grid, el("div", {},
       el("h3", {}, "Paint"), swatches, el("div", { class: "row" }, picker, el("label", { class: "tick" }, tick, " Mirror left and right")),
       el("h3", {}, "Size"), size,
-      el("h3", {}, "In the game"), small,
+      el("h3", {}, "Drawings"), tabs,
       el("h3", {}, "Grow one from words"), el("div", { class: "row" }, seed, grow))),
+    el("h3", {}, "As the game draws it"),
+    el("div", { class: "banner-preview" }, shown, el("div", { class: "row" }, play), shownNote),
     el("p", { class: "note" }, "Click or drag to paint, right button to rub out. With the keyboard: arrow keys move, Space paints, Delete rubs out. " +
-      "The game draws two pixel rows in one line of text, so pixels come out about square."));
+      "More drawings play in turn after the first (how fast is set above); the one before shows faintly while you draw. " +
+      `Use it as a picture anywhere art goes: "art": "${state.id || "name"}" in a scene or an item, "portrait" on a character, or name it "title" for the title screen; ` +
+      "an enemy fights with it as its \"sprite\"."));
 }
 
 // ---------------------------------------------------------------------- enemies: make one, try one

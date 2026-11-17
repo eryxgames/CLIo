@@ -20,8 +20,7 @@ from __future__ import annotations
 
 import unicodedata
 
-from .art import Art
-from .term import to_ascii
+from .pixels import Canvas, braille, halfblock, make_art, mix
 
 STYLES = {
     "pixel": "half-block pixel letters in a gradient",
@@ -145,21 +144,6 @@ def text_width(text, gap=1):
 # --------------------------------------------------------------------------- #
 # colours
 # --------------------------------------------------------------------------- #
-def _rgb(c):
-    c = c.lstrip("#")
-    if len(c) == 3:
-        c = "".join(x * 2 for x in c)
-    return tuple(int(c[i:i + 2], 16) for i in (0, 2, 4))
-
-
-def _hex(t):
-    return "#%02x%02x%02x" % tuple(max(0, min(255, int(round(v)))) for v in t)
-
-
-def mix(a, b, t):
-    return _hex(tuple(x + (y - x) * t for x, y in zip(_rgb(a), _rgb(b))))
-
-
 def ramp(stops, n):
     """n colours spread evenly over a list of hex stops."""
     if n <= 1 or len(stops) == 1:
@@ -170,10 +154,6 @@ def ramp(stops, n):
         k = min(int(p), len(stops) - 2)
         out.append(mix(stops[k], stops[k + 1], p - k))
     return out
-
-
-def _close(a, b, limit=120):
-    return sum((x - y) ** 2 for x, y in zip(_rgb(a), _rgb(b))) ** 0.5 <= limit
 
 
 def _colours(value):
@@ -208,73 +188,6 @@ def palette_of(spec, style, palettes=None):
     if "accent" in spec:
         accent = _colours(spec["accent"]) or None
     return list(main) or list(default[0]), (list(accent) if accent else None)
-
-
-# --------------------------------------------------------------------------- #
-# cells
-# --------------------------------------------------------------------------- #
-class Canvas:
-    def __init__(self, w, h):
-        self.w, self.h = w, h
-        self.ch = [[" "] * w for _ in range(h)]
-        self.col = [[None] * w for _ in range(h)]
-
-    def put(self, x, y, ch, spec=None):
-        if 0 <= x < self.w and 0 <= y < self.h:
-            self.ch[y][x], self.col[y][x] = ch, spec
-
-    def blit(self, other, ox, oy):
-        for y in range(other.h):
-            for x in range(other.w):
-                if other.ch[y][x] != " " or other.col[y][x]:
-                    self.put(ox + x, oy + y, other.ch[y][x], other.col[y][x])
-
-
-def halfblock(img, solid=False):
-    """Pixels (rows of colour or None) to cells, two pixel rows per text row.
-    ``solid``: never use a background colour (for the version without Unicode)."""
-    w = max((len(r) for r in img), default=0)
-    img = [list(r) + [None] * (w - len(r)) for r in img]
-    if len(img) % 2:
-        img.append([None] * w)
-    cv = Canvas(w, len(img) // 2)
-    for cy in range(cv.h):
-        for x in range(w):
-            t, b = img[2 * cy][x], img[2 * cy + 1][x]
-            if t and b:
-                if t == b or _close(t, b) or solid:
-                    cv.put(x, cy, "█", t if t == b or solid else mix(t, b, 0.5))
-                else:
-                    cv.put(x, cy, "▀", "%s on_%s" % (t, b))
-            elif t:
-                cv.put(x, cy, "▀", t)
-            elif b:
-                cv.put(x, cy, "▄", b)
-    return cv
-
-
-_DOTS = {(0, 0): 0x01, (0, 1): 0x02, (0, 2): 0x04, (1, 0): 0x08,
-         (1, 1): 0x10, (1, 2): 0x20, (0, 3): 0x40, (1, 3): 0x80}
-
-
-def braille(img):
-    w = max((len(r) for r in img), default=0)
-    img = [list(r) + [None] * (w - len(r)) for r in img]
-    while len(img) % 4:
-        img.append([None] * w)
-    cv = Canvas((w + 1) // 2, len(img) // 4)
-    for cy in range(cv.h):
-        for cx in range(cv.w):
-            bits, votes = 0, {}
-            for (dx, dy), bit in _DOTS.items():
-                x, y = 2 * cx + dx, 4 * cy + dy
-                c = img[y][x] if x < w else None
-                if c:
-                    bits |= bit
-                    votes[c] = votes.get(c, 0) + 1
-            if bits:
-                cv.put(cx, cy, chr(0x2800 + bits), max(votes, key=votes.get))
-    return cv
 
 
 # --------------------------------------------------------------------------- #
@@ -472,36 +385,7 @@ def _wrap(text, width_of, max_px):
 
 
 def _to_art(cv, ascii_cv, name, effect):
-    keys = ("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-            "!$%&*+-/<>?@^_~:;,()[]{}|'`\"\\")
-    specs = {}
-
-    def key(spec):
-        if spec not in specs:
-            specs[spec] = keys[len(specs)] if len(specs) < len(keys) else chr(0xE100 + len(specs))
-        return specs[spec]
-
-    def variant(c, ascii_only=False):
-        lines, mask = [], []
-        for y in range(c.h):
-            row = "".join(c.ch[y]).rstrip()
-            if ascii_only:                      # one character for one, so the mask still fits
-                row = "".join((to_ascii(ch) or "?")[0] for ch in row)
-            lines.append(row)
-            mask.append("".join(key(c.col[y][x]) if c.col[y][x] else " " for x in range(len(row))))
-        while lines and not lines[-1].strip():
-            lines.pop()
-            mask.pop()
-        return lines, mask
-    art = Art(name)
-    art.variants["art"] = variant(cv)
-    art.variants["ascii"] = variant(ascii_cv, True)
-    art.palette = {k: s for s, k in specs.items()}
-    if effect:
-        from . import fx
-        spec = fx.parse(effect)
-        art.effect = spec if spec and spec["name"] != "none" else None
-    return art
+    return make_art(name, cv, None, ascii_cv, (), effect)
 
 
 COLOUR_KEYS = ("palette", "colors", "accent")

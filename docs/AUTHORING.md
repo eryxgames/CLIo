@@ -16,7 +16,7 @@ to have the engine look for broken references.
 - [Text, colour and themes](#text-colour-and-themes)
 - [ASCII art](#ascii-art)
 - [Title screens, banners and animation](#title-screens-banners-and-animation)
-- [Pixel sprites](#pixel-sprites)
+- [Pixel sprites](#pixel-sprites) (and [pictures in the styles](#pictures-in-the-styles))
 - [The map](#the-map)
 - [Sound and music](#sound-and-music)
 - [Generated dungeons](#generated-dungeons)
@@ -518,6 +518,39 @@ Two pixel rows share one text row (`▀` with a foreground and a background colo
 pixels are square. `.` is transparent. Give a character `"sprite": "bugrat"` - or
 `"sprite": "auto"` to have one grown from its name (`"sprite_size": 14` to change the size).
 
+### Pictures in the styles
+
+A sprite is also a picture: any name that has no `.art` file is looked up in `sprites.json`,
+so `"art": "torch"` in a scene, `"portrait": "torch"` on a character, `{"art": "torch"}` in
+the story and a sprite called `title` (the title screen) all work. A sprite can choose how
+it is drawn, animate, and hold more drawings that play in turn:
+
+```json
+"torch": {
+  "palette": {"y": "#ffd23f", "r": "#ff5533", "s": "#8a5a2b"},
+  "pixels": ["..yy..", ".yrry.", "..ss.."],
+  "frames": [[".yy...", ".yrry.", "..ss.."], ["...yy.", ".yrry.", "..ss.."]],
+  "fps": 6, "loops": 3, "style": "dots", "effect": "twinkle"
+}
+```
+
+| `style` | A pixel is drawn as | Size of a 16x16 picture |
+| --- | --- | --- |
+| `pixel` | half a character (the default; two colours a character) | 16 x 8 |
+| `blocks` | two full blocks: big, crisp and square | 32 x 16 |
+| `dots` | braille dots, eight to a character: the finest detail, one colour a character | 8 x 4 |
+| `led` | a round dot and a space, like an LED panel | 31 x 16 |
+| `ascii` | two letters by brightness, like classic ASCII art | 32 x 16 |
+
+`frames` are drawings of the same size, played after the first `loops` times at `fps`
+drawings a second; `effect` is any [animation](#animation) instead. Where the picture is too
+wide for the screen it is drawn in dots; without Unicode, in letters by brightness. Enemies
+fight in their sprite's style too.
+
+In the editor every sprite has a drawing board of up to 64 x 64 pixels, drawings to add,
+copy and remove (the one before shows faintly while you draw the next), and the picture as
+the game draws it, in its style, with its animation.
+
 ## The map
 
 `map` draws explored rooms from the exits. Give exits a `dir` and the layout follows it;
@@ -893,8 +926,17 @@ a creature grown from the character's name - the same words always grow the same
   at it, and opens it in the pixel editor.
 - The pixel editor - also for any sprite under *Sprites* - paints with the mouse (right
   button rubs out) or the keyboard (arrow keys, Space, Delete), mirrors left and right
-  unless you switch that off, changes the colours and the size, and can grow a fresh
-  creature from any words. A small picture shows it as the game will, on a dark screen.
+  unless you switch that off, changes the colours and the size (up to 64 x 64), and can
+  grow a fresh creature from any words.
+- *Drawings* adds more drawings to play in turn - *Copy this drawing* starts the next one
+  from the current, and the one before shows faintly while you draw. *Drawn as* picks the
+  [style](#pictures-in-the-styles), *Animation* an effect, and the speed and the number of
+  times the drawings play are just above the board.
+- *As the game draws it* is the picture drawn by the engine, in its style, on a dark
+  screen; *Play the animation* plays it.
+
+Banners in game.json (*The title drawn in a graphic style* and the others) are drawn the
+same way, as you type, on a desktop, a phone or a 24-column screen.
 
 What counts as text is a rule of thumb (`engine/editor/texts.py`): names, titles and
 anything called `..._text` always; otherwise a string with a space in it, unless its key

@@ -47,6 +47,8 @@ python clio.py depths --mode rogue    # ...with one life and no bottom
 - [x] Banners: a game's title (or any text) in nine graphic styles and thirteen palettes, with
       animation - glitch, flicker, shine, twinkle, pulse, colour cycle, typing, hand-drawn frames
 - [x] A game's own palettes and house style for banners, drawn live in the editor
+- [x] Pictures in the same styles - half blocks, square blocks, braille dots, LED, ASCII -
+      with drawings that play in turn, drawn and played in the editor
 - [x] Fifteen CLIo logos to choose from, most of them animated
 - [x] Auto-map
 - [x] Generative maze, monster packs, endless dungeons that scale with depth
@@ -195,7 +197,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 142 tests, about twenty seconds
+python -m unittest discover -s tests     # 148 tests, about twenty seconds
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 ```
@@ -209,7 +211,8 @@ the bot falls, round-trip saves, and render every sound effect. They write nothi
 Raise `__version__` in `engine/__init__.py`, add a `## x.y.z - date` section to
 `CHANGELOG.md`, then push a tag: `git tag -a vx.y.z -m "CLIo x.y.z" && git push origin vx.y.z`.
 The release workflow (`.github/workflows/release.yml`) runs the tests, makes the GitHub release
-with those notes, the engine as a zip and the editor's web pack, and pushes both to itch.io
+with those notes (each paragraph joined onto one line, as GitHub keeps line breaks in release
+notes), the engine as a zip and the editor's web pack, and pushes both to itch.io
 (channels `win-linux-mac` and `html5`). It needs the repository secret `BUTLER_API_KEY`
 (itch.io → Settings → API keys, the key whose source is wharf); without it the itch.io step is
 skipped.

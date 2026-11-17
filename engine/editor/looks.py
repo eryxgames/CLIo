@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2024-2026 Daniel Sandner
 """Pictures for the editor: grow a sprite as the game would, say what colour a palette entry
-is, and draw a banner of game.json as the game draws it.
+is, and draw a banner of game.json or a sprite in its style as the game draws it.
 
 The game draws a character with ``"sprite": "auto"`` by growing a creature from
 its name (``engine.sprite.generate``).  ``grow`` returns that same creature as
@@ -113,3 +113,28 @@ def banner(game_dir, key, width=78, pending=None):
             "frames": [[[cells(l) for l in fr], round(secs, 3)] for fr, secs in frames],
             "reveals": reveals, "style": getattr(art, "style", chosen["style"]), "chosen": chosen["style"],
             "effect": (art.effect or {}).get("name"), "size": list(art.size("art"))}
+
+
+def picture(game_dir, name, pending=None):
+    """A sprite drawn in its style, as scenes, portraits and the title screen show it.
+
+    Returns ``{"rows", "frames", "reveals", "style", "effect", "size": [w, h],
+    "small": [w, h] of the version for narrow screens or None}``."""
+    from ..data import GameData
+    from ..pixels import picture as make_picture
+    from ..term import Term
+    from . import EditorError, workdir
+    with workdir(game_dir, pending) as work:
+        data = GameData(work)
+        sprites = dict(data.sprites or {})
+    sp = sprites.get(name)
+    if not isinstance(sp, dict) or not sp.get("pixels"):
+        raise EditorError("There is no sprite called %s, or it has no pixels." % name)
+    art = make_picture(sp, name)
+    term = Term(out=io.StringIO(), width=160, height=60, color=3, unicode=True, env={})
+    frames, reveals = art.animation(term, None, None, None, seed=name)
+    return {"rows": [cells(l) for l in art.render(term)],
+            "frames": [[[cells(l) for l in fr], round(secs, 3)] for fr, secs in frames],
+            "reveals": reveals, "style": sp.get("style") or "pixel",
+            "effect": (art.effect or {}).get("name") or ("frames" if art.frames else None),
+            "size": list(art.size("art")), "small": list(art.size("small")) if "small" in art.variants else None}

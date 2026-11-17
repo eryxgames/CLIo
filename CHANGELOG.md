@@ -2,17 +2,32 @@
 
 Notable changes to CLIo. Versions follow [semantic versioning](https://semver.org).
 
-## Unreleased
+## 2.2.0 - 2026-11-17
+
+CLIo 2.2 is about how games look. A game can set its title in a graphic style without
+drawing a thing, draw pictures and animations in the same styles, and bring any art to
+life; the editor shows all of it as the game will draw it. CLIo itself has a new logo.
+Games made for 2.1 run unchanged.
 
 ### Added
 
 - **Banners.** Any text in one of nine graphic styles - `pixel`, `shadow`, `chrome`,
   `glitch`, `reflect`, `synthwave`, `led`, `dots`, `plain` - and thirteen palettes, or
   colours of your own. A game draws its title this way with `"title_banner"` in game.json,
-  puts one up in the story with the `banner` effect, and ends with `"win_banner"` /
-  `"lose_banner"`. Banners wrap and shrink to fit, down to a 24-column phone; lower case is
-  drawn as small capitals. Each theme has a style of its own for banners that name none.
-  `clio.py --banner TEXT` shows one; `--export FILE` writes it as an `.art` file to draw over.
+  puts one up in the story with the `banner` effect (`{"banner": "Chapter II", "style":
+  "led"}`), and ends with `"win_banner"` / `"lose_banner"`. Banners wrap and shrink to fit,
+  down to a 24-column phone; lower case is drawn as small capitals. Each theme has a style
+  of its own for banners that name none. `clio.py --banner TEXT` shows one; `--export FILE`
+  writes it as an `.art` file to draw over.
+- **A game's own palettes and house style.** `"palettes"` in game.json names colours of the
+  game's own, used like the built-in ones; `"banner_defaults"` sets what every banner uses
+  unless it says otherwise.
+- **Pictures in the styles.** A sprite can be drawn as half blocks (as before), big square
+  `blocks`, fine braille `dots`, an `led` panel or `ascii` letters, and can hold more
+  drawings that play in turn (`"frames"`, `"fps"`, `"loops"`) or any animation
+  (`"effect"`). Every sprite is a picture too: `"art": "torch"` in a scene, a portrait, the
+  story's `art` effect and a sprite called `title` all find it when there is no `.art` file
+  of that name. Enemies fight in their sprite's style.
 - **Animated art.** Effects that play over any art once it is shown: `glitch`, `flicker`,
   `shine`, `twinkle`, `pulse`, `cycle`, `type`, and `frames`, which plays the `@frame`
   drawings an `.art` file has always been able to hold (they were read but never shown).
@@ -22,17 +37,21 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 - **A new CLIo logo**: a little terminal window that types its own name at the prompt. It
   shows in the launcher and on the title screen of games without title art, keeps its window
   without Unicode and fits a 24-column screen in one line.
-- **Fourteen more CLIo logos** in `engine/art/logos/`, most with an animation of their own, the old
-  logo among them as `classic`. A game picks one with `"logo"`; the launcher with
-  `--logo NAME` or `CLIO_LOGO`. `--looks` lists them.
-- **A game's own palettes and house style.** `"palettes"` in game.json names colours of the
-  game's own, used like the built-in palettes; `"banner_defaults"` sets what every banner
-  uses unless it says otherwise.
-- **Banners drawn live in the editor.** Every banner field of game.json is drawn as you type,
-  by the engine, as the game will draw it - on a desktop, a phone or a 24-column screen, with
-  a note when it has to fall back to plain letters - and its animation plays on request.
+- **Fourteen more CLIo logos** in `engine/art/logos/`, most with an animation of their own,
+  the old logo among them as `classic`. A game picks one with `"logo"`; the launcher with
+  `--logo NAME` or `CLIO_LOGO`. `--looks` lists the logos, styles, palettes and animations.
+- **The editor draws it all.** Banner fields of game.json are drawn by the engine as you
+  type - on a desktop, a phone or a 24-column screen, with a note when a style has to fall
+  back to plain letters. The sprite editor has drawings (add, copy, remove, with the one
+  before showing faintly underneath), boards up to 64 x 64, a style and an animation, and
+  the picture as the game draws it, with *Play the animation*. Palettes are edited as forms;
+  the `banner` effect is in the list of effects.
 - **`@ascii`** in `.art` files: a hand-made version for terminals without Unicode.
-- The editor offers the new game.json fields (palettes as forms) and the `banner` effect.
+
+### Changed
+
+- Games without title art, and the launcher, show the new logo. `"logo": "classic"` in
+  game.json (or `--logo classic`) brings back the old one.
 
 ### Fixed
 

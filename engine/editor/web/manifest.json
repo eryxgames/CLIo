@@ -13,6 +13,7 @@
   "engine/game.py",
   "engine/maze.py",
   "engine/parser.py",
+  "engine/pixels.py",
   "engine/quests.py",
   "engine/records.py",
   "engine/schema.py",

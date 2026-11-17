@@ -223,8 +223,8 @@ class Art:
             if key != "art" or not self.frames:
                 return [], False
             delay = fx.seconds(1.0 / self.fps, spec)
-            seq = [(self._render(term, l, m), delay) for l, m in self.frames]
-            frames = seq * max(1, int(spec.get("loops", 1))) + [(base, 0.0)]
+            seq = [(self._render(term, l, m), delay) for l, m in self.frames] + [(base, delay)]
+            frames = seq * max(1, min(20, int(spec.get("loops", 1) or 1)))
             reveals = bool(spec.get("reveal"))     # the frames build the picture up: do not show it first
         else:
             frames, reveals = fx.frames(spec, lines, mask, self.palette, self.default_color, term, seed,
@@ -276,10 +276,12 @@ def _trim_mask(mask, raw_lines, n):
 
 
 class ArtLibrary:
-    """Loads and caches the ``.art`` files of a game."""
+    """Loads and caches the ``.art`` files of a game.  ``sprites`` (the game's
+    sprites.json) are pictures too: a name with no file is looked up there."""
 
-    def __init__(self, *dirs):
+    def __init__(self, *dirs, sprites=None):
         self.dirs = [d for d in dirs if d]
+        self.sprites = sprites if sprites is not None else {}
         self._cache = {}
 
     def get(self, name):
@@ -299,6 +301,9 @@ class ArtLibrary:
                     break
             if art:
                 break
+        if art is None and isinstance(self.sprites.get(name), dict) and self.sprites[name].get("pixels"):
+            from .pixels import picture
+            art = picture(self.sprites[name], name)
         self._cache[name] = art
         return art
 

@@ -278,7 +278,7 @@ class Battle:
             sprites = [f.sprite for f in self.enemies]
         if not sprites or any(s is None for s in sprites):
             return
-        total = sum(s.width for s in sprites) + 3 * (len(sprites) - 1)
+        total = sum(s.cols for s in sprites) + 3 * (len(sprites) - 1)
         if ui.width < total + 4:
             return
         lines = []
@@ -297,10 +297,10 @@ class Battle:
         sprite = self.enemies[0].sprite
         if self.group or not (sprite and ui.animated and self.g.settings.get("art", True)):
             return
-        if ui.width < sprite.width + 4:
+        if ui.width < sprite.cols + 4:
             return
         try:
-            pad = " " * max(1, (min(ui.width, 60) - sprite.width) // 2)
+            pad = " " * max(1, (min(ui.width, 60) - sprite.cols) // 2)
             frames = [sprite.render(ui.term, tint="flash"), sprite.render(ui.term, tint="hurt")]
             n = len(frames[0])
             for i, fr in enumerate(frames):

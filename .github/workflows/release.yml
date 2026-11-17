@@ -2,7 +2,8 @@
 #   1. checks the tag matches __version__ in engine/__init__.py and that CHANGELOG.md has a
 #      "## 2.2.0" section (a date after the number is fine),
 #   2. runs the tests,
-#   3. makes a GitHub release with that section as its notes, the engine as a zip and the
+#   3. makes a GitHub release with that section as its notes (each paragraph and list item
+#      joined onto one line, as GitHub shows a release's line breaks as they are), the engine as a zip and the
 #      editor's web pack (python -m engine.editor.hosted --pack),
 #   4. pushes both to itch.io with butler (if the BUTLER_API_KEY secret is set).
 #
@@ -37,6 +38,7 @@ jobs:
           test "$version" = "$engine"
           awk -v v="$version" '$1=="##" && $2==v {on=1; next} /^## / {on=0} on' CHANGELOG.md > notes.md
           test -s notes.md || { echo "CHANGELOG.md has no '## $version' section"; exit 1; }
+          python3 .github/unwrap.py notes.md
           echo "VERSION=$version" >> "$GITHUB_ENV"
       - name: Tests
         run: python -m unittest discover -s tests

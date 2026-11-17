@@ -43,7 +43,7 @@ class Game(Actions):
         if not self.audio.sounds:
             self.audio.sounds = dict(self.data.sounds)
         self.ui.audio = self.audio
-        self.art = ArtLibrary(self.data.art_dir, ENGINE_ART)
+        self.art = ArtLibrary(self.data.art_dir, ENGINE_ART, sprites=self.data.sprites)
         self.parser = Parser(self.data.config.get("verbs"))
         self.abilities = {k: dict(v) for k, v in ABILITIES.items()}
         for aid, spec in (self.data.config.get("abilities") or {}).items():

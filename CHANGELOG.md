@@ -11,6 +11,10 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   power chord, and a kit can be made to crack. With `lowpass` after it, the fizz goes.
   Songs without it sound exactly as they did. `docs/AUTHORING.md` now also names the
   other things an instrument can have: `gate`, `lowpass`, `echo`.
+- **Three more settings for instruments**, for strings, brass, pads and acid lines:
+  `detune` (two more oscillators a few cents above and below), `filter` (a resonant
+  low-pass whose cutoff moves over every note: `[from Hz, to Hz, resonance, seconds]`)
+  and `room` (a cluster of early echoes). Songs without them sound exactly as they did.
 
 ## 2.2.1 - 2026-11-17
 

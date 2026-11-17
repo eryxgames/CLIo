@@ -604,6 +604,23 @@ wave - `[e2 b2]:8` - growl as a power chord does; a `lowpass` after it takes the
 "guitar": {"wave": "saw", "drive": 0.7, "lowpass": 0.45, "sustain": 0.8, "volume": 0.3}
 ```
 
+Three more, also since 2.3:
+
+- `detune` (cents, try 6 to 12): two more oscillators a little above and below. They beat
+  slowly against the first - a string section, a fat synthesizer.
+- `filter` (`[from Hz, to Hz, resonance, seconds]`): every note goes through a resonant
+  low-pass whose cutoff travels from the first frequency to the second in about that many
+  seconds. Closing and resonant, it is the squelch of an acid bass; opening slowly, it is
+  brass, or strings that swell.
+- `room` (0 to 1, or `[amount, size]`): the track is heard in a room - a cluster of early
+  echoes. With `echo` after it, a hall.
+
+```json
+"strings": {"wave": "saw", "detune": 9, "attack": 0.3, "release": 0.6, "filter": [500, 2400, 0.1, 0.6],
+            "room": [0.5, 1.5], "volume": 0.2},
+"acid":    {"wave": "saw", "filter": [2400, 280, 0.85, 0.12], "drive": 0.3, "gate": 0.6, "volume": 0.4}
+```
+
 A note can also move (since 2.1). `c3>c5:16` slides from one pitch to the other over its
 length; `c4@5` plays at a level between `@0` (silent) and `@9` (full, the default);
 `c4@2>9:16` swells from level 2 to level 9; `c3>c5@2>9:16` does both and is a riser. Levels

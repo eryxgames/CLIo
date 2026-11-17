@@ -44,6 +44,21 @@ through it, so the notes of a chord grind against each other: a root and its fif
 ``saw`` wave is a power chord.  ``"lowpass"`` after it is the loudspeaker that takes the
 fizz off.  A song without ``drive`` plays exactly as before.
 
+Three more settings shape an instrument (since 2.3), and again a song without them is
+unchanged:
+
+``"detune": 8``                     two more oscillators, 8 cents above and below: the
+                                    slow beating of a string section or a fat synthesizer
+``"filter": [2400, 300, 0.8, 0.15]`` every note goes through a resonant low-pass whose
+                                    cutoff travels from 2400 Hz to 300 Hz in 0.15 seconds;
+                                    the third number is the resonance, 0 to 1.  Downwards
+                                    and resonant it is the squelch of an acid bass line;
+                                    upwards and slow (``[300, 2600, 0.2, 0.5]``) it is
+                                    brass, or strings that open
+``"room": 0.5``                     the track is heard in a room: a cluster of early
+                                    echoes, 0 (dry) to 1; ``[0.5, 2.0]`` makes the room
+                                    twice as large
+
 Rendering is done with list comprehensions over wavetables and a note cache,
 which keeps a 30-second song to well under a second on a laptop and a few
 seconds on a phone; results are cached on disk by the audio system.
@@ -164,9 +179,31 @@ def _envelope(n, attack, decay, sustain, release, hold):
     return env[:n]
 
 
+def _swept(raw, start, end, resonance=0.5, seconds=0.2):
+    """A resonant low-pass over one note, its cutoff travelling from ``start`` to ``end`` Hz in about ``seconds``.
+
+    A state-variable filter, its cutoff set anew every 32 samples.  At full resonance it rings at the cutoff."""
+    top = RATE / 6.5                                         # above this the filter is not stable
+    start, end = max(30.0, min(top, float(start))), max(30.0, min(top, float(end)))
+    damp = 2.0 * (1.0 - 0.94 * max(0.0, min(1.0, float(resonance))))
+    slow = max(0.005, float(seconds)) / 3.0 * RATE           # the cutoff is within 5 % of its end after ``seconds``
+    quiet = 1.0 / (1.0 + max(0.0, min(1.0, float(resonance))))  # a ringing filter is loud: keep it in bounds
+    low = band = 0.0
+    out = []
+    append = out.append
+    sin, exp = math.sin, math.exp
+    for at in range(0, len(raw), 32):
+        f = 2.0 * sin(math.pi * (end + (start - end) * exp(-at / slow)) / RATE)
+        for x in raw[at:at + 32]:
+            low += f * band
+            band += f * (x - low - damp * band)
+            append(low * quiet)
+    return out
+
+
 def tone(freq, seconds, wave_name="square", duty=0.5, attack=0.005, decay=0.05,
          sustain=0.7, release=0.05, volume=1.0, vibrato=None, slide_to=None,
-         noise_rate=None, tail=True, glide=False, **_ignored):
+         noise_rate=None, tail=True, glide=False, detune=None, filter=None, **_ignored):
     """Render one note. Returns a list of floats in roughly [-1, 1].
 
     ``slide_to`` bends the pitch towards another frequency: by default evenly in
@@ -206,6 +243,19 @@ def tone(freq, seconds, wave_name="square", duty=0.5, attack=0.005, decay=0.05,
             raw = [tbl[int(i * inc + amp * sine[int(i * vinc) & MASK]) & MASK] for i in range(n)]
         else:
             raw = [tbl[int(i * inc) & MASK] for i in range(n)]
+        if detune and not slide_to:                         # two more of the same, a little above and below
+            wide = 2.0 ** (abs(float(detune)) / 1200.0)
+            for k, other in enumerate((inc * wide, inc / wide)):
+                turn = (k + 1) * TABLE // 3                 # each begins elsewhere in its wave
+                if vibrato and vibrato[0] > 0 and vibrato[1] > 0:
+                    amp2 = other * vdepth * RATE / (TWO_PI * vrate)
+                    more = [tbl[int(turn + i * other + amp2 * sine[int(i * vinc) & MASK]) & MASK] for i in range(n)]
+                else:
+                    more = [tbl[int(turn + i * other) & MASK] for i in range(n)]
+                raw = [a + b for a, b in zip(raw, more)]
+            raw = [a * 0.58 for a in raw]                   # three together are about as loud as one was
+    if filter:
+        raw = _swept(raw, *list(filter)[:4])
     v = float(volume)
     return [s * e * v for s, e in zip(raw, env)]
 
@@ -319,6 +369,27 @@ def drive(buf, amount=0.5):
     tanh = math.tanh
     into, out = gain / peak, peak / tanh(gain)
     return [tanh(x * into) * out if x else 0.0 for x in buf]
+
+
+_ROOM = ((0.031, 0.5), (0.071, 0.36)), ((0.113, 0.45), (0.197, 0.3))
+
+
+def room(buf, amount=0.5, size=1.0):
+    """Early echoes of a room: two passes of two echoes each, so that eight arrive, none on a beat.
+    ``amount`` 0..1 (how much of the room is heard), ``size`` stretches the distances."""
+    amount = max(0.0, min(1.0, float(amount)))
+    if amount <= 0.0:
+        return buf
+    out = buf
+    for taps in _ROOM:
+        dry = out
+        out = list(dry)
+        for seconds, gain in taps:
+            d = int(seconds * max(0.1, float(size)) * RATE)
+            if 0 < d < len(dry):
+                g = gain * amount
+                out[d:] = [a + b * g for a, b in zip(out[d:], dry)]
+    return out
 
 
 def lowpass(buf, strength=0.5):
@@ -496,6 +567,9 @@ def render_song(song, max_seconds=180.0):
             buf = drive(buf, float(inst["drive"]))
         if inst.get("lowpass"):
             buf = lowpass(buf, float(inst["lowpass"]))
+        if inst.get("room"):
+            r = inst["room"]
+            buf = room(buf, *((r, 1.0) if isinstance(r, (int, float)) else (float(r[0]), float(r[1]) if len(r) > 1 else 1.0)))
         if inst.get("echo"):
             e = inst["echo"]
             if isinstance(e, (int, float)):
@@ -522,6 +596,8 @@ def _inst_args(inst, vol):
         "sustain": float(inst.get("sustain", 0.6)),
         "release": float(inst.get("release", 0.08)),
         "vibrato": inst.get("vibrato"),
+        "detune": inst.get("detune"),
+        "filter": inst.get("filter"),
         "volume": vol,
     }
 

@@ -249,6 +249,44 @@ class AudioTests(unittest.TestCase):
         edges = lambda samples: sum(abs(b - a) for a, b in zip(samples, samples[1:]))
         self.assertLess(edges(dark), edges(hard))
 
+    def test_detune_a_moving_filter_and_a_room(self):
+        def song(track, **inst):
+            return {"tempo": 120, "steps_per_beat": 4, "loop": False, "sequence": ["p"], "patterns": {"p": {"a": track}},
+                    "instruments": {"a": dict({"wave": "saw", "volume": 0.5, "attack": 0.001, "decay": 0.01,
+                                               "sustain": 1.0, "release": 0.01}, **inst)}}
+
+        step = int(60.0 / 120 / 4 * synth.RATE)
+        loud = lambda samples: (sum(v * v for v in samples) / max(1, len(samples))) ** 0.5
+        # how sharp-edged a stretch of sound is: high where there is treble, low where there is none
+        edges = lambda samples: sum((b - a) ** 2 for a, b in zip(samples, samples[1:])) / max(1e-9, sum(v * v for v in samples))
+        plain = synth.render_song(song("c3:8 .:8"))
+        for nothing in ({"detune": 0}, {"filter": None}, {"room": 0}):
+            self.assertEqual(synth.render_song(song("c3:8 .:8", **nothing)), plain, nothing)     # the old sound
+        # detune: three oscillators beat against each other, so the level wanders where one alone is steady
+        wide = synth.render_song(song("c3:16", detune=12))
+        blocks = lambda samples: [loud(samples[i:i + step]) for i in range(step, 13 * step, step)]
+        self.assertGreater(max(blocks(wide)) / min(blocks(wide)), 1.15)
+        self.assertLess(max(blocks(synth.render_song(song("c3:16")))) / min(blocks(synth.render_song(song("c3:16")))), 1.05)
+        # a filter that closes: bright at the start of the note, dull at its end; one that opens, the other way
+        closing = synth.render_song(song("c3:8 .:8", filter=[2400, 300, 0.8, 0.15]))
+        late = slice(5 * step, 7 * step)
+        self.assertGreater(edges(closing[:step // 2]), 3.0 * edges(closing[late]))
+        opening = synth.render_song(song("c3:8 .:8", filter=[300, 2600, 0.2, 0.5]))
+        self.assertLess(edges(opening[:step // 2]), 0.5 * edges(opening[late]))
+        self.assertLess(edges(closing[late]), 0.5 * edges(plain[late]))
+        ringing = synth.render_song(song("c3:8 .:8", filter=[3000, 200, 1.0, 0.3]))
+        self.assertLess(max(abs(v) for v in ringing), 3.0 * max(abs(v) for v in plain))      # loud, not out of bounds
+        self.assertEqual(len(synth._swept([0.0] * 100, 99999, 1, 5, 0)), 100)                # nonsense is brought into range
+        # a room: sound goes on after the note has stopped, and a larger room keeps it longer
+        after = lambda samples: loud(samples[int(8.6 * step):12 * step])
+        self.assertEqual(after(plain), 0.0)
+        small = synth.render_song(song("c3:8 .:8", room=0.5))
+        large = synth.render_song(song("c3:8 .:8", room=[0.5, 2.0]))
+        self.assertGreater(after(small), 0.0)
+        self.assertGreater(after(large), 1.5 * after(small))
+        self.assertEqual(small[:int(0.03 * synth.RATE)], plain[:int(0.03 * synth.RATE)])     # the note itself comes first
+        self.assertEqual(synth.room([], 0.5), [])
+
     def test_every_builtin_sfx_renders(self):
         for name, spec in SFX.items():
             samples = synth.render_sfx(spec)

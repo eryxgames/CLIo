@@ -2,7 +2,10 @@
 
 Notable changes to CLIo. Versions follow [semantic versioning](https://semver.org).
 
-## Unreleased
+## 2.2.2 - 2026-11-18
+
+Music with more colours: instruments that can be overdriven, detuned, filtered and put in
+a room, and generated music whose sound and length a game's designer chooses.
 
 ### Added
 

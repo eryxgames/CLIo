@@ -14,8 +14,8 @@
     "aliases": [
       "log"
     ],
-    "description": "A scuffed datapad holding the Marigold's log.",
-    "readable_item": "CHX-7 MARIGOLD - LOG, FINAL ENTRIES\n\nDay 211. Bugrats in the vents again. Cook says they will do anything for fruit. Cook would know.\n\nDay 213. Security unit 4 is running hot and has started confiscating things. Yesterday: the chef's knives. Today: the chief's lunch.\n\nDay 214. The Nexus terminal in storage cracked its logic chip and now speaks only in warnings. Shame - it is the only thing aboard that remembers the code to the captain's suitcase, and her spare passcard is inside.\n\nDay 215. Unit 4 has confiscated the reactor's fission relay as 'unregistered nuclear material'. Reactor is down. Captain has ordered everyone to the shuttle. We'll send someone back for the tech in the utility closet. Probably."
+    "description": "A scuffed datapad holding the Erebus's log.",
+    "readable_item": "CH EREBUS - LOG, FINAL ENTRIES\n\nDay 211. Bugrats in the vents again. Cook says they will do anything for fruit. Cook would know.\n\nDay 213. Security unit 4 is running hot and has started confiscating things. Yesterday: the chef's knives. Today: the chief's lunch.\n\nDay 214. The Nexus terminal in storage cracked its logic chip and now speaks only in warnings. Shame - it is the only thing aboard that remembers the code to the captain's suitcase, and her spare passcard is inside.\n\nDay 215. Unit 4 has confiscated the reactor's fission relay as 'unregistered nuclear material'. Reactor is down. Captain has ordered everyone to the shuttle. We'll send someone back for the tech in the utility closet. Probably."
   },
   "broken_communicator": {
     "name": "Broken Communicator",
@@ -416,7 +416,7 @@
     ],
     "takeable": false,
     "interactive": true,
-    "description": "The Marigold's reactor.",
+    "description": "The Erebus's reactor.",
     "current_state": "dead",
     "states": {
       "dead": {
@@ -448,7 +448,7 @@
             "set": "reactor_online"
           },
           {
-            "say": "Lights stutter on, deck by deck. The Marigold is awake.",
+            "say": "Lights stutter on, deck by deck. The Erebus is awake.",
             "style": "story",
             "effect": "glitch"
           },
@@ -468,7 +468,7 @@
             "set": "reactor_stable"
           },
           {
-            "say": "The reactor is stable. {hint}The Marigold could fly again - with a pilot.{/}",
+            "say": "The reactor is stable. {hint}The Erebus could fly again - with a pilot.{/}",
             "style": "success"
           }
         ]
@@ -484,7 +484,7 @@
             "set": "reactor_stable"
           },
           {
-            "say": "The reactor is stable. {hint}The Marigold could fly again - with a pilot.{/}",
+            "say": "The reactor is stable. {hint}The Erebus could fly again - with a pilot.{/}",
             "style": "success"
           }
         ]

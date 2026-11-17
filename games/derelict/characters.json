@@ -589,20 +589,20 @@
     ]
   },
   "ship_ai": {
-    "name": "MARIGOLD",
+    "name": "EREBUS",
     "aliases": [
       "ai",
       "ship",
       "computer",
-      "marigold",
+      "erebus",
       "ships ai",
       "mind"
     ],
     "type": "neutral",
     "portrait": "ship_ai",
-    "description": "The ship's mind: a slow amber pulse on the main display, and a voice from everywhere at once. Dry, patient, and noticeably pleased to have power again.",
+    "description": "The ship's mind: a slow amber pulse on the main display, and a voice from everywhere at once. Dry, patient, and noticeably pleased to have power again. A worn plate beneath the display reads E.R.E.B.U.S.",
     "greeting": "An amber light pulses on the main display. 'Good evening, technician.'",
-    "dialogue_tree": "marigold",
+    "dialogue_tree": "erebus",
     "voice": {
       "pitch": 420,
       "wave": "sine"
@@ -627,7 +627,7 @@
         "consume": false
       }
     },
-    "refuse_text": "'I am a ship,' says MARIGOLD. 'I have nowhere to put that.'",
+    "refuse_text": "'I am a ship,' says EREBUS. 'I have nowhere to put that.'",
     "no_fight_text": "You are standing inside her. It would be rude, and brief."
   }
 }

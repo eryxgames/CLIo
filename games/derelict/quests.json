@@ -21,7 +21,7 @@
       },
       {
         "id": "escape",
-        "text": "Get off the Marigold: by pod, by distress call, or by flying her home",
+        "text": "Get off the Erebus: by pod, by distress call, or by flying her home",
         "done_when": "never"
       }
     ],

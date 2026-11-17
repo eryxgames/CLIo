@@ -1,7 +1,7 @@
 {
   "id": "derelict",
   "title": "Derelict",
-  "subtitle": "Adrift aboard the cargo hauler Marigold",
+  "subtitle": "Adrift aboard the cargo hauler Erebus",
   "description": "Sci-fi adventure. Wake up alone on an abandoned ship and find a way off.",
   "author": "Daniel Sandner",
   "version": "1.0",
@@ -18,7 +18,7 @@
   "max_hints": 8,
   "rpg": false,
   "intro": "intro",
-  "map_title": "CHX-7 Marigold",
+  "map_title": "CH Erebus",
   "title_music": "theme",
   "music": "lower_deck",
   "show_title": false,

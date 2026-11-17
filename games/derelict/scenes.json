@@ -362,7 +362,7 @@
     "art": "bridge",
     "music": "bridge",
     "enter_sfx": "teleport",
-    "description": "The bridge of the Marigold: a horseshoe of consoles under a wide viewport. A blue-green planet fills the lower half of the view, rather closer than a planet ought to be.",
+    "description": "The bridge of the Erebus: a horseshoe of consoles under a wide viewport. A blue-green planet fills the lower half of the view, rather closer than a planet ought to be.",
     "items": [],
     "passive_items": [
       "captain_console"

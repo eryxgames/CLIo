@@ -41,7 +41,7 @@ class DerelictTests(unittest.TestCase):
         self.assertEqual(GameData(os.path.join(ROOT, "games", "derelict")).validate(), [])
 
     def test_escape_pod_ending(self):
-        s = self.play(OPENING, POWER, ["combine goo with suit", "equip suit", "talk to marigold", "authorize", "0",
+        s = self.play(OPENING, POWER, ["combine goo with suit", "equip suit", "talk to erebus", "authorize", "0",
                                        "e", "use pod"])
         self.assertEqual(s.game.over, "win")
         self.assertIn("salvage tug", s.text)
@@ -52,10 +52,10 @@ class DerelictTests(unittest.TestCase):
         self.assertIn("MAYDAY", s.text)
 
     def test_pilot_ending(self):
-        s = self.play(OPENING, POWER, ["talk to marigold", "fly", "0"])
+        s = self.play(OPENING, POWER, ["talk to erebus", "fly", "0"])
         self.assertIsNone(s.game.over)                         # reactor not stable, manual unread
         s.do("w", "read manual", "e", "d", "s", "w", "use minty coolant on reactor", "e", "n", "u",
-             "talk to marigold", "fly")
+             "talk to erebus", "fly")
         self.assertEqual(s.game.over, "win")
         self.assertIn("captain's chair", s.text)
 
@@ -104,7 +104,7 @@ class DerelictTests(unittest.TestCase):
     def test_fits_a_phone_screen(self):
         for width, uni in ((40, True), (36, False)):
             s = Session("derelict", width=width, unicode=uni).start()
-            for part in (OPENING, POWER, ["map", "journal", "inventory", "stats", "help", "talk to marigold", "0"]):
+            for part in (OPENING, POWER, ["map", "journal", "inventory", "stats", "help", "talk to erebus", "0"]):
                 s.do(*part)
             for line in s.text.splitlines():
                 self.assertLessEqual(visible_len(line), width, repr(line))
@@ -116,7 +116,7 @@ class DerelictTests(unittest.TestCase):
         for width in (24, 30):
             s = Session("derelict", width=width).start()
             for part in (OPENING, POWER, ["map", "journal", "inventory", "stats", "help", "help fight", "about",
-                                          "sound", "style list", "talk to marigold", "0", "hint"]):
+                                          "sound", "style list", "talk to erebus", "0", "hint"]):
                 s.do(*part)
             for line in s.text.splitlines():
                 self.assertLessEqual(visible_len(line), width, repr(line))

@@ -178,7 +178,7 @@
       }
     }
   },
-  "marigold": {
+  "erebus": {
     "start": [
       {
         "if": "talked:ship_ai",
@@ -188,7 +188,7 @@
     ],
     "nodes": {
       "hello": {
-        "text": "Good evening. I am MARIGOLD, the ship's mind. Thank you for the power; I can once again say with confidence that our orbit is decaying. You have an afternoon. Possibly a brisk one.",
+        "text": "Good evening. I am EREBUS, the ship's mind. Thank you for the power; I can once again say with confidence that our orbit is decaying. You have an afternoon. Possibly a brisk one.",
         "goto": "menu"
       },
       "again": {
@@ -201,6 +201,11 @@
             "text": "What happened here?",
             "once": true,
             "say": "The reactor scrammed when Security confiscated its relay. The crew evacuated by shuttle. Your cryo-nap pod was listed on the manifest as 'storage'. I have filed a complaint on your behalf."
+          },
+          {
+            "text": "What does EREBUS stand for?",
+            "once": true,
+            "say": "Extraterrestrial Reconnaissance, Engineering, and Bio-Utility System. I was specified for a survey ship. The survey was cancelled, I was not, and I have hauled freight ever since. I try not to take it personally."
           },
           {
             "text": "How do I get off this ship?",
@@ -233,7 +238,7 @@
                   {
                     "say": "Reactor cool and stable. Pilot... literate. That is more than I usually get. Take the captain's chair, technician. Point the pointed end where you want to go.",
                     "style": "dialogue",
-                    "title": "MARIGOLD"
+                    "title": "EREBUS"
                   },
                   {
                     "win": "outro_pilot"
@@ -246,14 +251,14 @@
                       {
                         "say": "Not on this reactor. She is running hot; one burn and we become a brief new star. Find coolant for the loop in the engine room.",
                         "style": "dialogue",
-                        "title": "MARIGOLD"
+                        "title": "EREBUS"
                       }
                     ],
                     "else": [
                       {
                         "say": "The reactor would hold. The pilot would not. Regulations require that you have at least read the operator's manual. It is in the crew quarters. It is 312 pages. I will wait.",
                         "style": "dialogue",
-                        "title": "MARIGOLD"
+                        "title": "EREBUS"
                       }
                     ]
                   }

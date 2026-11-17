@@ -137,7 +137,7 @@ Games made for 2.1 run unchanged.
   question was read as an unknown kind and answered no. So a conversation never opened
   with its "we have met" line a second time, and hints that should move on after a talk
   stayed. It is a condition of its own now (`"talked:robot"`, `{"talked": "robot"}`). In
-  the demo games Bolt, Marigold, the replicator and Maren now greet you differently the
+  the demo games Bolt, the ship's mind, the replicator and Maren now greet you differently the
   second time, as they were written to.
 
 ## 2.0.0 - 2026-11-13

@@ -2,6 +2,24 @@
 
 Notable changes to CLIo. Versions follow [semantic versioning](https://semver.org).
 
+## 2.2.1 - 2026-11-17
+
+New names in the demo games, and saved games that cope with a renamed conversation.
+
+### Changed
+
+- Derelict: the cargo hauler has a new name, the CH Erebus, and so has its ship's mind,
+  EREBUS (`talk to erebus`). Ask it what the name stands for.
+- The Hollow: the boss of the deeper Court is now the Remains of the Hollow King, and the
+  quest down the endless floors is The Long Slumber.
+
+### Fixed
+
+- A save keeps each character's dialogue tree by name, so when a game renamed a tree the
+  conversation stopped at the greeting. It now falls back to the tree the game names for
+  that character. A Derelict game saved in 2.2.0 loads and plays on, under the old names
+  until you start a new game.
+
 ## 2.2.0 - 2026-11-17
 
 CLIo 2.2 is about how games look. A game can set its title in a graphic style without

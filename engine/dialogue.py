@@ -90,6 +90,10 @@ def run_dialogue(g, char, tree=None):
         tid = char.get("dialogue_tree")
         tree = g.data.dialogues.get(tid) if tid else None
         if tree is None:
+            # a save made before the game renamed the tree: the game's own copy knows the new name
+            base = g.data.characters.get(char.get("template") or char["id"]) or {}
+            tree = g.data.dialogues.get(base.get("dialogue_tree") or "")
+        if tree is None:
             tree = g.data.dialogues.get(char.get("template") or char["id"])
         if tree is None:
             tree = legacy_tree(char, g.data.texts)

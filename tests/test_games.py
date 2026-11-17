@@ -51,6 +51,13 @@ class DerelictTests(unittest.TestCase):
         self.assertEqual(s.game.over, "win")
         self.assertIn("MAYDAY", s.text)
 
+    def test_a_save_from_before_the_rename_still_talks(self):
+        # 2.2.0 saved the ship's mind with its old dialogue tree, "marigold"
+        s = self.play(OPENING, POWER)
+        s.game.world.characters["ship_ai"]["dialogue_tree"] = "marigold"
+        s.do("talk to erebus", "how do i get off", "0")
+        self.assertIn("escape pod", s.text)
+
     def test_pilot_ending(self):
         s = self.play(OPENING, POWER, ["talk to erebus", "fly", "0"])
         self.assertIsNone(s.game.over)                         # reactor not stable, manual unread

@@ -103,6 +103,7 @@
     }
   },
   "ui": {
+    "banner": {"style": "led", "palette": "phosphor"},
     "prompt": "] ",
     "title_gradient": [
       22,

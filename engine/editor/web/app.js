@@ -200,7 +200,7 @@ function fits(f, value) {
   if (f.type === "sprite") return typeof value === "string";
   if (f.type === "effects") return Array.isArray(value) || isObject(value);
   if (f.type === "condition") return typeof value === "string" || Array.isArray(value) || isObject(value);
-  if (f.type === "group") return isObject(value);
+  if (f.type === "group" || f.type === "banner") return isObject(value);
   if (f.type === "map") return isObject(value) && Object.values(value).every(isObject);
   if (f.type === "rows") return Array.isArray(value) && value.every(isObject);
   return typeof value === "string";
@@ -461,6 +461,7 @@ function control(kind, f, thing, path) {
   const tool = (label, title, act, off) => el("button", { type: "button", class: "quiet small", title, disabled: !!off, onclick: (e) => { e.preventDefault(); act(); again(); } }, label);
   if (f.type === "effects") return effectsControl(kind, f, thing);
   if (f.type === "condition") return conditionControl(kind, f, thing);
+  if (f.type === "banner") return bannerField(kind, f, thing, path);
   if (f.type === "group") {
     if (!isObject(value)) return el("button", { type: "button", class: "quiet", onclick: () => { thing[f.key] = {}; state.open.add(`${state.kind}/${state.id}/${path}`); again(); } }, `Add ${f.label.toLowerCase()}`);
     return el("div", { class: "group" }, ...subform(kind, f.fields, value, path));
@@ -884,6 +885,117 @@ function spriteField(kind, f, thing, change) {
   }
   show();
   return el("div", {}, input, el("div", { class: "sprite-row" }, canvas, el("div", {}, note, buttons)));
+}
+
+// ---------------------------------------------------------------------- banners, drawn as the game draws them
+// The engine draws the banner (/api/banner) and sends its cells; the page paints them on a canvas the way a
+// terminal does: blocks and braille dots as shapes, so they join without seams.
+const BLOCKS = { "▀": [0, 0, 1, 0.5], "▄": [0, 0.5, 1, 1], "█": [0, 0, 1, 1], "▌": [0, 0, 0.5, 1], "▐": [0.5, 0, 1, 1],
+  "▁": [0, 0.875, 1, 1], "▔": [0, 0, 1, 0.125], "▖": [0, 0.5, 0.5, 1], "▗": [0.5, 0.5, 1, 1], "▘": [0, 0, 0.5, 0.5], "▝": [0.5, 0, 1, 0.5] };
+const SHADES = { "░": 0.3, "▒": 0.55, "▓": 0.8 };
+const DOTS = [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [0, 3], [1, 3]];
+
+function paintCells(canvas, rows, cols, lines) {
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  const ctx = canvas.getContext("2d");
+  const px = Math.round(13 * dpr);
+  const font = (bold) => `${bold ? "bold " : ""}${px}px ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace`;
+  ctx.font = font(false);
+  const cw = Math.max(1, Math.round(ctx.measureText("M").width)), ch = Math.round(px * 1.2);
+  const width = (row) => row.reduce((n, run) => n + [...run[0]].length, 0);
+  const w = Math.max(0, ...rows.map(width));
+  cols = Math.max(cols, w);
+  lines = Math.max(lines, rows.length + 2);
+  canvas.width = cols * cw;
+  canvas.height = lines * ch;
+  canvas.style.width = `${canvas.width / dpr}px`;
+  canvas.style.height = `${canvas.height / dpr}px`;
+  ctx.fillStyle = "#0b0e14";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.textBaseline = "middle";
+  const left = Math.floor((cols - w) / 2), top = Math.floor((lines - rows.length) / 2);
+  rows.forEach((row, y) => {
+    let x = left;
+    for (const [text, fg, bg, bold] of row) {
+      for (const c of text) {
+        const X = x * cw, Y = (top + y) * ch;
+        if (bg) { ctx.fillStyle = bg; ctx.fillRect(X, Y, cw, ch); }
+        ctx.fillStyle = fg || "#c8cfdb";
+        const code = c.codePointAt(0);
+        if (BLOCKS[c]) {
+          const [a, b, d, e] = BLOCKS[c];
+          ctx.fillRect(X + Math.round(a * cw), Y + Math.round(b * ch), Math.round(d * cw) - Math.round(a * cw), Math.round(e * ch) - Math.round(b * ch));
+        } else if (SHADES[c]) {
+          ctx.globalAlpha = SHADES[c];
+          ctx.fillRect(X, Y, cw, ch);
+          ctx.globalAlpha = 1;
+        } else if (code >= 0x2800 && code <= 0x28ff) {
+          const r = Math.max(0.8, Math.min(cw / 2, ch / 4) * 0.36);
+          DOTS.forEach(([dx, dy], i) => {
+            if ((code - 0x2800) & (1 << i)) { ctx.beginPath(); ctx.arc(X + cw * (0.27 + 0.46 * dx), Y + ch * (0.14 + 0.24 * dy), r, 0, 2 * Math.PI); ctx.fill(); }
+          });
+        } else if (c !== " ") {
+          ctx.font = font(bold);
+          ctx.fillText(c, X, Y + ch / 2);
+        }
+        x += 1;
+      }
+    }
+  });
+}
+
+function bannerField(kind, f, thing, path) {
+  const value = thing[f.key];
+  if (!isObject(value)) {
+    return el("button", { type: "button", class: "quiet", onclick: () => { thing[f.key] = {}; touched(kind); renderForm(); } }, `Add ${f.label.toLowerCase()}`);
+  }
+  const game = kindOf("game");
+  const cfg = game && fileOf(game) ? fileOf(game).data : {};
+  const own = isObject(cfg.palettes) ? Object.keys(cfg.palettes) : [];
+  const fields = f.fields.map((x) => (x.key === "palette" ? Object.assign({}, x, { options: own.concat(x.options.filter((o) => !own.includes(o))) }) : x));
+  const canvas = el("canvas", { class: "banner-canvas", role: "img", "aria-label": `${f.label}, as the game draws it` });
+  const note = el("p", { class: "note" });
+  const SIZES = [[78, "Desktop"], [40, "Phone"], [24, "24 columns"]];
+  let width = state.bannerWidth || 78, drawn = null, timer = null, wait = null;
+  const sizes = el("span", { class: "row" }, ...SIZES.map(([w, label]) => el("button", { type: "button", class: "quiet small", "aria-pressed": String(w === width), onclick: (e) => {
+    width = state.bannerWidth = w;
+    for (const b of sizes.children) b.setAttribute("aria-pressed", String(b === e.currentTarget));
+    show();
+  } }, label)));
+  const play = el("button", { type: "button", class: "quiet small", onclick: () => animate() }, "Play the animation");
+
+  async function show() {
+    clearTimeout(timer);
+    try { drawn = await api("/api/banner", { pending: pending(), key: f.key, width }); } catch (err) { note.textContent = "It cannot be drawn: " + err.message; return; }
+    paintCells(canvas, drawn.rows, width, drawn.size[1] + 2);
+    const [w, h] = drawn.size;
+    const fell = drawn.style !== drawn.chosen;
+    note.textContent = `${drawn.style}, ${w}×${h} on a screen ${width} columns wide` +
+      (fell ? `: ${drawn.chosen} does not fit here, so the game writes it plain. A shorter text or a wider screen shows ${drawn.chosen}.` : ".") +
+      (drawn.effect && drawn.effect !== "none" ? ` Animation: ${drawn.effect}.` : "");
+    play.disabled = !drawn.frames.length;
+  }
+
+  function animate() {
+    if (!drawn || !drawn.frames.length) return;
+    clearTimeout(timer);
+    const h = drawn.size[1] + 2;
+    let i = 0;
+    const step = () => {
+      if (i >= drawn.frames.length) { paintCells(canvas, drawn.rows, width, h); return; }
+      const [rows, secs] = drawn.frames[i++];
+      paintCells(canvas, rows, width, h);
+      timer = setTimeout(step, Math.max(16, secs * 1000));
+    };
+    step();
+  }
+
+  const group = el("div", { class: "group" }, ...subform(kind, fields, value, path));
+  const later = () => { clearTimeout(wait); wait = setTimeout(show, 250); };
+  group.addEventListener("input", later);
+  group.addEventListener("change", later);
+  show();
+  return el("div", { class: "banner-field" }, group, el("div", { class: "banner-preview" }, canvas, el("div", { class: "row" }, sizes, play), note));
 }
 
 // Drawing a sprite: a grid of palette letters, painted with the mouse (or the arrow keys and Space).

@@ -44,6 +44,10 @@ python clio.py depths --mode rogue    # ...with one life and no bottom
 - [x] Sounds and music: synthesizer, generative composer, optional audio files
 - [x] Styling: seven themes, frames, typewriter / fade / glitch effects, HUD
 - [x] ASCII art with colour masks, half-block pixel sprites, procedural sprites
+- [x] Banners: a game's title (or any text) in nine graphic styles and thirteen palettes, with
+      animation - glitch, flicker, shine, twinkle, pulse, colour cycle, typing, hand-drawn frames
+- [x] A game's own palettes and house style for banners, drawn live in the editor
+- [x] Fifteen CLIo logos to choose from, most of them animated
 - [x] Auto-map
 - [x] Generative maze, monster packs, endless dungeons that scale with depth
 - [x] Game modes (for example story and rogue), permadeath, scores and a records table
@@ -75,6 +79,10 @@ python clio.py [game] [options]
   --seed N        reproducible random numbers (same seed, same dungeon)
   --mode NAME     game mode, for games that have several (depths: story, rogue)
   --check         validate a game's data files and exit
+  --looks         list the logos, banner styles, palettes and animations
+  --logo NAME     the logo the launcher shows (or CLIO_LOGO=NAME); --effect NAME animates it
+  --banner TEXT   draw TEXT in a style (--banner-style, --palette, --effect) or
+                  write it as an .art file (--export FILE)
   --edit          open the game in the editor, a page in your browser
   --export-text F write every line a player can read to a CSV file
   --import-text F put the texts of such a file back into the game
@@ -163,6 +171,7 @@ engine/
   ui.py              frames, panels, menus, HUD, text effects
   theme.py           themes (files in engine/style/configs/)
   art.py             ASCII art files          sprite.py   pixel sprites
+  banner.py          text in graphic styles   fx.py       art animation
   automap.py         auto-map                 maze.py     dungeon generator
   audio/             synth, composer, sound effects, playback backends
   data.py            loading and normalising game files
@@ -186,7 +195,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 71 tests, about fifteen seconds
+python -m unittest discover -s tests     # 142 tests, about twenty seconds
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 ```

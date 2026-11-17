@@ -56,6 +56,8 @@ def handle(game_dir, path, body=None):
         if "palette" in body:
             return {"colours": looks.colours(body.get("palette"))}
         return looks.grow(body.get("seed") or "nobody", body.get("size") or 12)
+    if path == "/api/banner":                               # a banner of game.json, drawn as the game draws it
+        return looks.banner(game_dir, str(body.get("key") or "title_banner"), body.get("width") or 78, pending)
     if path == "/api/archive":                              # the whole game folder as a zip file
         return archive(game_dir)
     raise Unknown("Nothing here.")

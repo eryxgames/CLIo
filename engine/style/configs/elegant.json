@@ -104,6 +104,7 @@
     }
   },
   "ui": {
+    "banner": {"style": "shadow", "palette": "royal"},
     "prompt": "» ",
     "title_gradient": [
       146,

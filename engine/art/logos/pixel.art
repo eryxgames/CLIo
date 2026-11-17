@@ -1,0 +1,63 @@
+# CLIo logo - Pixel
+# Pixel letters in half blocks (two pixels per character cell, the
+# same trick as CLIo sprites) with a cyan-to-blue gradient; the o is a
+# gold coin with a glint. Stays solid without colour. 32x5.
+@palette
+a=#aff0ff
+b=#c2f6ff
+c=#78dcff
+d=#89e6ff
+e=#3cb2ff
+f=#f8a21b
+g=#ffb729 on_#ffffff
+h=#fcac22
+i=#2d80fd
+j=#2c73fb
+k=#e2800f
+l=#ffffff on_#da760c
+m=#335feb
+n=#3655e3
+o=#c1640b
+p=#b45b0a
+q=#5fd7ff
+r=#b8f4ff
+s=#8ce6ff
+t=#ffd23f
+u=#2fa8ff
+v=#2f6bff
+w=#2f8aff
+x=#ffa51a
+y=#d9700a
+z=#ffb729
+A=#ffffff
+@effect shine
+@art
+ ▄██████ ██      ██████
+██▀      ██        ██
+██       ██        ██    ▄▀███▄
+██▄      ██        ██   █▀    ██
+ ▀██████ ██████  ██████  ▀████▀
+@mask
+ abbbbbb bb      bbbbbb
+ccd      cc        cc
+ee       ee        ee    fghhhf
+iij      ii        ii   kl    kk
+ mnnnnnn nnnnnn  nnnnnn  oppppo
+@small
+▄▀▀ █   ▀█▀  ▄▄
+▀▄▄ █▄▄ ▄█▄ ▀▄▄▀
+@mask
+qrr s   rsr  tt
+uvv wvv vwv xyyx
+@ascii
+ _###### ##      ######
+##"      ##        ##
+##       ##        ##    _####_
+##_      ##        ##   ##    ##
+ "###### ######  ######  "####"
+@mask
+ abbbbbb bb      bbbbbb
+ccd      cc        cc
+ee       ee        ee    fzhhhf
+iij      ii        ii   kA    kk
+ mnnnnnn nnnnnn  nnnnnn  oppppo

@@ -1,0 +1,27 @@
+# CLIo logo - Neon
+# Hollow letters bent from rounded box-drawing lines, like neon tubes.
+# In --ascii the curves become + - | and it still reads as an outline. 34x5.
+@palette
+a=#ff5fd2 b
+b=#45f3ff b
+c=#ff5fd2
+d=#45f3ff
+@effect flicker
+@art
+╭──────╮ ╭─╮      ╭─────╮
+│ ╭────╯ │ │      ╰─╮ ╭─╯ ╭──────╮
+│ │      │ │        │ │   │ ╭──╮ │
+│ ╰────╮ │ ╰────╮ ╭─╯ ╰─╮ │ ╰──╯ │
+╰──────╯ ╰──────╯ ╰─────╯ ╰──────╯
+@mask
+aaaaaaaa aaa      aaaaaaa
+a aaaaaa a a      aaa aaa bbbbbbbb
+a a      a a        a a   b bbbb b
+a aaaaaa a aaaaaa aaa aaa b bbbb b
+aaaaaaaa aaaaaaaa aaaaaaa bbbbbbbb
+@small
+╭─╴╷  ╶┬╴ ╭╮
+╰─╴╰─╴╶┴╴ ╰╯
+@mask
+cccc  ccc dd
+ccccccccc dd

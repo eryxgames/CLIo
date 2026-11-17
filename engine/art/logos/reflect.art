@@ -1,0 +1,79 @@
+# CLIo logo - Reflection
+# Chunky letters above their mirror image, which fades out in
+# shading characters (dark shade, medium, light). Because the fade is
+# made of characters, not colours, it works on a monochrome screen. 32x8.
+@palette
+a=#c5f1ff
+b=#d6f6ff
+c=#90e1ff
+d=#a2e6ff
+e=#5cbcff
+f=#ffb426
+g=#ffbc2c
+h=#3894ff
+i=#368cff
+j=#f89c18
+k=#337cff
+l=#3174ff
+m=#e6820f
+n=#e0790c
+o=#2a5aa0
+p=#8a5a12
+q=#1d3f75
+r=#6a4510
+s=#14294d
+t=#4a300c
+u=#7fdcff
+v=#e8fbff
+w=#b4ecff
+x=#ffd23f
+y=#3a9dff
+z=#2f6bff
+A=#3484ff
+B=#ffa51a
+C=#d9700a
+@effect shine
+@art
+ ▄██████ ██      ██████
+██▀      ██        ██
+██       ██        ██    ▄████▄
+██▄      ██        ██   ██    ██
+ ▀██████ ██████  ██████  ▀████▀
+ ▓▓▓▓▓▓▓ ▓▓▓▓▓▓  ▓▓▓▓▓▓  ▓▓▓▓▓▓
+▒▒▒      ▒▒        ▒▒   ▒▒    ▒▒
+░         ░         ░     ░ ░ ░
+@mask
+ abbbbbb bb      bbbbbb
+ccd      cc        cc
+ee       ee        ee    fggggf
+hhi      hh        hh   jj    jj
+ kllllll llllll  llllll  mnnnnm
+ ooooooo oooooo  oooooo  pppppp
+qqq      qq        qq   rr    rr
+s         s         s     t t t
+@small
+▄▀▀ █   ▀█▀  ▄▄
+▀▄▄ █▄▄ ▄█▄ ▀▄▄▀
+░░░ ░░░ ░░░ ░░░░
+@mask
+uvv w   vwv  xx
+yzz Azz zAz BCCB
+qqq qqq qqq rrrr
+@ascii
+ _###### ##      ######
+##"      ##        ##
+##       ##        ##    _####_
+##_      ##        ##   ##    ##
+ "###### ######  ######  "####"
+ ####### ######  ######  ######
+%%%      %%        %%   %%    %%
+:         :         :     : : :
+@mask
+ abbbbbb bb      bbbbbb
+ccd      cc        cc
+ee       ee        ee    fggggf
+hhi      hh        hh   jj    jj
+ kllllll llllll  llllll  mnnnnm
+ ooooooo oooooo  oooooo  pppppp
+qqq      qq        qq   rr    rr
+s         s         s     t t t

@@ -243,6 +243,45 @@ class GameData:
                         problems.append("dialogue '%s': node '%s' goes to unknown node '%s'" % (did, nid, g))
         problems += self._validate_modes()
         problems += self._validate_dungeon()
+        problems += self._validate_looks()
+        return problems
+
+    def _validate_looks(self):
+        """The logo, banners and animations game.json asks for."""
+        from . import banner, fx
+        from .art import LOGO_ALIASES, logo_names
+        problems = []
+        cfg = self.config
+        logo = cfg.get("logo")
+        if logo and logo not in logo_names() + list(LOGO_ALIASES):
+            problems.append("game.json: unknown logo '%s' (there are: %s)" % (logo, ", ".join(logo_names())))
+        if not fx.known(cfg.get("title_effect")):
+            problems.append("game.json: unknown title_effect '%s' (there are: %s)"
+                            % (cfg.get("title_effect"), ", ".join(fx.NAMES)))
+        own = cfg.get("palettes") or {}
+        if not isinstance(own, dict):
+            problems.append("game.json: palettes should be names, each with a list of colours")
+            own = {}
+        for name, value in own.items():
+            if not banner.own_palette(value):
+                problems.append("game.json: palette '%s' has no colours (a list of #rrggbb, or "
+                                "{\"colors\": [...], \"accent\": [...]})" % name)
+        for key in ("banner_defaults", "title_banner", "win_banner", "lose_banner"):
+            spec = cfg.get(key)
+            if not spec or isinstance(spec, str):
+                continue
+            if not isinstance(spec, dict):
+                problems.append("game.json: %s should be a text or an object" % key)
+                continue
+            style, pal = spec.get("style"), spec.get("palette")
+            if style and style not in banner.STYLES:
+                problems.append("game.json: %s has an unknown style '%s' (there are: %s)"
+                                % (key, style, ", ".join(banner.STYLES)))
+            if isinstance(pal, str) and pal not in banner.PALETTES and pal not in own:
+                problems.append("game.json: %s has an unknown palette '%s' (there are: %s)"
+                                % (key, pal, ", ".join(list(own) + list(banner.PALETTES))))
+            if not fx.known(spec.get("effect")):
+                problems.append("game.json: %s has an unknown effect '%s'" % (key, spec.get("effect")))
         return problems
 
     def _validate_modes(self):

@@ -1,21 +1,143 @@
 # CLIo logo
+# The word as a command line in a little terminal window, with the
+# three window buttons and a blinking block cursor (the 'blink'
+# attribute; terminals that do not blink just show the block). 28x7.
+# Animated: the word is typed at the prompt (@frame drawings).
 @palette
-a = 39
-b = 45
-c = 51
-d = 87
-o = 220
+a=#5c6370
+b=#ff5f57
+c=#febc2e
+d=#28c840
+e=#7f8796
+f=#5fd7ff
+g=#b8f4ff
+h=#8ce6ff
+i=#ffd23f
+j=#5af78e b
+k=#2fa8ff
+l=#2f6bff
+m=#2f8aff
+n=#ffa51a
+o=#d9700a
+p=#e6e6e6 blink
+q=#5fd7ff b
+r=#ffd23f b
+s=#e6e6e6
+@effect frames reveal=1
+@fps 9
 @art
-  ____ _     ___
- / ___| |   |_ _|___
-| |   | |    | |/ _ \
-| |___| |___ | | (_) |
- \____|_____|___\___/
+╭──────────────────────────╮
+│ ● ● ●              clio  │
+├──────────────────────────┤
+│   ▄▀▀ █   ▀█▀  ▄▄        │
+│ > ▀▄▄ █▄▄ ▄█▄ ▀▄▄▀ █     │
+│                          │
+╰──────────────────────────╯
 @mask
-  aaaa a     aaa
- b bbbb b   bbbbbooo
-c c   c c    c co o o
-d ddddd dddd d d ooo o
- ddddddddddddddddoooo
+aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a b c d              eeee  a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a   fgg h   ghg  ii        a
+a j kll mll lml noon p     a
+a                          a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaa
 @small
- C L I o
+> CLIo█
+@mask
+j qqqrp
+@ascii
++--------------------------+
+| o o o              clio  |
++--------------------------+
+|                          |
+|  > C L I o _             |
+|                          |
++--------------------------+
+@mask
+aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a b c d              eeee  a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a                          a
+a  j q q q r p             a
+a                          a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+@frame
+╭──────────────────────────╮
+│ ● ● ●              clio  │
+├──────────────────────────┤
+│                          │
+│ > █                      │
+│                          │
+╰──────────────────────────╯
+@mask
+aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a b c d              eeee  a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a                          a
+a j s                      a
+a                          a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+@frame
+╭──────────────────────────╮
+│ ● ● ●              clio  │
+├──────────────────────────┤
+│   ▄▀▀                    │
+│ > ▀▄▄ █                  │
+│                          │
+╰──────────────────────────╯
+@mask
+aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a b c d              eeee  a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a   fgg                    a
+a j kll s                  a
+a                          a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+@frame
+╭──────────────────────────╮
+│ ● ● ●              clio  │
+├──────────────────────────┤
+│   ▄▀▀ █                  │
+│ > ▀▄▄ █▄▄ █              │
+│                          │
+╰──────────────────────────╯
+@mask
+aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a b c d              eeee  a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a   fgg h                  a
+a j kll mll s              a
+a                          a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+@frame
+╭──────────────────────────╮
+│ ● ● ●              clio  │
+├──────────────────────────┤
+│   ▄▀▀ █   ▀█▀            │
+│ > ▀▄▄ █▄▄ ▄█▄ █          │
+│                          │
+╰──────────────────────────╯
+@mask
+aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a b c d              eeee  a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a   fgg h   ghg            a
+a j kll mll lml s          a
+a                          a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+@frame
+╭──────────────────────────╮
+│ ● ● ●              clio  │
+├──────────────────────────┤
+│   ▄▀▀ █   ▀█▀  ▄▄        │
+│ > ▀▄▄ █▄▄ ▄█▄ ▀▄▄▀ █     │
+│                          │
+╰──────────────────────────╯
+@mask
+aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a b c d              eeee  a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a   fgg h   ghg  ii        a
+a j kll mll lml noon s     a
+a                          a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaa

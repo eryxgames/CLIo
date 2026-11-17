@@ -25,6 +25,7 @@ Effects (a dict may carry several; they run in order)::
     {"spawn": ["char", "scene"]}  {"remove_char": "char"}  {"move_char": ["char", "scene"]}
     {"item_state": ["item", "state"]}  {"quest": ["id", "start"]}
     {"sfx": "name"}  {"music": "track"}  {"art": "name"}  {"fight": "char"}
+    {"art": "name", "effect": "glitch"}    {"banner": "Chapter II", "style": "led", "effect": "flicker"}
     {"win": "text_key"}  {"lose": "text_key"}
     {"if": cond, "then": [...], "else": [...]}  {"random": [[...], [...]]}
 """
@@ -399,7 +400,18 @@ def _e_music(g, arg, eff, ctx):
 
 
 def _e_art(g, arg, eff, ctx):
-    g.show_art(arg)
+    g.show_art(arg, eff.get("effect"))
+
+
+def _e_banner(g, arg, eff, ctx):
+    # {"banner": "Chapter II", "style": "led", "palette": "amber", "effect": "flicker"}
+    spec = dict(arg) if isinstance(arg, dict) else {"text": arg}
+    for k in ("style", "palette", "colors", "accent", "scale"):
+        if k in eff:
+            spec[k] = eff[k]
+    if "effect" in eff:
+        spec["effect"] = eff["effect"]
+    g.show_banner(spec)
 
 
 def _e_pause(g, arg, eff, ctx):
@@ -488,7 +500,7 @@ _EFFECTS = {
     "damage": _e_damage, "gold": _e_gold, "xp": _e_xp, "goto": _e_goto, "unlock": _e_unlock,
     "lock": _e_lock, "reveal": _e_reveal, "hide": _e_hide, "block": _e_block, "spawn": _e_spawn,
     "remove_char": _e_remove_char, "move_char": _e_move_char, "char_set": _e_char_set,
-    "quest": _e_quest, "sfx": _e_sfx, "music": _e_music, "art": _e_art, "pause": _e_pause,
+    "quest": _e_quest, "sfx": _e_sfx, "music": _e_music, "art": _e_art, "banner": _e_banner, "pause": _e_pause,
     "fight": _e_fight, "dialogue": _e_dialogue, "win": _e_win, "lose": _e_lose,
     "random": _e_random, "do": _e_do, "learn": _e_learn, "end_dialogue": _e_end_dialogue,
     "turns": _e_turns, "shop": _e_shop, "story": _e_story, "transition": _e_transition,

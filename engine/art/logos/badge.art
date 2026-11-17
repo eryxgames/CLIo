@@ -1,0 +1,22 @@
+# CLIo logo - Badge
+# A two-tone tag in reverse colours: for menus, status lines, the
+# --version screen and the narrowest phones. 18x3, small 8x1.
+@palette
+a=#2f8fff
+b=#ffc83d
+c=#ffffff b on_#2f8fff
+d=on_#2f8fff
+e=#0b1220 b on_#ffc83d
+@effect shine
+@art
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+  C  L  I     o  █
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+@mask
+aaaaaaaaaaaabbbbbb
+cccccccccccdeeeeeb
+aaaaaaaaaaaabbbbbb
+@small
+ CLI  o▌
+@mask
+ccccceeb

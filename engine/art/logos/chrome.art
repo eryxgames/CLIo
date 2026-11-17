@@ -1,0 +1,69 @@
+# CLIo logo - Chrome
+# Letters extruded two pixels deep, with a chrome face: bright sky
+# on top, a dark horizon line through the middle, light below. The o
+# is polished gold. Half-block pixels, 34x6.
+@palette
+a=#f1f6ff
+b=#f8faff
+c=#3a4fa8
+d=#d0def1
+e=#dde8f8 on_#3a4fa8
+f=#2c3e87
+g=#1f2c66
+h=#a3b8d6 on_#4f5f7a
+i=#8a5a10
+j=#f5b52e on_#8a5a10
+k=#a2b6d2
+l=#3a4fa8 on_#b9cbe3
+m=#e4a92d
+n=#dbe7f7
+o=#e8f0fb
+p=#ffd25e
+q=#ffde7f
+r=#ffd25e on_#3a4fa8
+s=#c3d3ea
+t=#ffffff
+u=#e1e9f4
+v=#ffd23f
+w=#4f5f7a
+x=#4f5f7a on_#dbe7f7
+y=#ffa51a
+z=#d9700a
+A=#dde8f8
+B=#a3b8d6
+C=#f5b52e
+@effect shine
+@art
+ ▄██████▄██▄     ██████▄
+██▀██████████     ▀██████
+▀▀██▀    ▀▀██      ▀▀██  ▄▀▀▀▀▄
+██▀█     ████      ████ ████████▄
+ ▀██████▄██████▄ ██████▄ ▀████▀███
+   ▀██████▀██████ ▀██████  ▀████▀
+@mask
+ abbbbbbcbbc     bbbbbbc
+ddecfffffddcg     cddcffg
+hhcgg    hhcg      hhcg  ijjjji
+kklg     kkcg      kkcg mmcfffmmc
+ noooooocooooooc ooooooc pqqqqrcfg
+   cfffffgcfffffg cfffffg  cfffgg
+@small
+▄▀▀ █   ▀█▀  ▄▄
+▀▄▄ ▀▄▄ ▄▀▄ ▀▄▄▀
+@mask
+stt u   tut  vv
+wnn xnn nxn yzzy
+@ascii
+ _######_##_     ######_
+#############     "######
+####"    ####      ####  _####_
+####     ####      #### ########_
+ "######_######_ ######_ "########
+   "######"###### "######  "####"
+@mask
+ abbbbbbcbbc     bbbbbbc
+ddAcfffffddcg     cddcffg
+BBcgg    BBcg      BBcg  iCCCCi
+kkcg     kkcg      kkcg mmcfffmmc
+ noooooocooooooc ooooooc pqqqqpcfg
+   cfffffgcfffffg cfffffg  cfffgg

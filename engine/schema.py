@@ -15,14 +15,18 @@ A kind has a ``shape``:
 A field has a ``type``: ``text``, ``long`` (several lines), ``number``,
 ``bool``, ``choice`` (one of ``options``), ``tags`` (a list of words), ``ref``
 (the id of a thing of kind ``of``), ``refs`` (a list of such ids), ``sprite``
-(the name of a pixel sprite, or ``auto``).  Three types hold fields of their
-own, in ``fields``: ``group`` (an object: stats), ``rows`` (a list of objects:
-exits, moves, quest stages) and ``map`` (objects by name: dialogue nodes, item
-states).  ``effects`` is what happens (the lists under ``do``) and
+(the name of a pixel sprite, or ``auto``).  Four types hold fields of their
+own, in ``fields``: ``group`` (an object: stats), ``banner`` (a group that is
+also drawn, as the game would draw it: title banners), ``rows`` (a list of
+objects: exits, moves, quest stages) and ``map`` (objects by name: dialogue
+nodes, item states).  ``effects`` is what happens (the lists under ``do``) and
 ``condition`` what is asked (``if``), built from the vocabularies ``EFFECTS``
 and ``CONDITIONS`` below.  Anything else is edited as JSON.  A kind with ``"editor"`` gets a
 tool of its own in the page (``sprite``: the pixel editor).
 """
+
+from . import banner as _banner, fx as _fx
+from .art import logo_names as _logo_names
 
 
 def R(key, type, label, **more):
@@ -74,6 +78,7 @@ EFFECTS = [
     V("fight", "Start a fight with", {"ref": "characters"}), V("dialogue", "Start a conversation with", {"ref": "characters"}),
     V("end_dialogue", "End the conversation", "none"), V("shop", "Open a shop", "json"),
     V("sfx", "Play the sound"), V("music", "Play the music", {"ref": "music"}), V("art", "Show the picture"),
+    V("banner", "Show a banner (big styled text)", "text"),
     V("pause", "Pause, in seconds", "number"), V("transition", "Wipe the screen", "none"),
     V("turns", "Let turns pass", "number"), V("save", "Save the game", "none"), V("deepen", "Add a dungeon floor", "none"),
     V("win", "Win, with the text", {"ref": "texts"}), V("lose", "Lose, with the text", {"ref": "texts"}),
@@ -128,11 +133,28 @@ GIVEN = [F("if", "condition", "Accepted when"), F("else", "long", "Said when it 
          F("do", "effects", "And then"), R("consume", "bool", "Keeps the item"), R("reward_item", "ref", "Gives in return", of="items"),
          R("flag", "text", "Sets the flag"), R("sfx", "text", "Sound")]
 
+# A banner: text drawn in one of the graphic styles of engine/banner.py.  The editor shows a
+# field of type "banner" as a group of these fields with a live picture of the result.
+BANNER = [F("text", label="Text (the game's title if left empty)"),
+          F("style", "choice", options=list(_banner.STYLES)),
+          F("palette", "choice", "Colours (the game's own palettes come first)", options=list(_banner.PALETTES)),
+          F("effect", "choice", "Animation", options=list(_fx.NAMES)),
+          F("scale", "number", "Scale (1 or 2)")]
+PALETTE = [F("colors", "tags", "Colours, top to bottom (#rrggbb, #rrggbb, ...)"),
+           F("accent", "tags", "Colours for lower-case letters (optional)")]
+
 KINDS = [
     {"key": "game", "file": "game", "label": "Game", "one": "game", "shape": "object", "title": "title", "fields": [
         F("title"), F("subtitle"), F("description", "long"), F("author"), F("version"),
         F("initial_scene", "ref", "First scene", of="scenes"), F("style"), F("currency"),
         F("max_hints", "number"), F("player_stats", "group", "The player's stats", fields=STATS),
+        R("title_banner", "banner", "The title drawn in a graphic style", fields=BANNER),
+        R("title_effect", "choice", "Animation of the title picture", options=list(_fx.NAMES)),
+        R("logo", "choice", "CLIo logo on the title screen", options=_logo_names()),
+        R("win_banner", "banner", "Banner when the player wins", fields=BANNER),
+        R("lose_banner", "banner", "Banner when the player loses", fields=BANNER),
+        R("banner_defaults", "banner", "The game's banner style (for every banner)", fields=BANNER),
+        R("palettes", "map", "The game's own colour palettes", one="palette", fields=PALETTE),
         R("on_start", "effects", "When a new game starts")]},
     {"key": "scenes", "file": "scenes", "label": "Scenes", "one": "scene", "shape": "list", "title": "name", "fields": [
         F("name"), F("area"), F("description", "long"), F("first_visit", "long"), F("art"),

@@ -1,0 +1,40 @@
+# CLIo logo - Shadow
+# Solid block letters with a box-drawing drop shadow. 30x6.
+# Closest in spirit to the original logo, just bolder.
+# --ascii: blocks become #, the shadow becomes + | = lines.
+@palette
+a=#b8f4ff
+b=#2a4f8f
+c=#75deff
+d=#47c0ff
+e=#fff2a8
+f=#8a5a12
+g=#2f99ff
+h=#ffd23f
+i=#2f6bff
+j=#ffa51a
+k=#5fd7ff
+l=#8ce6ff
+m=#2fa8ff
+n=#2f8aff
+o=#d9700a
+@art
+ ██████╗██╗      ██╗
+██╔════╝██║      ██║
+██║     ██║      ██║  ██████╗
+██║     ██║      ██║ ██╔═══██╗
+╚██████╗███████╗ ██║ ╚██████╔╝
+ ╚═════╝╚══════╝ ╚═╝  ╚═════╝
+@mask
+ aaaaaabaab      aab
+ccbbbbbbccb      ccb
+ddb     ddb      ddb  eeeeeef
+ggb     ggb      ggb hhffffhhf
+biiiiiibiiiiiiib iib fjjjjjjff
+ bbbbbbbbbbbbbbb bbb  fffffff
+@small
+▄▀▀ █   ▀█▀  ▄▄
+▀▄▄ █▄▄ ▄█▄ ▀▄▄▀
+@mask
+kaa l   ala  hh
+mii nii ini jooj

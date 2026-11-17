@@ -238,3 +238,11 @@ body.opening .tools, body.opening main, body.opening #save { display: none; }
 .open.busy button { opacity: 0.5; pointer-events: none; }
 @media (max-width: 520px) { .open li { grid-template-columns: minmax(0, 1fr); gap: 0.2rem; } }
 .open button.link { padding: 0; font-size: inherit; }
+
+/* banners: drawn as the game draws them, on a terminal-dark screen whatever the page's theme */
+.banner-field { display: grid; gap: 0.6rem; }
+.banner-preview { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.4rem; justify-items: start; }
+.banner-canvas { border-radius: 6px; background: #0b0e14; max-width: 100%; height: auto; }
+.banner-preview .row { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+.banner-preview .note { grid-column: 1; margin: 0; font-size: 0.85rem; color: var(--ink-2); max-width: 44rem; }
+.banner-preview button[aria-pressed="true"] { border-color: var(--ink); font-weight: 600; }

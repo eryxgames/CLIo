@@ -603,8 +603,42 @@ class UI:
             out.append("".join(row))
         return out
 
-    def title_screen(self, art_lines, title, subtitle="", credit=""):
-        """Animated title card: art fades in over a twinkling star field."""
+    def play_art(self, lines, animation=None, reveals=False):
+        """Show art centred, then play its animation over it in place (on a real terminal)."""
+        w = self.width
+
+        def centre(block):
+            out = []
+            for l in block:
+                gap = max(0, (w - visible_len(l)) // 2)
+                out.append(" " * gap + l)
+            return out
+        base = centre(lines)
+        if not animation or not self.animated or len(lines) >= self.term.rows - 2:
+            self._plain([l.rstrip() for l in base])
+            return
+        try:
+            self.term.hide_cursor(True)
+            if not reveals:
+                self._plain(base)
+                self.term.cursor_up(len(base))
+            for block, secs in animation:
+                self._plain(centre(block))
+                self.term.sleep(secs)
+                self.term.cursor_up(len(base))
+            self._plain(base)
+        except KeyboardInterrupt:
+            self._skip = True
+            self.term.write(RESET + "\n")
+        finally:
+            self.term.hide_cursor(False)
+
+    def title_screen(self, art_lines, title, subtitle="", credit="", animation=None, reveals=False):
+        """Animated title card: art fades in over a twinkling star field.
+
+        ``animation`` is a list of ``(lines, seconds)`` played over the art once it
+        is in (see :meth:`engine.art.Art.animation`); with ``reveals`` it replaces
+        the fade-in instead of following it."""
         term = self.term
         w = self.width
         art_lines = list(art_lines or [])
@@ -614,14 +648,15 @@ class UI:
             rows = art_h
         top = (rows - art_h) // 2
 
-        def compose(step, reveal):
+        def compose(step, reveal, lines=None):
+            lines = art_lines if lines is None else lines
             field = self.starfield(w, rows, seed=11, twinkle=step)
             out = []
             for y in range(rows):
                 bg = self.term.paint(field[y], "darkgray" if (y + step) % 3 else "gray")
                 ai = y - top
-                if 0 <= ai < art_h and ai < reveal:
-                    art = art_lines[ai]
+                if 0 <= ai < len(lines) and ai < reveal:
+                    art = lines[ai]
                     aw = visible_len(art)
                     left = max(0, (w - aw) // 2)
                     out.append(self.term.paint(field[y][:left], "darkgray") + art
@@ -634,10 +669,16 @@ class UI:
         try:
             if self.animated and rows < term.rows - 4:
                 term.hide_cursor(True)
-                steps = art_h + 3
+                steps = 0 if (animation and reveals) else art_h + 3
                 for s in range(steps):
                     self._plain(compose(s, s))
                     term.sleep(0.06)
+                    term.cursor_up(rows)
+                for i, (lines, secs) in enumerate(animation or []):
+                    if self._skip:
+                        break
+                    self._plain(compose(steps + i // 3, art_h, lines))
+                    term.sleep(secs)
                     term.cursor_up(rows)
                 self._plain(compose(0, art_h))
             else:

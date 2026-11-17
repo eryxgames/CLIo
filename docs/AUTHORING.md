@@ -15,6 +15,7 @@ to have the engine look for broken references.
 - [Combat](#combat)
 - [Text, colour and themes](#text-colour-and-themes)
 - [ASCII art](#ascii-art)
+- [Title screens, banners and animation](#title-screens-banners-and-animation)
 - [Pixel sprites](#pixel-sprites)
 - [The map](#the-map)
 - [Sound and music](#sound-and-music)
@@ -80,6 +81,13 @@ That is a finished game: `take corkscrew`, `use corkscrew on barrel`, `up`. It s
 | `initial_scene` | Where the player starts. |
 | `player_stats` | `health`, `max_health`, `attack`, `defense`, `critical_hit_chance`, `evasion`, plus any stat of your own. |
 | `style` | Theme name (see [themes](#text-colour-and-themes)). |
+| `title_banner` | The title drawn in a graphic style: `{"style": "reflect", "palette": "ice"}` - see [banners](#title-screens-banners-and-animation). |
+| `title_effect` | How the title picture animates: `"glitch"`, `"shine"`, `"none"`... |
+| `logo` | Which CLIo logo the title screen shows when the game has no title art or banner (`python clio.py --looks`). |
+| `win_banner`, `lose_banner` | A banner at the end, when there is no `win` / `lose` art. |
+| `palettes` | The game's own named colours, for every banner: `{"dusk": ["#ffd27a", "#ff6f91", "#5a2a8f"]}`. |
+| `banner_defaults` | The game's house style: what every banner uses unless it says otherwise. |
+| `show_title` | `false` hides the title text under the title art (it is hidden under a banner unless `true`). |
 | `intro` | Key of a text in `texts.json` (or the text itself) shown at the start. |
 | `music`, `title_music` | Default track and title-screen track. |
 | `max_hints`, `default_hint` | Hint budget and fallback hint. |
@@ -233,7 +241,8 @@ Effects (one dict may hold several; they run in order):
 | `{"spawn": ["char", "scene"]}` (add `"copy": true` for a fresh instance), `{"remove_char": "id"}`, `{"move_char": ["id", "scene"]}`, `{"char_set": ["id", "key", value]}` | characters |
 | `{"quest": ["id", "start"]}` (`advance`, `complete`, `fail`) | quests |
 | `{"fight": "char"}`, `{"dialogue": "char"}`, `{"shop": "char"}` | encounters |
-| `{"sfx": "name"}`, `{"music": "track"}`, `{"art": "name"}`, `{"pause": 0.5}` | presentation |
+| `{"sfx": "name"}`, `{"music": "track"}`, `{"art": "name"}` (add `"effect": "glitch"`), `{"pause": 0.5}` | presentation |
+| `{"banner": "Chapter II", "style": "led", "palette": "amber", "effect": "flicker"}` | big text in a [graphic style](#title-screens-banners-and-animation) |
 | `{"save": true}` (the mode's own slot; a string names another), `{"win": "text or key"}`, `{"lose": "text or key"}` | the game |
 | `{"deepen": true}` | builds the next floor of an [endless dungeon](#endless-dungeons) (the generator does this itself) |
 | `{"if": cond, "then": [...], "else": [...]}`, `{"random": [[...], [...]]}` | control |
@@ -388,6 +397,111 @@ The mask has the same shape as the art; each letter picks a palette colour, blan
 left out. Keep art within about 34 columns so it fits beside the text on a desktop and
 above it on a phone. Reference art from scenes (`"art"`), items (`"art"`) and characters
 (`"portrait"`); `title`, `win` and `lose` are picked up automatically.
+
+A palette colour is anything markup takes: `y = amber`, `w = #ffffff b`, `s = #3a2a14 on_#101010`.
+A comment after a colour starts with ` # ` (a space, a hash, a space).
+
+More sections, all optional:
+
+```
+@effect shine          how the art animates when it is shown (see below)
+@fps 8                 the speed of the @frame drawings
+@ascii                 a hand-made version for terminals without Unicode (--ascii), with its own @mask
+ (oo)
+@frame                 a drawing to play, in turn, after the art (each may have its own @mask)
+ /--\
+```
+
+Without `@ascii` the engine turns box-drawing and block characters into `+ - | # " _`
+itself, and braille dots into `. ' : #`; a hand-made version usually reads better.
+
+## Title screens, banners and animation
+
+The title screen shows, in this order of preference: the game's own `art/title.art`; its
+`title_banner`; the CLIo logo named in `logo` (the engine's own by default). Every picture
+fades in over a star field and then plays its animation, if it has one.
+
+### Banners
+
+A banner is any text drawn in one of the engine's graphic styles. The game's title is the
+usual one, so a game can have a title screen of its own without drawing anything:
+
+```json
+"title_banner": {"style": "reflect", "palette": "ice", "effect": "shine"}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `text` | What to draw; the game's `title` when left out. |
+| `style` | `pixel`, `shadow`, `chrome`, `glitch`, `reflect`, `synthwave`, `led`, `dots`, `plain` |
+| `palette` | `clio`, `sunset`, `ice`, `fire`, `toxic`, `gold`, `steel`, `amber`, `phosphor`, `blood`, `royal`, `forest`, `mono` |
+| `colors`, `accent` | Your own colours instead: `["#fff07a", "#ff6f91", "#9b5cff"]` top to bottom; `accent` for lower-case letters. |
+| `effect` | Its animation (each style has a default: `glitch` for glitch, `shine` for chrome...; `"none"` for none). |
+| `scale` | `2` draws every pixel twice as big, for short titles on wide screens. |
+
+A game can name colours of its own and use them like the built-in palettes, and set a
+house style that every banner follows unless it says otherwise:
+
+```json
+"palettes": {
+  "dusk":  ["#ffd27a", "#ff6f91", "#5a2a8f"],
+  "brand": {"colors": ["#e8f6ff", "#5fd7ff", "#2f6bff"], "accent": ["#ffd23f", "#d9700a"]}
+},
+"banner_defaults": {"style": "shadow", "palette": "brand"},
+"title_banner": {"scale": 2}
+```
+
+The house colours stay when a banner picks another style (`{"banner": "Act II", "style": "led"}`
+is a brand-coloured LED board). In the editor, every banner field is drawn as you type, as
+the game will draw it, on a desktop, a phone or a 24-column screen, with its animation.
+
+Capitals and digits are 5x7 pixels; lower-case letters are drawn as small capitals, so
+`CLIo` keeps its small o. Accented letters lose their accent. A banner too wide for the
+screen is wrapped at spaces, then drawn smaller, and in the end written as spaced capitals,
+so it shows on any phone. Without a `style`, the theme chooses: `retro` draws green LEDs,
+`techno` glitches, `elegant` casts a shadow, `minimal` keeps to plain letters.
+
+The same banners work in the story - `{"banner": "Chapter II", "style": "led"}` - and at
+the end: `"win_banner": {"text": "Victory", "style": "chrome"}`.
+
+To see them, or to turn one into a file you can draw over:
+
+```
+python clio.py --looks                                     # every style, palette, logo, animation
+python clio.py --banner "The Hollow" --banner-style synthwave
+python clio.py --banner "The Hollow" --banner-style shadow --export games/mygame/art/title.art
+```
+
+### Animation
+
+| Effect | What happens |
+| --- | --- |
+| `glitch` | rows slip sideways, colours split into red and cyan, noise flickers, then it settles |
+| `flicker` | it lights up part by part like a neon sign switched on |
+| `shine` | a bright glint sweeps across |
+| `twinkle` | stars and dots twinkle (in other art, a few cells sparkle) |
+| `pulse` | the colours swell towards white and back |
+| `cycle` | the colours run once round the colour wheel |
+| `type` | it is typed in from the left behind a block cursor |
+| `frames` | the `@frame` drawings of the `.art` file play at `@fps`; with `reveal=1` they build the picture up, so it is not shown before them |
+
+An effect is named in the art itself (`@effect glitch`), for the title (`"title_effect"`),
+for a banner (`"effect"`), or where art is shown (`{"art": "door", "effect": "flicker"}`).
+It may carry options: `"glitch loops=2 speed=0.5"` (`speed` 2 is twice as fast). An `.art`
+file with `@frame` drawings and no `@effect` plays its frames.
+
+Animation plays once, only on a real terminal, never with `--fast`, and Ctrl-C skips it.
+`shine`, `pulse` and `cycle` are made of colour and do not play without it; the others
+work everywhere.
+
+### The CLIo logos
+
+The CLIo logo is a little terminal window that types its own name (`engine/art/clio_logo.art`).
+Fourteen more are in `engine/art/logos/`, most with an animation of their own: `classic` (the
+logo before 2.2), `glitch`, `neon` (flickers on), `led` (a scrolling LED board), `chrome`,
+`synthwave`, `pixel`, `shadow`, `slant`, `reflect`, `sword`, `braille`, `constellation`,
+`badge`. A game shows one with `"logo": "neon"`; the launcher with `--logo neon` or
+`CLIO_LOGO=neon`, and `--effect` gives it another animation.
 
 ## Pixel sprites
 

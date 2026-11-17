@@ -2,6 +2,47 @@
 
 Notable changes to CLIo. Versions follow [semantic versioning](https://semver.org).
 
+## Unreleased
+
+### Added
+
+- **Banners.** Any text in one of nine graphic styles - `pixel`, `shadow`, `chrome`,
+  `glitch`, `reflect`, `synthwave`, `led`, `dots`, `plain` - and thirteen palettes, or
+  colours of your own. A game draws its title this way with `"title_banner"` in game.json,
+  puts one up in the story with the `banner` effect, and ends with `"win_banner"` /
+  `"lose_banner"`. Banners wrap and shrink to fit, down to a 24-column phone; lower case is
+  drawn as small capitals. Each theme has a style of its own for banners that name none.
+  `clio.py --banner TEXT` shows one; `--export FILE` writes it as an `.art` file to draw over.
+- **Animated art.** Effects that play over any art once it is shown: `glitch`, `flicker`,
+  `shine`, `twinkle`, `pulse`, `cycle`, `type`, and `frames`, which plays the `@frame`
+  drawings an `.art` file has always been able to hold (they were read but never shown).
+  Named in the file (`@effect glitch`, `@fps 12`), in game.json (`"title_effect"`) or in
+  an effect (`{"art": "door", "effect": "flicker"}`). Only on a real terminal, never with
+  `--fast`; Ctrl-C skips.
+- **A new CLIo logo**: a little terminal window that types its own name at the prompt. It
+  shows in the launcher and on the title screen of games without title art, keeps its window
+  without Unicode and fits a 24-column screen in one line.
+- **Fourteen more CLIo logos** in `engine/art/logos/`, most with an animation of their own, the old
+  logo among them as `classic`. A game picks one with `"logo"`; the launcher with
+  `--logo NAME` or `CLIO_LOGO`. `--looks` lists them.
+- **A game's own palettes and house style.** `"palettes"` in game.json names colours of the
+  game's own, used like the built-in palettes; `"banner_defaults"` sets what every banner
+  uses unless it says otherwise.
+- **Banners drawn live in the editor.** Every banner field of game.json is drawn as you type,
+  by the engine, as the game will draw it - on a desktop, a phone or a 24-column screen, with
+  a note when it has to fall back to plain letters - and its animation plays on request.
+- **`@ascii`** in `.art` files: a hand-made version for terminals without Unicode.
+- The editor offers the new game.json fields (palettes as forms) and the `banner` effect.
+
+### Fixed
+
+- In an `.art` palette, `a = #ff8800` read as a comment and gave no colour. A comment now
+  needs a space after the `#` (or anything that is not a hex colour).
+- Without Unicode, accented letters became the letter and a `?` (`ř` -> `r?`), which also
+  pushed lines one column wider per accent. They now just lose the accent.
+- Without Unicode, braille dots became `?`; they now become `. ' : #` by how many dots are
+  set. The quadrant blocks `▖▗▘▝▚▞` got ASCII stand-ins too.
+
 ## 2.1.0 - 2026-11-14
 
 ### Added

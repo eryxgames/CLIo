@@ -1,0 +1,75 @@
+# CLIo logo - Synthwave
+# Sunset gradient letters standing on a horizon, with a perspective
+# grid running towards the vanishing point. 34x9.
+@palette
+a=#ffd766
+b=#ffe470
+c=#ffaf5b
+d=#ffbe52
+e=#fc7490
+f=#f9689f
+g=#e455c9
+h=#db50d6
+i=#bb56eb
+j=#ab59f5
+k=#ff3fa4
+l=#5a2a8f
+m=#8f3ac0
+n=#d24fe0
+o=#ff9a5c
+p=#fff07a
+q=#ffc56b
+r=#ff5fa8
+s=#b45cff
+t=#da5ed4
+u=#c13bd0
+v=#9b5cff
+@effect cycle
+@art
+  ▄██████ ██      ██████
+ ██▀      ██        ██
+ ██       ██        ██    ▄████▄
+ ██▄      ██        ██   ██    ██
+  ▀██████ ██████  ██████  ▀████▀
+▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+   ╱  ╱   ╱  ╱   │   ╲  ╲   ╲  ╲
+╱────╱─────╱─────│─────╲─────╲────
+ ╱       ╱       │       ╲       ╲
+@mask
+  abbbbbb bb      bbbbbb
+ ccd      cc        cc
+ ee       ee        ee    feeeef
+ ggh      gg        gg   gg    gg
+  ijjjjjj jjjjjj  jjjjjj  ijjjji
+kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk
+   l  l   l  l   l   l  l   l  l
+mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+ n       n       n       n       n
+@small
+ ▄▀▀ █   ▀█▀  ▄▄
+ ▀▄▄ █▄▄ ▄█▄ ▀▄▄▀
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+@mask
+ opp q   pqp  rr
+ rss tss sts uvvu
+kkkkkkkkkkkkkkkkkk
+@ascii
+  _###### ##      ######
+ ##"      ##        ##
+ ##       ##        ##    _####_
+ ##_      ##        ##   ##    ##
+  "###### ######  ######  "####"
+__________________________________
+   /  /   /  /   |   \  \   \  \
+/----/-----/-----|-----\-----\----
+ /       /       |       \       \
+@mask
+  abbbbbb bb      bbbbbb
+ ccd      cc        cc
+ ee       ee        ee    feeeef
+ ggh      gg        gg   gg    gg
+  ijjjjjj jjjjjj  jjjjjj  ijjjji
+kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk
+   l  l   l  l   l   l  l   l  l
+mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm
+ n       n       n       n       n

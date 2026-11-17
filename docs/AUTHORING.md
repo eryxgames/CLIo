@@ -652,7 +652,7 @@ description it uses, and experience and gold grow with them. The `endless` block
   "names": ["The Lower Crypt", "The Drowned Deep", "The Ashen Halls"],
   "arrival": ["The stair keeps going. Nobody ever drew a map of this far down."],
   "floor": {"merchant": "merchant", "chest_loot": [["heart_root", 3], ["whetstone", 3]]},
-  "boss": {"name": "Echo of the Hollow King", "on_defeat": [{"add_item": "heart_root"}]}
+  "boss": {"name": "Remains of the Hollow King", "on_defeat": [{"add_item": "heart_root"}]}
 }
 ```
 

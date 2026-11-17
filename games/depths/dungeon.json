@@ -662,15 +662,15 @@
       ]
     },
     "boss": {
-      "name": "Echo of the Hollow King",
+      "name": "Remains of the Hollow King",
       "battle_intro": "The throne is occupied. It should not be. You have already killed what sits there.",
-      "defeat_text": "The Echo comes apart into sparks, and the sparks go out one by one.",
+      "defeat_text": "The Remains come apart into sparks, and the sparks go out one by one.",
       "on_defeat": [
         {
           "add_item": "heart_root"
         },
         {
-          "say": "Where the Echo stood, a {item}Heart Root{/} is pushing up through the flagstones.",
+          "say": "Where the Remains stood, a {item}Heart Root{/} is pushing up through the flagstones.",
           "style": "story"
         }
       ]

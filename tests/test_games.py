@@ -374,9 +374,9 @@ class ModeTests(unittest.TestCase):
         rats = [ch for ch in deep if ch.get("template") == "bone_rat"]
         self.assertTrue(rats and all(ch["name"] == "Elder Bone Rat" for ch in rats))
         self.assertGreater(rats[0]["stats"]["max_health"], 22 * 2)
-        echo = [ch for ch in w.characters.values() if ch.get("name") == "Echo of the Hollow King"]
-        self.assertEqual(len(echo), 1)                            # floor 6 uses the Court again
-        self.assertGreater(echo[0]["stats"]["max_health"], 250)
+        remains = [ch for ch in w.characters.values() if ch.get("name") == "Remains of the Hollow King"]
+        self.assertEqual(len(remains), 1)                            # floor 6 uses the Court again
+        self.assertGreater(remains[0]["stats"]["max_health"], 250)
 
     def test_every_floor_is_harder_than_the_one_above(self):
         g = Session("depths").game

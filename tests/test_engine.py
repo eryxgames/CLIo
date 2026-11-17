@@ -223,6 +223,32 @@ class AudioTests(unittest.TestCase):
         chord = synth.render_song(song("[c4 e4 g4]@4:4"))
         self.assertLess(max(abs(v) for v in chord), 0.6 * max(abs(v) for v in synth.render_song(song("[c4 e4 g4]:4"))))
 
+    def test_an_overdriven_instrument(self):
+        def song(track, **inst):
+            return {"tempo": 120, "steps_per_beat": 4, "loop": False, "sequence": ["p"], "patterns": {"p": {"a": track}},
+                    "instruments": {"a": dict({"wave": "sine", "volume": 0.5, "attack": 0.001, "decay": 0.01,
+                                               "sustain": 1.0, "release": 0.01}, **inst)}}
+
+        def loud(samples):
+            return (sum(v * v for v in samples) / len(samples)) ** 0.5
+
+        clean = synth.render_song(song("[e2 b2]:8 .:8"))
+        self.assertEqual(synth.render_song(song("[e2 b2]:8 .:8", drive=0)), clean)       # no drive: the old sound
+        hard = synth.render_song(song("[e2 b2]:8 .:8", drive=0.8))
+        self.assertAlmostEqual(max(abs(v) for v in hard), max(abs(v) for v in clean), places=6)   # the peak stays
+        self.assertGreater(loud(hard), 1.3 * loud(clean))                                 # and the rest comes up to it
+        some = synth.render_song(song("[e2 b2]:8 .:8", drive=0.2))
+        self.assertTrue(loud(clean) < loud(some) < loud(hard))
+        step = int(60.0 / 120 / 4 * synth.RATE)
+        self.assertEqual(max(abs(v) for v in hard[10 * step:15 * step]), 0.0)             # silence stays silent
+        self.assertEqual(synth.drive([], 1.0), [])
+        self.assertEqual(synth.drive([0.0, 0.0], 1.0), [0.0, 0.0])
+        self.assertEqual(synth.drive([0.2, -0.4], 9.0)[1], -0.4)                          # out of range: as hard as it goes
+        # with a low-pass after it: darker, still a valid song
+        dark = synth.render_song(song("[e2 b2]:8 .:8", drive=0.8, lowpass=0.6))
+        edges = lambda samples: sum(abs(b - a) for a, b in zip(samples, samples[1:]))
+        self.assertLess(edges(dark), edges(hard))
+
     def test_every_builtin_sfx_renders(self):
         for name, spec in SFX.items():
             samples = synth.render_sfx(spec)

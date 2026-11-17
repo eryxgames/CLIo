@@ -594,6 +594,16 @@ Notes: `c4`, `d#4`, `eb3`; `:4` lasts four steps; `.` rests; `-` holds; `[c4 e4 
 chord (arpeggiated if the instrument has `arp`); `|` is ignored. Waves: `square` (with
 `duty`), `triangle`, `saw`, `sine`, `soft`, `organ`, `noise`, `drums` (`k s h o t c`).
 
+Besides its wave and its envelope (`attack`, `decay`, `sustain`, `release`) an instrument
+can have `gate` (how much of a note's length it sounds, 0.9 by default), `lowpass` (0 to
+1, darker), `echo` (`[seconds, gain]`) and, since 2.3, `drive` (0 to 1): overdrive, as of
+a guitar amplifier. The whole track goes through it, so a root and its fifth on a `saw`
+wave - `[e2 b2]:8` - growl as a power chord does; a `lowpass` after it takes the fizz off:
+
+```json
+"guitar": {"wave": "saw", "drive": 0.7, "lowpass": 0.45, "sustain": 0.8, "volume": 0.3}
+```
+
 A note can also move (since 2.1). `c3>c5:16` slides from one pitch to the other over its
 length; `c4@5` plays at a level between `@0` (silent) and `@9` (full, the default);
 `c4@2>9:16` swells from level 2 to level 9; `c3>c5@2>9:16` does both and is a riser. Levels

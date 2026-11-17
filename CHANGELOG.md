@@ -2,6 +2,16 @@
 
 Notable changes to CLIo. Versions follow [semantic versioning](https://semver.org).
 
+## Unreleased
+
+### Added
+
+- **Overdrive in songs.** An instrument can have `"drive"` (0 to 1): its track is
+  flattened as by a guitar amplifier, so a root and its fifth on a `saw` wave sound as a
+  power chord, and a kit can be made to crack. With `lowpass` after it, the fizz goes.
+  Songs without it sound exactly as they did. `docs/AUTHORING.md` now also names the
+  other things an instrument can have: `gate`, `lowpass`, `echo`.
+
 ## 2.2.1 - 2026-11-17
 
 New names in the demo games, and saved games that cope with a renamed conversation.

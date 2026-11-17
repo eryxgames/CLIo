@@ -38,6 +38,12 @@ as before:
 
 A level also works on a chord (``[c4 e4 g4]@6:8``) and on a drum hit (``k@4``).
 
+An instrument can be overdriven (since 2.3): ``"drive": 0.6`` (0 is clean, 1 is hard)
+flattens the loud parts of its track as a guitar amplifier does.  The whole track goes
+through it, so the notes of a chord grind against each other: a root and its fifth on a
+``saw`` wave is a power chord.  ``"lowpass"`` after it is the loudspeaker that takes the
+fizz off.  A song without ``drive`` plays exactly as before.
+
 Rendering is done with list comprehensions over wavetables and a note cache,
 which keeps a 30-second song to well under a second on a laptop and a few
 seconds on a phone; results are cached on disk by the audio system.
@@ -302,6 +308,19 @@ def echo(buf, seconds=0.25, gain=0.3, taps=2):
     return out
 
 
+def drive(buf, amount=0.5):
+    """Overdrive: a soft clipper.  ``amount`` 0..1 (higher = harder); the peak of the track stays where it was,
+    what was quieter comes up towards it - louder to the ear, as an amplifier turned up is."""
+    amount = max(0.0, min(4.0, float(amount)))
+    peak = max(max(buf, default=0.0), -min(buf, default=0.0))
+    if amount <= 0.0 or peak <= 0.0:
+        return buf
+    gain = 1.0 + 12.0 * amount
+    tanh = math.tanh
+    into, out = gain / peak, peak / tanh(gain)
+    return [tanh(x * into) * out if x else 0.0 for x in buf]
+
+
 def lowpass(buf, strength=0.5):
     """One-pole low-pass; ``strength`` 0..1 (higher = darker)."""
     a = max(0.0, min(0.98, strength))
@@ -473,6 +492,8 @@ def render_song(song, max_seconds=180.0):
     master = [0.0] * (total_n + tail)
     for tname, buf in track_bufs.items():
         inst = instruments.get(tname, {})
+        if inst.get("drive"):
+            buf = drive(buf, float(inst["drive"]))
         if inst.get("lowpass"):
             buf = lowpass(buf, float(inst["lowpass"]))
         if inst.get("echo"):

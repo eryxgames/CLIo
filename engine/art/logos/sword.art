@@ -1,0 +1,80 @@
+# CLIo logo - Sword
+# An RPG crest: the I is a sword with a gold crossguard on the
+# baseline and a ruby pommel, C and L are steel, the o is a coin. 32x8.
+@palette
+a=#ffffff
+b=#cad6e6
+c=#d4deec
+d=#e9f1fb
+e=#aabcd5
+f=#b4c5db
+g=#879dbc
+h=#c9d6e8
+i=#ffb426
+j=#ffbc2c
+k=#6a80a2
+l=#647a9c
+m=#f89c18
+n=#586e8f
+o=#526889
+p=#ffcc33
+q=#e6820f
+r=#e0790c
+s=#a0642c
+t=#ff3355
+u=#9fb4cf
+v=#dfe7f2
+w=#bfcee0
+x=#ffd23f
+y=#6f86a8
+z=#4d6283
+A=#5e7496
+B=#ffa51a
+C=#d9700a
+@effect shine
+@art
+                   ▲
+ ▄██████ ██        █
+██▀      ██        █
+██       ██        █     ▄████▄
+██▄      ██        █    ██    ██
+ ▀██████ ██████  ◄═╪═►   ▀████▀
+                   ┃
+                   ◆
+@mask
+                   a
+ bcccccc cc        d
+eef      ee        d
+gg       gg        h     ijjjji
+kkl      kk        h    mm    mm
+ noooooo oooooo  ppppp   qrrrrq
+                   s
+                   t
+@small
+         ▲
+▄▀▀ █    █   ▄▄
+▀▄▄ █▄▄ ═╪═ ▀▄▄▀
+         ◆
+@mask
+         a
+uvv w    d   xx
+yzz Azz ppp BCCB
+         t
+@ascii
+                   ^
+ _###### ##        #
+##"      ##        #
+##       ##        #     _####_
+##_      ##        #    ##    ##
+ "###### ######  <=+=>   "####"
+                   |
+                   *
+@mask
+                   a
+ bcccccc cc        d
+eef      ee        d
+gg       gg        h     ijjjji
+kkl      kk        h    mm    mm
+ noooooo oooooo  ppppp   qrrrrq
+                   s
+                   t

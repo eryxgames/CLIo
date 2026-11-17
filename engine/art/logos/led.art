@@ -1,0 +1,269 @@
+# CLIo logo - LED board
+# The classic 5x7 dot-matrix letters on a framed LED board, unlit
+# dots included. Pure symbols: in --ascii the lit dots become O and
+# the dark ones dots, so the board survives. 49x9; the small one
+# drops the board and the spacing (18x7).
+# Animated: the text scrolls in like a marquee (@frame drawings).
+@palette
+a=#4a4a52
+b=#3a2a14
+c=#ff9d1a
+d=#ffd23f
+@effect frames reveal=1
+@fps 16
+@art
+╭───────────────────────────────────────────────╮
+│ · · ● ● ● · · ● · · · · · ● ● ● · · · · · · · │
+│ · ● · · · ● · ● · · · · · · ● · · · · · · · · │
+│ · ● · · · · · ● · · · · · · ● · · · ● ● ● · · │
+│ · ● · · · · · ● · · · · · · ● · · ● · · · ● · │
+│ · ● · · · · · ● · · · · · · ● · · ● · · · ● · │
+│ · ● · · · ● · ● · · · · · · ● · · ● · · · ● · │
+│ · · ● ● ● · · ● ● ● ● ● · ● ● ● · · ● ● ● · · │
+╰───────────────────────────────────────────────╯
+@mask
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a b b c c c b b c b b b b b c c c b b b b b b b a
+a b c b b b c b c b b b b b b c b b b b b b b b a
+a b c b b b b b c b b b b b b c b b b d d d b b a
+a b c b b b b b c b b b b b b c b b d b b b d b a
+a b c b b b b b c b b b b b b c b b d b b b d b a
+a b c b b b c b c b b b b b b c b b d b b b d b a
+a b b c c c b b c c c c c b c c c b b d d d b b a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+@small
+ ●●● ●    ●●●
+●    ●     ●
+●    ●     ●   ●●
+●    ●     ●  ●  ●
+●    ●     ●  ●  ●
+●    ●     ●  ●  ●
+ ●●● ●●●● ●●●  ●●
+@mask
+ ccc c    ccc
+c    c     c
+c    c     c   dd
+c    c     c  d  d
+c    c     c  d  d
+c    c     c  d  d
+ ccc cccc ccc  dd
+@frame
+╭───────────────────────────────────────────────╮
+│ · · · · · · · · · · · · · · · · · · · · · · · │
+│ · · · · · · · · · · · · · · · · · · · · · · · │
+│ · · · · · · · · · · · · · · · · · · · · · · · │
+│ · · · · · · · · · · · · · · · · · · · · · · · │
+│ · · · · · · · · · · · · · · · · · · · · · · · │
+│ · · · · · · · · · · · · · · · · · · · · · · · │
+│ · · · · · · · · · · · · · · · · · · · · · · · │
+╰───────────────────────────────────────────────╯
+@mask
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a b b b b b b b b b b b b b b b b b b b b b b b a
+a b b b b b b b b b b b b b b b b b b b b b b b a
+a b b b b b b b b b b b b b b b b b b b b b b b a
+a b b b b b b b b b b b b b b b b b b b b b b b a
+a b b b b b b b b b b b b b b b b b b b b b b b a
+a b b b b b b b b b b b b b b b b b b b b b b b a
+a b b b b b b b b b b b b b b b b b b b b b b b a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+@frame
+╭───────────────────────────────────────────────╮
+│ · · · · · · · · · · · · · · · · · · · · · · ● │
+│ · · · · · · · · · · · · · · · · · · · · · ● · │
+│ · · · · · · · · · · · · · · · · · · · · · ● · │
+│ · · · · · · · · · · · · · · · · · · · · · ● · │
+│ · · · · · · · · · · · · · · · · · · · · · ● · │
+│ · · · · · · · · · · · · · · · · · · · · · ● · │
+│ · · · · · · · · · · · · · · · · · · · · · · ● │
+╰───────────────────────────────────────────────╯
+@mask
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a b b b b b b b b b b b b b b b b b b b b b b c a
+a b b b b b b b b b b b b b b b b b b b b b c b a
+a b b b b b b b b b b b b b b b b b b b b b c b a
+a b b b b b b b b b b b b b b b b b b b b b c b a
+a b b b b b b b b b b b b b b b b b b b b b c b a
+a b b b b b b b b b b b b b b b b b b b b b c b a
+a b b b b b b b b b b b b b b b b b b b b b b c a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+@frame
+╭───────────────────────────────────────────────╮
+│ · · · · · · · · · · · · · · · · · · · · ● ● ● │
+│ · · · · · · · · · · · · · · · · · · · ● · · · │
+│ · · · · · · · · · · · · · · · · · · · ● · · · │
+│ · · · · · · · · · · · · · · · · · · · ● · · · │
+│ · · · · · · · · · · · · · · · · · · · ● · · · │
+│ · · · · · · · · · · · · · · · · · · · ● · · · │
+│ · · · · · · · · · · · · · · · · · · · · ● ● ● │
+╰───────────────────────────────────────────────╯
+@mask
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a b b b b b b b b b b b b b b b b b b b b c c c a
+a b b b b b b b b b b b b b b b b b b b c b b b a
+a b b b b b b b b b b b b b b b b b b b c b b b a
+a b b b b b b b b b b b b b b b b b b b c b b b a
+a b b b b b b b b b b b b b b b b b b b c b b b a
+a b b b b b b b b b b b b b b b b b b b c b b b a
+a b b b b b b b b b b b b b b b b b b b b c c c a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+@frame
+╭───────────────────────────────────────────────╮
+│ · · · · · · · · · · · · · · · · · · ● ● ● · · │
+│ · · · · · · · · · · · · · · · · · ● · · · ● · │
+│ · · · · · · · · · · · · · · · · · ● · · · · · │
+│ · · · · · · · · · · · · · · · · · ● · · · · · │
+│ · · · · · · · · · · · · · · · · · ● · · · · · │
+│ · · · · · · · · · · · · · · · · · ● · · · ● · │
+│ · · · · · · · · · · · · · · · · · · ● ● ● · · │
+╰───────────────────────────────────────────────╯
+@mask
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a b b b b b b b b b b b b b b b b b b c c c b b a
+a b b b b b b b b b b b b b b b b b c b b b c b a
+a b b b b b b b b b b b b b b b b b c b b b b b a
+a b b b b b b b b b b b b b b b b b c b b b b b a
+a b b b b b b b b b b b b b b b b b c b b b b b a
+a b b b b b b b b b b b b b b b b b c b b b c b a
+a b b b b b b b b b b b b b b b b b b c c c b b a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+@frame
+╭───────────────────────────────────────────────╮
+│ · · · · · · · · · · · · · · · · ● ● ● · · ● · │
+│ · · · · · · · · · · · · · · · ● · · · ● · ● · │
+│ · · · · · · · · · · · · · · · ● · · · · · ● · │
+│ · · · · · · · · · · · · · · · ● · · · · · ● · │
+│ · · · · · · · · · · · · · · · ● · · · · · ● · │
+│ · · · · · · · · · · · · · · · ● · · · ● · ● · │
+│ · · · · · · · · · · · · · · · · ● ● ● · · ● ● │
+╰───────────────────────────────────────────────╯
+@mask
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a b b b b b b b b b b b b b b b b c c c b b c b a
+a b b b b b b b b b b b b b b b c b b b c b c b a
+a b b b b b b b b b b b b b b b c b b b b b c b a
+a b b b b b b b b b b b b b b b c b b b b b c b a
+a b b b b b b b b b b b b b b b c b b b b b c b a
+a b b b b b b b b b b b b b b b c b b b c b c b a
+a b b b b b b b b b b b b b b b b c c c b b c c a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+@frame
+╭───────────────────────────────────────────────╮
+│ · · · · · · · · · · · · · · ● ● ● · · ● · · · │
+│ · · · · · · · · · · · · · ● · · · ● · ● · · · │
+│ · · · · · · · · · · · · · ● · · · · · ● · · · │
+│ · · · · · · · · · · · · · ● · · · · · ● · · · │
+│ · · · · · · · · · · · · · ● · · · · · ● · · · │
+│ · · · · · · · · · · · · · ● · · · ● · ● · · · │
+│ · · · · · · · · · · · · · · ● ● ● · · ● ● ● ● │
+╰───────────────────────────────────────────────╯
+@mask
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a b b b b b b b b b b b b b b c c c b b c b b b a
+a b b b b b b b b b b b b b c b b b c b c b b b a
+a b b b b b b b b b b b b b c b b b b b c b b b a
+a b b b b b b b b b b b b b c b b b b b c b b b a
+a b b b b b b b b b b b b b c b b b b b c b b b a
+a b b b b b b b b b b b b b c b b b c b c b b b a
+a b b b b b b b b b b b b b b c c c b b c c c c a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+@frame
+╭───────────────────────────────────────────────╮
+│ · · · · · · · · · · · · ● ● ● · · ● · · · · · │
+│ · · · · · · · · · · · ● · · · ● · ● · · · · · │
+│ · · · · · · · · · · · ● · · · · · ● · · · · · │
+│ · · · · · · · · · · · ● · · · · · ● · · · · · │
+│ · · · · · · · · · · · ● · · · · · ● · · · · · │
+│ · · · · · · · · · · · ● · · · ● · ● · · · · · │
+│ · · · · · · · · · · · · ● ● ● · · ● ● ● ● ● · │
+╰───────────────────────────────────────────────╯
+@mask
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a b b b b b b b b b b b b c c c b b c b b b b b a
+a b b b b b b b b b b b c b b b c b c b b b b b a
+a b b b b b b b b b b b c b b b b b c b b b b b a
+a b b b b b b b b b b b c b b b b b c b b b b b a
+a b b b b b b b b b b b c b b b b b c b b b b b a
+a b b b b b b b b b b b c b b b c b c b b b b b a
+a b b b b b b b b b b b b c c c b b c c c c c b a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+@frame
+╭───────────────────────────────────────────────╮
+│ · · · · · · · · · · ● ● ● · · ● · · · · · ● ● │
+│ · · · · · · · · · ● · · · ● · ● · · · · · · ● │
+│ · · · · · · · · · ● · · · · · ● · · · · · · ● │
+│ · · · · · · · · · ● · · · · · ● · · · · · · ● │
+│ · · · · · · · · · ● · · · · · ● · · · · · · ● │
+│ · · · · · · · · · ● · · · ● · ● · · · · · · ● │
+│ · · · · · · · · · · ● ● ● · · ● ● ● ● ● · ● ● │
+╰───────────────────────────────────────────────╯
+@mask
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a b b b b b b b b b b c c c b b c b b b b b c c a
+a b b b b b b b b b c b b b c b c b b b b b b c a
+a b b b b b b b b b c b b b b b c b b b b b b c a
+a b b b b b b b b b c b b b b b c b b b b b b c a
+a b b b b b b b b b c b b b b b c b b b b b b c a
+a b b b b b b b b b c b b b c b c b b b b b b c a
+a b b b b b b b b b b c c c b b c c c c c b c c a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+@frame
+╭───────────────────────────────────────────────╮
+│ · · · · · · · · ● ● ● · · ● · · · · · ● ● ● · │
+│ · · · · · · · ● · · · ● · ● · · · · · · ● · · │
+│ · · · · · · · ● · · · · · ● · · · · · · ● · · │
+│ · · · · · · · ● · · · · · ● · · · · · · ● · · │
+│ · · · · · · · ● · · · · · ● · · · · · · ● · · │
+│ · · · · · · · ● · · · ● · ● · · · · · · ● · · │
+│ · · · · · · · · ● ● ● · · ● ● ● ● ● · ● ● ● · │
+╰───────────────────────────────────────────────╯
+@mask
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a b b b b b b b b c c c b b c b b b b b c c c b a
+a b b b b b b b c b b b c b c b b b b b b c b b a
+a b b b b b b b c b b b b b c b b b b b b c b b a
+a b b b b b b b c b b b b b c b b b b b b c b b a
+a b b b b b b b c b b b b b c b b b b b b c b b a
+a b b b b b b b c b b b c b c b b b b b b c b b a
+a b b b b b b b b c c c b b c c c c c b c c c b a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+@frame
+╭───────────────────────────────────────────────╮
+│ · · · · · · ● ● ● · · ● · · · · · ● ● ● · · · │
+│ · · · · · ● · · · ● · ● · · · · · · ● · · · · │
+│ · · · · · ● · · · · · ● · · · · · · ● · · · ● │
+│ · · · · · ● · · · · · ● · · · · · · ● · · ● · │
+│ · · · · · ● · · · · · ● · · · · · · ● · · ● · │
+│ · · · · · ● · · · ● · ● · · · · · · ● · · ● · │
+│ · · · · · · ● ● ● · · ● ● ● ● ● · ● ● ● · · ● │
+╰───────────────────────────────────────────────╯
+@mask
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a b b b b b b c c c b b c b b b b b c c c b b b a
+a b b b b b c b b b c b c b b b b b b c b b b b a
+a b b b b b c b b b b b c b b b b b b c b b b d a
+a b b b b b c b b b b b c b b b b b b c b b d b a
+a b b b b b c b b b b b c b b b b b b c b b d b a
+a b b b b b c b b b c b c b b b b b b c b b d b a
+a b b b b b b c c c b b c c c c c b c c c b b d a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+@frame
+╭───────────────────────────────────────────────╮
+│ · · · · ● ● ● · · ● · · · · · ● ● ● · · · · · │
+│ · · · ● · · · ● · ● · · · · · · ● · · · · · · │
+│ · · · ● · · · · · ● · · · · · · ● · · · ● ● ● │
+│ · · · ● · · · · · ● · · · · · · ● · · ● · · · │
+│ · · · ● · · · · · ● · · · · · · ● · · ● · · · │
+│ · · · ● · · · ● · ● · · · · · · ● · · ● · · · │
+│ · · · · ● ● ● · · ● ● ● ● ● · ● ● ● · · ● ● ● │
+╰───────────────────────────────────────────────╯
+@mask
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+a b b b b c c c b b c b b b b b c c c b b b b b a
+a b b b c b b b c b c b b b b b b c b b b b b b a
+a b b b c b b b b b c b b b b b b c b b b d d d a
+a b b b c b b b b b c b b b b b b c b b d b b b a
+a b b b c b b b b b c b b b b b b c b b d b b b a
+a b b b c b b b c b c b b b b b b c b b d b b b a
+a b b b b c c c b b c c c c c b c c c b b d d d a
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

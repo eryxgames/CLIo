@@ -1,0 +1,54 @@
+# CLIo logo - Braille
+# Smooth geometric letters drawn in braille dots: 2x4 dots per
+# character cell, the finest resolution a plain terminal font has.
+# In --ascii the dots become . ' : # by how many are set. 33x5.
+@palette
+a=#8ee6ff
+b=#aaefff
+c=#b8f4ff
+d=#5ad2ff
+e=#80e2ff
+f=#ffcd3b
+g=#52cbff
+h=#ffb124
+i=#ffbf2f
+j=#ffc635
+k=#ffb82a
+l=#34adff
+m=#2f9bff
+n=#2f92ff
+o=#ffaa1e
+p=#f19114
+q=#2f88ff
+r=#eb8912
+s=#87e4ff
+t=#a0ecff
+u=#5bd3ff
+v=#ffb527
+w=#ffce3c
+x=#2f9dff
+y=#2f8cff
+z=#2f7cff
+A=#f89b17
+B=#e37e0e
+@effect pulse
+@art
+ ⣠⣶⣿⣿⣿⣶⣄   ⢸⣿⡇     ⢸⣿⣿⣿⣿⡇
+⣰⣿⠟⠁ ⠈⠙⠉   ⢸⣿⡇       ⣿⣿     ⢀⣀⣀⡀
+⣿⣿         ⢸⣿⡇       ⣿⣿   ⢀⣾⣿⠿⢿⣿⣦
+⠹⣿⣦⡀ ⢀⣠⣀   ⢸⣿⡇       ⣿⣿   ⢸⣿⣇ ⢀⣿⣿
+ ⠙⠿⣿⣿⣿⠿⠋   ⢸⣿⣿⣿⣿⣿⡇ ⢸⣿⣿⣿⣿⡇  ⠻⢿⣿⣿⠿⠃
+@mask
+ abcccba   ccc     cccccc
+deee eee   eee       ee     ffff
+gg         ggg       gg   hijjjjk
+llmn nnn   lll       ll   oop poo
+ qqqqqqq   qqqqqqq qqqqqq  rrrrrr
+@small
+⢠⡾⠛⠻⠦  ⣿   ⠘⣿⠛
+⣿      ⣿    ⣿  ⣴⠟⠻⣦
+⠘⢷⣤⣴⠖  ⣿⣤⣤⡄⢠⣿⣤ ⠻⣦⣴⠟
+@mask
+stccs  c   ccc
+u      u    u  vwwv
+xyzzy  xzzzzxz ABBA

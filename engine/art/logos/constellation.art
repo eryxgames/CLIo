@@ -1,0 +1,33 @@
+# CLIo logo - Constellation
+# The letters as constellations: stars joined by thin lines, a star
+# chart to sit in the title screen's twinkling star field. 36x7.
+@palette
+a=#ffffff b
+b=#4a6aa0
+c=#8fd0ff
+d=#ffb347
+e=#9a6a20
+f=#ffd23f b
+g=#ffffff
+h=#5fd7ff b
+@effect twinkle
+@art
+  ★─────•  ★        ★─┬─★
+ ╱         │          │
+•          │          │      •───★
+│          │          │     ╱     ╲
+•          │          │    ★       •
+ ╲         │          │     ╲     ╱
+  ★─────★  •─────★  ★─┴─•    ★───•
+@mask
+  abbbbbc  a        abbba
+ b         b          b
+c          b          b      deeef
+b          b          b     e     e
+c          b          b    f       d
+ b         b          b     e     e
+  abbbbba  cbbbbba  abbbc    feeed
+@small
+·★· CLIo ·★·
+@mask
+bgb hhhf bgb

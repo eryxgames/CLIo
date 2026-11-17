@@ -103,6 +103,7 @@
     }
   },
   "ui": {
+    "banner": {"style": "led", "palette": "amber"},
     "prompt": "$ ",
     "title_gradient": [
       130,

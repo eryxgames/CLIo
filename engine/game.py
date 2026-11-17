@@ -16,7 +16,7 @@ from .data import GameData
 from .dialogue import run_dialogue
 from .parser import Parser
 from .quests import QuestLog
-from .term import QuitGame, Term, pad_to, visible_len
+from .term import QuitGame, Term, visible_len
 from .theme import available_themes, load_theme
 from .ui import UI
 from .world import (World, list_saves, read_save, saves_dir, slot_path, write_save)
@@ -204,13 +204,70 @@ class Game(Actions):
             return []
         return art.render(self.term, max_width if max_width is not None else self.ui.width - 4, max_height)
 
-    def show_art(self, name):
+    def show_art(self, name, effect=None):
+        """Show a picture between the lines of text, playing its animation (its own
+        ``@effect``, or ``effect``) on a real terminal."""
         lines = self.art_lines(name)
         if lines:
-            self.ui.gap()
-            for l in lines:
-                self.ui.line(pad_to(l, self.ui.width, "center").rstrip())
-            self.ui.gap()
+            art = self.art.get(name)
+            frames, reveals = art.animation(self.term, self.ui.width - 4, None, effect, seed=self.data.id)
+            self.play_picture(lines, frames, reveals)
+
+    def play_picture(self, lines, frames=None, reveals=False):
+        self.ui.gap()
+        self.ui.play_art(lines, frames if self.ui.animated else None, reveals)
+        self.ui.gap()
+
+    def make_banner(self, spec, text=None, max_width=None, max_height=None):
+        """A banner (``engine.banner``) in the theme's style, sized for this screen; None if art is off."""
+        if not self.settings.get("art", True) or not self.ui.theme.ui.get("art", True):
+            return None
+        from . import banner
+        if isinstance(spec, str):
+            spec = {"text": spec}
+        spec = dict(spec or {})
+        if "text" in spec:
+            spec["text"] = self.subst(str(spec["text"]))
+        return banner.make(spec, max_width or self.ui.width - 4, max_height or max(4, self.term.rows - 8),
+                           text=text, theme=self.ui.theme, palettes=self.cfg.get("palettes"),
+                           defaults=self.cfg.get("banner_defaults"))
+
+    def show_banner(self, spec, effect=None, text=None):
+        art = self.make_banner(spec, text=text)
+        if art is None:
+            text = spec.get("text") if isinstance(spec, dict) else spec
+            if text:
+                self.say(self.subst(str(text)), "list_title")
+            return
+        lines = art.render(self.term)
+        frames, reveals = art.animation(self.term, None, None, effect, seed=self.data.id)
+        self.play_picture(lines, frames, reveals)
+
+    def title_picture(self):
+        """The title screen's art: the game's own ``title`` art, else its ``title_banner``,
+        else the CLIo logo it chose (``"logo"``).  Returns ``(lines, animation, reveals, kind)``."""
+        from .art import load_logo
+        cfg = self.cfg
+        if not self.settings.get("art", True) or not self.ui.theme.ui.get("art", True):
+            return [], [], False, None
+        maxw = self.ui.width - 4
+        art, kind = self.art.get("title"), "title"
+        if art and not art.render(self.term, maxw):
+            art = None
+        if art is None and cfg.get("title_banner"):
+            art, kind = self.make_banner(cfg["title_banner"], text=self.data.title, max_width=maxw), "banner"
+        if art is None:
+            # a game may still put its own clio_logo.art in art/; "logo" picks one of the engine's
+            art, kind = (load_logo(cfg["logo"]) if cfg.get("logo") else None) or self.art.get("clio_logo"), "logo"
+        if art is None:
+            return [], [], False, None
+        lines = art.render(self.term, maxw)
+        if not lines:
+            return [], [], False, None
+        frames, reveals = [], False
+        if self.ui.animated:
+            frames, reveals = art.animation(self.term, maxw, None, cfg.get("title_effect"), seed=self.data.id)
+        return lines, frames, reveals, kind
 
     def dialogue_box(self, speaker, text, portrait=None):
         """A line of speech, with a portrait beside it when there is room."""
@@ -824,13 +881,15 @@ class Game(Actions):
         ui.clear()
         self.audio.music(cfg.get("title_music") or cfg.get("music")
                          or {"generate": {"mood": cfg.get("mood", "mystery"), "seed": self.data.id}})
-        if not self.data.legacy or self.art.get("title"):
-            art = self.art_lines("title") or self.art_lines("clio_logo")
-            ui.title_screen(art, self.data.title if not art or cfg.get("show_title", True) else "",
+        art, frames, reveals, kind = self.title_picture()
+        if not self.data.legacy or self.art.get("title") or cfg.get("title_banner"):
+            # a banner already shows the title; the logo and the game's own art may not
+            show = cfg.get("show_title", kind != "banner")
+            ui.title_screen(art, self.data.title if not art or show else "",
                             cfg.get("subtitle", ""),
-                            ("by %s" % cfg["author"]) if cfg.get("author") else "")
+                            ("by %s" % cfg["author"]) if cfg.get("author") else "", frames, reveals)
         else:
-            ui.title_screen(self.art_lines("clio_logo"), self.data.title, "CLIo %s" % __version__)
+            ui.title_screen(art, self.data.title, "CLIo %s" % __version__, "", frames, reveals)
         if self.term.interactive and self.offer_continue():
             return
         if self.term.interactive:
@@ -966,6 +1025,8 @@ class Game(Actions):
         art = self.art_lines("win" if kind == "win" else "lose")
         if art:
             self.show_art("win" if kind == "win" else "lose")
+        elif self.cfg.get("%s_banner" % kind):
+            self.show_banner(self.cfg["%s_banner" % kind], text="The End" if kind == "win" else "Game Over")
         self.say(body, "story", title="THE END" if kind == "win" else "GAME OVER")
         mins = max(1, int((time.time() - w.started) / 60))
         facts = ["%d turns" % w.turn, "%d of %d places seen" % (len(w.visited), len(w.scenes))]

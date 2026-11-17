@@ -314,6 +314,25 @@ _ASCII_FALLBACK = str.maketrans({
 })
 
 
+def _braille_ascii(code):
+    """A braille cell (2x4 dots) as one ASCII character of about the same weight."""
+    bits = code - 0x2800
+    n = bin(bits).count("1")
+    if n == 0:
+        return " "
+    if n >= 5:
+        return "#"
+    top = bin(bits & 0x1B).count("1")          # dots in the upper two rows
+    if top and top < n:
+        return "#" if n >= 4 else ":"
+    return "'" if top else "."
+
+
+# braille dots and quadrant blocks (finer-grained art) degrade too
+_ASCII_FALLBACK.update({c: _braille_ascii(c) for c in range(0x2800, 0x2900)})
+_ASCII_FALLBACK.update(str.maketrans({"▖": ".", "▗": ".", "▘": "'", "▝": "'", "▚": "\\", "▞": "/"}))
+
+
 def to_ascii(s):
     """Best-effort transliteration of the engine's Unicode glyphs to ASCII."""
     if s.isascii():
@@ -321,7 +340,9 @@ def to_ascii(s):
     s = s.translate(_ASCII_FALLBACK)
     if s.isascii():
         return s
-    return unicodedata.normalize("NFKD", s).encode("ascii", "replace").decode("ascii")
+    # accented letters lose the accent (ř -> r), not become a letter and a '?'
+    s = "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c))
+    return s.encode("ascii", "replace").decode("ascii")
 
 
 # --------------------------------------------------------------------------- #

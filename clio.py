@@ -7,6 +7,8 @@
     python clio.py derelict        play a game by folder name (or a path)
     python clio.py --list          list the games
     python clio.py depths --seed 7 a reproducible dungeon
+    python clio.py --looks         the logos, banner styles, palettes and animations
+    python clio.py --banner "The Hollow" --banner-style reflect --export art/title.art
 
 Needs only Python 3.8+.  Runs on Linux, macOS, Windows and Termux.
 """
@@ -94,7 +96,20 @@ def resolve_game(name):
     return None
 
 
-def choose_game(term):
+def launcher_logo(term, ui, name=None, effect=None):
+    """The logo the launcher shows (--logo, or CLIO_LOGO) and its animation."""
+    from engine.art import load_logo
+    logo = load_logo(name or os.environ.get("CLIO_LOGO")) or load_logo(None)
+    if not logo:
+        return [], [], False
+    lines = logo.render(term, ui.width - 4)
+    frames, reveals = ([], False)
+    if ui.animated:
+        frames, reveals = logo.animation(term, ui.width - 4, None, effect, seed="clio")
+    return lines, frames, reveals
+
+
+def choose_game(term, logo=None, effect=None):
     games = find_games(ROOT)
     if not games:
         term.line("No games found. Put a game folder under 'games/'.")
@@ -102,12 +117,10 @@ def choose_game(term):
     if len(games) == 1:
         return games[0][0]
     ui = UI(term, load_theme("default"))
-    from engine.art import ArtLibrary
-    logo = ArtLibrary(os.path.join(ROOT, "engine", "art")).get("clio_logo")
+    lines, frames, reveals = launcher_logo(term, ui, logo, effect)
     ui.clear()
-    ui.title_screen(logo.render(term, ui.width - 4) if logo else [], "",
-                    "the stylish command-line game engine",
-                    "version %s %s %s" % (__version__, ui.g("dot"), __url__.split("//")[-1]))
+    ui.title_screen(lines, "", "the stylish command-line game engine",
+                    "version %s %s %s" % (__version__, ui.g("dot"), __url__.split("//")[-1]), frames, reveals)
     labels = []
     for _path, title, desc in games:
         labels.append("{key}%s{/}%s" % (title, (" {hint}%s %s{/}" % (ui.g("dot"), desc)) if desc else ""))
@@ -115,9 +128,63 @@ def choose_game(term):
     return games[pick][0] if pick is not None else None
 
 
-def display_test(term):
+def looks():
+    """--looks: what a game can choose for its title screen."""
+    from engine import banner, fx
+    from engine.art import logo_names
+    print("Logos (\"logo\" in game.json, --logo, CLIO_LOGO):")
+    print("  " + ", ".join(logo_names()))
+    print("Banner styles (\"title_banner\": {\"style\": ...}, --banner-style):")
+    for name, what in banner.STYLES.items():
+        print("  %-10s %s" % (name, what))
+    print("Palettes (\"palette\", --palette):")
+    print("  " + ", ".join(banner.PALETTES))
+    print("Animations (\"title_effect\", \"effect\", --effect, @effect in an .art file):")
+    for name, what in fx.EFFECTS.items():
+        print("  %-10s %s" % (name, what))
+    return 0
+
+
+def draw_banner(term, text, style=None, palette=None, effect=None, export=None):
+    """--banner: draw a banner (and play its animation), or write it as an .art file."""
+    from engine import banner
+    ui = UI(term, load_theme("default"))
+    spec = {"text": text}
+    for key, value in (("style", style), ("palette", palette), ("effect", effect)):
+        if value:
+            spec[key] = value
+    if style and style not in banner.STYLES:
+        print("No banner style called '%s'. There are: %s" % (style, ", ".join(banner.STYLES)))
+        return 2
+    if palette and "#" in palette:
+        spec.pop("palette")
+        spec["colors"] = [c.strip() for c in palette.split(",")]
+    elif palette and palette not in banner.PALETTES:
+        print("No palette called '%s'. There are: %s (or give colours: \"#fff07a,#ff6f91\")"
+              % (palette, ", ".join(banner.PALETTES)))
+        return 2
+    if export:
+        art = banner.export(spec)
+        if art is None:
+            print("Nothing to draw.")
+            return 2
+        with open(export, "w", encoding="utf-8") as f:
+            f.write(art.to_text("banner: %s" % text))
+        print("Wrote %s (%s). Put it in a game's art/ folder; title.art becomes the title screen."
+              % (export, ", ".join("%s %dx%d" % ((k,) + art.size(k)) for k in art.variants)))
+        return 0
+    art = banner.make(spec, ui.width - 4)
+    if art is None:
+        print(text)
+        return 0
+    lines = art.render(term)
+    frames, reveals = art.animation(term, ui.width - 4, None, None, seed=text) if ui.animated else ([], False)
+    ui.play_art(lines, frames, reveals)
+    return 0
+
+
+def display_test(term, logo_name=None):
     """Draw a page that shows at a glance whether this terminal renders CLIo correctly."""
-    from engine.art import ArtLibrary
     from engine.sprite import generate
     from engine.term import is_termux, pad_to
     ui = UI(term, load_theme("default"))
@@ -159,7 +226,8 @@ def display_test(term):
     ui.say("{key}5. Pixel sprite and art{/} - a small creature with two eyes, and the CLIo logo:", "default")
     for l in generate("display test", 12).render(term):
         ui.line("   " + l)
-    logo = ArtLibrary(os.path.join(ROOT, "engine", "art")).get("clio_logo")
+    from engine.art import load_logo
+    logo = load_logo(logo_name or os.environ.get("CLIO_LOGO")) or load_logo(None)
     for l in (logo.render(term, w - 4) if logo else []):
         ui.line("   " + l)
     ui.gap()
@@ -194,6 +262,14 @@ def main(argv=None):
     ap.add_argument("--width", type=int, help="force the layout width in columns")
     ap.add_argument("--seed", type=int, help="random seed (same seed, same dungeon)")
     ap.add_argument("--mode", help="game mode, for games that have several (e.g. story, rogue)")
+    ap.add_argument("--logo", help="the CLIo logo the launcher shows (see --looks; also CLIO_LOGO)")
+    ap.add_argument("--effect", help="animation for --logo or --banner (see --looks; 'none' for none)")
+    ap.add_argument("--looks", action="store_true",
+                    help="list the logos, banner styles, palettes and animations a game can use")
+    ap.add_argument("--banner", metavar="TEXT", help="draw TEXT in a graphic style and exit")
+    ap.add_argument("--banner-style", metavar="NAME", help="with --banner: the style (see --looks)")
+    ap.add_argument("--palette", metavar="NAME", help="with --banner: the colours (see --looks), or '#fff07a,#ff6f91'")
+    ap.add_argument("--export", metavar="FILE", help="with --banner: write it as an .art file to edit by hand")
     ap.add_argument("--version", action="version",
                     version="CLIo %s - %s, %s" % (__version__, __author__, __url__))
     args = ap.parse_args(argv)
@@ -208,10 +284,19 @@ def main(argv=None):
                 unicode=False if args.ascii else None,
                 animate=False if args.fast else None,
                 glyphs=args.glyphs)
+    if args.looks:
+        return looks()
+    if args.banner:
+        return draw_banner(term, args.banner, args.banner_style, args.palette, args.effect, args.export)
+    if args.logo:
+        from engine.art import load_logo, logo_names
+        if load_logo(args.logo) is None:
+            print("No logo called '%s'. There are: %s" % (args.logo, ", ".join(logo_names())))
+            return 2
     if args.test_display:
-        return display_test(term)
+        return display_test(term, args.logo)
     try:
-        game_dir = resolve_game(args.game) if args.game else choose_game(term)
+        game_dir = resolve_game(args.game) if args.game else choose_game(term, args.logo, args.effect)
     except QuitGame:
         return 0
     if not game_dir:

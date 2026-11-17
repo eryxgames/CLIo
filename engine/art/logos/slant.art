@@ -1,0 +1,37 @@
+# CLIo logo - Slant
+# Italic outline letters in plain 7-bit ASCII: looks the same with
+# --ascii, on old consoles and in a README. 34x5.
+@palette
+a=#b8f4ff
+b=#75deff
+c=#ffda59
+d=#47c0ff
+e=#ffbc2c
+f=#2f99ff
+g=#f69816
+h=#2f6bff
+i=#d9700a
+j=#5fd7ff
+k=#2fa8ff
+l=#ffd23f
+@effect type
+@art
+     ______  __       _____
+    / ____/ / /      /_  _/  ____
+   / /     / /        / /   / __ \
+  / /___  / /___    _/ /_  / /_/ /
+  \____/ /_____/   /_____/  \____/
+@mask
+     aaaaaa  aa       aaaaa
+    b bbbbb b b      bb  bc  cccc
+   d d     d d        d d   e ee e
+  f ffff  f ffff    ff fg  g ggg g
+  hhhhhh hhhhhhh   hhhhiii  iiiiii
+@small
+  _  _   ___
+ / ` /    /   _
+/__,/__ _/_ (_)
+@mask
+  j  j   jjj
+ k k k    k   l
+hhhhhhh hhh lll

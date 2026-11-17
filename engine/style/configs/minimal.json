@@ -102,6 +102,7 @@
     }
   },
   "ui": {
+    "banner": {"style": "plain", "palette": "mono"},
     "prompt": "> ",
     "transition": "none",
     "title_gradient": [

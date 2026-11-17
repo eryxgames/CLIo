@@ -22,7 +22,7 @@ from engine.editor import hosted, service                       # noqa: E402
 from engine.editor.server import make_server                    # noqa: E402
 
 TYPES = {"text", "long", "number", "bool", "choice", "tags", "ref", "refs", "sprite", "group", "rows", "map",
-         "effects", "condition"}
+         "effects", "condition", "banner"}
 
 
 def copy_of(name):
@@ -46,7 +46,7 @@ class SchemaTests(unittest.TestCase):
                     self.assertIn(f["of"], keys, f)
                 if f["type"] == "choice":
                     self.assertTrue(f["options"])
-                if f["type"] in ("group", "rows", "map"):                # parts with fields of their own
+                if f["type"] in ("group", "rows", "map", "banner"):      # parts with fields of their own
                     fields_ok(f["fields"], "%s.%s" % (where, f["key"]))
             return seen
 
@@ -578,6 +578,38 @@ class SpriteTests(unittest.TestCase):
         self.assertEqual(len(looks.grow("x", 99)["pixels"]), 32)                # kept to a sensible size
         self.assertEqual(looks.colours({"a": "#2B3340", "b": 202, "c": [1, 2, 3], "d": "none", "e": "no such colour"}),
                          {"a": "#2b3340", "b": "#ff5f00", "c": "#010203", "d": None, "e": None})
+
+
+class BannerTests(unittest.TestCase):
+    def test_a_banner_is_drawn_as_the_game_draws_it(self):
+        from engine import banner
+        folder = os.path.join(tempfile.mkdtemp(prefix="clio-editor-test-"), "starter")
+        shutil.copytree(os.path.join(ROOT, "templates", "starter"), folder)
+        with open(os.path.join(folder, "game.json"), encoding="utf-8") as f:
+            cfg = json.load(f)
+        cfg.update({"title_banner": {"style": "chrome", "palette": "dusk"},
+                    "palettes": {"dusk": {"colors": ["#ffd27a", "#ff6f91", "#5a2a8f"]}}})
+        drawn = service.handle(folder, "/api/banner", {"key": "title_banner", "width": 78, "pending": {"game": cfg}})
+        game = banner.make(cfg["title_banner"], 74, text=cfg["title"], palettes=cfg["palettes"])
+        self.assertEqual((drawn["style"], drawn["chosen"], drawn["effect"]), ("chrome", "chrome", "shine"))
+        self.assertEqual(drawn["size"], list(game.size()))
+        self.assertEqual(len(drawn["rows"]), game.size()[1])
+        self.assertTrue(drawn["frames"])
+        text = "".join(run[0] for row in drawn["rows"] for run in row)
+        self.assertIn("▀", text)
+        self.assertIn("#ffd27a", json.dumps(drawn["rows"]))                     # the game's own palette
+        narrow = service.handle(folder, "/api/banner", {"key": "title_banner", "width": 24, "pending": {"game": cfg}})
+        self.assertEqual((narrow["style"], narrow["chosen"]), ("plain", "chrome"))
+        end = service.handle(folder, "/api/banner", {"key": "lose_banner", "width": 78, "pending": {"game": cfg}})
+        self.assertEqual(end["size"], list(banner.make({}, 74, text="Game Over").size()))   # with no banner set
+        with self.assertRaises(Exception):
+            service.handle(folder, "/api/banner", {"key": "description"})
+
+    def test_terminal_output_to_cells(self):
+        from engine.editor import looks
+        self.assertEqual(looks.cells("\x1b[38;2;1;2;3;48;2;4;5;6m\u2580\u2580\x1b[0m x"),
+                         [["\u2580\u2580", "#010203", "#040506", False], [" x", None, None, False]])
+        self.assertEqual(looks.cells("\x1b[1;7;38;2;255;0;0mA")[0][1:], ["#0b0e14", "#ff0000", True])
 
 
 class HostedTests(unittest.TestCase):

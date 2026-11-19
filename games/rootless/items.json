@@ -119,5 +119,17 @@
    "sprite": "armor_ring0",
    "text": "Ring-0 armour: kernel mode. (200)"
   }
+ },
+ "goggles": {
+  "name": "TTY goggles",
+  "description": "Two green screens on a strap. The world as a terminal sees it.",
+  "pickup": {
+   "power": "goggles",
+   "beats": 40,
+   "sprite": "goggles",
+   "size": 0.45,
+   "sound": "goggles_on",
+   "text": "TTY goggles! You see the world the way the terminal does - and what is hollow shows."
+  }
  }
 }

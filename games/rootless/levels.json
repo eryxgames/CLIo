@@ -29,14 +29,14 @@
    "######c..#.z...o...z.######.....#",
    "######.N.P...........+.~~~....k.#",
    "######c..#.....G.....######.....#",
-   "##########.b.s.......######.m...#",
-   "##########..........h########1###",
+   "##########.b.s...&...Hv..##.m...#",
+   "##########.......^..h#..c####1###",
    "###############+#############O###",
    "###########...P.=############_###",
-   "###########.r.=.=#####~~~~~_____#",
+   "###########Lr.=.=#####~~~~~&__ql#",
    "###############+######~~~~~~~~~~#",
    "############....zb.###~s.~~~~~~~#",
-   "############.......Sa#~.K~~~~~~~#",
+   "############.......Sa#~QK~~~~~~~#",
    "############.h...c.###~~~~~~~~~~#",
    "############...@...##############",
    "#################################"
@@ -102,12 +102,39 @@
    "K": "armor_ring0",
    "_": {
     "floor": "grate"
+   },
+   "^": {
+    "plate": "goggles"
+   },
+   "H": {
+    "door": true,
+    "open_while": "goggles",
+    "secret": true
+   },
+   "v": "goggles",
+   "L": {
+    "lift": "sump",
+    "deck": 0
+   },
+   "l": {
+    "lift": "sump",
+    "deck": -1
+   },
+   "Q": {
+    "teleport": "island"
+   },
+   "q": {
+    "teleport": "island",
+    "arrive": true,
+    "facing": "w",
+    "floor": "grate"
    }
   },
   "events": {
    "keyroom": "The key room's walls grind open. They were waiting for you to touch it.",
    "arena": "The x door slams shut and locks behind you.",
-   "boss_escaped": "Far away, the sealed door unlocks."
+   "boss_escaped": "Far away, the sealed door unlocks.",
+   "goggles": "Clunk. Somewhere near, a door slides open while the plate stays down."
   },
   "boss_escaped_line": "Cron escaped. He will be waiting at the end of time.",
   "death_text": "outro_lose",
@@ -121,6 +148,7 @@
    "T",
    "C",
    "E"
-  ]
+  ],
+  "exit_ride": "down"
  }
 }

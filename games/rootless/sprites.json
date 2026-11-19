@@ -765,5 +765,48 @@
    "G": "#27458e",
    "Y": "#f0f0f0"
   }
+ },
+ "crate": {
+  "pixels": [
+   "kkkkkkkkkkkkkk",
+   "kbbbbbbbbbbbbk",
+   "kbssssssssssbk",
+   "kbsSssssssSsbk",
+   "kbssSssssSssbk",
+   "kyyyyyyyyyyyyk",
+   "kddyyddyyddyyk",
+   "kyyyyyyyyyyyyk",
+   "kbssSssssSssbk",
+   "kbsSssssssSsbk",
+   "kbssssssssssbk",
+   "kbbbbbbbbbbbbk",
+   "kkkkkkkkkkkkkk"
+  ],
+  "palette": {
+   "k": "#1e2026",
+   "b": "#6c727e",
+   "s": "#4a4f5a",
+   "S": "#3a3e47",
+   "y": "#d8ae2c",
+   "d": "#262420"
+  }
+ },
+ "goggles": {
+  "pixels": [
+   "..kkkk..kkkk..",
+   ".kggggk.kggggk",
+   "kgGGggkkgGGggk",
+   "kgGggggggGgggk",
+   ".kggggk.kggggk",
+   "..kkkk..kkkk..",
+   "ss..........ss"
+  ],
+  "palette": {
+   "k": "#20242a",
+   "g": "#2fa04a",
+   "G": "#9cffb0",
+   "s": "#5a4a3a"
+  },
+  "keep": "G"
  }
 }

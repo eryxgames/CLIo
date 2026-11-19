@@ -83,6 +83,8 @@ def info(game_dir, pending=None):
         pk = spec.get("pickup") if isinstance(spec, dict) else None
         if isinstance(pk, dict) and iid not in things:
             things[iid] = {"kind": "item", "name": spec.get("name") or iid, "picture": picture(pk.get("sprite") or iid)}
+    crate = picture("crate") or [[_hex(c) for c in row] for row in firstperson.CRATE.rows]
+    things.setdefault("crate", {"kind": "fixture", "name": "crate", "picture": crate})
     return {"legend": LEGEND, "tiles": tiles, "things": things, "facing": ["n", "e", "s", "w"]}
 
 

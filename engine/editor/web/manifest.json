@@ -9,6 +9,7 @@
   "engine/conditions.py",
   "engine/data.py",
   "engine/dialogue.py",
+  "engine/ending.py",
   "engine/firstperson.py",
   "engine/frame.py",
   "engine/fx.py",

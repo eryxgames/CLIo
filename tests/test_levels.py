@@ -48,7 +48,7 @@ class LevelTests(unittest.TestCase):
     def test_the_map(self):
         lv = level()
         self.assertEqual((lv.player.x, lv.player.y, lv.player.facing), (15, 28, 0))
-        self.assertEqual(lv.total_secrets, 4)
+        self.assertEqual(lv.total_secrets, 5)
         z1 = next(m for m in lv.monsters if m.tag == "z1")
         self.assertEqual((z1.x, z1.y), (16, 25))              # numbered in the order they are met
         self.assertIsNotNone(lv.boss)
@@ -358,6 +358,144 @@ class TileTests(unittest.TestCase):
         self.assertEqual(outcome, "exit")
 
 
+class PhysicsTests(unittest.TestCase):
+    def test_a_crate_on_the_plate_holds_the_door(self):
+        lv = level()
+        door, plate = lv.cell(21, 19), lv.cell(17, 20)
+        self.assertTrue(lv.cell(17, 19).crate and door.solid)
+        put(lv, 17, 21, 0)                                     # from the plate's south side: stand on it
+        lv.player.x, lv.player.y = 17, 20
+        lv.plates()
+        self.assertTrue(plate.down and door.open == 1.0)       # a person is weight too
+        lv.player.x, lv.player.y = 16, 20
+        lv.plates()
+        self.assertTrue(not plate.down and door.open == 0.0)   # off it: the door shuts
+        put(lv, 17, 18, 2)                                     # north of the crate, facing south
+        lv.run_line("k")                                       # push it onto the plate
+        self.assertEqual(((lv.player.x, lv.player.y), lv.cell(17, 20).crate, plate.down, door.open), ((17, 19), True, True, 1.0))
+        lv.run_line("k")                                       # it will not go into the wall
+        self.assertEqual((lv.player.x, lv.player.y), (17, 19))
+        put(lv, 20, 19, 1)
+        lv.run_line("k")                                       # into the doorway: a secret area
+        self.assertEqual(lv.stats["secrets"], 1)
+        lv.run_line("k")
+        self.assertEqual(lv.player.goggles, 39)                # 40 beats, one gone already
+        self.assertEqual(door.open, 1.0)
+
+    def test_a_crate_sinks_into_acid(self):
+        lv = level()
+        put(lv, 28, 23, 3)
+        lv.run_line("k")
+        c = lv.cell(26, 23)
+        self.assertTrue(c.sunk and not c.toxic and not c.crate and not lv.cell(27, 23).crate)
+        hp = lv.player.hp
+        lv.run_line("k")                                       # onto the crate's step: no burn
+        self.assertEqual(((lv.player.x, lv.player.y), lv.player.hp), ((26, 23), hp))
+
+    def test_the_lift_and_the_teleporter(self):
+        lv = level()
+        put(lv, 11, 23, 0)
+        lv.run_line("use")
+        self.assertEqual((lv.player.x, lv.player.y), (31, 23))
+        lv.run_line("use")
+        self.assertEqual((lv.player.x, lv.player.y), (11, 23))
+        put(lv, 23, 25, 2)
+        lv.run_line("k")                                       # onto the island's pad: to the ledge, facing west
+        self.assertEqual((lv.player.x, lv.player.y, lv.player.facing), (30, 23, 3))
+        put(lv, 29, 23, 1)
+        lv.run_line("k")                                       # the ledge's pad only receives
+        self.assertEqual((lv.player.x, lv.player.y), (30, 23))
+
+    def test_knocked_back_into_acid(self):
+        lv = level()
+        z = next(m for m in lv.monsters if m.tag == "z1")
+        for m in lv.monsters:
+            if m is not z:
+                m.dead = True
+        z.x, z.y, z.hp, z.awake = 23, 17, 200, True
+        put(lv, 24, 17, 3)                                     # in the acid corridor, facing west
+        lv.player.weapons.append("3"); lv.player.weapon = "3"; lv.player.ammo["shells"] = 9
+        lv.cell(23, 17).toxic = False                          # z1 stands at the edge; behind it, acid
+        lv.cell(22, 17).toxic = True
+        lv.run_line("f z1")
+        self.assertIn("thrown back into the acid", " ".join(str(t) for t in lv.console.told))
+        z.x, z.y, z.awake, z.wake_on = 22, 17, False, "never"  # held there a beat
+        hp = z.hp
+        lv.run_line("w")
+        self.assertLess(z.hp, hp)                              # it burns there
+
+    def test_a_blast_throws_and_tears(self):
+        lv = level()
+        b = next(m for m in lv.monsters if m.barrel and (m.x, m.y) == (17, 25))
+        z = next(m for m in lv.monsters if (m.x, m.y) == (16, 25))
+        for m in lv.monsters:
+            if m not in (b, z):
+                m.dead = True
+        z.hp = 300
+        lv.explode(b)
+        self.assertEqual((z.x, z.y), (15, 25))                 # thrown a cell away
+        z.hp = 10
+        lv.damage([(z, 60)], lead="BLAM.")                    # overkill: it comes apart (only seen; nothing else changes)
+        self.assertTrue(z.dead)
+
+    def test_problems_with_pairs(self):
+        data = with_level({"map": ["#######", "#.@.ab#", "#..h.E#"],
+                           "legend": {"a": {"teleport": "one"}, "b": {"lift": "solo"}, "h": {"door": True, "open_while": "nobody"}}})
+        said = " | ".join(validate(data))
+        for words in ("teleporter 'one' has one pad", "lift 'solo' should have two ends", "no plate called 'nobody'"):
+            self.assertIn(words, said)
+
+    def test_new_things_in_the_picture(self):
+        from engine.firstperson import Bits
+        lv = level()
+        put(lv, 17, 17, 2)                                     # looking at the crate and the plate
+        plain = View(80, 17, "pixel").render(lv, FX(), 0)
+        bits = Bits(lv.vrng).burst(17, 19, 0.5, [(255, 0, 255)], n=20).frames(2)
+        flying = View(80, 17, "pixel").render(lv, FX(parts=bits[1], casing=0.5), 0)
+        self.assertNotEqual(plain, flying)
+        self.assertTrue(any((255, 0, 255) in c for row in flying for c in row))
+        lv.player.goggles = 5
+        green = View(80, 17, "dots").render(lv, FX(), 0)
+        self.assertEqual(len(green), 17)
+
+
+class EndScreenTests(unittest.TestCase):
+    def test_totals_and_the_screen(self):
+        from engine import ending
+        from engine.frame import Painter
+        from engine.term import strip_ansi, visible_len
+        t = ending.totals({"a": {"kills": 3, "kills_total": 4, "beats": 50, "par": 60, "fired": 10, "hits": 5},
+                           "b": {"kills": 2, "kills_total": 2, "secrets": 1, "secrets_total": 3, "beats": 20, "par": 30}})
+        self.assertEqual((t["kills"], t["kills_total"], t["secrets_total"], t["beats"], t["par"]), (5, 6, 3, 70, 90))
+
+        class Game:                                          # what the screen asks of a game
+            data = GameData(ROOTLESS)
+            cfg = data.config
+            term = None
+            make_banner = staticmethod(lambda *a, **k: None)
+        spec = Game.cfg["end_screen"]
+        rows = ending.rows_of(Game, spec, "The end text.", t, 1.0, 0.0, 80, 30, Painter(3))
+        text = "\n".join(strip_ansi(r) for r in rows)
+        for words in ("RØØTLESS", "KNEE-DEEP", "5 / 6", "par 90", "The end text.", "Next: User Space"):
+            self.assertIn(words, text)
+        self.assertNotIn("items", text)                        # nothing to count: no line
+        self.assertTrue(all(visible_len(r) <= 80 for r in rows))
+        half = "\n".join(strip_ansi(r) for r in ending.rows_of(Game, spec, "The end text.", t, 0.5, 0.0, 80, 30, Painter(3)))
+        self.assertIn("2 / 6", half)                           # counting up
+        self.assertNotIn("The end text.", half)
+        self.assertIn("next run in", strip_ansi(ending.tick_line(spec, 1.2, Painter(3), 80)))
+        self.assertLessEqual(len(ending.picture(Game.data, "cron", 10)), 10)    # shrunk to fit
+        self.assertEqual(len(ending.picture(Game.data, "cron", 16)), 15)         # at its own size
+
+    def test_piped_the_usual_ending(self):
+        from engine.game import Game
+        term = Term(out=io.StringIO(), width=80, color=0, unicode=True, animate=False, env={})
+        g = Game(ROOTLESS, term=term, seed=1)
+        g.audio.enabled = False
+        g.end_game("win", "outro_demo")
+        self.assertIn("THE END", term.out.getvalue())
+
+
 class EditorTests(unittest.TestCase):
     def test_level_pictures_and_checks(self):
         from engine.editor import service
@@ -375,7 +513,7 @@ class EditorTests(unittest.TestCase):
         self.assertEqual((len(w["frames"]), w["drawn"]), (4, True))
         self.assertEqual(len(service.handle(ROOTLESS, "/api/tile", {"name": "steel"})["pixels"]), 32)
         c = service.handle(ROOTLESS, "/api/levelcheck", {"level": "e1m1", "runs": 1})
-        self.assertEqual((c["runs"], c["secrets"], c["games"][0]["outcome"]), (1, 4, "exit"))
+        self.assertEqual((c["runs"], c["secrets"], c["games"][0]["outcome"]), (1, 5, "exit"))
         from engine import schema
         self.assertEqual(schema.BY_FILE["levels"]["editor"], "level")
         self.assertIn("tiles", schema.BY_FILE)

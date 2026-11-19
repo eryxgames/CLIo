@@ -51,5 +51,15 @@
  "help": "Arrows step and turn, Ctrl+arrows or , . strafe, space fires, Enter opens, Tab shows the map.",
  "about": "A demo of CLIo's first-person levels: frame mode, keys that act at once, a crontab boss.",
  "website": "eryxian.com",
- "license": "All rights reserved - see LICENSE.md in this game's folder"
+ "license": "All rights reserved - see LICENSE.md in this game's folder",
+ "end_screen": {
+  "heading": "EPISODE 1: KNEE-DEEP IN THE SHELL",
+  "picture": "cron",
+  "next": "Next: User Space",
+  "credits": [
+   "RØØTLESS - a game by Daniel Sandner",
+   "made with CLIo"
+  ],
+  "tick": "*/3 * * * *  cron  rain --on rootless"
+ }
 }

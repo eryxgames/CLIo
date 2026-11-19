@@ -282,7 +282,85 @@ class FX:
         self.fade = 0.0
         self.whiten = 0.0
         self.rise = {}           # id -> how far it has risen out of sight (an escape)
+        self.parts = ()          # small things flying: (x, y, height, colour, size) - see Bits
+        self.casing = 0.0        # a spent case thrown from the gun, 0..1 of its flight
+        self.crates = {}         # (x, y) of a crate's cell -> (x, y) where it is drawn while it slides
+        self.lift_items = {}     # an Item -> how high it bounces as it falls
+        self.style = None        # draw this frame in another style (a teleport's dots)
+        self.face = None         # the way the picture looks, in place of the player's (a teleport)
         self.__dict__.update(kw)
+
+
+class Bits:
+    """Small things flying for the frames of an animation - debris, gibs, sparks, drops - in the level's
+    own units (cells across, a person's height up). Cheap: a few dozen points, gravity and a bounce."""
+
+    def __init__(self, rng):
+        self.rng, self.p = rng, []
+
+    def burst(self, x, y, h, colours, n=16, speed=1.6, up=1.6, size=1.0, toward=(0.0, 0.0)):
+        rng = self.rng
+        for _ in range(n):
+            ang = rng.uniform(0, 2 * math.pi)
+            sp = speed * rng.uniform(0.25, 1.0)
+            self.p.append([x, y, h, math.cos(ang) * sp + toward[0], math.sin(ang) * sp + toward[1],
+                           up * rng.uniform(0.4, 1.3), rng.choice(colours), size * rng.uniform(0.6, 1.3)])
+        return self
+
+    def frames(self, n, dt=0.05, gravity=5.0):
+        out = []
+        for _ in range(n):
+            for q in self.p:
+                q[0] += q[3] * dt
+                q[1] += q[4] * dt
+                q[5] -= gravity * dt
+                q[2] += q[5] * dt
+                if q[2] < 0:                                   # the floor: a bounce, slower each time
+                    q[2], q[5], q[3], q[4] = 0.0, -q[5] * 0.3, q[3] * 0.55, q[4] * 0.55
+            out.append([(q[0], q[1], q[2], q[6], q[7]) for q in self.p])
+        return out
+
+
+def _crate_picture():
+    wood, dark, band, bolt = (122, 92, 58), (80, 58, 36), (70, 74, 82), (150, 154, 160)
+    rows = []
+    for y in range(13):
+        row = []
+        for x in range(14):
+            c = wood
+            if y in (0, 12) or x in (0, 13):
+                c = band
+            elif y in (1, 11) or x in (1, 12):
+                c = dark
+            elif x == y or x == 13 - y:
+                c = dark
+            elif y % 4 == 2:
+                c = shade(wood, 0.86)
+            if (x, y) in ((1, 1), (12, 1), (1, 11), (12, 11)):
+                c = bolt
+            row.append(c)
+        rows.append(row)
+    return Picture(rows)
+
+
+CRATE = _crate_picture()
+
+
+def vslide(old, new, k, down, gap=3):
+    """Cells of a lift's ride half done: the old view slides away, the shaft goes by, the new one comes."""
+    H = len(old or new or [])
+    if not H:
+        return new
+    W = len((old or new)[0])
+    dark = lambda i: [(" ", None, (14, 14, 18) if i % 3 else (60, 58, 50))] * W     # noqa: E731
+    shaft = [dark(i) for i in range(gap)]
+    if new is None:                                           # down into the dark: the shaft goes on
+        new = [dark(i + 1) for i in range(H)]
+    if old is None:
+        old = [dark(i + 1) for i in range(H)]
+    strip = (old + shaft + new) if down else (new + shaft + old)
+    n = int(round(max(0.0, min(1.0, k)) * (H + gap)))
+    return strip[n:n + H] if down else strip[H + gap - n: 2 * H + gap - n]
 
 
 class View:
@@ -360,6 +438,8 @@ class View:
                     if cell is not None:
                         tile = getattr(cell, "floor", None) or (None if cell.toxic else floor_tile)
                     c = sample(tile, ux, uy) if tile else None
+                    if c is None and cell is not None:
+                        c = self.fixture(cell, ux, uy, phase)
                     if c is None and cell is not None and cell.toxic:
                         c = TOXIC_HI if noise(int(ux * 8) + ix * 8, int(uy * 8) + iy * 8, phase) < 0.07 else TOXIC
                         row[x] = shade(c, 0.45 + 0.55 * fog)
@@ -391,6 +471,29 @@ class View:
                     row[x] = shade(c, fog)
             out.append(row)
         return out
+
+    @staticmethod
+    def fixture(cell, ux, uy, phase):
+        """What is set in a floor: a pressure plate, a crate sunk in acid, a teleporter's pad, a lift."""
+        m = max(abs(ux), abs(uy))
+        if getattr(cell, "plate", None):
+            if m < 0.34:
+                c = (150, 128, 70) if not cell.down else (96, 82, 46)
+                return shade(c, 1.15) if m > 0.3 and not cell.down else c
+            return (34, 32, 30) if m < 0.38 else None
+        if getattr(cell, "sunk", False):
+            return (104, 78, 50) if int((uy + 0.5) * 6) % 2 else (88, 64, 40)
+        if getattr(cell, "teleport", None):
+            d = math.hypot(ux, uy)
+            if d < 0.44:
+                ring = int(d * 14 - phase) % 3
+                return ((90, 40, 160), (60, 200, 230), (20, 16, 40))[ring]
+            return None
+        if getattr(cell, "lift", None):
+            if m > 0.42:
+                return (215, 175, 40) if int((ux + uy + 2) * 8) % 2 else (34, 32, 30)
+            return (70, 74, 84) if int((ux + 0.5) * 8) % 4 else (52, 55, 62)
+        return None
 
     # ---- drawing helpers ------------------------------------------------ #
     def blit(self, px, rows, x0, y0, s, fn=None, dist=None):
@@ -506,7 +609,7 @@ class View:
         W, PW, PH = self.W, self.PW, self.PH
         p = lv.player
         cx, cy = fx.cam if fx.cam is not None else (p.x, p.y)
-        f = p.facing
+        f = fx.face if fx.face is not None else p.facing
         fx_, fy_ = DIRS[f]
         rx, ry = DIRS[(f + 1) % 4]
         px = self.backdrop(lv, cx, cy, f, phase)
@@ -541,6 +644,15 @@ class View:
             a, z = rel(it.x, it.y)
             if -0.3 < z <= FAR:
                 items.append((z, 2, 0, "item", (a, it)))
+        for (x, y) in getattr(lv, "crate_cells", lambda: ())():
+            cx_, cy_ = fx.crates.get((x, y), (x, y))
+            a, z = rel(cx_, cy_)
+            if -0.3 < z <= FAR + 0.5:
+                items.append((z, 2, 0, "crate", a))
+        for wx, wy, h, col, size in fx.parts:
+            a, z = rel(wx, wy)
+            if 0.12 < z <= FAR:
+                items.append((z - 0.005, 6, 0, "part", (a, h, col, size)))
         for m in lv.monsters:
             if m.gone or (m.dead and m.id not in fx.dissolve):
                 continue
@@ -574,6 +686,8 @@ class View:
                 cell, a, x, y = obj
                 opened = fx.doors.get((x, y), cell.open if cell.kind == "door" else 0.0)
                 tex = self.texture(lv, cell.texture(), phase)
+                if cell.kind == "panel" and getattr(p, "goggles", 0):       # the goggles show what is hollow
+                    tex = [[None if c is None else mix(c, (200, 110, 255), 0.55) for c in row] for row in tex]
                 if abs(a) > 0.02:
                     k = 1 if a > 0 else -1
                     if not solid(x - k * rx, y - k * ry):
@@ -595,7 +709,20 @@ class View:
                           lambda c, i, j: shade(c, fog))
             elif kind == "item":
                 a, it = obj
-                self.draw_thing(px, lv.sprites.get(it.sprite), a, z, it.size, None, fx, labels=None)
+                self.draw_thing(px, lv.sprites.get(it.sprite), a, z, it.size, None, fx, labels=None,
+                                lift=fx.lift_items.get(it, 0.0))
+            elif kind == "crate":
+                self.draw_thing(px, lv.sprites.get("crate") or CRATE, obj, z, 0.75, None, fx, labels=None)
+            elif kind == "part":
+                a, h, col, size = obj
+                t = DECAY ** z
+                r = max(1, int(round(size * t * self.K * 0.9)))
+                x0 = int(self.X(a, z) - r / 2)
+                y0 = int(self.yh + self.FS * t - h * REF_H * t * self.K - r / 2)
+                for yy in range(max(0, y0), min(self.PH, y0 + r)):
+                    row = px[yy]
+                    for xx in range(max(0, x0), min(self.PW, x0 + r)):
+                        row[xx] = col
             elif kind == "mob":
                 a, m = obj
                 self.draw_thing(px, lv.sprites.get(m.sprite), a, z, m.size, m, fx, labels)
@@ -617,6 +744,9 @@ class View:
             px = [[shade(c, 1.35) for c in row] for row in px]
         if lv.player.sudo:
             px = [[mix(c, (255 - int(lum(c)),) * 3, 0.85) for c in row] for row in px]
+        if getattr(lv.player, "goggles", 0):
+            px = [[c if c[2] > c[1] + 40 and c[0] > c[1] else (int(lum(c) * 0.35), min(255, int(lum(c) * 1.25) + 18),
+                                                              int(lum(c) * 0.45)) for c in row] for row in px]
         if fx.hurt:
             self.vignette(px, fx.hurt, fx.hurt_dir)
         if fx.whiten:
@@ -630,7 +760,7 @@ class View:
         over = self.place_labels(labels, overlays)
         return self.halves(px, over) if self.style == "pixel" else self.braille(px, over)
 
-    def draw_thing(self, px, pic, a, z, size, m, fx, labels):
+    def draw_thing(self, px, pic, a, z, size, m, fx, labels, lift=0.0):
         if pic is None:
             return
         t = DECAY ** z
@@ -640,7 +770,7 @@ class View:
         s = target_h / pp.h
         sw, sh = int(round(pp.w * s)), int(round(pp.h * s))
         base = self.yh + self.FS * t
-        lift = (m.float * REF_H * t * self.K) if m is not None else 0
+        lift = (m.float * REF_H * t * self.K) if m is not None else lift * REF_H * t * self.K
         if m is not None and fx.rise.get(m.id):
             lift += fx.rise[m.id] * self.PH
         x = self.X(a, z)
@@ -762,6 +892,16 @@ class View:
             self.glow(px, self.half, y0 - 2 * ws, 10 * ws, (255, 200, 90), 0.5)
             if mb:
                 self.blit(px, mb.rows, int(round(self.half - mb.w * ws / 2)), y0 - int(round(mb.h * ws)) + 1, ws)
+        if fx.casing:                          # a spent case, thrown up and to the right
+            k = fx.casing
+            cxp = self.half + sw * (0.25 + 0.9 * k)
+            cyp = y0 + sh * 0.2 - (4.0 * k * (1 - k)) * sh * 0.9 + k * k * sh * 0.4
+            colour = (200, 40, 30) if lv.weapons.get(lv.player.weapon, {}).get("ammo") == "shells" else (215, 170, 70)
+            r = max(1, int(ws))
+            for yy in range(int(cyp), int(cyp) + r + (r if colour[0] == 200 else 0)):
+                for xx in range(int(cxp), int(cxp) + r):
+                    if 0 <= yy < self.PH and 0 <= xx < self.PW:
+                        px[yy][xx] = colour
         rows = pic.rows
         if y0 + sh < self.PH:                  # raised (a punch): the arm goes on below it, to the bottom
             rows = rows + [rows[-1]] * int(math.ceil((self.PH - y0 - sh) / ws))

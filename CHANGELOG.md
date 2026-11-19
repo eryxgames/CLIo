@@ -45,6 +45,19 @@ game, RØØTLESS, shows them.
   colours). The engine makes them when a level starts; a sprite can have its own.
 - **Monsters grown on a body plan**: `sprite.monster(seed, body, size)` - biped, beast,
   floater, crawler, brute - with eyes kept in the far versions.
+- **Things that move**: crates to push (cover from shots; pushed into acid they sink and
+  make a step), pressure plates that hold doors and walls open while something heavy
+  stands on them, teleporter pads (the picture dissolves into braille dots and back),
+  lifts between two places (a ride in dots, the shaft going by) and a level ending in a
+  lift (`exit_ride`), secret areas counted when entered. A barrel's blast throws crates
+  and monsters a cell away; the shotgun at point blank throws its target back; monsters
+  burn on toxic floor. In the picture only, drawn from dice of their own: debris, gibs,
+  sparks, acid splashing, spent cases, items bouncing out. TTY goggles (`power:
+  "goggles"`): the level in green braille dots, secret walls showing. `push`, `plate` and
+  `lift` sounds.
+- **An end screen** (`"end_screen"` in game.json): a won game of levels ends on a screen
+  of its own - banner, picture, the totals counting up, the ending, what comes next,
+  credits and a crontab line still ticking.
 - **Tiles** (`tiles.json`): the walls, floors and ceilings of levels drawn from a game's own
   pictures, in the sprites' format and of any size; a tile named like one of the engine's
   takes its place; `frames` change a beat at a time; clear pixels show what is behind a
@@ -61,14 +74,16 @@ game, RØØTLESS, shows them.
   away, keeps its far versions to paint over them pixel by pixel, makes them again, or
   leaves them to the game.
 - **RØØTLESS** (`games/rootless`), the third demo game: E1M1 *Boot Sector*, a first-person
-  level with zombie processes, orphans, daemons, a spawner, barrels, four secrets (one of
-  them hazmat boots), an acid vat with ring-0 armour across it, a locked arena and Cron,
-  who rains fire on a schedule and escapes to be the final boss of the whole game (the
-  flag `cron_escaped`). Its own riff, sounds, 26 sprites and a tile.
+  level with zombie processes, orphans, daemons, a spawner, barrels, five secrets (hazmat
+  boots behind a vent, TTY goggles behind a door a crate must hold open), an acid vat with
+  ring-0 armour on an island and a teleporter back, a lift from the boots down to the vat,
+  a locked arena and Cron, who rains fire on a schedule and escapes to be the final boss
+  of the whole game (the flag `cron_escaped`); the exit is a lift down. Its own riff,
+  sounds, 28 sprites, a tile and an end screen.
 - `--view STYLE`, `--lines` (every command typed, no single keys), `--scroll`.
   `--check` also counts levels and monsters, and checks their maps and references.
 - `engine/levelbot.py`: a simple player that walks a level by its `"bot"` goals - if it can
-  finish, a person can (`python tests/levelbot.py`, and in the editor). 39 more tests.
+  finish, a person can (`python tests/levelbot.py`, and in the editor). 48 more tests.
 - **Sound sets** (`sounds.NAME.json`): other sets of sound effects over a game's own, chosen
   with `--sounds NAME`, `CLIO_SOUNDS`, `"sound_set"` in game.json, or `sound set NAME` while
   playing (in levels too).

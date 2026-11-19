@@ -1037,8 +1037,14 @@ class Game(Actions):
         if body is None and kind == "win":
             body = self.text("outro_win", "You have won.")
         ui.gap()
+        shown = False
+        if kind == "win" and isinstance(self.cfg.get("end_screen"), dict):   # a game of levels ends on a screen of its own
+            from . import ending
+            shown = ending.show(self, self.cfg["end_screen"], body)
         art = self.art_lines("win" if kind == "win" else "lose")
-        if art:
+        if shown:
+            pass
+        elif art:
             self.show_art("win" if kind == "win" else "lose")
         elif self.cfg.get("%s_banner" % kind):
             self.show_banner(self.cfg["%s_banner" % kind], text="The End" if kind == "win" else "Game Over")

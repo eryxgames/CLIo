@@ -61,7 +61,7 @@ class Bot(TextConsole):
                     if n in dist:
                         continue
                     c = lv.cell(*n)
-                    if c.kind in ("wall", "panel", "exit") or (c.kind == "door" and c.sealed):
+                    if c.kind in ("wall", "panel", "exit") or c.crate or (c.kind == "door" and (c.sealed or c.open_while)):
                         continue
                     if c.kind == "door" and c.key and c.key not in p.keys and c.open < 1:
                         continue

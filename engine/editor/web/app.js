@@ -1378,6 +1378,10 @@ function sortOf(spec) {
   if (spec.item) return "item";
   if (spec.start) return "start";
   if (spec.exit) return "exit";
+  if (spec.crate) return "crate";
+  if (spec.plate) return "plate";
+  if (spec.teleport) return "pad";
+  if (spec.lift) return "lift";
   if (spec.door) return "door";
   if (spec.panel) return "panel";
   if (spec.toxic) return "toxic";
@@ -1385,8 +1389,10 @@ function sortOf(spec) {
   return "floor";
 }
 const SORTS = [["floor", "Floor"], ["toxic", "Toxic floor"], ["wall", "Wall"], ["door", "Door"], ["panel", "Secret wall"],
-  ["monster", "Monster"], ["item", "Item"], ["start", "Start"], ["exit", "Exit switch"]];
+  ["monster", "Monster"], ["item", "Item"], ["start", "Start"], ["exit", "Exit switch"], ["crate", "Crate (pushed)"],
+  ["plate", "Pressure plate"], ["pad", "Teleporter pad"], ["lift", "Lift"]];
 const solidSort = (k) => ["wall", "panel", "exit", "unknown"].includes(k);
+const blocksWalk = (k) => solidSort(k) || k === "crate";
 
 function tileOf(spec) {                                        // the tile a wall-like cell is drawn with
   const k = sortOf(spec);
@@ -1407,6 +1413,10 @@ function describe(spec, info) {
     door: () => (spec.key ? `door: needs the ${spec.key} key` : spec.sealed || spec.opens_on ? "sealed door" : "door") + (spec.open ? ", open" : ""),
     panel: () => (spec.panel === "shoot" ? "dented vent: shoot it (secret)" : "hollow wall: punch it (secret)"),
     toxic: () => "toxic floor", wall: () => `wall: ${spec.wall || spec.texture || "steel"}`, floor: () => "floor",
+    crate: () => "a crate: walk into it to push it",
+    plate: () => `pressure plate "${spec.plate}"`,
+    pad: () => `teleporter pad "${spec.teleport}"` + (spec.arrive ? ", arrivals only" : "") + (spec.facing ? `, facing ${spec.facing}` : ""),
+    lift: () => `lift "${spec.lift}", deck ${spec.deck || 0}`,
   }[k]();
   const more = [];
   if (spec.on_enter) more.push(`sets off ${spec.on_enter}`);
@@ -1416,6 +1426,8 @@ function describe(spec, info) {
   if (spec.opens_on && k !== "door") more.push(`opens on ${spec.opens_on}`);
   if (spec.opens_on && k === "door") more.push(`opens on ${spec.opens_on}`);
   if (spec.closes_on) more.push(`shuts on ${spec.closes_on}`);
+  if (spec.open_while) more.push(`open while plate "${spec.open_while}" is down`);
+  if (spec.secret && k !== "panel") more.push("a secret area");
   if (spec.floor) more.push(`floor ${spec.floor}`);
   if (spec.ceiling) more.push(`ceiling ${spec.ceiling}`);
   return what + (more.length ? "; " + more.join(", ") : "");
@@ -1470,6 +1482,14 @@ function paintCell(g, info, thing, ch, x, y, cs) {
       const art = thingArt(info, spec.monster || spec.item, cs);
       if (art) g.drawImage(art, X, Y);
       else { g.fillStyle = k === "monster" ? "#ff6b5e" : "#f0c85a"; g.font = `${Math.round(cs * 0.8)}px ui-monospace, monospace`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(ch, X + cs / 2, Y + cs / 2 + 1); }
+    }
+    if (k === "plate") { g.fillStyle = "#968046"; g.fillRect(X + cs * 0.2, Y + cs * 0.2, cs * 0.6, cs * 0.6); }
+    if (k === "pad") { g.strokeStyle = "#4fd8ea"; g.lineWidth = Math.max(1, cs / 8); g.beginPath(); g.arc(X + cs / 2, Y + cs / 2, cs * 0.32, 0, 2 * Math.PI); g.stroke(); g.lineWidth = 1; }
+    if (k === "lift") { g.strokeStyle = "#d7af28"; g.lineWidth = Math.max(1, cs / 7); g.strokeRect(X + 2, Y + 2, cs - 4, cs - 4); g.lineWidth = 1; }
+    if (k === "crate") {
+      const art = thingArt(info, "crate", cs);
+      if (art) g.drawImage(art, X, Y);
+      else { g.fillStyle = "#7a5c3a"; g.fillRect(X + cs * 0.12, Y + cs * 0.12, cs * 0.76, cs * 0.76); g.strokeStyle = "#4f3a24"; g.strokeRect(X + cs * 0.12 + 0.5, Y + cs * 0.12 + 0.5, cs * 0.76, cs * 0.76); }
     }
     if (k === "start") {
       const f = TURN.indexOf(String(thing.facing || "n")[0]);
@@ -1626,7 +1646,7 @@ function levelEditor(kind, thing, id) {
     const raw = legend()[ch];
     const s = typeof raw === "string" ? (info.things[raw] && info.things[raw].kind === "monster" ? { monster: raw } : { item: raw }) : Object.assign({}, raw);
     const write = () => {                                     // a monster or an item with nothing more is written as its id alone
-      const keys = Object.keys(s).filter((k) => s[k] !== "" && s[k] !== false && s[k] !== undefined && s[k] !== null);
+      const keys = Object.keys(s).filter((k) => s[k] !== "" && s[k] !== false && s[k] !== undefined && s[k] !== null && !(k === "deck" && s[k] === 0));
       const clean = Object.fromEntries(keys.map((k) => [k, s[k]]));
       legend()[ch] = keys.length === 1 && (clean.monster || clean.item) ? (clean.monster || clean.item) : clean;
       changed(); draw(); swatches(); head.textContent = `${ch}: ${describe(specOf(thing, info, ch), info)}`;
@@ -1642,6 +1662,10 @@ function levelEditor(kind, thing, id) {
       if (k === "item") s.item = Object.keys(info.things).find((t) => info.things[t].kind === "item") || "";
       if (k === "start") s.start = true;
       if (k === "exit") s.exit = true;
+      if (k === "crate") s.crate = true;
+      if (k === "plate") s.plate = "plate";
+      if (k === "pad") s.teleport = "pad";
+      if (k === "lift") { s.lift = "lift"; s.deck = 0; }
       write(); edit();
     };
     const rows = [field("Is", el("select", { onchange: (e) => setSort(e.target.value) }, ...SORTS.map(([k, label]) => el("option", { value: k, selected: k === sort }, label))))];
@@ -1654,8 +1678,26 @@ function levelEditor(kind, thing, id) {
     if (sort === "door") {
       rows.push(field("Needs the key", el("select", { onchange: (e) => { s.key = e.target.value; write(); } }, ...["", "r", "w", "x"].map((k) => el("option", { value: k, selected: (s.key || "") === k }, k || "no key")))));
       evRow("opens_on", "Opens when this happens (sealed until then)"); evRow("closes_on", "Shuts for good when this happens");
+      rows.push(field("Open only while a plate is down", el("input", { type: "text", class: "code short", value: s.open_while || "", placeholder: "plate",
+        oninput: (e) => { s.open_while = e.target.value.trim(); write(); } })));
       rows.push(field("Open from the start", el("input", { type: "checkbox", checked: !!s.open, onchange: (e) => { s.open = e.target.checked; write(); } })));
     }
+    if (sort === "plate") rows.push(field("Its name (doors and walls open while it is down)", el("input", { type: "text", class: "code short", value: s.plate || "",
+      oninput: (e) => { s.plate = e.target.value.trim() || "plate"; write(); } })));
+    if (sort === "pad") {
+      rows.push(field("Its name (pads of one name lead to each other)", el("input", { type: "text", class: "code short", value: s.teleport || "",
+        oninput: (e) => { s.teleport = e.target.value.trim() || "pad"; write(); } })));
+      rows.push(field("Only arrives here", el("input", { type: "checkbox", checked: !!s.arrive, onchange: (e) => { s.arrive = e.target.checked; write(); } })));
+      rows.push(field("Faces on arrival", el("select", { onchange: (e) => { s.facing = e.target.value; write(); } },
+        ...["", "n", "e", "s", "w"].map((f) => el("option", { value: f, selected: (s.facing || "") === f }, f || "as before")))));
+    }
+    if (sort === "lift") {
+      rows.push(field("Its name (the two ends of a lift)", el("input", { type: "text", class: "code short", value: s.lift || "",
+        oninput: (e) => { s.lift = e.target.value.trim() || "lift"; write(); } })));
+      rows.push(field("Deck (the lower end rides down to it)", el("input", { type: "number", value: String(s.deck || 0), oninput: (e) => { s.deck = Number(e.target.value) || 0; write(); } })));
+    }
+    if (sort === "floor" || sort === "door") rows.push(field("A secret area (counted when the player stands in it)",
+      el("input", { type: "checkbox", checked: !!s.secret, onchange: (e) => { s.secret = e.target.checked; write(); } })));
     if (sort === "panel") rows.push(field("Opened by", el("select", { onchange: (e) => { s.panel = e.target.value; write(); } },
       el("option", { value: "fist", selected: s.panel !== "shoot" }, "a punch (a hollow wall)"), el("option", { value: "shoot", selected: s.panel === "shoot" }, "a shot (a dented vent)"))));
     if (!solidSort(sort) && sort !== "door") {
@@ -1710,7 +1752,7 @@ function levelEditor(kind, thing, id) {
     else {
       const [dx, dy] = STEPS[f].map((v) => (cmd === "back" ? -v : v));
       const ch = (thing.map[ui.cam.y + dy] || "")[ui.cam.x + dx];
-      if (ch === undefined || solidSort(sortOf(specOf(thing, info, ch)))) return;
+      if (ch === undefined || blocksWalk(sortOf(specOf(thing, info, ch)))) return;
       ui.cam.x += dx; ui.cam.y += dy;
     }
     draw(); look();

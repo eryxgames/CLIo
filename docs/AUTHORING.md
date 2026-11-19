@@ -651,7 +651,8 @@ step door airlock locked unlock pickup drop open use craft read computer power t
 secret coin quest quest_done levelup heal trap alarm encounter hit crit miss hurt guard
 focus special flee enemy_down win lose explosion`. A level also plays `footstep` at every step, which is
 silent unless the game or its sound set defines it; a step into toxic floor plays `wade` (or the footstep, if
-there is no `wade`), and `acid_burn` when the floor burns the player. Add or replace them in `sounds.json`:
+there is no `wade`), and `acid_burn` when the floor burns the player; `push` when a crate is pushed, `plate` when a
+pressure plate goes down or comes up, `lift` when a lift rides. Add or replace them in `sounds.json`:
 
 ```json
 "zap": {"wave": "saw", "freq": [900, 120], "dur": 0.2, "vol": 0.4},
@@ -1126,6 +1127,8 @@ The map is rows of characters, north at the top. Without a legend entry a charac
 | `S` | a hollow wall: a secret that opens to a punch (the fist, weapon 1) |
 | `P` | a dented vent: a secret that opens to a gunshot with nothing else to aim at |
 | `E` | the exit switch, on a wall |
+| `&` | a crate: walk into it to push it (see [Things that move](#things-that-move)) |
+| `^` | a pressure plate, named `plate` |
 
 A legend entry is either the id of a monster or an item (`"m": "medkit"`), or an object:
 `{"monster": id}` or `{"item": id}` on a floor cell; `{"wall": tile}`; `{"door": true,
@@ -1145,6 +1148,37 @@ sets off its own event (see below). Monster closets, traps and doors that open w
 fight is won are all made this way.
 
 Monsters are named on the map in the order a player meets them: the nearest zombie is `z1`.
+
+### Things that move
+
+The rules move a cell at a time, a beat at a time:
+
+- **Crates** (`{"crate": true}`, `&`): walking into one pushes it a cell on, if nothing
+  is behind it (a wall, a monster, an item, a pad or a lift). A crate blocks the way, sight
+  and shots - it is cover. Pushed into toxic floor it sinks and makes a step to stand on.
+- **Pressure plates** (`{"plate": name}`, `^`): down while something heavy stands on it -
+  a crate, the player, a monster that does not float. A door or a wall with
+  `"open_while": name` is open only while a plate of that name is down, and shuts again
+  when nothing holds it (not on top of someone). The level's `events` text for the name is
+  shown the first time. A crate on the plate keeps a door open: the old puzzle.
+- **Teleporter pads** (`{"teleport": name}`): stepping on one takes the player to the next
+  pad of that name in the map's order; `"arrive": true` only receives, `"facing"` turns the
+  player on arrival. The picture dissolves into braille dots and back. A monster standing
+  on the pad the player arrives at dies of it.
+- **Lifts** (`{"lift": name, "deck": n}`): Enter while standing on one rides to the other
+  lift of that name, down if its deck is lower; the picture slides away in dots and the
+  shaft goes by. `"exit_ride": "down"` (or `"up"`) on a level ends it in a lift ride when
+  the exit switch is thrown.
+- **Blasts and the shotgun**: a barrel's blast throws crates and monsters next to it a cell
+  further away; the shotgun at point blank throws its target a cell back. Monsters that do
+  not float burn on toxic floor like the player.
+- **A secret area**: a floor cell or a door with `"secret": true` counts as a secret when
+  the player stands in it.
+
+What only flies in the picture - debris and fire from a barrel, a monster torn apart by a
+blast or by overkill, sparks where a shot hits a wall, acid splashing, a spent case thrown
+from the gun, an item bouncing out of a dying monster - changes nothing in the game: it
+is drawn from its own dice, so a level plays the same with it.
 
 ### monsters.json
 
@@ -1210,7 +1244,8 @@ walking onto it:
 (armour soaks a third of every hurt), `ammo`, `key`, `weapon`, `power: "sudo"` (nothing
 hurts the player for `beats`; the picture inverts), `power: "boots"` (toxic floor does not
 hurt for `beats` spent on it - they wear down only there, show under the picture, and go
-on to the next level). `size` is the picture's size on the floor (0.55 if not said).
+on to the next level), `power: "goggles"` (for `beats` the level is drawn in braille dots,
+in green, and secret walls show). `size` is the picture's size on the floor (0.55 if not said).
 
 The weapons are in weapons.json, by the key that picks them (`"weapons"` in game.json's
 `first_person` works too; weapons.json comes over it):
@@ -1237,6 +1272,23 @@ A shot goes for what is in sight, nearest and most central first; a barrel only 
 straight ahead and not at arm's length. `pellets` spread to monsters next to the target
 (`spread`); `burst` fires (and spends) that many rounds a beat. `view` is how the level is
 drawn: `pixel` (half blocks), `dots` or `dots-fill` (braille); `--view` overrides it.
+
+### The end of a game of levels
+
+`"end_screen"` in game.json ends a won game on a screen of its own, on a terminal big
+enough for a level:
+
+```json
+"end_screen": {"heading": "EPISODE 1: KNEE-DEEP IN THE SHELL", "picture": "cron",
+               "next": "Next: User Space", "credits": ["RØØTLESS - a game by ..."],
+               "tick": "*/3 * * * *  cron  rain --on rootless"}
+```
+
+The title banner, the `picture` (a sprite), the `heading`, every level's kills, items,
+secrets, beats against par and accuracy added up and counted up, the ending's text, what
+comes `next`, the `credits`, and the `tick` line at the bottom, which keeps counting down
+to its next run. A key goes on to the usual "THE END". Piped or on a small screen the usual
+ending is all there is.
 
 ### Sprites for a level
 
@@ -1305,9 +1357,10 @@ e1m1` lets it play ten times; the editor does the same.
 monsters and items, and a palette of its characters - the level's own legend first, then
 the engine's. Click or drag to paint with a character, the right button paints floor;
 pointing at a cell says what it is. Choosing a character opens what it means: floor,
-toxic floor, wall (and its tile), door (its key, the events that open and shut it),
-secret wall, monster (and the event that wakes it), item (and the event taking it sets
-off), start or exit, and the tiles above and below it. *Add a character* gives the legend a
+toxic floor, wall (and its tile), door (its key, the events that open and shut it, the
+plate that holds it open), secret wall, monster (and the event that wakes it), item (and
+the event taking it sets off), start, exit, crate, pressure plate, teleporter pad or lift
+(and their names), a secret area, and the tiles above and below it. *Add a character* gives the legend a
 new one; *Change its meaning here* gives one of the engine's another meaning in this level.
 Below the map: the tiles of the whole level, the text of each event, and *Seen from a
 cell* - choose *Look from a cell*, click the map, and the engine draws what the player sees

@@ -282,3 +282,10 @@ button.pal .unused { color: var(--ink-2); }
 .pic-pair { align-items: flex-start; gap: 0.75rem; }
 .changes { margin: 0.25rem 0 0.5rem 1.2rem; font-family: ui-monospace, monospace; font-size: 0.9em; }
 .changes .warn { color: var(--bad, #b3261e); }
+
+/* 3D models: the builder's rows */
+.model-list { display: flex; flex-direction: column; gap: 0.35rem; margin: 0.3rem 0 0.6rem; }
+.model-part { border-top: 1px solid var(--rule); padding-top: 0.35rem; }
+.model-part .row, .model-row { flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+.triple { display: inline-flex; gap: 0.2rem; align-items: center; margin-right: 0.5rem; }
+.model-list input.tiny, .model-list input[type="number"].tiny { width: 4.4em; min-width: 0; }

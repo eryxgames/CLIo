@@ -587,8 +587,10 @@ function renderForm() {
     && (thing.frames === undefined || (Array.isArray(thing.frames) && thing.frames.every(rowsOk)))
     && (thing.lod === undefined || (Array.isArray(thing.lod) && thing.lod.every((l) => l && rowsOk(l.pixels) && l.pixels.length)));
   const mapped = kind.editor === "level" && (thing.map === undefined || rowsOk(thing.map)) && (thing.legend === undefined || isObject(thing.legend));
+  const built = kind.editor === "model" && (thing.materials === undefined || isObject(thing.materials))
+    && (thing.parts === undefined || (Array.isArray(thing.parts) && thing.parts.every(isObject)));
   const known = new Set(fields.map((f) => f.key).concat(kind.shape === "list" ? ["id"] : [], drawn ? ["palette", "pixels", "frames", "lod", "keep"] : [],
-    mapped ? ["map", "legend", "events", "bot", "floor", "ceiling"] : []));
+    mapped ? ["map", "legend", "events", "bot", "floor", "ceiling"] : [], built ? ["materials", "parts"] : []));
   const parts = [];
 
   const head = el("div", { class: "head" }, el("h2", {}, single ? kind.label : titleOf(kind, hit)));
@@ -620,6 +622,7 @@ function renderForm() {
   if (drawn) parts.push(spriteEditor(kind, thing));
   if (mapped) parts.push(levelEditor(kind, thing, hit.id));
   if (kind.editor === "weapon") parts.push(weaponSheet(kind, thing, hit.id));
+  if (kind.editor === "model") parts.push(modelSheet(kind, thing, hit.id, built));
 
   // everything the schema does not describe is still here, as JSON
   const rest = restArea(kind, thing, known, kind.fields.length || drawn ? "" : "This kind has no form yet: edit it as JSON.");
@@ -2110,6 +2113,188 @@ function weaponSheet(kind, thing, id) {
     el("div", { class: "row" }, el("button", { type: "button", class: "quiet", onclick: fire }, "Fire"),
       thing.sprite ? el("button", { type: "button", class: "quiet", onclick: () => select("sprites", thing.sprite) }, "Edit its sprite") : null), note,
     el("p", { class: "note" }, `The id is the key that picks it in a level (${id}); a pick-up gives it with "weapon": "${id}".`));
+}
+
+// ---------------------------------------------------------------------- 3D models: build one, see it
+const SHAPES = ["box", "wedge", "cylinder", "cone", "sphere", "ring"];
+const ROUND = ["cylinder", "cone", "ring"];
+const round3 = (v) => Math.round(v * 1000) / 1000;
+function hexOf(c) {                                              // "#rrggbb" or [r, g, b] as a colour input wants it
+  if (Array.isArray(c) && c.length >= 3) return "#" + c.slice(0, 3).map((v) => Math.max(0, Math.min(255, Math.round(+v || 0))).toString(16).padStart(2, "0")).join("");
+  return typeof c === "string" && /^#[0-9a-fA-F]{6}$/.test(c) ? c.toLowerCase() : "#808080";
+}
+
+function modelSheet(kind, thing, id, built) {
+  const canvas = el("canvas", { class: "banner-canvas", role: "img", "aria-label": "The model in a small room, as a level draws it" });
+  const note = el("p", { class: "note" }), facts = el("p", { class: "note" }), importNote = el("p", { class: "note" });
+  const clipsBox = el("span", { class: "row" });
+  let drawn = null, timer = null, wait = null, at = 0;
+  const paint = (rows) => { if (drawn && rows) paintCells(canvas, rows, drawn.cols, drawn.lines); };
+  const still = () => paint(drawn && drawn.turn[at]);
+  async function show() {
+    clearTimeout(timer);
+    try { drawn = await api("/api/modelview", { pending: pending(), name: id }); } catch (err) { note.textContent = "It cannot be drawn: " + err.message; return; }
+    note.classList.toggle("bad", drawn.problems.length > 0);
+    note.textContent = drawn.problems.join(" ");
+    if (drawn.problems.length) { facts.textContent = ""; return; }
+    facts.textContent = `${drawn.triangles} triangles, ${drawn.parts} parts, ${drawn.materials} materials; ${drawn.height} cells high, ${drawn.width} across.` +
+      (drawn.triangles > 400 ? " That is a lot of triangles for a terminal: a few hundred is plenty." : "");
+    at %= drawn.turn.length;
+    still();
+    clipsBox.replaceChildren(...Object.keys(drawn.clips).map((c) => el("button", { type: "button", class: "quiet", onclick: () => play(drawn.clips[c], still) }, `Play ${c}`)));
+  }
+  function play(frames, then) {
+    clearTimeout(timer);
+    let i = 0;
+    const step = () => { if (i >= frames.length) { if (then) then(); return; } paint(frames[i++]); timer = setTimeout(step, 90); };
+    step();
+  }
+  const later = () => { clearTimeout(wait); wait = setTimeout(show, 350); };
+  const changed = () => { touched(kind); later(); };
+  setTimeout(() => {
+    const form = canvas.closest("#form");
+    if (form) { form.addEventListener("input", later); form.addEventListener("change", later); }
+  }, 0);
+  const turnBy = (d) => { if (drawn && drawn.turn.length) { at = (at + d + drawn.turn.length) % drawn.turn.length; still(); } };
+  const controls = el("div", { class: "row" },
+    el("button", { type: "button", class: "quiet", "aria-label": "Turn it left", onclick: () => turnBy(-1) }, "◀"),
+    el("button", { type: "button", class: "quiet", "aria-label": "Turn it right", onclick: () => turnBy(1) }, "▶"),
+    el("button", { type: "button", class: "quiet", onclick: () => drawn && play(drawn.turn.slice(at).concat(drawn.turn, drawn.turn.slice(0, at)), still) }, "Turn round"),
+    el("button", { type: "button", class: "quiet", onclick: () => drawn && play(drawn.broken, () => { timer = setTimeout(still, 700); }) }, "Break it"),
+    clipsBox);
+
+  // materials: glTF's metallic-roughness, a row each
+  const matsBox = el("div", { class: "model-list" });
+  const mats = () => { if (!isObject(thing.materials)) thing.materials = {}; return thing.materials; };
+  const partsOf = () => { if (!Array.isArray(thing.parts)) thing.parts = []; return thing.parts; };
+  function renameMat(from, to) {
+    const m = mats();
+    if (!to || to === from || m[to] !== undefined || !validId(to)) { drawMats(); return; }
+    const next = {};
+    for (const [k, v] of Object.entries(m)) next[k === from ? to : k] = v;     // the order kept
+    thing.materials = next;
+    for (const p of partsOf()) if (p.material === from) p.material = to;
+    drawMats(); drawParts(); changed();
+  }
+  function drawMats() {
+    const m = mats();
+    const num = (mat, key, min, max, step, label) => el("label", { class: "pair" }, label, el("input", { type: "number", class: "tiny", min, max, step, value: mat[key] ?? "",
+      oninput: (e) => { if (e.target.value === "") delete mat[key]; else mat[key] = +e.target.value; changed(); } }));
+    matsBox.replaceChildren(...Object.keys(m).map((name) => {
+      const mat = isObject(m[name]) ? m[name] : (m[name] = {});
+      return el("div", { class: "row model-row" },
+        el("input", { type: "text", class: "code short", value: name, spellcheck: "false", "aria-label": "Material name", onchange: (e) => renameMat(name, e.target.value.trim()) }),
+        el("input", { type: "color", value: hexOf(mat.color), "aria-label": "Colour", oninput: (e) => { mat.color = e.target.value; changed(); } }),
+        num(mat, "metal", 0, 1, 0.05, "metal"), num(mat, "rough", 0.04, 1, 0.05, "rough"), num(mat, "glow", 0, 5, 0.1, "glow"),
+        el("button", { type: "button", class: "quiet warn", onclick: () => {
+          delete m[name];
+          for (const p of partsOf()) if (p.material === name) delete p.material;
+          drawMats(); drawParts(); changed();
+        } }, "Remove"));
+    }), el("button", { type: "button", class: "quiet", onclick: () => {
+      let n = 1;
+      while (m["material" + n] !== undefined) n++;
+      m["material" + n] = { color: "#808080", metal: 0, rough: 0.5 };
+      drawMats(); drawParts(); changed();
+    } }, "Add a material"));
+  }
+
+  // parts: a shape, its material and group, its size, place and turn - and what its shape takes besides
+  const partsBox = el("div", { class: "model-list" });
+  const triple = (part, key, def, step, label) => {
+    const now = () => (Array.isArray(part[key]) ? part[key].slice() : def.slice());
+    return el("span", { class: "triple" }, label, ...[0, 1, 2].map((i) => el("input", { type: "number", class: "tiny", step, value: now()[i] ?? def[i], "aria-label": `${label} ${"xyz"[i]}`,
+      oninput: (e) => {
+        const v = now();
+        v[i] = e.target.value === "" ? def[i] : +e.target.value;
+        if (key !== "size" && v.every((c, j) => c === def[j])) delete part[key]; else part[key] = v.map(round3);
+        changed();
+      } })));
+  };
+  const numberIn = (part, key, min, max, step, label, def) => el("label", { class: "pair" }, label, el("input", { type: "number", class: "tiny", min, max, step, value: part[key] ?? def,
+    oninput: (e) => { if (e.target.value === "" || +e.target.value === def) delete part[key]; else part[key] = +e.target.value; changed(); } }));
+  function drawParts() {
+    const list = partsOf(), names = Object.keys(mats());
+    partsBox.replaceChildren(...list.map((part, i) => {
+      const shape = part.shape || "box";
+      const extra = [];
+      if (ROUND.includes(shape)) {
+        extra.push(el("label", { class: "pair" }, "along", el("select", { onchange: (e) => { if (e.target.value === "z") delete part.axis; else part.axis = e.target.value; changed(); } },
+          ...["z", "x", "y"].map((a) => el("option", { value: a, selected: (part.axis || "z") === a }, a)))));
+        extra.push(numberIn(part, "sides", 3, 32, 1, "sides", 8));
+      }
+      if (shape === "ring") extra.push(numberIn(part, "thick", 0.05, 0.9, 0.05, "thick", 0.3), numberIn(part, "tube", 3, 12, 1, "tube", 6));
+      if (shape === "sphere") extra.push(numberIn(part, "detail", 0, 3, 1, "detail", 1));
+      const copy = (mirror) => {
+        const c = JSON.parse(JSON.stringify(part));
+        if (mirror) {                                      // the same part on the other side: x and the turns about z and y the other way
+          const a = c.at || [0, 0, 0];
+          c.at = [round3(-a[0]), a[1], a[2]];
+          if (c.turn) c.turn = [round3(-c.turn[0]), c.turn[1], round3(-c.turn[2])];
+        }
+        list.splice(i + 1, 0, c);
+        drawParts(); changed();
+      };
+      return el("div", { class: "model-part" },
+        el("div", { class: "row" },
+          el("strong", {}, String(i + 1)),
+          el("select", { "aria-label": "Shape", onchange: (e) => { part.shape = e.target.value; drawParts(); changed(); } }, ...SHAPES.map((s) => el("option", { value: s, selected: shape === s }, s))),
+          el("select", { "aria-label": "Material", onchange: (e) => { if (e.target.value) part.material = e.target.value; else delete part.material; changed(); } },
+            el("option", { value: "" }, "(the first material)"), ...names.map((n) => el("option", { value: n, selected: part.material === n }, n))),
+          el("input", { type: "text", class: "code short", placeholder: "group", spellcheck: "false", value: part.group || "", "aria-label": "Group: parts that spin or break together",
+            onchange: (e) => { const v = e.target.value.trim(); if (v) part.group = v; else delete part.group; changed(); } }),
+          el("button", { type: "button", class: "quiet", title: "A copy of it, next in the list", onclick: () => copy(false) }, "Copy"),
+          el("button", { type: "button", class: "quiet", title: "A copy on the other side (left for right)", onclick: () => copy(true) }, "Mirror"),
+          i ? el("button", { type: "button", class: "quiet", title: "Up the list", "aria-label": "Up the list", onclick: () => { [list[i - 1], list[i]] = [list[i], list[i - 1]]; drawParts(); changed(); } }, "↑") : null,
+          el("button", { type: "button", class: "quiet warn", onclick: () => { list.splice(i, 1); drawParts(); changed(); } }, "Remove")),
+        el("div", { class: "row" }, triple(part, "size", [1, 1, 1], 0.05, "size"), triple(part, "at", [0, 0, 0], 0.05, "at"), triple(part, "turn", [0, 0, 0], 5, "turn°"), ...extra));
+    }));
+  }
+  const addShape = el("select", { "aria-label": "Shape of the new part" }, ...SHAPES.map((s) => el("option", { value: s }, s)));
+  const addPart = el("button", { type: "button", class: "quiet", onclick: () => {
+    const p = { shape: addShape.value, size: [0.4, 0.4, 0.4], at: [0, 0, 0.2] };
+    const first = Object.keys(mats())[0];
+    if (first) p.material = first; else mats().plain = { color: "#808080", metal: 0, rough: 0.5 };
+    partsOf().push(p);
+    drawMats(); drawParts(); changed();
+  } }, "Add a part");
+
+  // a glTF file from Blender: its meshes, materials and animations, keeping how the model moves
+  const scale = el("input", { type: "number", class: "short", min: "0.01", step: "0.05", value: "0.4", "aria-label": "Cells per metre" });
+  const file = el("input", { type: "file", accept: ".glb,.gltf", onchange: async (e) => {
+    const f = e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    importNote.textContent = `Reading ${f.name}…`;
+    try {
+      const got = await api("/api/modelimport", { data: base64(await f.arrayBuffer()), name: id, scale: +scale.value || 0.4 });
+      const keep = {};
+      for (const k of ["bob", "turning", "smooth", "spin", "scale", "break"]) if (thing[k] !== undefined) keep[k] = thing[k];
+      for (const k of Object.keys(thing)) delete thing[k];
+      Object.assign(thing, keep, got.spec);
+      touched(kind);
+      status(`${f.name} taken in` + (got.notes.length ? ": " + got.notes.join(" ") : "."));
+      renderForm();
+    } catch (err) { importNote.textContent = "It could not be taken in: " + err.message; }
+  } });
+
+  if (built) { drawMats(); drawParts(); }
+  show();
+  const mesh = isObject(thing.mesh) && Array.isArray(thing.mesh.v) && thing.mesh.v.length;
+  return el("div", { class: "sheet" },
+    el("h3", {}, "In a small room, as a level draws it"), canvas, controls, facts, note,
+    built ? el("div", {},
+      el("h3", {}, "Materials"),
+      el("p", { class: "note" }, "As glTF has them: a colour, how metal (0 to 1) and how rough (0.04 to 1) it is; glow makes it shine in the dark."), matsBox,
+      el("h3", {}, "Parts"),
+      el("p", { class: "note" }, "x is right, y forward (where it faces), z up; a cell is 1. Turn is yaw, pitch and roll in degrees. A group's parts spin together (\"spin\" below) and, " +
+        "with Destroyed: parts or groups, fly off together." + (mesh ? " It has an imported mesh too: the parts are added to it." : "")),
+      partsBox, el("div", { class: "row" }, addShape, addPart))
+      : el("p", { class: "note" }, "Its materials or parts are not as the builder wants them: edit them in the JSON below."),
+    el("h3", {}, "From Blender"),
+    el("p", { class: "note" }, "Export glTF 2.0 (.glb). Its meshes, materials, vertex colours, PNG textures and animations take this model's place; " +
+      "how it bobs, turns, spins and breaks stays. clio.py --import-model does the same from a terminal."),
+    el("div", { class: "row" }, el("label", { class: "pair" }, "Cells per metre", scale), file), importNote);
 }
 
 // ---------------------------------------------------------------------- enemies: make one, try one

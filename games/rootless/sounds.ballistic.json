@@ -63,5 +63,22 @@
  "daemon_sight": {"ballistic": "dragon", "p": {"crMass": 600, "crDist": 6, "env": "indoor"}, "action": "game", "vol": 0.9, "variations": 3, "length": 3},
  "daemon_bite": {"ballistic": "growl", "p": {"crCall": "attack", "crMass": 300, "crLength": 0.25, "crRough": 2, "crDist": 2, "env": "indoor"}, "action": "game", "vol": 0.9, "variations": 4, "length": 1},
  "daemon_death": {"ballistic": "dying", "p": {"crType": "reptile", "crMass": 600, "crDist": 6, "env": "indoor"}, "action": "game", "vol": 0.9, "variations": 3, "length": 3.6},
- "spawner_sight": {"ballistic": "robottaunt", "p": {"crMass": 1500, "crDist": 8, "env": "indoor"}, "action": "game", "vol": 0.9, "variations": 2, "length": 3.2}
+ "spawner_sight": {"ballistic": "robottaunt", "p": {"crMass": 1500, "crDist": 8, "env": "indoor"}, "action": "game", "vol": 0.9, "variations": 2, "length": 3.2},
+ "drone_sight": {"ballistic": "robotalert", "p": {"crDist": 5, "crMass": 15, "env": "indoor"}, "action": "game", "vol": 0.7, "variations": 3, "length": 1.2},
+ "drone_zap": {"ballistic": "pew", "p": {"env": "indoor"}, "action": "game", "vol": 0.6, "variations": 3, "length": 0.8},
+ "drone_death": {"ballistic": "robotdown", "p": {"crDist": 4, "crMass": 20, "env": "indoor"}, "action": "game", "vol": 0.8, "variations": 3, "length": 1.6},
+ "hornet_sight": {"ballistic": "swarm", "p": {"env": "indoor"}, "action": "game", "vol": 0.6, "variations": 2, "length": 1.6},
+ "hornet_sting": {"ballistic": "spark", "p": {"env": "indoor"}, "action": "game", "vol": 0.6, "variations": 3, "length": 0.8},
+ "warden_sight": {"ballistic": "robottaunt", "p": {"crDist": 5, "env": "indoor"}, "action": "game", "vol": 0.9, "variations": 2, "length": 1.8},
+ "drone_bolt": {"ballistic": "plasmabolt", "p": {"env": "indoor"}, "action": "game", "vol": 0.8, "variations": 3, "length": 1.4},
+ "warden_death": {"ballistic": "robotdown", "p": {"crDist": 4, "crMass": 400, "env": "indoor"}, "action": "game", "vol": 1.0, "variations": 2, "length": 2.2},
+ "hopper_gun": {"ballistic": "cannon", "p": {"env": "outdoor"}, "action": "game", "vol": 0.9, "variations": 3, "length": 1.4},
+ "hopper_fly": {"ballistic": "helihover", "p": {"env": "outdoor"}, "action": "none", "vol": 0.5, "variations": 3, "length": 1.2},
+ "hopper_start": {"ballistic": "thruster", "p": {"env": "outdoor"}, "action": "none", "vol": 0.8, "variations": 1, "length": 2.4},
+ "hopper_stop": {"ballistic": "engcool", "p": {"env": "outdoor"}, "action": "none", "vol": 0.7, "variations": 1, "length": 2.4},
+ "refuel": {"ballistic": "vactank", "p": {"env": "indoor"}, "action": "none", "vol": 0.6, "variations": 2, "length": 1.4},
+ "rumble": {"ballistic": "gantry", "p": {"env": "indoor"}, "action": "game", "vol": 1.0, "variations": 2, "length": 2.4},
+ "thud": {"ballistic": "hull", "p": {"env": "indoor"}, "action": "game", "vol": 0.9, "variations": 3, "length": 1.6},
+ "clack": {"ballistic": "crate", "p": {"env": "indoor"}, "action": "none", "vol": 0.7, "variations": 3, "length": 1.0},
+ "switch": {"ballistic": "lever", "p": {"mcMass": 8, "mcDist": 1, "env": "indoor"}, "action": "game", "vol": 0.8, "variations": 2, "length": 1.0}
 }

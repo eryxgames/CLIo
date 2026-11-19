@@ -1244,7 +1244,9 @@ The rules move a cell at a time, a beat at a time:
   down: `"on_empty": "exit"` ends the level there (the ride is the level's end), else it
   just stops. `"gun"` is a weapon (`damage`, `burst`, `pellets`, `sound`, `text`) that Space
   fires with no ammunition; `"canopy": "#4b5047"` draws a canopy's frame and a dashboard
-  instead of a cage. Its texts add `start` and `empty`, its `sounds` `start` and `empty`.
+  instead of a cage. Once it lifts, the player sees from higher up - `"eye"`, of a wall's
+  height (0.74; standing is 0.52) - swaying a little, rising as it lifts off and sinking
+  as it comes down. Its texts add `start` and `empty`, its `sounds` `start` and `empty`.
 - **Balls** (a monster of `"kind": "ball"`): heavy, and they roll. Walking into one shoves
   it: it rolls `speed` cells a beat (2) for `roll` cells (8), and on until something stops
   it. What it rolls into takes `crush` damage - and if that kills it, the ball rolls on;
@@ -1479,8 +1481,11 @@ labelled as a sprite is. Model space: x to the right, y forward, z up; one unit 
   model so many degrees a beat (a pickup); `"spin"` turns a `group` of parts about its own
   middle (rotors, turbines, a radar dish). Imported animations play as **frames**: `idle`,
   `walk` (while it moves), `attack` (while it aims and fires); `fps` is frames a beat.
-- **Destroyed**, a model breaks into its triangles, which fly out from its middle, turn,
-  fall to the floor and are gone; it leaves no gore unless its monster names `remains`.
+- **Destroyed**, a model breaks apart: its pieces fly out from its middle, turn, fall to
+  the floor and are gone; it leaves no gore unless its monster names `remains`. The pieces
+  are its triangles (`"break": "shards"`, the default), its parts (`"parts"`: a pod, a
+  gun, a canopy fly off whole; an imported mesh comes apart where it is not joined), or its
+  groups (`"groups"`).
 - **From Blender**: export glTF 2.0 (`.glb`, or `.gltf` with its `.bin`), then
   `python clio.py GAME --import-model drone.glb` (`--model-name`, `--model-scale`: cells
   per metre, 0.4 by default - a 2.5 m room is a cell high). It brings in the meshes of
@@ -1494,6 +1499,14 @@ labelled as a sprite is. Model space: x to the right, y forward, z up; one unit 
 
 `--check` checks the shapes, sizes, materials and mesh of every model, and that what names
 a model has one.
+
+In the editor, **3D models** shows each model in a small room as a level draws it - turn it
+(◀ ▶, *Turn round*), *Break it*, play its frames - with its triangles, size and anything
+wrong with it. Its **materials** are a row each (name, colour, metal, rough, glow) and its
+**parts** too: shape, material, group, size, place and turn, and what a round shape takes
+besides; *Copy*, *Mirror* (the same part on the other side, left for right), up the list,
+*Remove*, *Add a part*. *From Blender* takes a `.glb` in, as `--import-model` does, keeping
+how the model bobs, turns, spins and breaks. The picture follows every change.
 
 ### Saving in a level
 

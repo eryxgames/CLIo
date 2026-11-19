@@ -447,6 +447,7 @@ class FX:
         self.face = None         # the way the picture looks, in place of the player's (a teleport)
         self.missiles = ()       # things flying: (x, y, height, sprite name, glow colour or None) - a rocket, a grenade
         self.tick = 0.0          # how far into the beat the animation is (0..1): spinning parts turn by it
+        self.eye = None          # how high the eye is (of a wall's height), in place of the player's: a lift-off
         self.__dict__.update(kw)
 
 
@@ -588,12 +589,30 @@ class View:
         self.yh = round(self.PH * 0.40)                       # the horizon, in pixel rows
         self.FS = self.PH - self.yh                           # floor height on screen at distance 0
         self.CH = self.FS * 0.92                              # ceiling height
+        self.TALL = self.FS + self.CH                         # a wall's height on screen at distance 0
+        self.EYE0 = self.FS / self.TALL                       # the eye's height, standing (of a wall's height)
         self.LW = self.sx * max(W * 0.40, min(30.0, W * 0.6))  # a cell's width on screen at distance 0
         self.K = min(self.FS * 1.45 / REF_H, self.LW * 1.25 / REF_W)
         self.cache = {}
         self.skies = {}
         self.cover = {}
         self.half = self.PW / 2.0
+
+    def set_eye(self, eye):
+        """The eye ``eye`` high (of a wall's height): more floor below the horizon, less wall above it -
+        a machine flying sees from higher up. None: standing."""
+        eye = self.EYE0 if eye is None else max(0.2, min(0.95, float(eye)))
+        self.FS, self.CH = self.TALL * eye, self.TALL * (1 - eye)
+        self.EYE = eye
+
+    @staticmethod
+    def eye_of(lv):
+        """How high the player's eye is: a flying machine's ``"eye"`` (0.74) once it is up, with a little sway."""
+        v = getattr(lv.player, "vehicle", None)
+        spec = getattr(v, "vehicle", None) or {}
+        if v is None or not spec.get("fly") or not getattr(v, "started", False):
+            return None
+        return float(spec.get("eye", 0.74)) + 0.012 * math.sin(lv.beat * 1.7)
 
     # ---- projection ----------------------------------------------------- #
     def X(self, a, z):
@@ -609,7 +628,7 @@ class View:
 
     # ---- the room ------------------------------------------------------- #
     def backdrop(self, lv, cx, cy, f, phase):
-        key = (id(lv), round(cx, 3), round(cy, 3), f, phase, lv.marks_version)
+        key = (id(lv), round(cx, 3), round(cy, 3), f, phase, lv.marks_version, round(self.FS, 2))
         rows = self.cache.get(key)
         if rows is None:
             if len(self.cache) > 40:
@@ -935,6 +954,7 @@ class View:
         fx_, fy_ = DIRS[f]
         rx, ry = DIRS[(f + 1) % 4]
         cam = (cx, cy, fx_, fy_, rx, ry)
+        self.set_eye(fx.eye if fx.eye is not None else self.eye_of(lv))
         px = self.backdrop(lv, cx, cy, f, phase)
         self.cover = {}
         self.fireball = lv.sprites.get("fireball")
@@ -1199,7 +1219,7 @@ class View:
         else:
             project = lambda x, y, h: self.project(cam, x, y, h)   # noqa: E731
         if gone > 0:
-            tris = model_mod.shards(mdl, world, gone, seed)
+            tris = model_mod.shards(mdl, world, gone, seed, by=mdl.breaks)
             cull = False
         else:
             tris = [((world[f[0]], world[f[1]], world[f[2]]), f) for f in mdl.faces]

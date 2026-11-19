@@ -705,7 +705,8 @@ class Level:
 
     def intro_lines(self):
         lines = [(self.spec.get("title") or self.name.upper(), "title")]
-        for t in self.spec.get("intro") or []:
+        intro = self.spec.get("intro") or []
+        for t in [intro] if isinstance(intro, str) else intro:   # a line, or a list of them
             lines.append((t, "dim"))
         lines.append(("", "text"))
         lines += HELP[:3]
@@ -1012,7 +1013,9 @@ class Level:
         v.started = False
         self.sfx((spec.get("sounds") or {}).get("empty") or "power_down", "power")
         self.say(spec.get("empty") or "The engines cough and stop. The %s settles." % v.name, "alert")
-        self.anim([FX(shake=s, whiten=w) for s, w in ((1, 0.0), (-1, 0.0), (1, 0.1), (0, 0.2), (0, 0.35))], 0.08)
+        up = float(spec.get("eye", 0.74)) if spec.get("fly") else 0.52
+        self.anim([FX(shake=s, whiten=w, eye=up - (up - 0.52) * k) for s, w, k in
+                   ((1, 0.0, 0.1), (-1, 0.0, 0.3), (1, 0.1, 0.6), (0, 0.2, 0.85), (0, 0.35, 1.0))], 0.08)
         if spec.get("on_empty") == "exit":               # the ride is the end of the level
             self.exit_kind = "exit"
             self.over = "exit"
@@ -1176,6 +1179,10 @@ class Level:
                 v.started = True
                 self.sfx((v.vehicle.get("sounds") or {}).get("start") or "power", "power")
                 self.say(v.vehicle.get("start") or "The engines spool up. (%d beats of fuel)" % v.fuel, "good")
+                if v.vehicle.get("fly"):                    # it lifts: the eye goes up with it
+                    up = float(v.vehicle.get("eye", 0.74))
+                    self.anim([FX(eye=0.52 + (up - 0.52) * k, shake=s) for k, s in
+                               ((0.1, 1), (0.3, -1), (0.55, 1), (0.8, 0), (0.95, 0))], 0.07)
             m = self.monster_at(nx, ny)
             if (m is not None and not m.barrel and not m.spec.get("boss") and not m.float
                     and not v.vehicle.get("fly")):
@@ -3654,6 +3661,8 @@ def validate(data):
             return bool(sp.get("exit")) or (isinstance(veh, dict) and veh.get("on_empty") == "exit")
         if not any(ends(legend.get(ch)) for ch in used):
             problems.append("level '%s': there is no exit (E)" % lid)
+        if lv.get("death_text") and lv["death_text"] not in (getattr(data, "texts", None) or {}):
+            problems.append("level '%s': death_text '%s' is not a text in texts.json" % (lid, lv["death_text"]))
         if lv.get("sky") is not None and not isinstance(lv["sky"], dict):
             problems.append("level '%s': sky should be an object (top, horizon, sun, ridges, clouds, stars)" % lid)
         listening = set()

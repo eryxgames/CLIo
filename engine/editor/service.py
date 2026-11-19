@@ -77,6 +77,10 @@ def handle(game_dir, path, body=None):
         return levels.tile_view(game_dir, str(body.get("name") or ""), body.get("where") or "wall", pending)
     if path == "/api/weaponview":                           # a weapon in the hands, and one shot of it
         return levels.weapon_view(game_dir, str(body.get("weapon") or ""), pending)
+    if path == "/api/modelview":                            # a 3D model in a small room: turning, broken, its frames
+        return levels.model_view(game_dir, str(body.get("name") or ""), pending, body.get("turns") or 12)
+    if path == "/api/modelimport":                          # a glTF file from Blender, made a model (not written)
+        return levels.model_import(body.get("data"), str(body.get("name") or ""), body.get("scale") or 0.4)
     if path == "/api/levelcheck":                           # the level bot plays the level a few times
         return levels.check(game_dir, str(body.get("level") or ""), pending, body.get("runs") or 5)
     if path == "/api/archive":                              # the whole game folder as a zip file

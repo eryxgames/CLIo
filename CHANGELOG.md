@@ -203,6 +203,17 @@ game, RØØTLESS, shows them.
   that ends the level counts as its exit. The editor lists **3D models** (models.json),
   draws monsters and items that have a model as a small picture of it, and its map painter
   knows switches, the sky and a ball's roll.
+- **A model builder in the editor** (3D models): the model in a small room as a level draws
+  it, turned, broken and playing its frames, with its triangles and size; its materials
+  and parts as rows to edit (shape, material, group, size, place, turn; copy, mirror, add,
+  remove), and *From Blender* to take a `.glb` in. The picture follows every change.
+- **Models break into their parts** (`"break": "parts"`, or `"groups"`): a drone's gun and
+  plates fly off whole. An imported mesh comes apart where it is not joined.
+- **A flying machine's eye is higher** (`"eye"`, 0.74 of a wall's height): more of the
+  ground below, a little sway; it rises as the machine lifts off and sinks as it lands.
+- **RØØTLESS's Ballistic set** has the sounds E1M3 brought: drones, the hornet swarm, the
+  warden, the hopper's cannon, fans, start and stop, fuel, the rolling core, balls and
+  the switch.
 - **`--import-model FILE`**: glTF 2.0 (`.glb`, `.gltf`) from Blender into `models.json` -
   meshes with their placing, PBR materials, PNG textures and vertex colours as colours per
   triangle, object and skinned animations as frames (`--model-name`, `--model-scale`).
@@ -257,6 +268,9 @@ game, RØØTLESS, shows them.
 
 - A first-person view no longer shows the floor and ceiling of the level before when the
   next one starts at the same place, facing the same way.
+- E1M3's title page showed its intro a letter to a line (a level's `intro` may now be one
+  line or a list), and dying there named a text that is not one; `--check` now says when
+  a level's `death_text` is not in texts.json.
 
 ## 2.2.2 - 2026-11-18
 

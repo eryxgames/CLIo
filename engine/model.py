@@ -193,9 +193,10 @@ class Model:
         self.materials = [Material(k, v) for k, v in mats.items()] or [Material("plain", {})]
         index = {m.name: i for i, m in enumerate(self.materials)}
         self.verts, self.faces = [], []                   # faces: (a, b, c, material, colour or None, group)
+        self.pieces = []                                  # each face's piece: the part it came from
         self.groups = ["body"]
         self.group_spin = {}
-        for part in spec.get("parts") or []:
+        for part_no, part in enumerate(spec.get("parts") or []):
             if not isinstance(part, dict):
                 continue
             g = part.get("group", "body")
@@ -207,18 +208,22 @@ class Model:
             mi = index.get(part.get("material"), 0)
             tint = colour(part["color"]) if part.get("color") else None
             self.faces += [(a + o, b + o, c + o, mi, tint, self.groups.index(g)) for a, b, c in f]
+            self.pieces += [part_no] * len(f)
         mesh = spec.get("mesh") or {}
         if mesh.get("v"):
             o = len(self.verts)
             self.verts += [tuple(float(c) for c in p[:3]) for p in mesh["v"]]
+            first = len(self.faces)
             for mname, tris in (mesh.get("faces") or {}).items():
                 mi = index.get(mname, 0)
                 for t in tris:
                     self.faces.append((t[0] + o, t[1] + o, t[2] + o, mi, colour(t[3]) if len(t) > 3 else None, 0))
+            self.pieces += _pieces(self.faces[first:], len(spec.get("parts") or []))
         for g, how in (spec.get("spin") or {}).items():   # groups that turn: {"fans": {"axis": "z", "speed": 360}}
             if g in self.groups and isinstance(how, dict):
                 self.group_spin[self.groups.index(g)] = (how.get("axis", "z"), float(how.get("speed", 180)))
         self.scale = float(spec.get("scale", 1.0))
+        self.breaks = spec.get("break", "shards")         # destroyed: into "shards", its "parts" or its "groups"
         self.smooth = bool(spec.get("smooth"))
         self.bob = spec.get("bob")                        # [height, beats a bob takes]
         self.turning = float(spec.get("turning", 0.0))     # degrees a beat, the whole model (a pickup)
@@ -294,6 +299,9 @@ def load(table):
     return out
 
 
+BREAKS = ("shards", "parts", "groups")                 # how a model comes apart when it is destroyed
+
+
 def problems(table, where="models.json"):
     """What is wrong with a table of models, as sentences (for --check)."""
     out = []
@@ -326,6 +334,8 @@ def problems(table, where="models.json"):
                 out.append("%s: model '%s': a face of '%s' names a corner the mesh has not" % (where, name, mname))
         if not spec.get("parts") and not n:
             out.append("%s: model '%s' has neither parts nor a mesh" % (where, name))
+        if spec.get("break", "shards") not in BREAKS:
+            out.append("%s: model '%s': break '%s' should be one of %s" % (where, name, spec.get("break"), ", ".join(BREAKS)))
         try:
             Model(name, spec)
         except (TypeError, ValueError, IndexError, KeyError) as e:
@@ -378,16 +388,39 @@ def _srgb(c):
 
 
 # ---------------------------------------------------------------- shards ------------------------------
-def shards(model, verts, k, seed, by_group=False):
-    """The model blown apart, ``k`` (0..1) of the way: its triangles (or its groups) thrown out from the
-    middle and up, turning and falling to the floor. Returns ``[(triangle verts, face)]``."""
+def _pieces(faces, first):
+    """The pieces of a mesh: triangles that share corners belong together. A number for each face."""
+    up = {}
+
+    def root(i):
+        while up.get(i, i) != i:
+            up[i] = up.get(up[i], up[i])
+            i = up[i]
+        return i
+    for f in faces:
+        a = root(f[0])
+        for i in f[1:3]:
+            b = root(i)
+            if a != b:
+                up[b] = a
+    names = {}
+    return [first + names.setdefault(root(f[0]), len(names)) for f in faces]
+
+
+def shards(model, verts, k, seed, by_group=False, by=None):
+    """The model blown apart, ``k`` (0..1) of the way: its triangles - or its parts, or its groups (``by``:
+    "shards", "parts", "groups") - thrown out from the middle and up, turning and falling to the floor.
+    Returns ``[(triangle verts, face)]``."""
+    by = "groups" if by_group else (by or "shards")
     rng = random.Random(seed)
     cx = sum(p[0] for p in verts) / max(1, len(verts))
     cy = sum(p[1] for p in verts) / max(1, len(verts))
     cz = sum(p[2] for p in verts) / max(1, len(verts))
     pieces = {}
-    for f in model.faces:
-        pieces.setdefault(f[5] if by_group else id(f), []).append(f)
+    whose = getattr(model, "pieces", None) or []
+    for i, f in enumerate(model.faces):
+        key = f[5] if by == "groups" else (whose[i] if by == "parts" and i < len(whose) else i)
+        pieces.setdefault(key, []).append(f)
     out = []
     t = k * 1.6
     for key in sorted(pieces, key=str):

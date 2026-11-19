@@ -350,11 +350,14 @@
  "e1m3": {
   "name": "Drone Refit Assembly",
   "title": "E1M3: Drone Refit Assembly",
-  "intro": "Where the facility's drones are built again from what is left of them. The press is still running.",
+  "intro": [
+   "Where the facility's drones are built again from what is left of them.",
+   "The press is still running. Somewhere past the launch gate, a hopper waits for fuel."
+  ],
   "par": 300,
   "music": "drone_refit",
   "facing": "n",
-  "death_text": "Crushed, shot, or stung: the refit line takes everything back.",
+  "death_text": "outro_lose",
   "events": {
    "chute": "A hatch grinds open at the top of the chute. Something heavy rolls out of it. RUN.",
    "launch_gate": "Far off, sirens. The launch gate's locks let go and it rolls open on the swamp."

@@ -263,8 +263,9 @@ KINDS = [
         F("awake", "bool", "Awake from the start"), F("boss", "bool"), F("drops", "ref", "Drops", of="items"),
         F("death", label="When it dies (%s: its tag)"),
         R("model", "ref", "A 3D model drawn instead of the sprite", of="models")]},
-    {"key": "models", "file": "models", "label": "3D models", "one": "model", "shape": "map", "fields": [
+    {"key": "models", "file": "models", "label": "3D models", "one": "model", "shape": "map", "editor": "model", "fields": [
         F("smooth", "bool", "Smooth (lit at the corners: round things)"), F("scale", "number", "Scale (1: as built)"),
+        F("break", "choice", "Destroyed, it breaks into", options=["shards", "parts", "groups"]),
         F("turning", "number", "Turns this many degrees a beat (a pickup)"), F("fps", "number", "Frames a beat")]},
 ]
 

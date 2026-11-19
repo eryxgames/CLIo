@@ -70,6 +70,108 @@ def _goggled(c):
     return int(v * 0.35), min(255, int(v * 1.25) + 18), int(v * 0.45)
 
 
+# --------------------------------------------------------------------------- #
+# the sky over open cells
+# --------------------------------------------------------------------------- #
+SKY = {"top": (14, 18, 36), "horizon": (150, 96, 80), "ridges": [{"color": (30, 30, 40), "height": 0.2, "seed": 3},
+                                                                 {"color": (16, 17, 22), "height": 0.1, "seed": 9,
+                                                                  "near": 1.0}]}
+
+
+def _colour(v, default):
+    if isinstance(v, (list, tuple)) and len(v) == 3:
+        return tuple(int(c) for c in v)
+    if isinstance(v, str):
+        from .sprite import _rgb
+        try:
+            return _rgb(v)
+        except (ValueError, TypeError):
+            return default
+    return default
+
+
+def _wave(t, n, seed):
+    """Smooth noise round a circle: ``t`` in turns, ``n`` bumps a turn."""
+    f = (t % 1.0) * n
+    i = int(f)
+    k = f - i
+    k = k * k * (3 - 2 * k)
+    a, b = noise(i % n, seed, 17), noise((i + 1) % n, seed, 17)
+    return a + (b - a) * k
+
+
+def sky_spec(spec):
+    """A level's ``"sky"`` with its colours read and gaps filled."""
+    spec = spec if isinstance(spec, dict) else {}
+    out = {"top": _colour(spec.get("top"), SKY["top"]), "horizon": _colour(spec.get("horizon"), SKY["horizon"]),
+           "stars": float(spec.get("stars", 0.0) or 0.0), "ridges": [], "sun": None, "clouds": None}
+    for i, r in enumerate(spec.get("ridges", SKY["ridges"]) or []):
+        if isinstance(r, dict):
+            out["ridges"].append((_colour(r.get("color"), (24, 24, 30)), float(r.get("height", 0.15)),
+                                  int(r.get("seed", i * 7 + 3)), float(r.get("near", 0.0)), float(r.get("rough", 0.5))))
+    sun = spec.get("sun")
+    if isinstance(sun, dict):
+        out["sun"] = (float(sun.get("at", 0.0)), float(sun.get("height", 0.3)), float(sun.get("size", 0.1)),
+                      _colour(sun.get("color"), (240, 220, 180)), float(sun.get("glow", 0.5)),
+                      _colour(sun.get("bands"), None) if sun.get("bands") else None)
+    cl = spec.get("clouds")
+    if isinstance(cl, dict):
+        out["clouds"] = (_colour(cl.get("color"), (60, 50, 70)), float(cl.get("amount", 0.4)))
+    return out
+
+
+def sky_picture(sky, PW, yh, f, lateral, phase):
+    """The sky above the horizon, ``yh`` rows of ``PW`` pixels, looking ``f`` (a quarter turn is the picture's
+    width): a gradient, a sun or a planet, clouds that drift, stars, and ridges - the near ones move a little
+    as the player moves sideways."""
+    rows = []
+    top, hor = sky["top"], sky["horizon"]
+    sun, clouds, stars = sky["sun"], sky["clouds"], sky["stars"]
+    ridges = []                                        # each ridge's height in rows, per column
+    for col, height, seed, near, rough in sky["ridges"]:
+        shift = -lateral * near * 0.006
+        hs = []
+        for x in range(PW):
+            u = (f + (x + 0.5) / PW - 0.5) / 4.0 + shift
+            h = 0.55 * _wave(u, 9, seed) + 0.3 * _wave(u, 23, seed + 1) + 0.15 * rough * _wave(u, 61, seed + 2)
+            hs.append(h * height * yh)
+        ridges.append((mix(col, hor, 0.3 * (1 - near)), hs))
+    for y in range(yh):
+        e = (yh - y - 0.5) / float(yh)                   # 0 at the horizon, 1 at the top
+        base = mix(hor, top, min(1.0, e ** 0.55))
+        row = []
+        for x in range(PW):
+            c = base
+            u = (f + (x + 0.5) / PW - 0.5) / 4.0
+            if stars and e > 0.3 and noise(int(u * 4 * PW), y, 41) < stars:
+                c = mix(c, (230, 230, 255), 0.5 + 0.4 * noise(int(u * 4 * PW), y, phase + 5))
+            if clouds and 0.18 < e < 0.85:
+                k = _wave(u * 3 + phase * 0.004, 7, 31) * _wave(u * 5 - phase * 0.003 + e * 0.7, 13, 37)
+                band = 1 - abs(e - 0.45) * 2.2
+                if k * band > 1 - clouds[1]:
+                    c = mix(c, clouds[0], min(0.8, (k * band - (1 - clouds[1])) * 3))
+            if sun is not None:
+                at, sh, size, scol, glow, bands = sun
+                du = ((u - at + 0.5) % 1.0 - 0.5) * 4 * PW
+                dv = (e - sh) * yh
+                r = size * yh
+                d = math.hypot(du, dv)
+                if d < r:                                # the disc: lit from one side, banded if a planet
+                    lit = 0.55 + 0.45 * max(0.0, min(1.0, 0.5 + (du + dv) / (2.5 * r)))
+                    sc = scol
+                    if bands is not None and int((dv / r + 1) * 4.5 + 0.3 * math.sin(du / r * 3)) % 2:
+                        sc = mix(scol, bands, 0.6)
+                    c = shade(sc, lit)
+                elif glow and d < r * 3.5:
+                    c = mix(c, scol, glow * (1 - (d - r) / (2.5 * r)) ** 2)
+            for rc, hs in ridges:
+                if (yh - y - 0.5) < hs[x]:
+                    c = rc
+            row.append(c)
+        rows.append(row)
+    return rows
+
+
 def _avg(cols):
     n = len(cols)
     return (sum(c[0] for c in cols) // n, sum(c[1] for c in cols) // n, sum(c[2] for c in cols) // n)
@@ -213,6 +315,30 @@ def _exit(on=False):
     return t
 
 
+def _switch(on=False):
+    """A control panel: a screen, two lamps and a lever - thrown, it is up and the lamps are green."""
+    t = _steel()
+    for y in range(4, 28):
+        for x in range(6, 26):
+            t[y][x] = (30, 32, 38) if (x in (6, 25) or y in (4, 27)) else (52, 56, 64)
+    for y in range(6, 14):                              # the screen: bars of a readout
+        for x in range(8, 24):
+            lit = (x - 8) % 4 < 3 and (y - 6) > (6 - ((x * 5) % 7)) * (0.4 if on else 1.0)
+            t[y][x] = ((60, 200, 120) if on else (210, 150, 40)) if lit else (12, 18, 16)
+    for i, lx in enumerate((10, 20)):                   # the lamps
+        c = (70, 230, 100) if on else ((230, 60, 40) if i == 0 else (90, 30, 26))
+        for y in range(16, 19):
+            for x in range(lx, lx + 3):
+                t[y][x] = c
+    top = 17 if on else 24                              # the lever: down is off
+    for y in range(min(top, 21), max(top, 21) + 1):
+        t[y][15] = t[y][16] = (170, 170, 180)
+    for x in range(13, 19):
+        t[top][x] = (230, 190, 60)
+        t[min(26, top + 1)][x] = (150, 120, 40)
+    return t
+
+
 def _fist_panel():
     t = _steel()
     x = 11.0
@@ -237,7 +363,7 @@ def _shoot_panel():
 def _make_textures():
     out = {"steel": _steel(), "screens": _screens(1), "screens2": _screens(2), "hazard": _hazard(),
            "door": _door(), "sealed": _door(sealed=True), "exit": _exit(False), "exit_on": _exit(True),
-           "fist": _fist_panel(), "shoot": _shoot_panel()}
+           "fist": _fist_panel(), "shoot": _shoot_panel(), "switch": _switch(False), "switch_on": _switch(True)}
     for k, c in KEY_COLOURS.items():
         out["door_" + k] = _door(stripe=c)
     return out
@@ -465,6 +591,7 @@ class View:
         self.LW = self.sx * max(W * 0.40, min(30.0, W * 0.6))  # a cell's width on screen at distance 0
         self.K = min(self.FS * 1.45 / REF_H, self.LW * 1.25 / REF_W)
         self.cache = {}
+        self.skies = {}
         self.cover = {}
         self.half = self.PW / 2.0
 
@@ -482,7 +609,7 @@ class View:
 
     # ---- the room ------------------------------------------------------- #
     def backdrop(self, lv, cx, cy, f, phase):
-        key = (round(cx, 3), round(cy, 3), f, phase, lv.marks_version)
+        key = (id(lv), round(cx, 3), round(cy, 3), f, phase, lv.marks_version)
         rows = self.cache.get(key)
         if rows is None:
             if len(self.cache) > 40:
@@ -500,6 +627,16 @@ class View:
         fires = getattr(lv, "fires", None) or ()
         marks, cell_at, fixture, floor_ = lv.marks, lv.cell, self.fixture, math.floor
         drawings, below, above = {}, {}, {}
+        sky = None
+        look = getattr(lv, "sky_look", None)
+        if look is not None:                                 # open cells: the sky over them
+            lateral = round((cx * rx + cy * ry) * 4) / 4.0
+            key = (f, lateral, phase, id(look))
+            sky = self.skies.get(key)
+            if sky is None:
+                if len(self.skies) > 16:
+                    self.skies.clear()
+                sky = self.skies[key] = sky_picture(look, PW, self.yh, f, lateral, phase)
         step = 2 if self.detail == "low" else 1                # low: every other pixel, each drawn twice
 
         def drawing(name):                                   # a floor or ceiling tile, fixed to the world
@@ -583,8 +720,14 @@ class View:
                         tex = above.get((ix, iy), 0)
                         if tex == 0:
                             cell = cell_at(ix, iy)
-                            tile = (getattr(cell, "ceiling", None) if cell is not None else None) or ceiling_tile
-                            tex = above[(ix, iy)] = drawing(tile) if tile else None
+                            if sky is not None and getattr(cell, "sky", False):
+                                tex = above[(ix, iy)] = "sky"
+                            else:
+                                tile = (getattr(cell, "ceiling", None) if cell is not None else None) or ceiling_tile
+                                tex = above[(ix, iy)] = drawing(tile) if tile else None
+                    if tex == "sky":
+                        row[x] = sky[y][x]
+                        continue
                     c = None
                     if tex is not None:
                         th, tw = len(tex), len(tex[0])
@@ -1028,16 +1171,33 @@ class View:
         return self.half + a * self.LW * t, self.yh + self.FS * t - h * (self.FS + self.CH) * t, z
 
     def draw_model(self, px, mdl, wx, wy, heading, clip, t, cam, lift=0.0, size=1.0, gone=0.0, seed=0,
-                   flash=False, tint=None):
+                   flash=False, tint=None, roll=0.0):
         """A model standing at (wx, wy) facing ``heading`` (radians: 0 east, pi/2 south), posed for
-        ``clip`` at time ``t``; ``gone`` (0..1): blown apart that far. Returns its top and middle on the
-        picture (y, x), or None if none of it showed."""
+        ``clip`` at time ``t``; ``gone`` (0..1): blown apart that far; ``roll``: turned forward about its
+        middle that far (radians: a ball rolling). Returns its top and middle on the picture (y, x), or None
+        if none of it showed."""
         verts = mdl.pose(clip, t)
+        if roll:
+            c, s, zc = math.cos(roll), math.sin(roll), mdl.height / 2.0
+            verts = [(x, y * c + (z - zc) * s, zc - y * s + (z - zc) * c) for x, y, z in verts]
         if size != 1.0:
             verts = [(x * size, y * size, z * size) for x, y, z in verts]
         fxw, fyw = math.cos(heading), math.sin(heading)
         rxw, ryw = -fyw, fxw
         world = [(wx + x * rxw + y * fxw, wy + x * ryw + y * fyw, z + lift) for x, y, z in verts]
+        zc = (wx - cam[0]) * cam[2] + (wy - cam[1]) * cam[3]     # how far off it stands
+        flat = max(0.0, min(1.0, 1.3 - zc))                      # close by, depth is the middle's: no bulging
+        if flat > 0 and gone <= 0:
+            cx_, cy_, fx_, fy_, rx_, ry_ = cam
+            zm = max(0.3, zc)
+
+            def project(x, y, h):
+                dx, dy = x - cx_, y - cy_
+                a, z = dx * rx_ + dy * ry_, dx * fx_ + dy * fy_
+                t = DECAY ** (zm + (max(z, 0.0) - zm) * (1 - flat))
+                return self.half + a * self.LW * t, self.yh + self.FS * t - h * (self.FS + self.CH) * t, max(z, 0.05)
+        else:
+            project = lambda x, y, h: self.project(cam, x, y, h)   # noqa: E731
         if gone > 0:
             tris = model_mod.shards(mdl, world, gone, seed)
             cull = False
@@ -1061,7 +1221,7 @@ class View:
                     s[2] += n[2]
         top, xs, shown = self.PH, [], False
         for (p0, p1, p2), f in tris:
-            pts = [self.project(cam, p[0], p[1], p[2]) for p in (p0, p1, p2)]
+            pts = [project(p[0], p[1], p[2]) for p in (p0, p1, p2)]
             if None in pts:
                 continue
             area = (pts[1][0] - pts[0][0]) * (pts[2][1] - pts[0][1]) - (pts[1][1] - pts[0][1]) * (pts[2][0] - pts[0][0])
@@ -1127,9 +1287,14 @@ class View:
         else:
             tz = DECAY ** z
             self.shadow(px, self.X(a, z), self.yh + self.FS * tz, mdl.radius * 1.4 * m.size * self.LW * tz)
+        roll = 0.0
+        if getattr(m, "ball", False):                  # a ball turns as far as it has rolled
+            heading = m.heading or 0.0
+            gap = math.hypot(m.x - mx, m.y - my)
+            roll = (m.rolled - gap) / max(0.05, mdl.height / 2.0 * m.size)
         got = self.draw_model(px, mdl, mx, my, heading, clip, t, cam, lift=lift, size=m.size,
                               gone=fx.dissolve.get(m.id, 0.0) if m.dead or m.id in fx.dissolve else 0.0, seed=m.id,
-                              flash=m.id in fx.flash, tint=fx.tint.get(m.id))
+                              flash=m.id in fx.flash, tint=fx.tint.get(m.id), roll=roll)
         if got and labels is not None and not m.dead and m.seen:
             top, x = got
             text, role = m.label()
@@ -1265,9 +1430,75 @@ class View:
                 if dd <= r and noise(xx // self.sx, yy // max(1, self.sy // 2), seed) < density * (1.25 - dd / r):
                     px[yy][xx] = col if dd < r * 0.55 else mix(col, (110, 35, 10), 0.45)
 
+    def canopy(self, px, colour):
+        """A cockpit's canopy: a frame across the top, two posts slanting in from the bottom corners."""
+        dark, lite = shade(colour, 0.55), mix(colour, (255, 255, 255), 0.25)
+        bh = max(2, self.PH // 14)
+        bw = max(2, self.PW // 40)
+        for y in range(bh):
+            for x in range(self.PW):
+                px[y][x] = lite if y == bh - 1 else colour if y else dark
+        for y in range(bh, self.PH):
+            k = (y - bh) / float(max(1, self.PH - bh))
+            inset = int(self.PW * 0.16 * (1 - k))         # the posts lean in towards the top
+            for x0 in (inset, self.PW - inset - bw):
+                for x in range(max(0, x0), min(self.PW, x0 + bw)):
+                    px[y][x] = lite if x == x0 + bw - 1 or x == x0 else colour
+            for x in range(0, max(0, inset)):             # the hull beside the posts, out to the edges
+                px[y][x] = shade(px[y][x], 0.35)
+            for x in range(min(self.PW, self.PW - inset), self.PW):
+                px[y][x] = shade(px[y][x], 0.35)
+
+    def dashboard(self, px, v, colour):
+        """Under the canopy: the console, its two screens and the fuel gauge (amber, red when low)."""
+        h = max(3, self.PH // 9)
+        y0 = self.PH - h
+        x0, x1 = int(self.PW * 0.2), int(self.PW * 0.8)
+        dark = shade(colour, 0.4)
+        for y in range(y0, self.PH):
+            for x in range(x0, x1):
+                px[y][x] = dark if y > y0 else mix(colour, (255, 255, 255), 0.2)
+        w = x1 - x0
+        for sx in (x0 + w // 12, x1 - w // 12 - w // 6):        # two screens, a line of readout each
+            for y in range(y0 + 1, self.PH - 1):
+                for x in range(sx, sx + w // 6):
+                    lit = (x + y * 3) % 5 < 3 and y == y0 + 1 + (x // 3) % max(1, h - 2)
+                    px[y][x] = (90, 230, 140) if lit else (10, 26, 18)
+        fuel = getattr(v, "fuel", 0)
+        full = max(fuel, getattr(v, "fuel_max", 0) or 1)
+        v.fuel_max = full
+        gx0, gx1 = x0 + w * 3 // 10, x1 - w * 3 // 10
+        gy = y0 + h // 2
+        lit = gx0 + int((gx1 - gx0) * fuel / float(full))
+        for y in range(gy - max(0, h // 4), gy + max(1, h // 4)):
+            if 0 <= y < self.PH:
+                for x in range(gx0, gx1):
+                    px[y][x] = ((230, 70, 40) if fuel <= 5 else (240, 170, 50)) if x < lit else (30, 24, 16)
+
     def cockpit(self, px, lv, fx):
         """Riding a machine: its cage at the edges of the picture and its claws at the bottom (the sprite named
-        by the vehicle's ``cockpit``, as wide as the picture allows)."""
+        by the vehicle's ``cockpit``, as wide as the picture allows) - or, for a vehicle with a ``canopy``
+        (a colour), the canopy's frame."""
+        v = lv.player.vehicle
+        frame = (getattr(v, "vehicle", None) or {}).get("canopy")
+        if frame:
+            from .sprite import _rgb
+            try:
+                col = _rgb(frame) if isinstance(frame, str) else (70, 76, 60)
+            except (ValueError, TypeError):
+                col = (70, 76, 60)
+            self.canopy(px, col)
+            self.dashboard(px, v, col)
+            pic = lv.sprites.get(lv.weapon_sprite())
+            if pic is not None:
+                s = min(self.PW * 0.92 / pic.w, self.PH * 0.34 / pic.h)
+                x0 = int(round(self.half - pic.w * s / 2)) + fx.shake * self.sx
+                y0 = self.PH - int(round(pic.h * s)) + fx.recoil * self.sy
+                self.blit(px, pic.rows, x0, y0, s)
+            if fx.muzzle:                                  # the guns under the nose
+                for gx in (self.PW * 0.3, self.PW * 0.7):
+                    self.glow(px, gx, self.PH * 0.72, max(2.0, self.PH * 0.06), (255, 200, 90), 0.8)
+            return
         bw, bh = max(1, self.PW // 70), max(1, self.PH // 26)
         for y in range(self.PH):
             c = (214, 168, 48) if (y // max(2, bh * 2)) % 2 else (34, 32, 30)
@@ -1398,3 +1629,21 @@ def slide(old, new, k, direction):
         else:
             out.append(ro[n:] + rn[:n])
     return out
+
+
+def model_still(mdl, size=24, heading=1.0):
+    """A 3D model alone, three-quarters on, as rows of colours (None: clear) about ``size`` pixels square -
+    for a list of things or an editor's preview."""
+    v = View(150, 30, "pixel")                            # drawn as a level draws it, then shrunk
+    d = 1.2
+    cam = (0.0, d, 0, -1, 1, 0)                           # standing south of it, looking north
+    px = [[None] * v.PW for _ in range(v.PH)]
+    v.draw_model(px, mdl, 0.0, 0.0, heading, "idle", 0.0, cam)
+    ys = [y for y, row in enumerate(px) if any(c is not None for c in row)]
+    xs = [x for row in px for x, c in enumerate(row) if c is not None]
+    if not ys:
+        return []
+    y0, y1, x0, x1 = min(ys), max(ys) + 1, min(xs), max(xs) + 1
+    rows = [row[x0:x1] for row in px[y0:y1]]
+    k = max(1.0, max(len(rows), x1 - x0) / float(size))   # shrunk to fit: the pixel nearest each
+    return [[rows[int(y * k)][int(x * k)] for x in range(int((x1 - x0) / k))] for y in range(int(len(rows) / k))]

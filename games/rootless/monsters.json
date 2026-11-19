@@ -532,5 +532,204 @@
    "shoves containers you cannot move, and takes the hits instead of you - 150 of them.",
    "It will not go through doors. Enter climbs down. When it gives out, it blows up."
   ]
+ },
+ "scout": {
+  "name": "scout drone",
+  "role": "flying gunner",
+  "tag": "s",
+  "model": "drone_scout",
+  "hp": 22,
+  "float": 0.35,
+  "sight": 9,
+  "dodge": 0.3,
+  "attack": {
+   "kind": "hitscan",
+   "damage": [
+    3,
+    7
+   ],
+   "range": 8,
+   "keep": [
+    3,
+    6
+   ],
+   "eager": 0.55,
+   "accuracy": [
+    0.85,
+    0.8,
+    0.7,
+    0.55,
+    0.45,
+    0.35,
+    0.3,
+    0.25,
+    0.2
+   ]
+  },
+  "sounds": {
+   "sight": "drone_sight",
+   "attack": "drone_zap",
+   "death": "drone_death"
+  },
+  "death": "%s spins down and drops.",
+  "man": [
+   "A refitted survey drone: two thrusters, one red eye, one small gun.",
+   "",
+   "Floats over acid and belts. Sidesteps a shot it sees coming, like a kworker."
+  ]
+ },
+ "hornet": {
+  "name": "hornet drone",
+  "role": "swarm",
+  "tag": "h",
+  "model": "drone_hornet",
+  "hp": 12,
+  "size": 0.8,
+  "float": 0.45,
+  "sight": 8,
+  "attack": {
+   "kind": "melee",
+   "damage": [
+    4,
+    7
+   ],
+   "speed": 2
+  },
+  "sounds": {
+   "sight": "hornet_sight",
+   "attack": "hornet_sting",
+   "death": "drone_death"
+  },
+  "death": "%s pops in a puff of sparks.",
+  "man": [
+   "Two rotors and a cutting nose. They come in swarms, two cells a beat.",
+   "",
+   "Twelve health: anything kills one. Never all of them at once."
+  ]
+ },
+ "warden": {
+  "name": "warden drone",
+  "role": "heavy flying gunner",
+  "tag": "W",
+  "model": "drone_warden",
+  "hp": 90,
+  "size": 1.25,
+  "float": 0.25,
+  "sight": 9,
+  "move_every": 2,
+  "attack": {
+   "kind": "projectile",
+   "damage": [
+    12,
+    18
+   ],
+   "speed": 1,
+   "range": 8,
+   "keep": [
+    3,
+    6
+   ],
+   "eager": 0.5
+  },
+  "drops": "rockets",
+  "sounds": {
+   "sight": "warden_sight",
+   "windup": "orphan_windup",
+   "attack": "drone_bolt",
+   "death": "warden_death"
+  },
+  "death": "%s comes down like a dropped anvil.",
+  "man": [
+   "The assembly floor's warden: armour plate, two plasma guns, no patience.",
+   "",
+   "Slow: it moves every other beat. Its bolts fly a cell a beat - step aside.",
+   "Rockets are what it respects."
+  ]
+ },
+ "xantrium": {
+  "name": "Xantrium ball",
+  "tag": "x",
+  "model": "xantrium_ball",
+  "kind": "ball",
+  "hp": 999,
+  "size": 0.85,
+  "roll": 8,
+  "speed": 2,
+  "crush": [
+   26,
+   40
+  ],
+  "man": [
+   "Recycled Xantrium, pressed into a ball: what drone and battle robot hulls are made of.",
+   "",
+   "Walk into one and it rolls - two cells a beat, eight cells on, crushing what it meets.",
+   "It knocks another ball on, breaks a hollow wall, holds a plate down, and sinks in acid",
+   "to make a step. Shots ping off it; a blast next to it sets it rolling."
+  ]
+ },
+ "xantrium_core": {
+  "name": "Xantrium core",
+  "tag": "O",
+  "model": "xantrium_ball",
+  "kind": "ball",
+  "hp": 999,
+  "size": 1.75,
+  "roll": 99,
+  "speed": 1,
+  "crush": [
+   30,
+   42
+  ],
+  "man": [
+   "A whole charge of Xantrium, before the press. As tall as a door.",
+   "",
+   "Once it rolls, it rolls a cell a beat until a wall stops it. Do not stop in front of it."
+  ]
+ },
+ "hopper": {
+  "name": "Swamp Hopper",
+  "tag": "H",
+  "model": "hopper",
+  "hp": 220,
+  "size": 1.0,
+  "kind": "barrel",
+  "attack": {
+   "kind": "barrel",
+   "damage": 30
+  },
+  "vehicle": {
+   "fly": true,
+   "fuel": 0,
+   "on_empty": "exit",
+   "canopy": "#4b5047",
+   "gun": {
+    "name": "twin cannon",
+    "damage": [
+     9,
+     15
+    ],
+    "burst": 2,
+    "sound": "hopper_gun",
+    "text": "DAKKA."
+   },
+   "board": "You drop into the X-47B's seat and pull the canopy shut. Space: the twin cannon. It flies over acid and swamp - while the fuel lasts.",
+   "start": "The fans spool up and the hopper lifts off the pad.",
+   "leave": "You pop the canopy and climb down.",
+   "empty": "The fuel gauge hits zero. The fans cough, slow, and stop; the hopper settles on the swamp.",
+   "wreck": "The hopper's fan pods tear loose. You are thrown out as it goes up.",
+   "sounds": {
+    "step": "hopper_fly",
+    "board": "loader_board",
+    "start": "hopper_start",
+    "empty": "hopper_stop"
+   }
+  },
+  "man": [
+   "X-47B Swamp Hopper: an armoured hovering scout of the Eryxian fleet, twin ducted fans.",
+   "",
+   "Walk into it to climb in. It needs fuel - cans pour in when you board or pick them up -",
+   "and burns a beat of it every beat once it has lifted off. Space fires the twin cannon.",
+   "It flies over acid, water and belts; it will not go through doors or onto pads."
+  ]
  }
 }

@@ -1148,9 +1148,12 @@ The map is rows of characters, north at the top. Without a legend entry a charac
 A legend entry is either the id of a monster or an item (`"m": "medkit"`), or an object:
 `{"monster": id}` or `{"item": id}` on a floor cell; `{"wall": tile}`; `{"door": true,
 "key": "x"}`; `{"toxic": true}`; `{"panel": "fist"}` or `{"panel": "shoot"}`;
-`{"exit": true}` (or `{"exit": "secret"}`, see [The end of a game of levels](#the-end-of-a-game-of-levels)).
-A floor cell can also have `"floor"` and `"ceiling"` tiles, and a surface: `"oil": true`,
-`"slick": true` or `"conveyor": "e"` (a belt). The engine's
+`{"exit": true}` (or `{"exit": "secret"}`, see [The end of a game of levels](#the-end-of-a-game-of-levels));
+`{"switch": event, "label": "GATE"}` - a switch in a wall: Enter throws it (once) and sets
+off the event, and its label is shown on it.
+A floor cell can also have `"floor"` and `"ceiling"` tiles, a surface: `"oil": true`,
+`"slick": true` or `"conveyor": "e"` (a belt), and `"sky": true` (open to the sky, see
+[Under the sky](#under-the-sky)). The engine's
 tiles are `steel`, `screens`, `screens2`, `hazard`; a game can draw its own (see
 [Tiles](#tiles)). `"floor"` and `"ceiling"` on the level itself lay a tile everywhere
 (toxic floor keeps its own look unless its cell names a tile).
@@ -1165,6 +1168,30 @@ sets off its own event (see below). Monster closets, traps and doors that open w
 fight is won are all made this way.
 
 Monsters are named on the map in the order a player meets them: the nearest zombie is `z1`.
+
+### Under the sky
+
+Cells with `"sky": true` have no ceiling: the level's sky is over them - courtyards, a
+landing pad, a swamp. The sky is drawn behind everything: a gradient from the horizon up,
+a sun or a planet, clouds that drift a little every beat, stars, and ridges along the
+horizon - the far ones stay put, the near ones move a little as the player steps sideways.
+A quarter turn is a quarter of the sky. Walls stand under it as they are (rock, reeds - a
+tile with clear pixels shows the sky through it), and the level's fog still darkens what is
+far, so a sky at dusk or at night sits best with it.
+
+```json
+"sky": {"top": "#0b1022", "horizon": "#c46a44", "stars": 0.012,
+        "sun": {"at": 0.18, "height": 0.42, "size": 0.32, "color": "#d9b07a", "bands": "#a8744a", "glow": 0.35},
+        "clouds": {"color": "#3a2c44", "amount": 0.35},
+        "ridges": [{"color": "#2a2236", "height": 0.42, "seed": 3, "rough": 0.7},
+                   {"color": "#14121a", "height": 0.2, "seed": 11, "near": 1.0}]}
+```
+
+`sun`: `at` is where it stands round the horizon (0 north, 0.25 east, 0.5 south, 0.75 west),
+`height` above the horizon (0..1 of the sky), `size`, `color`, `bands` (a planet's stripes)
+and `glow` round it. `ridges`, far to near: `height` (0..1 of the sky), `seed` (another
+seed, another skyline), `rough`, `near` (0..1: how much it moves as the player does).
+`stars`: how many (0.01 is a clear night). Everything has a default: `"sky": {}` is a dusk.
 
 ### Things that move
 
@@ -1208,6 +1235,35 @@ The rules move a cell at a time, a beat at a time:
   would hurt the player hurts it, armour or not; at 0 it throws him clear and bursts for
   its attack's `damage`. Its texts are `board`, `leave` and `wreck`; its `sounds` are `step`,
   `board` and `claw`.
+- **Machines that fly on fuel**: `"fly": true` flies over acid, water and what is on the
+  floor, treads on nothing, and climbs down only beside dry floor. `"fuel"` (its tanks, in
+  beats, usually 0) makes it need fuel: an item with `"pickup": {"fuel": 12}` is carried
+  and poured in on boarding (or at once, if picked up while flying); a dry machine will
+  not lift. From its first move it burns a beat of fuel every beat - the status line and
+  the gauge on its dashboard show what is left - and when the last of it is gone it comes
+  down: `"on_empty": "exit"` ends the level there (the ride is the level's end), else it
+  just stops. `"gun"` is a weapon (`damage`, `burst`, `pellets`, `sound`, `text`) that Space
+  fires with no ammunition; `"canopy": "#4b5047"` draws a canopy's frame and a dashboard
+  instead of a cage. Its texts add `start` and `empty`, its `sounds` `start` and `empty`.
+- **Balls** (a monster of `"kind": "ball"`): heavy, and they roll. Walking into one shoves
+  it: it rolls `speed` cells a beat (2) for `roll` cells (8), and on until something stops
+  it. What it rolls into takes `crush` damage - and if that kills it, the ball rolls on;
+  another ball is knocked on and this one stops; a barrel goes off; a hollow wall breaks
+  and the ball rolls through; in acid it sinks and makes a step. It holds a plate down,
+  rides belts, takes no harm (shots ping off it), and a blast beside it sets it rolling
+  away. On the map, `{"monster": "xantrium_core", "wake_on": "chute", "roll": "s"}` waits
+  for the event, rumbles for a beat, and then rolls that way - with `"roll": 99` and
+  `"speed": 1` it rolls a cell a beat until a wall stops it, one step behind a player who
+  does not stop.
+
+```json
+"xantrium": {"name": "Xantrium ball", "tag": "x", "model": "xantrium_ball", "kind": "ball",
+             "size": 0.85, "roll": 8, "speed": 2, "crush": [26, 40]},
+"hopper": {"name": "Swamp Hopper", "tag": "H", "model": "hopper", "hp": 220, "kind": "barrel",
+           "attack": {"kind": "barrel", "damage": 30},
+           "vehicle": {"fly": true, "fuel": 0, "on_empty": "exit", "canopy": "#4b5047",
+                       "gun": {"damage": [9, 15], "burst": 2, "sound": "hopper_gun", "text": "DAKKA."}}}
+```
 
 ```json
 "loader": {"name": "cargo loader", "tag": "v", "sprite": "loader", "hp": 150, "size": 1.35, "kind": "barrel",
@@ -1496,7 +1552,9 @@ with a secret level of its own, whose exit leads back to the next level:
 {"id": "swap_partition", "level": "e1m9",
  "on_level_exit": [{"story": "e1m9_end"}, {"goto": "dynamic_loader"}]},
 {"id": "dynamic_loader", "level": "e1m2",
- "on_level_exit": [{"story": "e1m2_end"}, {"win": "outro_demo"}]}
+ "on_level_exit": [{"story": "e1m2_end"}, {"goto": "drone_refit"}]},
+{"id": "drone_refit", "level": "e1m3",
+ "on_level_exit": [{"story": "e1m3_end"}, {"win": "outro_demo"}]}
 ```
 
 ### Sprites for a level
@@ -1577,8 +1635,10 @@ the engine's. Click or drag to paint with a character, the right button paints f
 pointing at a cell says what it is. Choosing a character opens what it means: floor,
 toxic floor, wall (and its tile), door (its key, the events that open and shut it, the
 plate that holds it open), secret wall, monster (and the event that wakes it), item (and
-the event taking it sets off), start, exit, crate, pressure plate, teleporter pad or lift
-(and their names), a secret area, and the tiles above and below it. *Add a character* gives the legend a
+the event taking it sets off, and the way a ball rolls when it wakes), start, exit, a switch (the
+event it sets off, its label), crate, pressure plate, teleporter pad or lift (and their names), a
+secret area, the tiles above and below it, and whether it is open to the sky. Monsters and items
+drawn by 3D models are shown by a small picture of the model. *Add a character* gives the legend a
 new one; *Change its meaning here* gives one of the engine's another meaning in this level.
 Below the map: the tiles of the whole level, the text of each event, and *Seen from a
 cell* - choose *Look from a cell*, click the map, and the engine draws what the player sees
@@ -1586,7 +1646,8 @@ from there; the arrow keys (or the buttons) walk and turn. *Let the level bot pl
 plays it five times and says how far it got.
 
 **Tiles** are painted like sprites; **Weapons** have a form and show the weapon in the
-player's hands, with *Fire* to see a shot. **Monsters** are listed like everything else;
+player's hands, with *Fire* to see a shot. **3D models** (models.json) have a form for how a
+model moves and the JSON for its parts and materials. **Monsters** are listed like everything else;
 sprites can be grown on a body plan, and their far versions seen, made again and painted
 (see [Pictures](#pictures)).
 

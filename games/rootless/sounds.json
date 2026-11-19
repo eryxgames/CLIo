@@ -676,5 +676,363 @@
    "dur": 0.16,
    "vol": 0.22
   }
+ ],
+ "drone_sight": [
+  {
+   "wave": "square",
+   "freq": [
+    880,
+    1320
+   ],
+   "dur": 0.08,
+   "vol": 0.18
+  },
+  {
+   "wave": "square",
+   "freq": [
+    1320,
+    990
+   ],
+   "dur": 0.1,
+   "vol": 0.16
+  }
+ ],
+ "drone_zap": [
+  {
+   "wave": "saw",
+   "freq": [
+    1600,
+    400
+   ],
+   "dur": 0.09,
+   "vol": 0.24
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 5000,
+   "freq": 0,
+   "dur": 0.05,
+   "vol": 0.18,
+   "decay": 0.05,
+   "sustain": 0
+  }
+ ],
+ "drone_death": [
+  {
+   "wave": "square",
+   "freq": [
+    900,
+    120
+   ],
+   "dur": 0.32,
+   "vol": 0.22
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 2400,
+   "freq": 0,
+   "dur": 0.3,
+   "vol": 0.4,
+   "decay": 0.28,
+   "sustain": 0
+  }
+ ],
+ "hornet_sight": [
+  {
+   "wave": "saw",
+   "freq": [
+    300,
+    340
+   ],
+   "dur": 0.25,
+   "vol": 0.14
+  },
+  {
+   "wave": "saw",
+   "freq": [
+    340,
+    300
+   ],
+   "dur": 0.2,
+   "vol": 0.12
+  }
+ ],
+ "hornet_sting": [
+  {
+   "wave": "noise",
+   "noise_rate": 6000,
+   "freq": 0,
+   "dur": 0.08,
+   "vol": 0.3,
+   "decay": 0.07,
+   "sustain": 0
+  },
+  {
+   "wave": "saw",
+   "freq": [
+    520,
+    260
+   ],
+   "dur": 0.1,
+   "vol": 0.2
+  }
+ ],
+ "warden_sight": [
+  {
+   "wave": "saw",
+   "freq": [
+    110,
+    82
+   ],
+   "dur": 0.45,
+   "vol": 0.3
+  },
+  {
+   "wave": "square",
+   "freq": [
+    220,
+    165
+   ],
+   "dur": 0.4,
+   "vol": 0.12
+  }
+ ],
+ "drone_bolt": [
+  {
+   "wave": "saw",
+   "freq": [
+    200,
+    900
+   ],
+   "dur": 0.18,
+   "vol": 0.26
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 1800,
+   "freq": 0,
+   "dur": 0.2,
+   "vol": 0.22,
+   "decay": 0.18,
+   "sustain": 0
+  }
+ ],
+ "warden_death": [
+  {
+   "wave": "noise",
+   "noise_rate": 900,
+   "freq": 0,
+   "dur": 0.7,
+   "vol": 0.55,
+   "decay": 0.6,
+   "sustain": 0.2
+  },
+  {
+   "wave": "saw",
+   "freq": [
+    160,
+    40
+   ],
+   "dur": 0.6,
+   "vol": 0.28
+  }
+ ],
+ "hopper_gun": [
+  {
+   "wave": "noise",
+   "noise_rate": 2600,
+   "freq": 0,
+   "dur": 0.07,
+   "vol": 0.5,
+   "decay": 0.06,
+   "sustain": 0
+  },
+  {
+   "wave": "square",
+   "freq": [
+    150,
+    70
+   ],
+   "dur": 0.08,
+   "vol": 0.25
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 2600,
+   "freq": 0,
+   "dur": 0.07,
+   "vol": 0.45,
+   "decay": 0.06,
+   "sustain": 0
+  }
+ ],
+ "hopper_fly": [
+  {
+   "wave": "noise",
+   "noise_rate": 700,
+   "freq": 0,
+   "dur": 0.2,
+   "vol": 0.22,
+   "decay": 0.15,
+   "sustain": 0.4
+  },
+  {
+   "wave": "saw",
+   "freq": [
+    96,
+    104
+   ],
+   "dur": 0.2,
+   "vol": 0.12
+  }
+ ],
+ "hopper_start": [
+  {
+   "wave": "saw",
+   "freq": [
+    50,
+    180
+   ],
+   "dur": 0.7,
+   "vol": 0.24
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 900,
+   "freq": 0,
+   "dur": 0.7,
+   "vol": 0.25,
+   "decay": 0.2,
+   "sustain": 0.7
+  }
+ ],
+ "hopper_stop": [
+  {
+   "wave": "saw",
+   "freq": [
+    180,
+    40
+   ],
+   "dur": 0.9,
+   "vol": 0.26
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 600,
+   "freq": 0,
+   "dur": 0.8,
+   "vol": 0.22,
+   "decay": 0.7,
+   "sustain": 0.2
+  }
+ ],
+ "refuel": [
+  {
+   "wave": "noise",
+   "noise_rate": 1400,
+   "freq": 0,
+   "dur": 0.25,
+   "vol": 0.3,
+   "decay": 0.2,
+   "sustain": 0.3
+  },
+  {
+   "wave": "triangle",
+   "freq": [
+    330,
+    660
+   ],
+   "dur": 0.18,
+   "vol": 0.2
+  }
+ ],
+ "rumble": [
+  {
+   "wave": "noise",
+   "noise_rate": 220,
+   "freq": 0,
+   "dur": 0.8,
+   "vol": 0.6,
+   "decay": 0.3,
+   "sustain": 0.6
+  },
+  {
+   "wave": "saw",
+   "freq": [
+    45,
+    38
+   ],
+   "dur": 0.8,
+   "vol": 0.3
+  }
+ ],
+ "thud": [
+  {
+   "wave": "noise",
+   "noise_rate": 300,
+   "freq": 0,
+   "dur": 0.3,
+   "vol": 0.6,
+   "decay": 0.25,
+   "sustain": 0
+  },
+  {
+   "wave": "square",
+   "freq": [
+    80,
+    40
+   ],
+   "dur": 0.25,
+   "vol": 0.3
+  }
+ ],
+ "clack": [
+  {
+   "wave": "square",
+   "freq": [
+    1400,
+    1100
+   ],
+   "dur": 0.05,
+   "vol": 0.25
+  },
+  {
+   "wave": "triangle",
+   "freq": [
+    700,
+    650
+   ],
+   "dur": 0.2,
+   "vol": 0.2
+  }
+ ],
+ "switch": [
+  {
+   "wave": "square",
+   "freq": [
+    400,
+    300
+   ],
+   "dur": 0.05,
+   "vol": 0.2
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 3000,
+   "freq": 0,
+   "dur": 0.05,
+   "vol": 0.3,
+   "decay": 0.04,
+   "sustain": 0
+  },
+  {
+   "wave": "triangle",
+   "freq": [
+    440,
+    880
+   ],
+   "dur": 0.25,
+   "vol": 0.18
+  }
  ]
 }

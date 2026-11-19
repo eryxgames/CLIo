@@ -261,7 +261,11 @@ KINDS = [
         F("hp", "number", "Health"), F("size", "number", "Size (1: a person)"),
         F("float", "number", "Floats above the floor (0..1)"), F("sight", "number", "Sees this many cells"),
         F("awake", "bool", "Awake from the start"), F("boss", "bool"), F("drops", "ref", "Drops", of="items"),
-        F("death", label="When it dies (%s: its tag)")]},
+        F("death", label="When it dies (%s: its tag)"),
+        R("model", "ref", "A 3D model drawn instead of the sprite", of="models")]},
+    {"key": "models", "file": "models", "label": "3D models", "one": "model", "shape": "map", "fields": [
+        F("smooth", "bool", "Smooth (lit at the corners: round things)"), F("scale", "number", "Scale (1: as built)"),
+        F("turning", "number", "Turns this many degrees a beat (a pickup)"), F("fps", "number", "Frames a beat")]},
 ]
 
 BY_FILE = {k["file"]: k for k in KINDS}

@@ -104,12 +104,15 @@ class StopLine(Exception):
 # --------------------------------------------------------------------------- #
 # the map
 # --------------------------------------------------------------------------- #
+WALLS = ("wall", "panel", "exit", "switch")       # the kinds of cell that are walls: nothing goes through
+
+
 class Cell:
     __slots__ = ("x", "y", "ch", "kind", "tex", "key", "panel", "toxic", "open", "opens_on", "closes_on",
                  "on_enter", "sealed", "pressed", "label", "label_role", "secret", "found", "floor", "ceiling",
                  "savepoint",
                  "crate", "plate", "down", "open_while", "teleport", "arrive_only", "pad_facing", "lift", "deck", "sunk",
-                 "oil", "slick", "conveyor", "scorched", "exit_kind", "heavy")
+                 "oil", "slick", "conveyor", "scorched", "exit_kind", "heavy", "switch", "sky")
 
     def __init__(self, x, y, ch, spec):
         self.x, self.y, self.ch = x, y, ch
@@ -142,6 +145,8 @@ class Cell:
         self.pressed = False
         self.secret = bool(spec.get("secret")) or bool(self.panel)
         self.savepoint = bool(spec.get("savepoint"))    # a checkpoint: the game is saved when it is first reached
+        self.switch = spec.get("switch")                # a switch in the wall: using it sets off this event
+        self.sky = bool(spec.get("sky"))                # open to the sky: no ceiling over it
         self.found = False
         self.open = 0.0
         self.exit_kind = "secret" if spec.get("exit") == "secret" else "exit"
@@ -152,6 +157,8 @@ class Cell:
             self.open = 1.0 if spec.get("open") else 0.0
         elif self.panel:
             self.kind = "panel"
+        elif self.switch:
+            self.kind = "switch"
         elif spec.get("wall") or ((spec.get("opens_on") or spec.get("open_while")) and not spec.get("door")):
             self.kind = "wall"
         else:
@@ -162,6 +169,8 @@ class Cell:
             self.label_role = "key_" + self.key
         elif self.kind == "exit":
             self.label, self.label_role = "EXIT", "good"
+        elif self.kind == "switch" and spec.get("label"):
+            self.label, self.label_role = str(spec["label"])[:8], "info"
 
     @property
     def solid(self):
@@ -169,12 +178,12 @@ class Cell:
             return True
         if self.kind == "door":
             return self.open < 1.0
-        return self.kind in ("wall", "panel", "exit")
+        return self.kind in WALLS
 
     def drawn_as_wall(self, opened=None):
         if self.kind == "door":
             return (self.open if opened is None else opened) < 1.0
-        return self.kind in ("wall", "panel", "exit")
+        return self.kind in WALLS
 
     def texture(self):
         if self.kind == "door":
@@ -185,6 +194,8 @@ class Cell:
             return self.panel if self.panel in ("fist", "shoot") else "steel"
         if self.kind == "exit":
             return "exit_on" if self.pressed else "exit"
+        if self.kind == "switch":
+            return "switch_on" if self.pressed else "switch"
         return self.tex
 
 
@@ -218,8 +229,19 @@ class Monster:
         self.owner = None            # the monster that made this one
         self.clock = 0
         self.enraged = False
-        self.barrel = spec.get("kind") == "barrel" or self.attack.get("kind") == "barrel"
+        self.ball = spec.get("kind") == "ball"         # a heavy ball: it rolls when shoved, and crushes what it meets
+        self.barrel = spec.get("kind") == "barrel" or self.attack.get("kind") == "barrel" or self.ball
+        self.rolling = None                              # (dx, dy) while a ball rolls
+        self.left = 0                                    # cells it rolls on before it comes to rest
+        self.roll_wait = 0                               # beats before a released ball starts
+        self.roll_dir = None                             # the way an event sets it rolling (its map cell's "roll")
+        self.rolled = 0                                  # cells rolled: how far it has turned
+        if self.ball:
+            self.heading = 0.0
         self.vehicle = spec.get("vehicle") if isinstance(spec.get("vehicle"), dict) else None   # one can ride it
+        v = self.vehicle or {}
+        self.fuel = int(v.get("fuel", 0) or 0)           # beats of fuel in its tanks (a vehicle with "fuel")
+        self.started = False                             # its engines run: the fuel burns a beat at a time
 
     @property
     def name(self):
@@ -281,6 +303,7 @@ class Player:
         self.goggles = 0                             # beats the TTY goggles' battery has left
         self.goggles_on = False                      # worn: the battery runs down only while they are on
         self.had_goggles = False
+        self.fuel = 0                                # beats of fuel carried in cans, for a machine that needs it
 
     @property
     def nightvision(self):
@@ -401,6 +424,7 @@ class Level:
                     m = self.add_monster(spec["monster"], x, y)
                     if m is not None:
                         m.wake_on = spec.get("wake_on")
+                        m.roll_dir = FACING.get(str(spec.get("roll") or "").lower()[:1])
                         if spec.get("awake"):
                             m.awake = True
                 if spec.get("item"):
@@ -515,6 +539,9 @@ class Level:
                 if any(c is None for f in frames for r in f for c in r):
                     self.see_through.add(name)
         self.floor_tile, self.ceiling_tile = self.spec.get("floor"), self.spec.get("ceiling")
+        from .firstperson import sky_spec
+        open_air = any(c.sky for row in self.grid for c in row)
+        self.sky_look = sky_spec(self.spec.get("sky")) if open_air else None   # how the sky over open cells looks
 
     # ---- the grid ------------------------------------------------------- #
     def cell(self, x, y):
@@ -953,10 +980,42 @@ class Level:
         self.anim([FX(cam=(ox + (m.x - ox) * ease(i / 5.0), oy + (m.y - oy) * ease(i / 5.0)), recoil=6 - i)
                    for i in range(1, 6)], 0.04)
         self.say(spec.get("board") or "You climb into the %s." % m.name, "good")
+        if "fuel" in spec:
+            if p.fuel:
+                self.refuel(m)
+            elif m.fuel <= 0:
+                self.say("The tanks are dry: it will not lift. Find fuel.", "alert")
         self.update_seen()
         self.arrive()
         self.end_beat()
         return True
+
+    def refuel(self, v):
+        """The fuel the player carries goes into the machine's tanks."""
+        p = self.player
+        v.fuel += p.fuel
+        self.say("You pour %d beats of fuel into the tanks (%d in all)." % (p.fuel, v.fuel), "good")
+        p.fuel = 0
+        self.sfx("refuel", "pickup")
+
+    def fuel_beat(self):
+        """A beat of a running machine: its fuel burns, and when the last of it is gone it comes down."""
+        v = self.player.vehicle
+        if v is None or not v.started or "fuel" not in v.vehicle:
+            return
+        v.fuel = max(0, v.fuel - 1)
+        if v.fuel in (10, 5):
+            self.say("Fuel: %d beats left." % v.fuel, "alert")
+        if v.fuel:
+            return
+        spec = v.vehicle
+        v.started = False
+        self.sfx((spec.get("sounds") or {}).get("empty") or "power_down", "power")
+        self.say(spec.get("empty") or "The engines cough and stop. The %s settles." % v.name, "alert")
+        self.anim([FX(shake=s, whiten=w) for s, w in ((1, 0.0), (-1, 0.0), (1, 0.1), (0, 0.2), (0, 0.35))], 0.08)
+        if spec.get("on_empty") == "exit":               # the ride is the end of the level
+            self.exit_kind = "exit"
+            self.over = "exit"
 
     def leave(self):
         """Climb down from the vehicle: behind you, or to a side - it stays where it stands."""
@@ -969,10 +1028,11 @@ class Level:
         rx, ry = DIRS[(p.facing + 1) % 4]
         sides = [(-fx, -fy), (-rx, -ry), (rx, ry), (fx, fy)]
         ok = [(p.x + dx, p.y + dy) for dx, dy in sides if self.free(p.x + dx, p.y + dy)]
-        dry = [c for c in ok if not self.cell(*c).toxic and c not in self.fires] or ok
+        dry = [c for c in ok if not self.cell(*c).toxic and c not in self.fires] or ([] if v.vehicle.get("fly") else ok)
         if not dry:
-            self.say("No room to climb down here.", "dim")
+            self.say("Not here: set down by dry floor first." if ok else "No room to climb down here.", "dim")
             return False
+        v.started = False
         x, y = dry[0]
         p.vehicle = None
         v.x, v.y = p.x, p.y
@@ -1108,9 +1168,21 @@ class Level:
             if cell.teleport or cell.lift:
                 self.say("The %s is too heavy for the %s." % (v.name, "pad" if cell.teleport else "lift"), "dim")
                 return False
+            if "fuel" in v.vehicle and not v.started:
+                if v.fuel <= 0:
+                    self.say("The tanks are dry: the %s will not lift. Find fuel." % v.name, "dim")
+                    self.sfx("locked")
+                    return False
+                v.started = True
+                self.sfx((v.vehicle.get("sounds") or {}).get("start") or "power", "power")
+                self.say(v.vehicle.get("start") or "The engines spool up. (%d beats of fuel)" % v.fuel, "good")
             m = self.monster_at(nx, ny)
-            if m is not None and not m.barrel and not m.spec.get("boss") and not m.float:
+            if (m is not None and not m.barrel and not m.spec.get("boss") and not m.float
+                    and not v.vehicle.get("fly")):
                 return self.stomp(m, nx, ny)
+        if cell.crate and v is not None and v.vehicle.get("fly"):
+            self.say("The %s bumps the %s and hovers back." % (v.name, "container" if cell.heavy else "crate"), "dim")
+            return False
         if cell.crate and cell.heavy and v is None:
             self.say("A container: it will not budge for you. Something with hydraulics might move it.", "dim")
             self.sfx("locked")
@@ -1125,7 +1197,9 @@ class Level:
         m = self.monster_at(nx, ny)
         if m is not None and m.vehicle and v is None:
             return self.board(m)
-        if m is not None and m.barrel and not m.vehicle:
+        if m is not None and m.ball and side == 0 and ahead > 0:
+            return self.push_ball(m, nx - p.x, ny - p.y)
+        if m is not None and m.barrel and not m.vehicle and not m.ball:
             return self.push_barrel(m, nx - p.x, ny - p.y)
         if m is not None:
             self.say("%s is in the way." % m.tag, "dim")
@@ -1214,6 +1288,115 @@ class Level:
         self.arrive()
         self.end_beat()
         return True
+
+    def ball_room(self, x, y):
+        """Can a ball roll into (x, y)? Into anything but a wall or a crate - a hollow wall it breaks."""
+        c = self.cell(x, y)
+        return not c.solid or (c.kind == "panel" and c.panel == "fist")
+
+    def set_rolling(self, b, dx, dy, cells=None):
+        b.rolling = (dx, dy)
+        b.left = int(b.spec.get("roll", 8)) if cells is None else cells
+        b.heading = math.atan2(dy, dx)
+        b.roll_wait = 0
+
+    def push_ball(self, b, dx, dy):
+        """Walk into a ball: it rolls away from you, and on, until something stops it."""
+        p = self.player
+        if not self.ball_room(b.x + dx, b.y + dy):
+            self.say("The %s will not roll: something is behind it." % b.name, "dim")
+            self.sfx("locked")
+            return False
+        self.set_rolling(b, dx, dy)
+        self.sfx("push", "drop")
+        self.anim([FX(cam=(p.x + dx * k, p.y + dy * k)) for k in (0.18, 0.3, 0.12, 0.0)], 0.035)
+        self.say("You shove the %s and it rolls." % b.name, "dim")
+        self.end_beat()
+        return True
+
+    def roll(self):
+        """Rolling balls go on, ``speed`` cells a beat, until a wall, a crate or something that will not
+        give stops them: what they meet is crushed, another ball is knocked on, a hollow wall breaks,
+        and in acid they sink and make a step."""
+        rolling = [m for m in self.monsters if m.ball and m.rolling and not m.gone]
+        for b in rolling:
+            if self.over:
+                return
+            if b.roll_wait:
+                b.roll_wait -= 1
+                self.sfx("rumble", "door")
+                self.say("A rumble. Something heavy starts to move.", "alert")
+                self.anim([FX(shake=s) for s in (1, -1, 1, 0)], 0.05)
+                self.interrupt = self.interrupt or "something is rolling"
+                continue
+            for _ in range(max(1, int(b.spec.get("speed", 2)))):
+                if not b.rolling or b.left <= 0 or self.over or not self.roll_on(b):
+                    break
+            if b.rolling and b.left <= 0:
+                b.rolling = None
+        if rolling:
+            self.update_seen()
+
+    def roll_on(self, b):
+        """A ball's next cell: True if it got there."""
+        dx, dy = b.rolling
+        nx, ny = b.x + dx, b.y + dy
+        c = self.cell(nx, ny)
+        p = self.player
+        lo, hi = b.spec.get("crush") or [25, 35]
+        big = b.size >= 1.3
+
+        def stop(text, sound="thud"):
+            b.rolling, b.left = None, 0
+            self.sfx(sound, "hit_wall")
+            if text:
+                self.say(text, "dim")
+            if big:
+                self.anim([FX(shake=s) for s in (1, -1, 0)], 0.05)
+            return False
+
+        if c.kind == "panel" and c.panel == "fist":         # it smashes through, and rolls on
+            self.say("The %s smashes into the hollow wall - and through it." % b.name, "secret")
+            self.sfx("thud", "hit_wall")
+            self.open_panel(c)
+        if c.solid or c is VOID:
+            return stop("The %s crashes into the %s and stops." % (b.name, "crate" if c.crate else
+                                                                     "door" if c.kind == "door" else "wall"))
+        if (nx, ny) == (p.x, p.y):
+            self.hurt(self.rng.randint(lo, hi), "The %s rolls into you." % b.name, by=b)
+            return stop(None)
+        o = self.monster_at(nx, ny)
+        if o is not None:
+            if o.ball:                                   # it stops; the one it hit rolls on
+                self.set_rolling(o, dx, dy, cells=max(2, b.left))
+                return stop("%s knocks %s on." % (b.tag, o.tag), "clack")
+            if o.barrel and not o.vehicle:
+                stop(None)
+                self.kill(o)
+                return False
+            if o.vehicle or o.spec.get("boss"):
+                return stop("The %s thuds against %s." % (b.name, o.tag))
+            self.damage([(o, self.rng.randint(lo, hi))], lead="The %s rolls into it:" % b.name)
+            if not o.dead or self.over:
+                return stop(None)
+        ox, oy = b.x, b.y
+        b.x, b.y = nx, ny
+        b.rolled += 1
+        b.left -= 1
+        self.anim([FX(pos={b.id: (ox + dx * k, oy + dy * k)}) for k in (0.34, 0.67, 1.0)], 0.03)
+        if c.toxic:                                      # heavy: it sinks, and fills the pool
+            self.sink(b)
+            return False
+        return True
+
+    def sink(self, b):
+        """A ball in acid sinks, and fills the cell: a step you can stand on."""
+        c = self.cell(b.x, b.y)
+        c.toxic, c.sunk = False, True
+        self.marks_version += 1
+        b.gone, b.rolling = True, None
+        self.say("The %s sinks into the acid and settles: a step you can stand on." % b.name, "good")
+        self.sfx("wade", "drop")
 
     def push(self, cell, dx, dy):
         """Walk into a crate: it slides one cell on, if there is room - into acid, it sinks and makes a step."""
@@ -1400,10 +1583,14 @@ class Level:
         if pk.get("power") == "goggles":
             p.goggles = max(p.goggles, int(pk.get("beats", 30)))
             p.goggles_on = p.had_goggles = True
+        if pk.get("fuel"):
+            p.fuel += int(pk["fuel"])
         it.taken = True
         self.stats["items"] += 1
         self.say(pk.get("text") or "You pick up the %s." % name, "root" if pk.get("power") else "good")
         self.sfx(pk.get("sound") or ("special" if pk.get("weapon") or pk.get("power") else "pickup"))
+        if pk.get("fuel") and p.vehicle is not None and "fuel" in p.vehicle.vehicle:
+            self.refuel(p.vehicle)
         if it.on_pickup:
             self.event(it.on_pickup)
 
@@ -1416,7 +1603,7 @@ class Level:
         x, y = self.ahead()
         cell = self.cell(x, y)
         p = self.player
-        if p.vehicle is not None and cell.kind != "exit":           # in the cage, Enter climbs down
+        if p.vehicle is not None and cell.kind not in ("exit", "switch"):   # in the cage, Enter climbs down
             if cell.kind == "door":
                 self.say("The %s will not fit through the door: you climb down." % p.vehicle.name, "dim")
             return self.leave()
@@ -1457,6 +1644,17 @@ class Level:
                     self.sfx("lift", "power")
                     self.console.ride(self, old, None, ride == "down")
             self.over = "exit"
+            return True
+        if cell.kind == "switch":
+            if cell.pressed:
+                self.say("It is thrown already.", "dim")
+                return False
+            cell.pressed = True
+            self.sfx("switch", "power")
+            self.say("You throw the switch.", "good")
+            self.anim([FX() for _ in range(3)], 0.06)
+            self.event(cell.switch)
+            self.end_beat()
             return True
         if cell.kind == "panel":
             self.say("The wall sounds hollow here." if cell.panel == "fist" else "A vent, dented, as if shot at.", "dim")
@@ -1557,9 +1755,12 @@ class Level:
 
     def fire(self, tag=None):
         p, rng = self.player, self.rng
-        if p.vehicle is not None:
-            return self.claw()
         w = self.weapons.get(p.weapon) or WEAPONS["1"]
+        if p.vehicle is not None:
+            gun = p.vehicle.vehicle.get("gun")
+            if not isinstance(gun, dict):
+                return self.claw()
+            w = dict(gun, ammo=None)                     # the machine's own guns: they never run dry
         if w.get("ammo") and p.ammo.get(w["ammo"], 0) <= 0:
             self.say("Click. No %s." % w["ammo"], "hurt")
             return False
@@ -1578,7 +1779,7 @@ class Level:
             cone = self.cone()
             foes = [m for m in cone if not m.barrel]
             far_barrels = [m for m in cone if m.barrel and self.dist(m) > 1     # never one at arm's length,
-                           and abs(self.rel(m.x, m.y)[0]) < 0.5 and not m.vehicle]   # only one straight ahead
+                           and abs(self.rel(m.x, m.y)[0]) < 0.5 and not m.vehicle and not m.ball]   # one straight ahead
             target = (foes or far_barrels or [None])[0]
         if w.get("kind") in ("rocket", "grenade"):
             if w.get("ammo"):
@@ -1708,6 +1909,11 @@ class Level:
         for _ in range(fp.SIGHT + 2):
             x, y = x + fx, y + fy
             cell = self.cell(x, y)
+            ball = self.monster_at(x, y)
+            if ball is not None and ball.ball:
+                self.sfx("clack", "hit_wall")
+                self.say("Your shot pings off the %s." % ball.name, "dim")
+                return
             if cell.solid:
                 if cell.kind == "panel" and cell.panel == "shoot":
                     self.open_panel(cell)
@@ -1726,7 +1932,7 @@ class Level:
 
     # ---- damage ------------------------------------------------------------ #
     def damage(self, hits, lead="", source=None):
-        hits = [(m, d) for m, d in hits if not m.dead and not m.gone]
+        hits = [(m, d) for m, d in hits if not m.dead and not m.gone and not m.ball]     # a ball takes no harm
         if not hits:
             return
         turned = []
@@ -1967,7 +2173,7 @@ class Level:
         """A bullet hole in the face of wall (x, y) turned towards ``DIRS[n]``: ``along`` it (-0.5..0.5,
         sideways in the direction ``DIRS[n + 1]``) and ``down`` it (0 at the top, 1 at the floor)."""
         c = self.cell(x, y)
-        if c.kind not in ("wall", "panel", "exit") or c.crate or c is VOID:
+        if c.kind not in WALLS or c.crate or c is VOID:
             return
         self.holes.append((x, y, n, max(-0.45, min(0.45, along)), max(0.05, min(0.95, down))))
         del self.holes[:-HOLES]
@@ -2019,6 +2225,11 @@ class Level:
                     t.crate = True
                     slid[(t.x, t.y)] = (c.x, c.y)
         for m in self.monsters:
+            if m.ball and not m.gone and max(abs(m.x - x0), abs(m.y - y0)) == 1 and (m.x == x0 or m.y == y0) \
+                    and self.ball_room(m.x + sign(m.x - x0), m.y + sign(m.y - y0)):
+                self.set_rolling(m, sign(m.x - x0), sign(m.y - y0))      # it rolls away: next beat
+                self.say("The blast sets %s rolling." % m.tag, "dim")
+                continue
             if m.dead or m.gone or m.barrel or m.spec.get("boss") or max(abs(m.x - x0), abs(m.y - y0)) > 1:
                 continue
             dx, dy = sign(m.x - x0), sign(m.y - y0)
@@ -2130,6 +2341,9 @@ class Level:
             self.say("Somewhere, walls grind open.", "alert")
         for m in self.monsters:
             if m.wake_on == name and not m.dead:
+                if m.ball and m.roll_dir is not None:     # a ball let go: it rolls after a beat's rumble
+                    self.set_rolling(m, *DIRS[m.roll_dir], cells=999)
+                    m.roll_wait = int(m.spec.get("delay", 1))
                 self.wake(m, quiet=True)
         if closed or opened:
             self.sfx("door")
@@ -2165,6 +2379,9 @@ class Level:
             if self.over:
                 return
             job()
+        self.roll()
+        if self.over:
+            return
         if self.boss is not None and self.boss.awake and not self.boss.dead and not self.boss.gone:
             self.boss_beat()
         self.convey()
@@ -2196,6 +2413,7 @@ class Level:
             p.sudo -= 1
             if not p.sudo:
                 self.say("Root has expired. You are rootless again.", "dim")
+        self.fuel_beat()
         self.noise_at = None
         self.update_seen()
         if p.hp <= 0:
@@ -2310,6 +2528,9 @@ class Level:
                           pos={m.id: (x0 + (m.x - x0) * k, y0 + (m.y - y0) * k) for m, x0, y0 in moves},
                           crates={xy: (o[0] + (xy[0] - o[0]) * k, o[1] + (xy[1] - o[1]) * k) for xy, o in crates.items()})
                        for k in (0.33, 0.66, 1.0)], 0.04)
+            for m, _x, _y in moves:                       # a ball carried into acid sinks
+                if m.ball and self.cell(m.x, m.y).toxic:
+                    self.sink(m)
             if cam:
                 self.say("The belt carries you on.", "dim")
                 self.update_seen()
@@ -2834,6 +3055,8 @@ class FrameConsole:
         segs = [(" %s %d" % (g["heart"], p.hp), "hurt" if fx.hurt or p.hp < 30 else "text"),
                 ("  %s %d" % (g["armor"], p.armor), "dim" if not p.armor else "key_x" if p.armor > 100 else "good"), bar,
                 ] + ([("%s %d" % (p.vehicle.name, max(0, p.vehicle.hp)), "alert" if p.vehicle.hp <= 40 else "key_w"), bar]
+                     + ([("fuel %d" % p.vehicle.fuel, "alert" if p.vehicle.fuel <= 5 else "ammo"), bar]
+                        if "fuel" in p.vehicle.vehicle else [])
                      if p.vehicle is not None else
                      [("%s %s " % (lv.slot_of(p.weapon), w.get("name", "?")), "text"), (ammo, "ammo"), bar]) + keys + [
                 bar, (g["facing"][p.facing] + " " + FACE_NAMES[p.facing][0].upper(), "text"), bar,
@@ -2927,6 +3150,8 @@ class FrameConsole:
                 return fp.KEY_COLOURS.get(c.key, (170, 140, 90)) if c.open < 1 else (90, 80, 60)
             if c.kind == "exit":
                 return (90, 230, 120)
+            if c.kind == "switch":
+                return (230, 190, 70) if not c.pressed else (90, 230, 120)
             if c.crate:
                 return (140, 104, 64)
             if c.kind in ("wall", "panel"):
@@ -3075,6 +3300,8 @@ class TextConsole:
             return "/" if c.open >= 1 else (c.key or "+").upper() if c.key else "+"
         if c.kind == "exit":
             return "E"
+        if c.kind == "switch":
+            return "|" if c.pressed else "\\"
         if c.crate:
             return "&"
         if c.kind in ("wall", "panel"):
@@ -3114,6 +3341,10 @@ class TextConsole:
         ammo = (" %s %d" % (w["ammo"], p.ammo.get(w["ammo"], 0))) if w.get("ammo") else ""
         if p.vehicle is not None:
             ammo += " | riding the %s %d" % (p.vehicle.name, max(0, p.vehicle.hp))
+            if "fuel" in p.vehicle.vehicle:
+                ammo += ", fuel %d" % p.vehicle.fuel
+        elif p.fuel:
+            ammo += " | fuel cans %d" % p.fuel
         power = "".join(" | %s %d" % (n, v) for n, v in (("root", p.sudo), ("boots", p.boots),
                                                           ("goggles" if p.goggles_on else "goggles off", p.goggles)) if v)
         self.write("-- hp %d  armour %d | %s%s | keys %s%s | facing %s | beat %d --" % (
@@ -3330,6 +3561,23 @@ def validate(data):
                 problems.append("monster '%s': its crontab forks unknown monster '%s'" % (kind, job["spawn"]))
         if spec.get("drops") and spec["drops"] not in items:
             problems.append("monster '%s': drops unknown item '%s'" % (kind, spec["drops"]))
+        if spec.get("kind") == "ball":
+            for key in ("roll", "speed"):
+                if key in spec and (not isinstance(spec[key], int) or isinstance(spec[key], bool) or spec[key] < 1):
+                    problems.append("monster '%s': %s should be a whole number, 1 or more" % (kind, key))
+            c = spec.get("crush")
+            if c is not None and not (isinstance(c, list) and len(c) == 2 and all(isinstance(v, int) for v in c)):
+                problems.append("monster '%s': crush should be [least, most]" % kind)
+        veh = spec.get("vehicle")
+        if isinstance(veh, dict):
+            if "fuel" in veh and (not isinstance(veh["fuel"], int) or isinstance(veh["fuel"], bool) or veh["fuel"] < 0):
+                problems.append("monster '%s': its vehicle's fuel should be a number of beats (0 or more)" % kind)
+            if veh.get("on_empty") not in (None, "exit", "land"):
+                problems.append("monster '%s': on_empty should be \"exit\" or \"land\", not '%s'" % (kind, veh["on_empty"]))
+            gun = veh.get("gun")
+            if gun is not None and not (isinstance(gun, dict) and isinstance(gun.get("damage"), list)
+                                        and len(gun["damage"]) == 2):
+                problems.append("monster '%s': its vehicle's gun should be a weapon with damage [least, most]" % kind)
         sp = spec.get("sprite") or kind
         models = getattr(data, "models", None) or {}
         if spec.get("model") and spec["model"] not in models:
@@ -3343,6 +3591,8 @@ def validate(data):
         pk = (it or {}).get("pickup") if isinstance(it, dict) else None
         if isinstance(pk, dict) and pk.get("model") and pk["model"] not in models:
             problems.append("item '%s': no model '%s' in models.json" % (iid, pk["model"]))
+        if isinstance(pk, dict) and "fuel" in pk and (not isinstance(pk["fuel"], int) or pk["fuel"] < 1):
+            problems.append("item '%s': fuel should be a number of beats, 1 or more" % iid)
     from .firstperson import TEXTURES
     tiles = getattr(data, "tiles", None) or {}
     for name, t in tiles.items():
@@ -3395,10 +3645,23 @@ def validate(data):
                      if isinstance(spec, dict) and spec.get("start"))
         if starts != 1:
             problems.append("level '%s': the map should have one start (@), it has %d" % (lid, starts))
-        if not any("E" in r for r in rows) and not any(isinstance(s, dict) and s.get("exit") for s in legend.values()
-                                                         if any(k for k in s)):
-            problems.append("level '%s': there is no exit (E)" % lid)
         used = set("".join(rows))
+
+        def ends(sp):                                # a way the level ends: an exit, or a ride that ends it
+            if not isinstance(sp, dict):
+                sp = {"monster": sp} if sp in mons else {}
+            veh = (mons.get(sp.get("monster")) or {}).get("vehicle") if sp.get("monster") else None
+            return bool(sp.get("exit")) or (isinstance(veh, dict) and veh.get("on_empty") == "exit")
+        if not any(ends(legend.get(ch)) for ch in used):
+            problems.append("level '%s': there is no exit (E)" % lid)
+        if lv.get("sky") is not None and not isinstance(lv["sky"], dict):
+            problems.append("level '%s': sky should be an object (top, horizon, sun, ridges, clouds, stars)" % lid)
+        listening = set()
+        for ch in used:
+            sp = legend.get(ch)
+            if isinstance(sp, dict):
+                listening |= {sp.get("opens_on"), sp.get("closes_on"), sp.get("wake_on")}
+        listening |= set((lv.get("events") or {}))
         counts = {}
         for ch in used:
             sp = legend.get(ch)
@@ -3434,6 +3697,19 @@ def validate(data):
                 problems.append("level '%s': '%s' is a belt going '%s'; it should be n, e, s or w" % (lid, ch, spec["conveyor"]))
             if spec.get("exit") not in (None, False, True, "secret"):
                 problems.append("level '%s': '%s' is an exit '%s'; it should be true or \"secret\"" % (lid, ch, spec["exit"]))
+            if spec.get("switch") is not None:
+                if not isinstance(spec["switch"], str) or not spec["switch"]:
+                    problems.append("level '%s': '%s' is a switch; its value should be the name of the event it sets off"
+                                    % (lid, ch))
+                elif spec["switch"] not in listening:
+                    problems.append("level '%s': the switch '%s' sets off '%s', but nothing opens, closes or wakes on it"
+                                    % (lid, ch, spec["switch"]))
+            if spec.get("roll") is not None:
+                if str(spec["roll"]).lower()[:1] not in FACING or not spec["roll"]:
+                    problems.append("level '%s': '%s' rolls '%s'; it should be n, e, s or w" % (lid, ch, spec["roll"]))
+                elif (mons.get(spec.get("monster")) or {}).get("kind") != "ball":
+                    problems.append("level '%s': '%s' has roll, but only a ball (a monster of kind \"ball\") rolls"
+                                    % (lid, ch))
     fp = data.config.get("first_person") or {}
     saves = fp.get("saves")
     if saves is not None and (isinstance(saves, bool) or not isinstance(saves, int) or saves < 0):

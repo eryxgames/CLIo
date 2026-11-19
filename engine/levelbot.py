@@ -97,7 +97,7 @@ class Bot(TextConsole):
 
     def open_cell(self, lv, n, careful):
         c = lv.cell(*n)
-        if c.kind in ("wall", "panel", "exit") or c.crate or (c.kind == "door" and (c.sealed or c.open_while)):
+        if c.kind in ("wall", "panel", "exit", "switch") or c.crate or (c.kind == "door" and (c.sealed or c.open_while)):
             return False
         if c.kind == "door" and c.key and c.key not in lv.player.keys and c.open < 1:
             return False
@@ -137,8 +137,8 @@ class Bot(TextConsole):
                     return it.x, it.y
             for row in lv.grid:
                 for c in row:
-                    if c.ch == g and (c.kind != "exit" or not c.pressed):
-                        if c.kind == "exit":
+                    if c.ch == g and (c.kind not in ("exit", "switch") or not c.pressed):
+                        if c.kind in ("exit", "switch"):
                             self.exit = (c.x, c.y)
                             for dx, dy in DIRS:              # stand in front of it
                                 if lv.cell(c.x + dx, c.y + dy).kind == "floor":
@@ -156,9 +156,11 @@ class Bot(TextConsole):
             self.goals.pop(0)
             if p.vehicle is not None:
                 return "out"
-        if p.vehicle is not None:                      # riding: claw what is in reach, else on to the goal
+        if p.vehicle is not None:                      # riding: claw what is in reach (or shoot), else on to the goal
             ahead = lv.monster_at(p.x + DIRS[p.facing][0], p.y + DIRS[p.facing][1])
             if ahead is not None and not ahead.barrel:
+                return "f"
+            if p.vehicle.vehicle.get("gun") and any(not m.barrel for m in lv.cone()):
                 return "f"
             goal = self.goal_cell(lv)
             step = self.go(lv, *goal) if goal is not None else None
@@ -183,6 +185,19 @@ class Bot(TextConsole):
                     n = (p.x + rx * k, p.y + ry * k)
                     if lv.free(*n) and n not in [c for c in s.path[s.i:]] and n not in lv.marks:
                         return side
+        # out of the way of a ball rolling at him: aside if he can, else on, away from it
+        for b in lv.monsters:
+            if not getattr(b, "ball", False) or not b.rolling or b.gone:
+                continue
+            dx, dy = b.rolling
+            ahead = (p.x - b.x) * dx + (p.y - b.y) * dy
+            if (p.x - b.x) * dy - (p.y - b.y) * dx == 0 and 0 < ahead <= 8:
+                aside = [(dy, dx), (-dy, -dx)]
+                for sx, sy in aside:
+                    if lv.free(p.x + sx, p.y + sy) and not lv.cell(p.x + sx, p.y + sy).toxic:
+                        return self.step(lv, sx, sy)
+                if lv.free(p.x + dx, p.y + dy):
+                    return self.face(lv, dx, dy) or "k"
         # out of the fire, and out of line of a flamethrower that levels its nozzle
         fires = getattr(lv, "fires", {})
         safe = [(dx, dy) for dx, dy in DIRS if lv.free(p.x + dx, p.y + dy) and (p.x + dx, p.y + dy) not in fires
@@ -239,7 +254,7 @@ class Bot(TextConsole):
         if step is None:
             if self.goals:
                 g = self.goals[0]
-                if self.exit and lv.cell(*self.exit).kind == "exit":
+                if self.exit and lv.cell(*self.exit).kind in ("exit", "switch") and not lv.cell(*self.exit).pressed:
                     t = self.face(lv, self.exit[0] - p.x, self.exit[1] - p.y) \
                         if abs(self.exit[0] - p.x) + abs(self.exit[1] - p.y) == 1 else None
                     return t or "use"
@@ -259,7 +274,7 @@ class Bot(TextConsole):
 
     def barrel_worth(self, lv, b):
         p = lv.player
-        if max(abs(b.x - p.x), abs(b.y - p.y)) <= 2:
+        if getattr(b, "ball", False) or max(abs(b.x - p.x), abs(b.y - p.y)) <= 2:
             return False
         return any(not m.dead and not m.barrel and m.awake and max(abs(m.x - b.x), abs(m.y - b.y)) <= 1
                    for m in lv.monsters)

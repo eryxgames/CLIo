@@ -42,6 +42,24 @@
     "pause": true
    },
    {
+    "goto": "drone_refit"
+   }
+  ]
+ },
+ {
+  "id": "drone_refit",
+  "name": "Drone Refit Assembly",
+  "area": "Episode 1",
+  "description": "Where the facility's drones are pressed again out of Xantrium, and a hopper waits for fuel.",
+  "level": "e1m3",
+  "on_level_exit": [
+   {
+    "story": "e1m3_end"
+   },
+   {
+    "pause": true
+   },
+   {
     "win": "outro_demo"
    }
   ]

@@ -1604,6 +1604,7 @@ function sortOf(spec) {
   if (spec.item) return "item";
   if (spec.start) return "start";
   if (spec.exit) return "exit";
+  if (spec.switch) return "switch";
   if (spec.crate) return "crate";
   if (spec.plate) return "plate";
   if (spec.teleport) return "pad";
@@ -1615,9 +1616,9 @@ function sortOf(spec) {
   return "floor";
 }
 const SORTS = [["floor", "Floor"], ["toxic", "Toxic floor"], ["wall", "Wall"], ["door", "Door"], ["panel", "Secret wall"],
-  ["monster", "Monster"], ["item", "Item"], ["start", "Start"], ["exit", "Exit switch"], ["crate", "Crate (pushed)"],
-  ["plate", "Pressure plate"], ["pad", "Teleporter pad"], ["lift", "Lift"]];
-const solidSort = (k) => ["wall", "panel", "exit", "unknown"].includes(k);
+  ["monster", "Monster"], ["item", "Item"], ["start", "Start"], ["exit", "Exit switch"], ["switch", "Switch (sets off an event)"],
+  ["crate", "Crate (pushed)"], ["plate", "Pressure plate"], ["pad", "Teleporter pad"], ["lift", "Lift"]];
+const solidSort = (k) => ["wall", "panel", "exit", "switch", "unknown"].includes(k);
 const blocksWalk = (k) => solidSort(k) || k === "crate";
 
 function tileOf(spec) {                                        // the tile a wall-like cell is drawn with
@@ -1625,6 +1626,7 @@ function tileOf(spec) {                                        // the tile a wal
   if (k === "door") return spec.sealed || (spec.opens_on && !spec.key) ? "sealed" : spec.key ? "door_" + spec.key : "door";
   if (k === "panel") return spec.panel === "shoot" ? "shoot" : "fist";
   if (k === "exit") return "exit";
+  if (k === "switch") return "switch";
   if (k === "wall") return spec.wall || spec.texture || "steel";
   return null;
 }
@@ -1636,6 +1638,7 @@ function describe(spec, info) {
   const what = {
     monster: () => name(spec.monster) + (info.things[spec.monster] && info.things[spec.monster].boss ? " (boss)" : ""),
     item: () => name(spec.item), start: () => "where the player starts", exit: () => (spec.exit === "secret" ? "the secret exit switch" : "the exit switch"),
+    switch: () => `a switch: sets off ${spec.switch}` + (spec.label ? ` (labelled ${spec.label})` : ""),
     door: () => (spec.key ? `door: needs the ${spec.key} key` : spec.sealed || spec.opens_on ? "sealed door" : "door") + (spec.open ? ", open" : ""),
     panel: () => (spec.panel === "shoot" ? "dented vent: shoot it (secret)" : "hollow wall: punch it (secret)"),
     toxic: () => "toxic floor", wall: () => `wall: ${spec.wall || spec.texture || "steel"}`, floor: () => "floor",
@@ -1657,6 +1660,8 @@ function describe(spec, info) {
   if (spec.oil) more.push("oil on the floor (slippery, burns)");
   else if (spec.slick) more.push("slick floor (things slide)");
   if (spec.conveyor) more.push(`a belt moving ${({ n: "north", e: "east", s: "south", w: "west" })[String(spec.conveyor)[0]] || spec.conveyor}`);
+  if (spec.roll) more.push(`rolls ${({ n: "north", e: "east", s: "south", w: "west" })[String(spec.roll)[0]] || spec.roll} when it wakes`);
+  if (spec.sky) more.push("open to the sky");
   if (spec.floor) more.push(`floor ${spec.floor}`);
   if (spec.ceiling) more.push(`ceiling ${spec.ceiling}`);
   return what + (more.length ? "; " + more.join(", ") : "");
@@ -1736,7 +1741,7 @@ function paintCell(g, info, thing, ch, x, y, cs) {
     }
   }
   if (!spec) { g.fillStyle = "#c62828"; g.fillRect(X, Y, cs, cs); g.fillStyle = "#fff"; g.font = `bold ${Math.round(cs * 0.75)}px ui-monospace, monospace`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(ch === " " ? "·" : ch, X + cs / 2, Y + cs / 2 + 1); }
-  if (spec && EVENT_KEYS.some((key) => spec[key])) {             // something happens here: a corner, in the event's colour
+  if (spec && EVENT_KEYS.concat(["switch"]).some((key) => spec[key])) {             // something happens here: a corner, in the event's colour
     g.fillStyle = "#ffd54a";
     g.beginPath(); g.moveTo(X + cs, Y); g.lineTo(X + cs - Math.max(4, cs / 3), Y); g.lineTo(X + cs, Y + Math.max(4, cs / 3)); g.fill();
   }
@@ -1860,7 +1865,7 @@ function levelEditor(kind, thing, id) {
 
   // ---- what the chosen character is
   const events = () => [...new Set([...Object.keys(isObject(thing.events) ? thing.events : {}),
-    ...Object.values(legend()).filter(isObject).flatMap((s) => EVENT_KEYS.map((k) => s[k]).filter(Boolean))])];
+    ...Object.values(legend()).filter(isObject).flatMap((s) => EVENT_KEYS.concat(["switch"]).map((k) => s[k]).filter(Boolean))])];
   function tileSelect(value, set, none) {
     return el("select", { onchange: (e) => set(e.target.value) }, el("option", { value: "", selected: !value }, none || "the engine's"),
       ...Object.keys(info.tiles).sort().map((t) => el("option", { value: t, selected: t === value }, t + (info.tiles[t].own ? " (this game's)" : ""))),
@@ -1900,6 +1905,7 @@ function levelEditor(kind, thing, id) {
       if (k === "item") s.item = Object.keys(info.things).find((t) => info.things[t].kind === "item") || "";
       if (k === "start") s.start = true;
       if (k === "exit") s.exit = true;
+      if (k === "switch") s.switch = "switch";
       if (k === "crate") s.crate = true;
       if (k === "plate") s.plate = "plate";
       if (k === "pad") s.teleport = "pad";
@@ -1910,7 +1916,17 @@ function levelEditor(kind, thing, id) {
     const choose = (key, kindName) => el("select", { onchange: (e) => { s[key] = e.target.value; write(); } },
       ...Object.keys(info.things).filter((t) => info.things[t].kind === kindName).map((t) => el("option", { value: t, selected: t === s[key] }, `${info.things[t].name} (${t})`)));
     const evRow = (key, label) => rows.push(field(label, eventInput(s[key], (v) => { s[key] = v; write(); })));
-    if (sort === "monster") { rows.push(field("Monster", choose("monster", "monster"))); evRow("wake_on", "Wakes when this happens"); rows.push(field("Awake from the start", el("input", { type: "checkbox", checked: !!s.awake, onchange: (e) => { s.awake = e.target.checked; write(); } }))); }
+    if (sort === "monster") {
+      rows.push(field("Monster", choose("monster", "monster"))); evRow("wake_on", "Wakes when this happens");
+      rows.push(field("Awake from the start", el("input", { type: "checkbox", checked: !!s.awake, onchange: (e) => { s.awake = e.target.checked; write(); } })));
+      rows.push(field("A ball: rolls this way when it wakes", el("select", { onchange: (e) => { s.roll = e.target.value; write(); } },
+        ...["", "n", "e", "s", "w"].map((f) => el("option", { value: f, selected: (s.roll || "") === f }, f || "stays")))));
+    }
+    if (sort === "switch") {
+      evRow("switch", "Throwing it sets off");
+      rows.push(field("Label on it (a few letters)", el("input", { type: "text", class: "code short", maxlength: "8", value: s.label || "",
+        oninput: (e) => { s.label = e.target.value.trim(); write(); } })));
+    }
     if (sort === "item") { rows.push(field("Item", choose("item", "item"))); evRow("on_pickup", "Taking it sets off"); }
     if (sort === "wall") { rows.push(field("Tile", tileSelect(s.wall || s.texture, (v) => { delete s.texture; s.wall = v || "steel"; write(); }, "steel"))); evRow("opens_on", "Opens (becomes floor) when this happens"); }
     if (sort === "door") {
@@ -1959,6 +1975,8 @@ function levelEditor(kind, thing, id) {
       if (sort !== "item") evRow("on_enter", "Stepping here sets off");
       rows.push(field("Floor tile", tileSelect(s.floor, (v) => { s.floor = v; write(); })));
       rows.push(field("Ceiling tile", tileSelect(s.ceiling, (v) => { s.ceiling = v; write(); })));
+      rows.push(field("Open to the sky (the level's \"sky\" over it, no ceiling)", el("input", { type: "checkbox", checked: !!s.sky,
+        onchange: (e) => { s.sky = e.target.checked; write(); } })));
     }
     const rename = el("input", { type: "text", class: "code short", maxlength: "1", value: ch, "aria-label": "The character", onchange: (e) => {
       const next = e.target.value;

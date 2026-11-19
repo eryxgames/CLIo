@@ -74,15 +74,26 @@ def info(game_dir, pending=None):
         pal = {k: _hex(sprite._rgb(v)) for k, v in (sp.get("palette") or {}).items()}
         return [[pal.get(ch) for ch in r] for r in sp["pixels"]]
 
+    built = {}
+
+    def still(name):                                         # a 3D model, drawn as a small picture
+        if name not in built:
+            from .. import model as model_mod
+            mdl = model_mod.load({name: (getattr(data, "models", None) or {}).get(name)}).get(name)
+            built[name] = [[_hex(c) if c else None for c in r] for r in firstperson.model_still(mdl)] if mdl else None
+        return built[name]
+
     things = {}
     for mid, spec in (data.monsters or {}).items():
         if isinstance(spec, dict):
             things[mid] = {"kind": "monster", "name": spec.get("name") or mid, "tag": spec.get("tag") or mid[0],
-                           "boss": bool(spec.get("boss")), "picture": picture(spec.get("sprite") or mid)}
+                           "boss": bool(spec.get("boss")),
+                           "picture": picture(spec.get("sprite") or mid) or (still(spec["model"]) if spec.get("model") else None)}
     for iid, spec in (data.items or {}).items():
         pk = spec.get("pickup") if isinstance(spec, dict) else None
         if isinstance(pk, dict) and iid not in things:
-            things[iid] = {"kind": "item", "name": spec.get("name") or iid, "picture": picture(pk.get("sprite") or iid)}
+            things[iid] = {"kind": "item", "name": spec.get("name") or iid,
+                           "picture": picture(pk.get("sprite") or iid) or (still(pk["model"]) if pk.get("model") else None)}
     crate = picture("crate") or [[_hex(c) for c in row] for row in firstperson.CRATE.rows]
     things.setdefault("crate", {"kind": "fixture", "name": "crate", "picture": crate})
     container = picture("container")

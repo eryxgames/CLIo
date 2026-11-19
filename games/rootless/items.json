@@ -201,5 +201,29 @@
    "size": 0.5,
    "text": "A box of grenades. (6)  Thrown three cells ahead; they bounce off walls and go off a beat later."
   }
+ },
+ "fuel": {
+  "name": "fuel cell",
+  "description": "A sealed cell of hopper fuel, still warm.",
+  "pickup": {
+   "fuel": 12,
+   "model": "fuel_cell",
+   "sprite": "fuel_cell",
+   "size": 0.5,
+   "sound": "refuel",
+   "text": "A fuel cell: 12 beats of flight. It goes into the first machine that needs it."
+  }
+ },
+ "fuel_drop": {
+  "name": "supply drop",
+  "description": "A Mandate supply drop, parachute and all: hopper fuel.",
+  "pickup": {
+   "fuel": 12,
+   "model": "fuel_cell",
+   "sprite": "fuel_cell",
+   "size": 0.6,
+   "sound": "refuel",
+   "text": "A Mandate supply drop - fuel! 12 more beats in the air."
+  }
  }
 }

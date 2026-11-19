@@ -1,0 +1,121 @@
+{
+ "drone_scout": {
+  "materials": {
+   "hull": {"color": "#6b717c", "metal": 0.8, "rough": 0.35},
+   "paint": {"color": "#e07a1f", "metal": 0.0, "rough": 0.5},
+   "eye": {"color": "#ff3020", "glow": 3}
+  },
+  "bob": [0.04, 2],
+  "parts": [
+   {"shape": "sphere", "size": [0.5, 0.5, 0.34], "at": [0, 0, 0.55], "material": "hull", "detail": 1},
+   {"shape": "cylinder", "axis": "y", "size": [0.15, 0.42, 0.15], "at": [-0.36, -0.05, 0.52], "material": "paint"},
+   {"shape": "cylinder", "axis": "y", "size": [0.15, 0.42, 0.15], "at": [0.36, -0.05, 0.52], "material": "paint"},
+   {"shape": "box", "size": [0.5, 0.06, 0.04], "at": [0, 0, 0.53], "material": "hull"},
+   {"shape": "box", "size": [0.1, 0.07, 0.07], "at": [0, 0.25, 0.56], "material": "eye"},
+   {"shape": "cylinder", "size": [0.03, 0.03, 0.16], "at": [0.06, -0.05, 0.74], "material": "hull", "sides": 4}
+  ]
+ },
+ "drone_hornet": {
+  "materials": {
+   "shell": {"color": "#8a8f55", "metal": 0.2, "rough": 0.55},
+   "dark": {"color": "#2a2c28", "metal": 0.7, "rough": 0.4},
+   "eye": {"color": "#40e0ff", "glow": 3}
+  },
+  "bob": [0.05, 1.5],
+  "spin": {"rotors": {"axis": "z", "speed": 720}},
+  "parts": [
+   {"shape": "wedge", "size": [0.36, 0.5, 0.14], "at": [0, 0.05, 0.62], "material": "shell"},
+   {"shape": "box", "size": [0.3, 0.22, 0.12], "at": [0, -0.22, 0.6], "material": "dark"},
+   {"shape": "ring", "size": [0.3, 0.3, 0.06], "at": [-0.3, -0.12, 0.66], "material": "dark", "sides": 8, "thick": 0.2, "tube": 3},
+   {"shape": "ring", "size": [0.3, 0.3, 0.06], "at": [0.3, -0.12, 0.66], "material": "dark", "sides": 8, "thick": 0.2, "tube": 3},
+   {"shape": "box", "size": [0.26, 0.03, 0.01], "at": [-0.3, -0.12, 0.67], "material": "shell", "group": "rotors"},
+   {"shape": "box", "size": [0.26, 0.03, 0.01], "at": [0.3, -0.12, 0.67], "material": "shell", "group": "rotors"},
+   {"shape": "box", "size": [0.08, 0.04, 0.04], "at": [0, 0.28, 0.6], "material": "eye"}
+  ]
+ },
+ "drone_warden": {
+  "materials": {
+   "armour": {"color": "#5c5f66", "metal": 0.9, "rough": 0.3},
+   "plate": {"color": "#a3532a", "metal": 0.1, "rough": 0.6},
+   "gun": {"color": "#1e1f22", "metal": 0.8, "rough": 0.4},
+   "eye": {"color": "#ff4020", "glow": 3}
+  },
+  "bob": [0.03, 3],
+  "parts": [
+   {"shape": "sphere", "size": [0.8, 0.8, 0.7], "at": [0, 0, 0.6], "material": "armour", "detail": 1},
+   {"shape": "box", "size": [0.86, 0.3, 0.22], "at": [0, -0.05, 0.6], "material": "plate"},
+   {"shape": "cylinder", "axis": "y", "size": [0.1, 0.5, 0.1], "at": [0.18, 0.42, 0.5], "material": "gun", "sides": 6},
+   {"shape": "cylinder", "axis": "y", "size": [0.1, 0.5, 0.1], "at": [-0.18, 0.42, 0.5], "material": "gun", "sides": 6},
+   {"shape": "box", "size": [0.18, 0.06, 0.08], "at": [0, 0.37, 0.72], "material": "eye"},
+   {"shape": "cone", "size": [0.3, 0.3, 0.2], "at": [0, 0, 1.0], "material": "armour", "sides": 6}
+  ]
+ },
+ "xantrium_ball": {
+  "materials": {
+   "xantrium": {"color": "#43c9b9", "metal": 1.0, "rough": 0.28},
+   "band": {"color": "#2b3236", "metal": 0.9, "rough": 0.5},
+   "vein": {"color": "#7dffe6", "glow": 1.6}
+  },
+  "smooth": true,
+  "parts": [
+   {"shape": "sphere", "size": [0.78, 0.78, 0.78], "at": [0, 0, 0.39], "material": "xantrium", "detail": 1},
+   {"shape": "ring", "size": [0.82, 0.82, 0.07], "at": [0, 0, 0.39], "material": "band", "sides": 12, "thick": 0.08, "tube": 3},
+   {"shape": "ring", "axis": "y", "size": [0.82, 0.07, 0.82], "at": [0, 0, 0.39], "material": "band", "sides": 12, "thick": 0.08, "tube": 3},
+   {"shape": "box", "size": [0.06, 0.06, 0.06], "at": [0.28, 0.22, 0.6], "material": "vein"},
+   {"shape": "box", "size": [0.06, 0.06, 0.06], "at": [-0.24, -0.26, 0.2], "material": "vein"}
+  ]
+ },
+ "hopper": {
+  "materials": {
+   "armour": {"color": "#4b5047", "metal": 0.35, "rough": 0.55},
+   "plate": {"color": "#626a5c", "metal": 0.3, "rough": 0.5},
+   "glass": {"color": "#22323a", "metal": 0.9, "rough": 0.12},
+   "pod": {"color": "#3d413b", "metal": 0.55, "rough": 0.45},
+   "fan": {"color": "#2a2c2a", "metal": 0.8, "rough": 0.35},
+   "grille": {"color": "#141516", "metal": 0.2, "rough": 0.8},
+   "lamp": {"color": "#ffd27a", "glow": 2.5},
+   "mark": {"color": "#c8a23a", "metal": 0.1, "rough": 0.6}
+  },
+  "bob": [0.03, 3],
+  "spin": {"fans": {"axis": "z", "speed": 540}},
+  "parts": [
+   {"shape": "box", "size": [0.56, 0.95, 0.34], "at": [0, -0.18, 0.47], "material": "armour"},
+   {"shape": "wedge", "size": [0.5, 0.5, 0.3], "at": [0, 0.52, 0.45], "material": "armour"},
+   {"shape": "wedge", "size": [0.34, 0.36, 0.16], "at": [0, 0.4, 0.66], "material": "glass"},
+   {"shape": "box", "size": [0.44, 0.42, 0.16], "at": [0, -0.48, 0.72], "material": "plate"},
+   {"shape": "box", "size": [0.6, 0.22, 0.12], "at": [0, -0.08, 0.66], "material": "plate"},
+   {"shape": "box", "size": [0.08, 0.3, 0.02], "at": [0.2, -0.45, 0.81], "material": "mark"},
+   {"shape": "cylinder", "size": [0.03, 0.03, 0.14], "at": [0.12, -0.6, 0.86], "material": "fan", "sides": 4},
+   {"shape": "cylinder", "size": [0.03, 0.03, 0.1], "at": [-0.12, -0.6, 0.84], "material": "fan", "sides": 4},
+   {"shape": "ring", "size": [0.62, 0.62, 0.2], "at": [-0.6, 0.0, 0.44], "material": "pod", "sides": 14, "thick": 0.32},
+   {"shape": "ring", "size": [0.62, 0.62, 0.2], "at": [0.6, 0.0, 0.44], "material": "pod", "sides": 14, "thick": 0.32},
+   {"shape": "box", "size": [0.5, 0.04, 0.02], "at": [-0.6, 0.0, 0.42], "material": "fan", "group": "fans"},
+   {"shape": "box", "size": [0.04, 0.5, 0.02], "at": [-0.6, 0.0, 0.42], "material": "fan", "group": "fans"},
+   {"shape": "box", "size": [0.5, 0.04, 0.02], "at": [0.6, 0.0, 0.42], "material": "fan", "group": "fans"},
+   {"shape": "box", "size": [0.04, 0.5, 0.02], "at": [0.6, 0.0, 0.42], "material": "fan", "group": "fans"},
+   {"shape": "box", "size": [0.3, 0.1, 0.06], "at": [-0.3, 0.0, 0.47], "material": "plate"},
+   {"shape": "box", "size": [0.3, 0.1, 0.06], "at": [0.3, 0.0, 0.47], "material": "plate"},
+   {"shape": "box", "size": [0.26, 0.04, 0.08], "at": [-0.6, 0.31, 0.44], "material": "grille"},
+   {"shape": "box", "size": [0.26, 0.04, 0.08], "at": [0.6, 0.31, 0.44], "material": "grille"},
+   {"shape": "box", "size": [0.05, 0.03, 0.04], "at": [-0.2, 0.74, 0.42], "material": "lamp"},
+   {"shape": "box", "size": [0.05, 0.03, 0.04], "at": [0.2, 0.74, 0.42], "material": "lamp"},
+   {"shape": "box", "size": [0.04, 0.04, 0.3], "at": [-0.2, 0.2, 0.15], "material": "fan"},
+   {"shape": "box", "size": [0.04, 0.04, 0.3], "at": [0.2, 0.2, 0.15], "material": "fan"},
+   {"shape": "box", "size": [0.04, 0.04, 0.3], "at": [0.0, -0.5, 0.15], "material": "fan"}
+  ]
+ },
+ "fuel_cell": {
+  "materials": {
+   "can": {"color": "#b8402a", "metal": 0.2, "rough": 0.45},
+   "cap": {"color": "#9aa0a6", "metal": 1.0, "rough": 0.3},
+   "band": {"color": "#ffb340", "glow": 1.8}
+  },
+  "turning": 40,
+  "parts": [
+   {"shape": "cylinder", "size": [0.2, 0.2, 0.3], "at": [0, 0, 0.17], "material": "can", "sides": 8},
+   {"shape": "cylinder", "size": [0.21, 0.21, 0.04], "at": [0, 0, 0.18], "material": "band", "sides": 8},
+   {"shape": "cylinder", "size": [0.08, 0.08, 0.06], "at": [0, 0, 0.35], "material": "cap", "sides": 6},
+   {"shape": "box", "size": [0.16, 0.03, 0.03], "at": [0, 0, 0.39], "material": "cap"}
+  ]
+ }
+}

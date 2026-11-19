@@ -181,6 +181,28 @@ game, RØØTLESS, shows them.
   in the level's fog, with a depth buffer; it faces where it went or whom it aims at, bobs,
   turns, spins groups of parts, plays imported frames (`idle`, `walk`, `attack`), and when
   destroyed breaks into shards that fly, fall and fade. About 1 ms for 200 triangles.
+- **The sky over open cells** (`"sky": true` on a cell, the level's `"sky"`): a gradient,
+  a sun or a banded planet, drifting clouds, stars and ridges along the horizon - the near
+  ones move as the player steps sideways. Drawn once per facing and beat, behind everything.
+- **Switches** (`{"switch": event, "label": "GATE"}`): a panel in a wall; Enter throws it
+  and sets off the event. Thrown, its lever is up and its lamps green.
+- **Balls** (monsters of `"kind": "ball"`): shoved, they roll `speed` cells a beat for
+  `roll` cells, crushing what they meet (`crush`), knocking other balls on, setting barrels
+  off, breaking hollow walls and rolling through, sinking in acid to make a step, holding
+  plates down; shots ping off them and blasts set them rolling. Held by an event, one
+  rumbles for a beat and then rolls on its cell's `"roll"` way - a cell a beat behind a
+  player who must not stop. Their models turn as they roll. The level bot gets out of
+  their way.
+- **Machines that fly on fuel**: a vehicle with `"fly"` crosses acid and water; with
+  `"fuel"` it needs fuel cells (`"pickup": {"fuel": 12}`), burns a beat of it every beat
+  once it lifts, and when it runs dry comes down - `"on_empty": "exit"` ends the level. Its
+  `"gun"` fires with Space and never runs dry; `"canopy"` draws a canopy frame and a
+  dashboard with a fuel gauge. The status line shows the fuel.
+- **`--check`** also checks balls, vehicles' fuel, guns and `on_empty`, fuel items, switches
+  (something must listen to their event), `roll` on map cells and a level's `sky`; a ride
+  that ends the level counts as its exit. The editor lists **3D models** (models.json),
+  draws monsters and items that have a model as a small picture of it, and its map painter
+  knows switches, the sky and a ball's roll.
 - **`--import-model FILE`**: glTF 2.0 (`.glb`, `.gltf`) from Blender into `models.json` -
   meshes with their placing, PBR materials, PNG textures and vertex colours as colours per
   triangle, object and skinned animations as frames (`--model-name`, `--model-scale`).
@@ -206,6 +228,13 @@ game, RØØTLESS, shows them.
   loaded first - containers, a belt of crates feeding an acid channel, the w key across it,
   and a cargo loader in its bay; three secrets; the rocket launcher and grenades; its own
   music. E1M1's exit leads there, and so does the secret level's.
+- **RØØTLESS E1M3 *Drone Refit Assembly***: where the facility's drones are pressed again
+  out of recycled Xantrium. Balls of it to roll into the acid trough (or on to a plate that
+  holds a store open), the x key at the top of an ore chute whose hatch lets a Xantrium core
+  roll after you, drones in three sizes (scout, hornet swarm, warden) drawn as 3D models,
+  three fuel cells, the launch controls - and the X-47B Swamp Hopper, flown out of the
+  launch gate over a swamp under an alien dusk until its fuel runs out. Its own music, and
+  sounds for drones, balls and the hopper. E1M2's exit leads there; it ends the demo.
 
 ### Changed
 
@@ -223,6 +252,11 @@ game, RØØTLESS, shows them.
   (in an animation, often a small part), with colour codes that set only the colour that
   changed: a whole frame is about a quarter smaller. An animation keeps its time: a slow
   frame shortens the wait after it, and one that comes too late is left out (never the last).
+
+### Fixed
+
+- A first-person view no longer shows the floor and ceiling of the level before when the
+  next one starts at the same place, facing the same way.
 
 ## 2.2.2 - 2026-11-18
 

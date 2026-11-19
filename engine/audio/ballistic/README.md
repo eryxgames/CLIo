@@ -21,10 +21,16 @@ How a game uses it is in [docs/AUTHORING.md](../../../docs/AUTHORING.md), under 
    baked takes count as out of date: with Node the game renders fresh ones instead, without Node it plays the
    baked ones. `--bake-sounds` brings them up to date.
 
+## The C engine
+
+[Ballistic Engine](https://github.com/eigensoundlab/ballistic-engine) is the same engine in C, checked against the
+JavaScript sample for sample. Where its library is found - `CLIO_BALLISTIC_LIB`, else `lib/` here, else the system's
+library path - `__init__.py` renders through it (ctypes, in the game's process) every kind it has ported, and uses
+Node for the rest. It must follow the same Ballistic commit as `engine.js` (`ENGINE_COMMIT`); a library that follows
+another is not used, and the `sound` command says so.
+
 ## Without Node.js
 
-Nothing breaks. A sound from Ballistic plays its baked takes if the game has them, else the spec's `"fallback"`,
-else the game's own sound of the same name, else nothing. The `sound` command says what was found.
-
-A portable C version of the engine, for game engines and for playing without Node, is being written in
-[eigensoundlab/ballistic-engine](https://github.com/eigensoundlab/ballistic-engine).
+Nothing breaks. A sound from Ballistic renders through the C engine if it is installed and has ported its kind,
+else plays its baked takes if the game has them, else the spec's `"fallback"`, else the game's own sound of the
+same name, else nothing. The `sound` command says what was found.

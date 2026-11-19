@@ -270,7 +270,8 @@ class Audio:
             return "There is no sound set called '%s'. There are: %s." % (want.strip(), names)
         line = "Sound set: %s." % (self.sound_set or "default")
         if self._ballistic_sounds() and not self.ballistic.available():
-            line += " Its Ballistic sounds need Node.js, which is not here: the game's own sounds play instead."
+            line += (" Its Ballistic sounds need Node.js or the C engine (libballistic), and neither is here: the game's"
+                     " own sounds play instead.")
         return line
 
     def voice(self, pitch=220, wave="square", seed=0):

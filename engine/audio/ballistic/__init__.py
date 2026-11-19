@@ -14,13 +14,16 @@ to render (each shot plays another), ``"length"`` where to cut, ``"channels"`` 1
 
 The engine is JavaScript: ``engine.js`` is a copy of Ballistic's ``src/engine.js`` (see README.md), and
 ``render.cjs`` runs it in Node.js - one process for the whole game, rendering in the background, the takes
-kept in CLIo's audio cache.  A game can also ship the takes as WAV files (``clio.py GAME --bake-sounds SET``),
+kept in CLIo's audio cache.  Where the C port of the engine (Ballistic Engine, libballistic) is installed, the
+kinds it has ported render through it instead, in this process and several times faster, without Node.  A game can also ship the takes as WAV files (``clio.py GAME --bake-sounds SET``),
 which play without Node.  With neither, the game's own sound of that name plays instead (or the spec's
 ``"fallback"``), so a game never goes silent for want of Node.
 """
 from __future__ import annotations
 
 import collections
+import ctypes
+import ctypes.util
 import hashlib
 import heapq
 import itertools
@@ -31,8 +34,10 @@ import random
 import re
 import shutil
 import subprocess
+import sys
 import threading
 import time
+from array import array
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ENGINE = os.path.join(HERE, "engine.js")
@@ -41,6 +46,7 @@ BAKED = "baked.json"
 BAKED_FORMAT = "clio-ballistic-baked"
 RENDER_TIMEOUT = 30.0           # seconds one take may take before Node is thought stuck
 MAX_CRASHES = 3                 # Node is started again after it stops on its own, this many times
+ENGINE_COMMIT = "45a3f91"       # the Ballistic commit engine.js is a copy of; the C engine must follow the same
 
 _known = None
 _engine_id = None
@@ -238,6 +244,144 @@ def find_node(env=None):
     return shutil.which("node") or shutil.which("nodejs")
 
 
+def find_clib(env=None):
+    """The C engine's library: ``CLIO_BALLISTIC_LIB`` if set (``none`` for none), else one in
+    engine/audio/ballistic/lib/, else ``ballistic`` where the system keeps libraries."""
+    env = os.environ if env is None else env
+    want = env.get("CLIO_BALLISTIC_LIB")
+    if want:
+        return None if want.lower() in ("none", "off", "no", "0") else want
+    names = {"win32": ["ballistic.dll"], "darwin": ["libballistic.dylib"]}.get(sys.platform, ["libballistic.so"])
+    for name in names:
+        p = os.path.join(HERE, "lib", name)
+        if os.path.isfile(p):
+            return p
+    return ctypes.util.find_library("ballistic")
+
+
+# --------------------------------------------------------------------------- #
+# the C engine (Ballistic Engine), when it is installed
+# --------------------------------------------------------------------------- #
+class _Sound(ctypes.Structure):
+    _fields_ = [("L", ctypes.POINTER(ctypes.c_float)), ("R", ctypes.POINTER(ctypes.c_float)),
+                ("n", ctypes.c_int), ("rate", ctypes.c_int), ("peak_pa", ctypes.c_double), ("spl", ctypes.c_double),
+                ("events", ctypes.c_void_p), ("n_events", ctypes.c_int)]
+
+
+class CEngine:
+    """libballistic through ctypes. Answers the same requests as render.cjs, for the kinds it has ported."""
+
+    def __init__(self, path):
+        lib = ctypes.CDLL(path)
+        P, S, C, D, I = ctypes.c_void_p, ctypes.POINTER(_Sound), ctypes.c_char_p, ctypes.c_double, ctypes.c_int
+        for name, res, args in (
+                ("be_params_new", P, []), ("be_params_free", None, [P]), ("be_params_preset", I, [P, C]),
+                ("be_params_set", I, [P, C, D]), ("be_params_set_text", I, [P, C, C]), ("be_check", I, [P]),
+                ("be_render", I, [P, I, S]), ("be_finish", I, [S, C, ctypes.POINTER(C), ctypes.POINTER(D), I]),
+                ("be_cut", None, [S, D, D]), ("be_set_peak", None, [S, D]), ("be_write_wav", I, [S, C, I]),
+                ("be_sound_free", None, [S]), ("be_status_text", C, [I]), ("be_version", C, []),
+                ("be_reference", C, [])):
+            fn = getattr(lib, name)
+            fn.restype, fn.argtypes = res, args
+        self.lib = lib
+        self.path = path
+        self.version = lib.be_version().decode()
+        self.reference = lib.be_reference().decode()
+        self._can = {}
+        self._lock = threading.Lock()
+
+    def _params(self, preset, p):
+        """New parameters, or ``(None, why)``."""
+        lib = self.lib
+        h = lib.be_params_new()
+        if not h:
+            return None, "out of memory"
+        if preset and lib.be_params_preset(h, preset.encode()):
+            lib.be_params_free(h)
+            return None, 'Ballistic has no preset called "%s"' % preset
+        for key, value in (p or {}).items():
+            if isinstance(value, str):
+                st = lib.be_params_set_text(h, key.encode(), value.encode())
+            else:
+                st = lib.be_params_set(h, key.encode(), float(value))
+            if st:
+                lib.be_params_free(h)
+                if st == 1:
+                    return None, "Ballistic has no parameter %s" % key
+                return None, "%s: %s" % (key, lib.be_status_text(st).decode())
+        return h, ""
+
+    def supports(self, req):
+        """Whether this engine renders that preset with those parameters (a kind it has ported, no recording)."""
+        key = json.dumps([req.get("preset"), req.get("p")], sort_keys=True)
+        with self._lock:
+            if key not in self._can:
+                h, _why = self._params(req.get("preset"), req.get("p"))
+                self._can[key] = bool(h) and self.lib.be_check(h) == 0
+                if h:
+                    self.lib.be_params_free(h)
+            return self._can[key]
+
+    def call(self, req):
+        """A render request as render.cjs takes it; the answer as render.cjs gives it."""
+        lib, t0 = self.lib, time.monotonic()
+        h, why = self._params(req.get("preset"), req.get("p"))
+        if not h:
+            return {"ok": False, "error": why}
+        s = _Sound()
+        try:
+            st = lib.be_render(h, max(1, int(req.get("seed") or 1)), ctypes.byref(s))
+            if st:
+                return {"ok": False, "error": lib.be_status_text(st).decode()}
+            a = req.get("action")
+            if isinstance(a, str) and a not in ("", "none"):
+                st = lib.be_finish(ctypes.byref(s), a.encode(), None, None, 0)
+                if st:
+                    return {"ok": False, "error": 'Ballistic has no action preset called "%s"' % a}
+            elif isinstance(a, dict) and a:
+                keys = (ctypes.c_char_p * len(a))(*[k.encode() for k in a])
+                vals = (ctypes.c_double * len(a))(*[float(v) for v in a.values()])
+                st = lib.be_finish(ctypes.byref(s), None, keys, vals, len(a))
+                if st:
+                    return {"ok": False, "error": "Ballistic has no action parameter %s" % ", ".join(a)}
+            lib.be_cut(ctypes.byref(s), _num(req.get("length"), 3, 0.05, 30), 0.04)
+            gain = _num(req.get("gain"), 1, 0, 1)
+            out = str(req.get("out") or "")
+            if not out:
+                return {"ok": False, "error": "no file to write"}
+            tmp = "%s.%d.%d.tmp" % (out, os.getpid(), threading.get_ident())
+            if req.get("channels") == 1:
+                _write_mono(s, gain, tmp)
+            else:
+                lib.be_set_peak(ctypes.byref(s), gain)
+                if lib.be_write_wav(ctypes.byref(s), os.fsencode(tmp), 16):
+                    return {"ok": False, "error": "cannot write %s" % tmp}
+            os.replace(tmp, out)
+            return {"ok": True, "seconds": round(s.n / 48000.0, 3), "ms": round((time.monotonic() - t0) * 1000, 2)}
+        finally:
+            lib.be_sound_free(ctypes.byref(s))
+            lib.be_params_free(h)
+
+
+def _write_mono(s, gain, path):
+    import math
+    import wave
+    n = s.n
+    L = ctypes.cast(s.L, ctypes.POINTER(ctypes.c_float * n)).contents
+    R = ctypes.cast(s.R, ctypes.POINTER(ctypes.c_float * n)).contents
+    m = [0.5 * (L[i] + R[i]) for i in range(n)]
+    pk = max(map(abs, m)) if m else 0
+    g = gain / (pk or 1)
+    pcm = array("h", (int(math.floor(max(-1.0, min(1.0, v * g)) * 32767 + 0.5)) for v in m))
+    if sys.byteorder == "big":
+        pcm.byteswap()
+    with wave.open(path, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(48000)
+        w.writeframes(pcm.tobytes())
+
+
 # --------------------------------------------------------------------------- #
 # the Node process
 # --------------------------------------------------------------------------- #
@@ -346,6 +490,8 @@ class Sounds:
         self.sync = sync
         self.env = env
         self._node = False                      # not looked for yet
+        self._clib = False
+        self.c_problem = ""
         self.renderer = None
         self.ready = set()                      # paths of takes on disk
         self.failed = {}                        # sound name -> what went wrong
@@ -360,7 +506,7 @@ class Sounds:
         self.last = {}                          # sound name -> the take played last
         self.turn = collections.Counter()
         self.rng = random.Random(0 if sync else None)
-        self.rendered, self.ms = 0, 0.0
+        self.rendered, self.rendered_c, self.ms = 0, 0, 0.0
         self.version = ""
         self._baked = {}
 
@@ -371,10 +517,55 @@ class Sounds:
             self._node = find_node(self.env)
         return self._node
 
-    def available(self):
+    @property
+    def clib(self):
+        """The C engine, when it is installed and follows the same Ballistic as engine.js; else None."""
+        if self._clib is False:
+            self._clib = None
+            path = find_clib(self.env)
+            if path:
+                try:
+                    c = CEngine(path)
+                    if ENGINE_COMMIT in c.reference:
+                        self._clib = c
+                    else:
+                        self.c_problem = "%s follows %s, not engine.js %s" % (path, c.reference, ENGINE_COMMIT)
+                except (OSError, AttributeError) as e:
+                    self.c_problem = "%s: %s" % (path, e)
+        return self._clib
+
+    def node_ok(self):
         return bool(self.node) and not self.broken
 
+    def available(self):
+        """Whether anything here renders Ballistic's sounds."""
+        return bool(self.clib) or self.node_ok()
+
+    def can_render(self, spec):
+        c = self.clib
+        if c and c.supports({"preset": spec["preset"], "p": spec["p"]}):
+            return True
+        return self.node_ok()
+
     def _render(self, name, req, path):
+        c = self.clib
+        if c and c.supports(req):
+            a = c.call(dict(req, out=path))
+            with self.cond:
+                if a.get("ok"):
+                    self.ready.add(path)
+                    self.rendered += 1
+                    self.rendered_c += 1
+                    self.ms += float(a.get("ms") or 0)
+                else:
+                    self.failed[name] = a.get("error") or "the engine gave no reason"
+                self.cond.notify_all()
+            return bool(a.get("ok"))
+        if not self.node_ok():
+            with self.cond:
+                self.failed.setdefault(name, "needs Node.js: this kind is not in the C engine yet")
+                self.cond.notify_all()
+            return False
         if self.renderer is None:
             self.renderer = Renderer(self.node)
         try:
@@ -463,11 +654,11 @@ class Sounds:
         if spec is None:
             return None, False
         files, fresh = self.baked(set_name, name, spec)
-        if files and (fresh or not self.available()):
+        if files and (fresh or not self.can_render(spec)):
             pick = self._pick(name, files)
             self.last[name] = pick
             return pick, False
-        if not self.available():
+        if not self.can_render(spec):
             return None, False
         reqs, paths = self._takes(spec, volume)
         if self.sync:
@@ -519,7 +710,7 @@ class Sounds:
             self.queued = {j[4]: j[0] for j in self.jobs}
             for i, (name, raw) in enumerate(sounds):
                 spec = spec_of(raw)
-                if spec is None or self.baked(set_name, name, spec)[1]:
+                if spec is None or self.baked(set_name, name, spec)[1] or not self.can_render(spec):
                     continue
                 reqs, paths = self._takes(spec, volume)
                 for k, (r, p) in enumerate(zip(reqs, paths)):
@@ -585,7 +776,7 @@ class Sounds:
         if not folder:
             return ["no game folder"]
         if not self.available():
-            return [self.broken or "Node.js was not found; it is needed to bake the sounds"]
+            return [self.broken or "neither Node.js nor the C engine (libballistic) was found; one is needed to bake"]
         os.makedirs(folder, exist_ok=True)
         listed, bad = {}, []
         old = self._baked_list(set_name)
@@ -623,12 +814,19 @@ class Sounds:
         """A line for the ``sound`` command, when the game uses Ballistic sounds."""
         if not uses:
             return []
-        if not self.node:
-            return ["Ballistic sounds: Node.js not found - the game's own sounds play instead "
-                    "(install Node.js, or set CLIO_NODE to it)"]
-        if self.broken:
+        c = self.clib
+        if not c and not self.node:
+            return ["Ballistic sounds: neither Node.js nor the C engine found - the game's own sounds play instead "
+                    "(install Node.js, or set CLIO_BALLISTIC_LIB to libballistic)"]
+        if not c and self.broken:
             return ["Ballistic sounds: not working (%s) - the game's own sounds play instead" % self.broken]
-        line = "Ballistic sounds: %d take%s rendered" % (self.rendered, "" if self.rendered == 1 else "s")
+        if c:
+            whole = all(c.supports({"preset": spec_of(s)["preset"], "p": spec_of(s)["p"]}) for _n, s in uses)
+            engines = "C engine %s" % c.version + ("" if whole else (", Node.js for the rest" if self.node_ok()
+                                                                     else ", the rest needs Node.js"))
+        else:
+            engines = "Node.js"
+        line = "Ballistic sounds (%s): %d take%s rendered" % (engines, self.rendered, "" if self.rendered == 1 else "s")
         if self.rendered:
             line += ", %.0f ms each" % (self.ms / self.rendered)
         if self.pending():

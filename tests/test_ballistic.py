@@ -21,7 +21,19 @@ from engine.level import Level, TextConsole                     # noqa: E402
 
 ROOTLESS = os.path.join(ROOT, "games", "rootless")
 NODE = ballistic.find_node()
-NO_NODE = {"CLIO_NODE": "none"}
+NO_NODE = {"CLIO_NODE": "none", "CLIO_BALLISTIC_LIB": "none"}
+
+
+def c_engine():
+    path = ballistic.find_clib()
+    try:
+        c = ballistic.CEngine(path) if path else None
+    except OSError:
+        return None
+    return c if c and ballistic.ENGINE_COMMIT in c.reference else None
+
+
+CLIB = c_engine()
 SHOT = {"ballistic": "pistol", "p": {"D": 0, "env": "indoor"}, "vol": 0.5, "variations": 3, "length": 0.4}
 CHIP = {"wave": "noise", "freq": 0, "dur": 0.05, "vol": 0.3}
 
@@ -204,13 +216,13 @@ class WithoutNodeTests(unittest.TestCase):
                   sounds={"pistol": CHIP}, env=NO_NODE)
         a.sfx("pistol")
         own = a.backend.log[-1][1]
-        self.assertIn("Node.js, which is not here", a.choose_set("b"))
+        self.assertIn("Node.js or the C engine (libballistic), and neither is here", a.choose_set("b"))
         self.assertTrue(a.sfx("pistol"))
         self.assertEqual(a.backend.log[-1][1], own)
         self.assertTrue(a.sfx("zap2"))                            # its fallback
         self.assertFalse(a.sfx("only"))                           # nothing to fall back on: silence, no error
         self.assertEqual(a.last_error, "")
-        self.assertTrue(any("Node.js not found" in l for l in a.status()))
+        self.assertTrue(any("neither Node.js nor the C engine found" in l for l in a.status()))
 
     def test_baked_takes_play_without_node(self):
         game = folder()
@@ -297,7 +309,7 @@ class RenderTests(unittest.TestCase):
         a.sfx("wall")
         self.assertEqual(len(set(p for p, _v in backend.played)), 3)
         self.assertEqual({v for _p, v in backend.played}, {1.0})  # the level is in the file
-        self.assertIn("Ballistic sounds: 4 takes rendered", " ".join(a.status()))
+        self.assertIn("4 takes rendered", " ".join(a.status()))
         a.shutdown()
 
     def test_baking_writes_takes_that_play_without_node(self):
@@ -333,6 +345,76 @@ class RenderTests(unittest.TestCase):
             self.assertAlmostEqual(peak, spec["vol"] * a.sfx_volume, delta=0.01, msg=name)
         self.assertEqual(a.ballistic.failed, {})
         a.shutdown()
+
+
+@unittest.skipUnless(CLIB, "the C engine (libballistic) is not installed: set CLIO_BALLISTIC_LIB")
+class CEngineTests(unittest.TestCase):
+    """The C port of Ballistic's engine (eigensoundlab/ballistic-engine), through ctypes."""
+
+    def env(self, node=False):
+        e = {"CLIO_BALLISTIC_LIB": CLIB.path}
+        if not node:
+            e["CLIO_NODE"] = "none"
+        return e
+
+    def test_it_renders_without_node(self):
+        a = audio(sets={"b": {"pistol": SHOT, "rail": {"ballistic": "railgun", "p": {"D": 30}, "length": 0.8},
+                              "arc": {"ballistic": "tesla", "length": 0.5}}}, sounds={"arc": CHIP}, env=self.env())
+        a.set_sound_set("b")
+        self.assertTrue(a.sfx("pistol"))
+        path = a.backend.log[-1][1]
+        self.assertTrue(os.path.basename(path).startswith("ballistic-"))
+        ch, rate, width, seconds, peak = frames(path)
+        self.assertEqual((ch, rate, width), (2, 48000, 2))
+        self.assertLessEqual(seconds, 0.4 + 1e-3)
+        self.assertAlmostEqual(peak, 0.5 * a.sfx_volume, delta=0.01)
+        self.assertTrue(a.sfx("rail"))
+        self.assertEqual(a.ballistic.rendered_c, 2)
+        a.sfx("arc")                                              # a kind the C engine has not yet: the game's own
+        self.assertFalse(os.path.basename(a.backend.log[-1][1]).startswith("ballistic-"))
+        status = " ".join(a.status())
+        self.assertIn("C engine", status)
+        self.assertIn("the rest needs Node.js", status)
+        a.shutdown()
+
+    def test_mono_takes(self):
+        a = audio(sets={"b": {"pistol": dict(SHOT, channels=1)}}, env=self.env())
+        a.set_sound_set("b")
+        a.sfx("pistol")
+        ch, rate, _w, _s, peak = frames(a.backend.log[-1][1])
+        self.assertEqual((ch, rate), (1, 48000))
+        self.assertAlmostEqual(peak, 0.5 * a.sfx_volume, delta=0.01)
+        a.shutdown()
+
+    @unittest.skipUnless(NODE, "Node.js is not installed")
+    def test_the_same_take_as_node(self):
+        req = {"cmd": "render", "preset": "plasmabolt", "p": {"D": 6, "env": "indoor"}, "action": "game", "seed": 3,
+               "gain": 0.7, "length": 1.5, "channels": 2}
+        where = folder()
+        r = ballistic.Renderer(NODE)
+        try:
+            self.assertTrue(r.call(dict(req, out=os.path.join(where, "node.wav")))["ok"])
+        finally:
+            r.close()
+        self.assertTrue(CLIB.call(dict(req, out=os.path.join(where, "c.wav")))["ok"])
+        with wave.open(os.path.join(where, "node.wav")) as w1, wave.open(os.path.join(where, "c.wav")) as w2:
+            a, b = w1.readframes(w1.getnframes()), w2.readframes(w2.getnframes())
+        self.assertEqual(len(a), len(b))
+        worst = max(abs(int.from_bytes(a[i:i + 2], "little", signed=True) - int.from_bytes(b[i:i + 2], "little", signed=True))
+                    for i in range(0, len(a), 2))
+        self.assertLessEqual(worst, 2)                           # within 16-bit rounding
+
+    def test_errors_in_the_same_words(self):
+        where = os.path.join(folder(), "x.wav")
+        self.assertFalse(CLIB.supports({"preset": "nope"}))
+        self.assertEqual(CLIB.call({"preset": "nope", "out": where})["error"], 'Ballistic has no preset called "nope"')
+        self.assertEqual(CLIB.call({"preset": "pistol", "p": {"Dee": 1}, "out": where})["error"],
+                         "Ballistic has no parameter Dee")
+        self.assertEqual(CLIB.call({"preset": "pistol", "action": "loudest", "out": where})["error"],
+                         'Ballistic has no action preset called "loudest"')
+        self.assertTrue(CLIB.supports({"preset": "railgun", "p": {"D": 3}}))
+        self.assertFalse(CLIB.supports({"preset": "tesla"}))
+        self.assertFalse(CLIB.supports({"preset": "knockfire"}))  # needs a recording
 
 
 if __name__ == "__main__":

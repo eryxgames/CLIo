@@ -1639,7 +1639,7 @@ function describe(spec, info) {
     door: () => (spec.key ? `door: needs the ${spec.key} key` : spec.sealed || spec.opens_on ? "sealed door" : "door") + (spec.open ? ", open" : ""),
     panel: () => (spec.panel === "shoot" ? "dented vent: shoot it (secret)" : "hollow wall: punch it (secret)"),
     toxic: () => "toxic floor", wall: () => `wall: ${spec.wall || spec.texture || "steel"}`, floor: () => "floor",
-    crate: () => "a crate: walk into it to push it",
+    crate: () => (spec.crate === "heavy" ? "a container: only a vehicle shoves it" : "a crate: walk into it to push it"),
     plate: () => `pressure plate "${spec.plate}"`,
     pad: () => `teleporter pad "${spec.teleport}"` + (spec.arrive ? ", arrivals only" : "") + (spec.facing ? `, facing ${spec.facing}` : ""),
     lift: () => `lift "${spec.lift}", deck ${spec.deck || 0}`,
@@ -1725,7 +1725,7 @@ function paintCell(g, info, thing, ch, x, y, cs) {
     if (k === "pad") { g.strokeStyle = "#4fd8ea"; g.lineWidth = Math.max(1, cs / 8); g.beginPath(); g.arc(X + cs / 2, Y + cs / 2, cs * 0.32, 0, 2 * Math.PI); g.stroke(); g.lineWidth = 1; }
     if (k === "lift") { g.strokeStyle = "#d7af28"; g.lineWidth = Math.max(1, cs / 7); g.strokeRect(X + 2, Y + 2, cs - 4, cs - 4); g.lineWidth = 1; }
     if (k === "crate") {
-      const art = thingArt(info, "crate", cs);
+      const art = thingArt(info, spec.crate === "heavy" && info.things.container ? "container" : "crate", cs);
       if (art) g.drawImage(art, X, Y);
       else { g.fillStyle = "#7a5c3a"; g.fillRect(X + cs * 0.12, Y + cs * 0.12, cs * 0.76, cs * 0.76); g.strokeStyle = "#4f3a24"; g.strokeRect(X + cs * 0.12 + 0.5, Y + cs * 0.12 + 0.5, cs * 0.76, cs * 0.76); }
     }
@@ -1920,6 +1920,8 @@ function levelEditor(kind, thing, id) {
         oninput: (e) => { s.open_while = e.target.value.trim(); write(); } })));
       rows.push(field("Open from the start", el("input", { type: "checkbox", checked: !!s.open, onchange: (e) => { s.open = e.target.checked; write(); } })));
     }
+    if (sort === "crate") rows.push(field("Heavy: a container only a vehicle can shove", el("input", { type: "checkbox",
+      checked: s.crate === "heavy", onchange: (e) => { s.crate = e.target.checked ? "heavy" : true; write(); edit(); } })));
     if (sort === "plate") rows.push(field("Its name (doors and walls open while it is down)", el("input", { type: "text", class: "code short", value: s.plate || "",
       oninput: (e) => { s.plate = e.target.value.trim() || "plate"; write(); } })));
     if (sort === "pad") {

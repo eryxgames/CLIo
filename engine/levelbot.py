@@ -3,9 +3,10 @@
 """A simple player for first-person levels: for tests, for balance, and for the editor's check.
 
 It walks to its goals in order (the level's ``"bot"`` list: item ids or map
-characters; the exit ``E`` last), turns to face what it can see, shoots with the
-gun that suits the distance, sidesteps fire and steps off a boss's marked floor.
-It is not clever: if it can finish a level, a person can.
+characters; the exit ``E`` last; ``board`` climbs into the nearest vehicle and
+``out`` climbs down), turns to face what it can see, shoots with the gun that suits
+the distance, sidesteps fire and steps off a boss's marked floor. It is not clever:
+if it can finish a level, a person can.
 """
 from .firstperson import DIRS
 from .level import Level, TextConsole
@@ -88,7 +89,8 @@ class Bot(TextConsole):
                 frontier = nxt
             if found:
                 dx, dy = found
-                if lv.monster_at(p.x + dx, p.y + dy):           # blocked by a monster: face it and shoot
+                m = lv.monster_at(p.x + dx, p.y + dy)
+                if m is not None and not m.vehicle:             # blocked by a monster: face it and shoot
                     return self.face(lv, dx, dy) or "f"
                 return self.face(lv, dx, dy) or "k"
         return None
@@ -99,7 +101,11 @@ class Bot(TextConsole):
             return False
         if c.kind == "door" and c.key and c.key not in lv.player.keys and c.open < 1:
             return False
+        if lv.player.vehicle is not None and (c.kind == "door" or c.teleport or c.lift):
+            return False                                 # a machine goes through no doors
         m = lv.monster_at(*n)
+        if m is not None and m.vehicle:
+            return bool(self.goals) and self.goals[0] == "board"
         if m is not None and m.barrel:
             return False
         return not (careful is False and n in getattr(lv, "fires", {}))
@@ -116,6 +122,16 @@ class Bot(TextConsole):
     def goal_cell(self, lv):
         while self.goals:
             g = self.goals[0]
+            if g == "board":
+                if lv.player.vehicle is None:
+                    rides = [m for m in lv.monsters if m.vehicle and not m.dead]
+                    if rides:
+                        m = min(rides, key=lambda m: abs(m.x - lv.player.x) + abs(m.y - lv.player.y))
+                        return m.x, m.y
+                self.goals.pop(0)
+                continue
+            if g == "out":
+                return lv.player.x, lv.player.y
             for it in lv.items:
                 if it.iid == g and not it.taken:
                     return it.x, it.y
@@ -136,6 +152,20 @@ class Bot(TextConsole):
     # ---- what to do ------------------------------------------------------ #
     def decide(self, lv):
         p = lv.player
+        if self.goals and self.goals[0] == "out":
+            self.goals.pop(0)
+            if p.vehicle is not None:
+                return "out"
+        if p.vehicle is not None:                      # riding: claw what is in reach, else on to the goal
+            ahead = lv.monster_at(p.x + DIRS[p.facing][0], p.y + DIRS[p.facing][1])
+            if ahead is not None and not ahead.barrel:
+                return "f"
+            goal = self.goal_cell(lv)
+            step = self.go(lv, *goal) if goal is not None else None
+            if step is None and self.goals:
+                self.goals.pop(0)
+                return "w"
+            return step or "w"
         # off the scheduled fire
         if (p.x, p.y) in lv.marks:
             for dx, dy in DIRS:

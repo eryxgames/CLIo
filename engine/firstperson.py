@@ -318,6 +318,7 @@ class FX:
         self.lift_items = {}     # an Item -> how high it bounces as it falls
         self.style = None        # draw this frame in another style (a teleport's dots)
         self.face = None         # the way the picture looks, in place of the player's (a teleport)
+        self.missiles = ()       # things flying: (x, y, height, sprite name, glow colour or None) - a rocket, a grenade
         self.__dict__.update(kw)
 
 
@@ -402,6 +403,18 @@ def _flames():
 
 
 FLAMES = _flames()
+
+
+def _drawn(rows, palette):
+    return Picture([[palette.get(ch) for ch in row] for row in rows])
+
+
+# a grenade on the floor or in the air, and a rocket seen flying away (a game's sprites "grenade" and "rocket"
+# come before these)
+GRENADE = _drawn([".kk..", ".kKg.", "gGggg", "gGgGg", "ggggg", ".ggg."],
+                 {"k": (60, 62, 68), "K": (150, 154, 160), "g": (84, 96, 52), "G": (128, 140, 82)})
+ROCKET = _drawn([".ww.", "wWWw", "wWWw", ".ff.", ".FF."],
+                {"w": (120, 124, 130), "W": (190, 194, 200), "f": (255, 230, 140), "F": (255, 140, 40)})
 
 
 def vslide(old, new, k, down, gap=3):
@@ -662,7 +675,20 @@ class View:
                     self.cover[(yy, xx)] = dist
 
     # ---- walls ---------------------------------------------------------- #
-    def front_face(self, px, a, z, tex, opened=0.0):
+    def dents(self, px, spots, fog, x_lo, x_hi):
+        """Bullet holes: ``spots`` are (x, y, size) in pixels; only within the columns just drawn."""
+        core = shade((20, 18, 17), max(0.5, fog))
+        rim = shade((92, 90, 86), fog)
+        for x, y, r in spots:
+            x0, y0 = int(x - r / 2.0), int(y - r / 2.0)
+            for yy in range(max(0, y0), min(self.PH, y0 + r)):
+                row = px[yy]
+                for xx in range(max(x_lo, x0), min(x_hi, x0 + r)):
+                    row[xx] = core
+            if r >= 2 and 0 <= y0 + r < self.PH and x_lo <= x0 + r - 1 < x_hi:
+                px[y0 + r][x0 + r - 1] = rim             # the light catches the lower lip
+
+    def front_face(self, px, a, z, tex, opened=0.0, holes=()):
         zf = max(z - 0.5, -0.45)
         t = DECAY ** zf
         x0, x1 = self.half + (a - 0.5) * self.LW * t, self.half + (a + 0.5) * self.LW * t
@@ -689,10 +715,13 @@ class View:
                     if s is None:
                         s = fogged[c] = shade(c, fog)
                     row[x] = s
+        if holes and not opened:
+            r = max(1, int(round(th * 0.05)))
+            self.dents(px, [(x0 + u * tw, y0 + h * th, r) for u, h in holes], fog, X0, X1)
         self._mark_cover(X0, X1, Y0, Y1, z - 0.5)
         return (x0 + x1) / 2, y0, y1, t
 
-    def side_face(self, px, a, z, tex, opened=0.0, to_edge=False):
+    def side_face(self, px, a, z, tex, opened=0.0, to_edge=False, holes=()):
         edge = a - 0.5 if a > 0 else a + 0.5          # the face turned towards the middle
         if abs(edge) < 1e-6:
             return
@@ -731,6 +760,13 @@ class View:
                         s = fogged[c] = shade(c, fog)
                     px[y][x] = s
             self._mark_cover(x, x + 1, Y0, Y1, zc)
+        if holes and not opened and X1 > X0:
+            spots = []
+            for v, h in holes:
+                t = DECAY ** (z - 0.5 + v)
+                y0, y1 = self.yh - self.CH * t, self.yh + self.FS * t
+                spots.append((self.half + span * t, y0 + h * (y1 - y0), max(1, int(round((y1 - y0) * 0.05)))))
+            self.dents(px, spots, (0.18 + 0.82 * min(1.0, DECAY ** z) ** 0.75) * 0.72, X0, X1)
 
     # ---- one picture ---------------------------------------------------- #
     def render(self, lv, fx, phase=0):
@@ -750,6 +786,9 @@ class View:
             dx, dy = x - cx, y - cy
             return dx * rx + dy * ry, dx * fx_ + dy * fy_
 
+        holes = {}
+        for hx, hy, n, along, down in getattr(lv, "holes", ()):
+            holes.setdefault((hx, hy), []).append((n, along, down))
         items = []
         icx, icy = int(round(cx)), int(round(cy))
         sub_a, sub_z = rel(icx, icy)                          # the camera between cells, while it moves
@@ -783,7 +822,7 @@ class View:
             cx_, cy_ = fx.crates.get((x, y), (x, y))
             a, z = rel(cx_, cy_)
             if -0.3 < z <= SIGHT + 0.5:
-                items.append((z, 2, 0, "crate", a))
+                items.append((z, 2, 0, "crate", (a, getattr(lv.cell(x, y), "heavy", False))))
         for (x, y), left in (getattr(lv, "fires", None) or {}).items():
             a, z = rel(x, y)
             if 0.1 < z <= SIGHT + 0.5:
@@ -813,6 +852,14 @@ class View:
             a, z = rel(bx, by)
             if -0.5 < z <= SIGHT:
                 items.append((z - 0.01, 5, 0, "boom", (a, k)))
+        for mx, my, h, name, glow in fx.missiles:
+            a, z = rel(mx, my)
+            if 0.15 < z <= SIGHT + 4:
+                items.append((z, 4, 0, "missile", (a, h, name, glow)))
+        for g in getattr(lv, "grenades", ()):
+            a, z = rel(g.x, g.y)
+            if -0.3 < z <= SIGHT:
+                items.append((z, 2, 0, "grenade", (a, g)))
         items.sort(key=lambda it: (-it[0], it[1], it[2]))
 
         see_through = getattr(lv, "see_through", ())
@@ -841,10 +888,16 @@ class View:
                             behind = lv.cell(bx, by)
                             last = (z - 1 < -BACK or behind is None or not behind.drawn_as_wall(fx.doors.get((bx, by)))
                                     or solid(bx - k * rx, by - k * ry))
-                        self.side_face(px, a, z, tex, opened, last)
+                        side = (f + 3) % 4 if k > 0 else (f + 1) % 4     # the way that face is turned
+                        dot = DIRS[(side + 1) % 4][0] * fx_ + DIRS[(side + 1) % 4][1] * fy_
+                        self.side_face(px, a, z, tex, opened, last,
+                                       [(0.5 + along * dot, down) for n, along, down in holes.get((x, y), ()) if n == side])
                 # the face towards the player, if it is in front of him and nothing stands before it
                 if z - 0.5 > 0.0 and not solid(x - fx_, y - fy_):
-                    hit = self.front_face(px, a, z, tex, opened)
+                    front = (f + 2) % 4
+                    dot = DIRS[(front + 1) % 4][0] * rx + DIRS[(front + 1) % 4][1] * ry
+                    hit = self.front_face(px, a, z, tex, opened,
+                                          [(0.5 + along * dot, down) for n, along, down in holes.get((x, y), ()) if n == front])
                     if hit and cell.label and z <= 3.2 and not opened:
                         overlays.append((hit, cell.label, cell.label_role, z))
             elif kind == "decal":
@@ -862,7 +915,26 @@ class View:
                 self.draw_thing(px, lv.sprites.get(it.sprite), a, z, it.size, None, fx, labels=None,
                                 lift=fx.lift_items.get(it, 0.0))
             elif kind == "crate":
-                self.draw_thing(px, lv.sprites.get("crate") or CRATE, obj, z, 0.75, None, fx, labels=None)
+                a, heavy = obj
+                pic = (lv.sprites.get("container") if heavy else None) or lv.sprites.get("crate") or CRATE
+                self.draw_thing(px, pic, a, z, 0.98 if heavy else 0.75, None, fx, labels=None)
+            elif kind == "grenade":
+                a, g = obj
+                self.draw_thing(px, lv.sprites.get("grenade") or GRENADE, a, z, 0.26, None, fx, labels=None)
+                if (phase + g.fuse) % 2 == 0 or g.fuse <= 1:          # its light blinks; on the last beat, steady
+                    t = DECAY ** z
+                    self.glow(px, self.X(a, z), self.yh + self.FS * t - 0.2 * REF_H * t * self.K * 0.26 * 3,
+                              max(1.5, 3.0 * t * self.K), (255, 40, 30), 0.85)
+            elif kind == "missile":
+                a, h, name, glow = obj
+                t = DECAY ** z
+                s = t * self.K * 0.9
+                x = self.X(a, z)
+                y = self.yh + self.FS * t - h * REF_H * t * self.K
+                if glow:
+                    self.glow(px, x, y, 7 * s + 1, glow, 0.6)
+                pic = lv.sprites.get(name) or (GRENADE if name == "grenade" else ROCKET)
+                self.blit(px, pic.rows, int(round(x - pic.w * s / 2)), int(round(y - pic.h * s / 2)), s)
             elif kind == "flame":
                 a, x, y, left = obj
                 pic = FLAMES[(phase + x * 7 + y * 3) % len(FLAMES)]
@@ -1039,7 +1111,28 @@ class View:
                 if dd <= r and noise(xx // self.sx, yy // max(1, self.sy // 2), seed) < density * (1.25 - dd / r):
                     px[yy][xx] = col if dd < r * 0.55 else mix(col, (110, 35, 10), 0.45)
 
+    def cockpit(self, px, lv, fx):
+        """Riding a machine: its cage at the edges of the picture and its claws at the bottom (the sprite named
+        by the vehicle's ``cockpit``, as wide as the picture allows)."""
+        bw, bh = max(1, self.PW // 70), max(1, self.PH // 26)
+        for y in range(self.PH):
+            c = (214, 168, 48) if (y // max(2, bh * 2)) % 2 else (34, 32, 30)
+            for x in list(range(bw)) + list(range(self.PW - bw, self.PW)):
+                px[y][x] = c
+        for y in range(bh):
+            for x in range(self.PW):
+                px[y][x] = (214, 168, 48) if (x // max(3, bw * 3)) % 2 else (34, 32, 30)
+        pic = lv.sprites.get(lv.weapon_sprite())
+        if pic is None:
+            return
+        s = min(self.PW * 0.92 / pic.w, self.PH * 0.48 / pic.h)
+        x0 = int(round(self.half - pic.w * s / 2)) + fx.shake * self.sx
+        y0 = self.PH - int(round(pic.h * s)) + fx.recoil * self.sy
+        self.blit(px, pic.rows, x0, y0, s)
+
     def weapon(self, px, lv, fx):
+        if getattr(lv.player, "vehicle", None) is not None:
+            return self.cockpit(px, lv, fx)
         pic = lv.sprites.get(lv.weapon_sprite())
         if pic is None:
             return

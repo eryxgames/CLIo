@@ -13,7 +13,7 @@
     "pause": true
    },
    {
-    "win": "outro_demo"
+    "goto": "dynamic_loader"
    }
   ],
   "on_secret_exit": [
@@ -25,6 +25,24 @@
    },
    {
     "goto": "swap_partition"
+   }
+  ]
+ },
+ {
+  "id": "dynamic_loader",
+  "name": "Dynamic Loader",
+  "area": "Episode 1",
+  "description": "The cargo dock, where everything the facility runs is loaded first.",
+  "level": "e1m2",
+  "on_level_exit": [
+   {
+    "story": "e1m2_end"
+   },
+   {
+    "pause": true
+   },
+   {
+    "win": "outro_demo"
    }
   ]
  },
@@ -42,7 +60,7 @@
     "pause": true
    },
    {
-    "win": "outro_demo"
+    "goto": "dynamic_loader"
    }
   ]
  }

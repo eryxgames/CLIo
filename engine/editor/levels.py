@@ -85,6 +85,9 @@ def info(game_dir, pending=None):
             things[iid] = {"kind": "item", "name": spec.get("name") or iid, "picture": picture(pk.get("sprite") or iid)}
     crate = picture("crate") or [[_hex(c) for c in row] for row in firstperson.CRATE.rows]
     things.setdefault("crate", {"kind": "fixture", "name": "crate", "picture": crate})
+    container = picture("container")
+    if container:
+        things.setdefault("container", {"kind": "fixture", "name": "container", "picture": container})
     return {"legend": LEGEND, "tiles": tiles, "things": things, "facing": ["n", "e", "s", "w"]}
 
 

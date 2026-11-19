@@ -49,7 +49,9 @@
    },
    "max_ammo": {
     "bullets": 200,
-    "shells": 50
+    "shells": 50,
+    "rockets": 20,
+    "grenades": 12
    }
   }
  },

@@ -496,5 +496,41 @@
    "Spins up for two beats (red !!), then fires every beat while it sees you.",
    "Break its line of sight - a wall, a crate - and the barrels wind down."
   ]
+ },
+ "loader": {
+  "name": "cargo loader",
+  "tag": "v",
+  "sprite": "loader",
+  "hp": 150,
+  "size": 1.35,
+  "kind": "barrel",
+  "attack": {
+   "kind": "barrel",
+   "damage": 30
+  },
+  "vehicle": {
+   "claw": [
+    30,
+    50
+   ],
+   "stomp": 40,
+   "cockpit": "w_loader",
+   "wades": true,
+   "board": "You strap into the loader's cage. Space: claw. Walk into them: tread. Enter: climb down.",
+   "leave": "You unstrap and drop down out of the cage. The loader stands where you left it.",
+   "wreck": "The loader's hydraulics burst. You tumble out of the cage as it goes up.",
+   "sounds": {
+    "step": "loader_step",
+    "board": "loader_board",
+    "claw": "claw"
+   }
+  },
+  "man": [
+   "LD(8) - the facility's cargo loader. It links what arrives to where it is needed.",
+   "",
+   "Walk into it to climb in. It wades through acid, treads on what is in its way,",
+   "shoves containers you cannot move, and takes the hits instead of you - 150 of them.",
+   "It will not go through doors. Enter climbs down. When it gives out, it blows up."
+  ]
  }
 }

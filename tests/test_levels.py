@@ -340,7 +340,7 @@ class TileTests(unittest.TestCase):
                           {"9": {"name": "x", "damage": 5, "kind": "laser", "sprite": "w_none"}})
         said = " | ".join(validate(data))
         for words in ("unknown tile 'nowhere'", "unknown tile 'nada'", "tile 'odd' uses letters", "damage should be",
-                      "kind should be gun or melee", "no sprite 'w_none'"):
+                      "kind should be gun, melee, rocket or grenade", "no sprite 'w_none'"):
             self.assertIn(words, said)
 
     def test_weapons_json_over_game_json(self):
@@ -793,6 +793,217 @@ class MeleeWeaponTests(unittest.TestCase):
         self.assertIn("sprite 'odd': its walk and attack frames should be 2 x 2", said)
 
 
+def armed(lv, weapon, **ammo):
+    lv.player.weapons = sorted(set(lv.player.weapons) | {weapon})
+    lv.player.weapon = weapon
+    lv.player.ammo.update(ammo)
+    return lv
+
+
+class ExplosiveTests(unittest.TestCase):
+    def test_a_rocket_bursts_on_what_it_hits(self):
+        lv = armed(room_with(["#########",
+                              "#...b...#",
+                              "#...z...#",
+                              "#.......#",
+                              "#.......#",
+                              "#...@...#",
+                              "#########"]), "5", rockets=3)
+        lv.player.facing = 0
+        z, b = lv.monster_at(4, 2), lv.monster_at(4, 1)
+        lv.run_line("f z1")
+        self.assertTrue(z.dead and b.dead)                     # hit, and the barrel behind it went up too
+        self.assertEqual(lv.player.ammo["rockets"], 2)
+        self.assertTrue(lv.cell(4, 2).scorched)                # a black mark where it burst
+        self.assertEqual(lv.player.hp, 100)                    # far enough away
+
+    def test_a_rocket_at_arms_length_hurts(self):
+        lv = armed(room_with(["#####",
+                              "#...#",
+                              "#.@.#",
+                              "#####"]), "5", rockets=3)
+        lv.player.facing = 2
+        lv.run_line("f")
+        self.assertIn("arm's length", told(lv))
+        self.assertLess(lv.player.hp, 100)
+
+    def test_out_of_bullets_it_never_takes_up_explosives_by_itself(self):
+        lv = armed(room_with(["#####",
+                              "#.@.#",
+                              "#####"]), "2", bullets=1, rockets=5, grenades=5)
+        lv.player.weapons = ["1", "2", "5", "6"]
+        lv.run_line("f")
+        self.assertEqual(lv.player.weapon, "1")
+
+    def test_a_grenade_bounces_slides_and_goes_off_a_beat_later(self):
+        lv = armed(room_with(["#######",
+                              "#.....#",
+                              "#.....#",
+                              "#..@..#",
+                              "#######"]), "6", grenades=3)
+        lv.player.facing = 0
+        lv.run_line("f")                                       # three cells: the wall is two away
+        self.assertIn("bounces off the wall", told(lv))
+        self.assertEqual([(g.x, g.y, g.fuse) for g in lv.grenades], [(3, 1, 1)])
+        lv.run_line("w")                                       # two cells off: out of its reach
+        self.assertEqual(lv.grenades, [])
+        self.assertIn("The grenade", told(lv))
+        self.assertTrue(lv.cell(3, 1).scorched)
+        lv = armed(room_with(["#######",
+                              "#.....#",
+                              "#..;..#",
+                              "#.....#",
+                              "#..@..#",
+                              "#######"]), "6", grenades=3)
+        lv.weapons["6"] = dict(lv.weapons["6"], range=2)
+        lv.player.facing = 0
+        lv.run_line("f")
+        self.assertIn("skids on", told(lv))
+        self.assertEqual((lv.grenades[0].x, lv.grenades[0].y), (3, 1))
+
+    def test_a_grenade_rides_a_belt_and_sets_off_its_neighbours(self):
+        lv = room_with(["#########",
+                        "#>>>>...#",
+                        "#.......#",
+                        "#...@...#",
+                        "#########"], {">": {"conveyor": "e"}})
+        from engine.level import Grenade
+        lv.grenades = [Grenade(1, 1, 3, 50), Grenade(6, 2, 9, 50)]
+        lv.run_line("w")
+        self.assertEqual((lv.grenades[0].x, lv.grenades[0].y), (2, 1))
+        lv.grenades[0].fuse = 1
+        lv.grenades[0].x = 5
+        lv.run_line("w")                                       # it goes off next to the other: both go
+        self.assertEqual(lv.grenades, [])
+
+    def test_shots_leave_holes_in_the_wall(self):
+        from engine.level import HOLES
+        lv = armed(room_with(["#######",
+                              "#.....#",
+                              "#.....#",
+                              "#..@..#",
+                              "#######"]), "3", shells=40)
+        lv.player.facing = 0
+        plain = View(80, 17, "pixel").render(lv, FX(), 0)
+        lv.run_line("f")
+        self.assertTrue(lv.holes and all((x, y, n) == (3, 0, 2) for x, y, n, _a, _d in lv.holes))
+        self.assertNotEqual(View(80, 17, "pixel").render(lv, FX(), 0), plain)   # they show
+        for _ in range(30):
+            lv.run_line("f")
+        self.assertEqual(len(lv.holes), HOLES)                 # the oldest go
+        lv = armed(room_with(["#########",
+                              "#.......#",
+                              "#...z...#",
+                              "#.......#",
+                              "#.......#",
+                              "#.......#",
+                              "#.......#",
+                              "#...@...#",
+                              "#########"], seed=4), "2", bullets=50)
+        lv.player.facing = 0
+        for _ in range(8):
+            lv.run_line("f z1")
+            if lv.holes:
+                break
+        self.assertTrue(lv.holes)                              # a miss went on into the wall behind
+        self.assertEqual(lv.holes[0][1], 0)
+
+
+class LoaderTests(unittest.TestCase):
+    ROOM = ["###########",
+            "#.........#",
+            "#~~~~~~~~~#",
+            "#....H....#",
+            "#....V....#",
+            "#....@....#",
+            "#####+#####",
+            "#.........#",
+            "###########"]
+
+    def loader(self, rows=None, legend=None):
+        lv = room_with(rows or self.ROOM, dict({"V": {"monster": "loader"}, "H": {"crate": "heavy"}}, **(legend or {})))
+        lv.player.facing = 0
+        return lv
+
+    def test_climb_in_shove_a_container_wade_and_climb_down(self):
+        lv = self.loader()
+        v = lv.monster_at(5, 4)
+        put(lv, 5, 5, 0)
+        lv.run_line("k")
+        self.assertIs(lv.player.vehicle, v)
+        self.assertNotIn(v, lv.monsters)
+        lv.run_line("2")
+        self.assertIn("levers", told(lv))                      # no guns from the cage
+        lv.run_line("k")                                       # the container: shoved into the acid, a step
+        self.assertTrue(lv.cell(5, 2).sunk)
+        lv.run_line("h; k")                                    # into the acid beside it: steel feet
+        self.assertEqual(((lv.player.x, lv.player.y), lv.player.hp), ((4, 2), 100))
+        lv.run_line("j; j; j; l")
+        self.assertEqual((lv.player.x, lv.player.y), (5, 5))
+        lv.player.facing = 2
+        lv.run_line("k")                                       # the door: it will not fit
+        self.assertIn("will not fit", told(lv))
+        lv.run_line("use")                                     # Enter climbs down
+        self.assertIsNone(lv.player.vehicle)
+        self.assertIn(v, lv.monsters)
+        self.assertEqual(((v.x, v.y), (lv.player.x, lv.player.y)), ((5, 5), (5, 4)))
+
+    def test_on_foot_a_container_will_not_budge(self):
+        lv = self.loader(legend={"V": {}})
+        put(lv, 5, 4, 0)
+        lv.run_line("k")
+        self.assertTrue(lv.cell(5, 3).crate)
+        self.assertIn("will not budge", told(lv))
+
+    def test_it_treads_on_monsters_and_its_claws_throw_them(self):
+        lv = self.loader(["#########",
+                          "#.......#",
+                          "#...d...#",
+                          "#...z...#",
+                          "#...V...#",
+                          "#...@...#",
+                          "#########"], {"d": "daemon"})
+        z, d = lv.monster_at(4, 3), lv.monster_at(4, 2)
+        lv.run_line("k")
+        z.x, z.y, z.stun = 4, 3, 2
+        lv.run_line("k")                                       # the zombie: crushed, and the loader on its cell
+        self.assertTrue(z.dead)
+        self.assertEqual((lv.player.x, lv.player.y), (4, 3))
+        d.x, d.y, d.stun, d.hp = 4, 2, 3, 200                  # right ahead, reeling, tough
+        lv.run_line("f")
+        self.assertEqual((d.hp < 200, (d.x, d.y)), (True, (4, 1)))   # clawed, and flung back
+
+    def test_it_takes_the_hits_and_blows_up_when_it_gives_out(self):
+        lv = self.loader()
+        put(lv, 5, 5, 0)
+        lv.run_line("k")
+        v = lv.player.vehicle
+        lv.hurt(30, "A test hit.")
+        self.assertEqual((lv.player.hp, v.hp), (100, 120))
+        lv.hurt(200, "A big one.")
+        self.assertIsNone(lv.player.vehicle)
+        self.assertTrue(v.dead)
+        self.assertIn("goes up", told(lv))
+        self.assertLess(lv.player.hp, 100)                     # thrown clear - but not far
+
+    def test_riding_draws_the_cage_and_the_claws(self):
+        lv = self.loader()
+        put(lv, 5, 5, 0)
+        on_foot = View(80, 17, "pixel").render(lv, FX(), 0)
+        lv.run_line("k")
+        riding = View(80, 17, "pixel").render(lv, FX(), 0)
+        yellow = (214, 168, 48)
+        self.assertTrue(any(yellow in c for row in riding for c in row))
+        self.assertFalse(any(yellow in c for row in on_foot for c in row))
+
+    def test_the_bot_finishes_e1m2_with_the_loader(self):
+        from engine import levelbot
+        for seed in (0, 1, 2):
+            outcome, lv = levelbot.play(GameData(ROOTLESS), "e1m2", seed)
+            self.assertEqual(outcome, "exit", "seed %d" % seed)
+            self.assertIn("w", lv.player.keys)
+
+
 class SecretLevelTests(unittest.TestCase):
     def test_the_secret_exit_switch(self):
         lv = level()
@@ -816,10 +1027,30 @@ class SecretLevelTests(unittest.TestCase):
             return "exit"
         with mock.patch.object(level_mod.Level, "run", run):
             level_mod.play_scene(g, g.world.scenes["boot_sector"])
-        self.assertEqual(played, ["e1m1", "e1m9"])
-        self.assertEqual(g.world.scene_id, "swap_partition")
+        self.assertEqual(played, ["e1m1", "e1m9", "e1m2"])          # the secret level, then back to E1M2
+        self.assertEqual(g.world.scene_id, "dynamic_loader")
         self.assertEqual(g.over, "win")
-        self.assertIn("swap partition", term.out.getvalue().lower())
+        out = term.out.getvalue().lower()
+        self.assertIn("swap partition", out)
+        self.assertIn("loading dock", out)
+
+    def test_the_normal_exit_leads_to_e1m2(self):
+        from unittest import mock
+        from engine import level as level_mod
+        from engine.audio import Silent
+        from engine.game import Game
+        term = Term(out=io.StringIO(), inp=lambda p: "", width=80, height=24, color=0, unicode=True, animate=False, env={})
+        g = Game(ROOTLESS, term=term, audio=Silent())
+        played = []
+
+        def run(lv, console):
+            played.append(lv.id)
+            lv.exit_kind = "exit"
+            return "exit"
+        with mock.patch.object(level_mod.Level, "run", run):
+            level_mod.play_scene(g, g.world.scenes["boot_sector"])
+        self.assertEqual(played, ["e1m1", "e1m2"])
+        self.assertIn("pod six", term.out.getvalue().lower())
 
     def test_the_bot_finishes_e1m9(self):
         import levelbot

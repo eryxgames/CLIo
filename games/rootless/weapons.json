@@ -46,6 +46,30 @@
   "sound": "chaingun",
   "text": "BRRRT."
  },
+ "5": {
+  "name": "rocket launcher",
+  "ammo": "rockets",
+  "kind": "rocket",
+  "damage": [
+   30,
+   50
+  ],
+  "blast": 40,
+  "sprite": "w_rocket",
+  "sound": "rocket",
+  "text": "FWOOSH."
+ },
+ "6": {
+  "name": "grenades",
+  "ammo": "grenades",
+  "kind": "grenade",
+  "blast": 50,
+  "fuse": 2,
+  "range": 3,
+  "sprite": "w_grenade",
+  "sound": "throw",
+  "text": "Tink."
+ },
  "shovel": {
   "name": "shovel",
   "key": "1",

@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import contextlib
 import copy
+import math
 import random
 import re
 import time
@@ -76,8 +77,8 @@ HELP = [
     ("", "text"),
     ("Typed: k j h l, turn left/right/around, use,", "dim"),
     ("f [x], kill [-9] x, t x, w [n], map, ps, man x,", "dim"),
-    ("goggles [on|off], history, alias n='...', keys,", "dim"),
-    ("whoami, sound, q", "dim"),
+    ("goggles [on|off], out (of a vehicle), history,", "dim"),
+    ("alias n='...', keys, whoami, sound, q", "dim"),
     ("a; b   a && b   a || b   !!  !3  !f   as in a shell", "dim"),
     ("A surprise stops a line, as ^C would.", "dim"),
 ]
@@ -99,7 +100,7 @@ class Cell:
     __slots__ = ("x", "y", "ch", "kind", "tex", "key", "panel", "toxic", "open", "opens_on", "closes_on",
                  "on_enter", "sealed", "pressed", "label", "label_role", "secret", "found", "floor", "ceiling",
                  "crate", "plate", "down", "open_while", "teleport", "arrive_only", "pad_facing", "lift", "deck", "sunk",
-                 "oil", "slick", "conveyor", "scorched", "exit_kind")
+                 "oil", "slick", "conveyor", "scorched", "exit_kind", "heavy")
 
     def __init__(self, x, y, ch, spec):
         self.x, self.y, self.ch = x, y, ch
@@ -107,6 +108,7 @@ class Cell:
         self.floor = spec.get("floor")                  # tiles under and over this cell, else the level's
         self.ceiling = spec.get("ceiling")
         self.crate = bool(spec.get("crate"))            # a crate stands here: it can be pushed
+        self.heavy = spec.get("crate") == "heavy" or (self.crate and bool(spec.get("heavy")))   # only a machine moves it
         self.plate = spec.get("plate")                  # a pressure plate, by name
         self.down = False
         self.open_while = spec.get("open_while")        # a door or wall open only while a plate of this name is down
@@ -205,6 +207,7 @@ class Monster:
         self.clock = 0
         self.enraged = False
         self.barrel = spec.get("kind") == "barrel" or self.attack.get("kind") == "barrel"
+        self.vehicle = spec.get("vehicle") if isinstance(spec.get("vehicle"), dict) else None   # one can ride it
 
     @property
     def name(self):
@@ -226,6 +229,16 @@ class Item:
         self.size = float(self.pickup.get("size", 0.55))
         self.taken = False
         self.on_pickup = None
+
+
+class Grenade:
+    """A grenade on the floor, its fuse burning: beats left until it goes off."""
+
+    def __init__(self, x, y, fuse, blast):
+        self.x, self.y, self.fuse, self.blast = x, y, fuse, blast
+
+
+HOLES = 60                   # bullet holes kept in a level's walls (the oldest go first)
 
 
 class Shot:
@@ -251,6 +264,7 @@ class Player:
         self.keys = set()
         self.sudo = 0
         self.boots = int(start.get("boots", 0))      # beats on toxic floor the boots have left
+        self.vehicle = None                          # the machine he rides (a Monster), or None on foot
         self.goggles = 0                             # beats the TTY goggles' battery has left
         self.goggles_on = False                      # worn: the battery runs down only while they are on
         self.had_goggles = False
@@ -308,6 +322,8 @@ class Level:
         self.weapons.update(own)                         # weapons.json, over game.json's first_person "weapons"
         self.player = Player(player, self.cfg)
         self.monsters, self.items, self.shots, self.decals = [], [], [], []
+        self.grenades = []
+        self.holes = []                                  # (x, y, face, along, down): bullet holes in walls
         self.marks, self.marks_version = {}, 0
         self.log = []
         self.beat = 0
@@ -413,7 +429,9 @@ class Level:
     def load_sprites(self):
         from .sprite import _rgb, far_versions, walk_frames
         names = {m.sprite for m in self.monsters} | {it.sprite for it in self.items}
-        names |= {w.get("sprite") for w in self.weapons.values()} | {"fireball", "muzzle", "gore"}
+        names |= {w.get("sprite") for w in self.weapons.values()} | {"fireball", "muzzle", "gore", "crate", "container",
+                                                                     "grenade", "rocket"}
+        names |= {m.vehicle.get("cockpit") for m in self.monsters if m.vehicle}
         names |= {(m.spec.get("attack") or {}).get("spawn") for m in self.monsters}
         for kind in list(names):
             spec = (self.data.monsters or {}).get(kind)
@@ -581,6 +599,8 @@ class Level:
             self.console.play(self, frames, dt)
 
     def weapon_sprite(self):
+        if self.player.vehicle is not None:
+            return self.player.vehicle.vehicle.get("cockpit")
         return (self.weapons.get(self.player.weapon) or {}).get("sprite")
 
     # ---- playing ---------------------------------------------------------- #
@@ -715,6 +735,12 @@ class Level:
             return self.turn(turns[t])
         if t in ("u", "use", "open", "press"):
             return self.use()
+        if t in ("out", "leave", "dismount", "get out"):
+            return self.leave()
+        if self.player.vehicle is not None and (t in self.weapons or (len(t) == 1 and t.isdigit())):
+            self.say("Your hands are on the %s's levers: its claws are your weapon. (out: climb down)"
+                     % self.player.vehicle.name, "dim")
+            return True
         if t in ("w", "wait", "."):
             self.end_beat()
             return True
@@ -787,6 +813,130 @@ class Level:
         self.say("rootless: %s: command not found" % tok.strip(), "hurt")
         raise StopLine()
 
+    # ---- a machine to ride ------------------------------------------------- #
+    def board(self, m):
+        """Climb into a vehicle (walk into it): you go where it goes, it takes the hits, its claws are your hands."""
+        p = self.player
+        spec = m.vehicle
+        ox, oy = p.x, p.y
+        self.monsters.remove(m)
+        p.vehicle, p.x, p.y = m, m.x, m.y
+        if self.target is m:
+            self.target = None
+        self.sfx((spec.get("sounds") or {}).get("board") or "use", "use")
+        self.anim([FX(cam=(ox + (m.x - ox) * ease(i / 5.0), oy + (m.y - oy) * ease(i / 5.0)), recoil=6 - i)
+                   for i in range(1, 6)], 0.04)
+        self.say(spec.get("board") or "You climb into the %s." % m.name, "good")
+        self.update_seen()
+        self.arrive()
+        self.end_beat()
+        return True
+
+    def leave(self):
+        """Climb down from the vehicle: behind you, or to a side - it stays where it stands."""
+        p = self.player
+        v = p.vehicle
+        if v is None:
+            self.say("You are on your own two feet already.", "dim")
+            return False
+        fx, fy = DIRS[p.facing]
+        rx, ry = DIRS[(p.facing + 1) % 4]
+        sides = [(-fx, -fy), (-rx, -ry), (rx, ry), (fx, fy)]
+        ok = [(p.x + dx, p.y + dy) for dx, dy in sides if self.free(p.x + dx, p.y + dy)]
+        dry = [c for c in ok if not self.cell(*c).toxic and c not in self.fires] or ok
+        if not dry:
+            self.say("No room to climb down here.", "dim")
+            return False
+        x, y = dry[0]
+        p.vehicle = None
+        v.x, v.y = p.x, p.y
+        self.monsters.append(v)
+        ox, oy = p.x, p.y
+        p.x, p.y = x, y
+        self.sfx((v.vehicle.get("sounds") or {}).get("board") or "use", "use")
+        self.anim([FX(cam=(ox + (x - ox) * ease(i / 4.0), oy + (y - oy) * ease(i / 4.0))) for i in range(1, 5)], 0.04)
+        self.say(v.vehicle.get("leave") or "You climb down from the %s." % v.name, "dim")
+        self.update_seen()
+        self.arrive()
+        self.end_beat()
+        return True
+
+    def stomp(self, m, x, y):
+        """Riding into a monster: it is trodden on - crushed, if that kills it, or else thrown back."""
+        p, v = self.player, self.player.vehicle
+        dmg = int(v.vehicle.get("stomp", 40))
+        fx, fy = x - p.x, y - p.y
+        self.sfx((v.vehicle.get("sounds") or {}).get("step") or "punch", "punch")
+        self.anim([FX(cam=(p.x + fx * k, p.y + fy * k), shake=s) for k, s in ((0.25, 1), (0.4, -1), (0.2, 0))], 0.04)
+        self.damage([(m, dmg)], lead="The %s treads on it:" % v.name)
+        if self.over:
+            return True
+        if m.dead:
+            ox, oy = p.x, p.y
+            p.x, p.y = x, y
+            self.anim([FX(cam=(ox + fx * ease(i / 4.0), oy + fy * ease(i / 4.0))) for i in range(1, 5)], 0.03)
+            self.update_seen()
+            self.arrive()
+        elif self.free(x + fx, y + fy, skip=m):
+            m.x, m.y = x + fx, y + fy
+            self.anim([FX(pos={m.id: (x + fx * k, y + fy * k)}) for k in (0.5, 0.85, 1.0)], 0.04)
+            self.say("%s is thrown back." % m.tag, "hit")
+        self.end_beat()
+        return True
+
+    def claw(self):
+        """The vehicle's claws: a heavy blow to what is right ahead - a monster thrown back, a hollow wall
+        broken through, a barrel set off."""
+        p, v = self.player, self.player.vehicle
+        spec = v.vehicle
+        x, y = self.ahead()
+        cell = self.cell(x, y)
+        m = self.monster_at(x, y)
+        self.sfx((spec.get("sounds") or {}).get("claw") or "punch", "punch")
+        self.anim([FX(recoil=-3), FX(recoil=-5, shake=1), FX(recoil=-2)], 0.04)
+        if m is not None:
+            lo, hi = spec.get("claw", [30, 50])
+            self.stats["fired"] += 1
+            self.stats["hits"] += 1
+            self.damage([(m, self.rng.randint(lo, hi))], lead="CRUNCH.")
+            fx, fy = DIRS[p.facing]
+            if not m.dead and not m.barrel and not m.spec.get("boss") and self.free(m.x + fx, m.y + fy, skip=m):
+                ox, oy = m.x, m.y
+                m.x, m.y = ox + fx, oy + fy
+                m.stun, m.intent = max(m.stun, 1), None
+                self.anim([FX(pos={m.id: (ox + fx * k, oy + fy * k)}) for k in (0.5, 0.85, 1.0)], 0.04)
+                self.say("%s is flung back." % m.tag, "hit")
+        elif cell.kind == "panel" and cell.panel == "fist":
+            self.open_panel(cell)
+        elif cell.crate:
+            self.say("The claws clang on the %s. (Walk into it to shove it.)" % ("container" if cell.heavy else "crate"), "dim")
+        elif cell.solid:
+            self.say("The claws scrape the wall. Sparks.", "dim")
+        else:
+            self.say("The claws snap shut on air.", "dim")
+        self.end_beat()
+        return True
+
+    def wreck(self):
+        """The vehicle gives out under you: you are thrown clear, and it blows apart."""
+        p, v = self.player, self.player.vehicle
+        fx, fy = DIRS[p.facing]
+        rx, ry = DIRS[(p.facing + 1) % 4]
+        spots = [(p.x + dx, p.y + dy) for dx, dy in ((-fx, -fy), (-rx, -ry), (rx, ry), (fx, fy))
+                 if self.free(p.x + dx, p.y + dy)]
+        p.vehicle = None
+        v.x, v.y = p.x, p.y
+        self.monsters.append(v)
+        self.say(v.vehicle.get("wreck") or "The %s gives out. You are thrown clear." % v.name, "alert")
+        if spots:
+            ox, oy = p.x, p.y
+            p.x, p.y = spots[0]
+            self.anim([FX(cam=(ox + (p.x - ox) * ease(i / 3.0), oy + (p.y - oy) * ease(i / 3.0)), shake=1 - i % 2 * 2)
+                       for i in range(1, 4)], 0.04)
+        v.hp = 0
+        self.kill(v)
+        self.update_seen()
+
     # ---- the player's actions --------------------------------------------- #
     def goggles(self, how=None):
         """Put the TTY goggles on or take them off (a free action, as turning is): their battery lasts longer."""
@@ -824,6 +974,21 @@ class Level:
         rx, ry = DIRS[(p.facing + 1) % 4]
         nx, ny = p.x + fx * ahead + rx * side, p.y + fy * ahead + ry * side
         cell = self.cell(nx, ny)
+        v = p.vehicle
+        if v is not None:                                # riding: no doors, no pads; what is in the way is trodden
+            if cell.kind == "door":
+                self.say("The %s will not fit through the door. (Enter or `out`: climb down)" % v.name, "dim")
+                return False
+            if cell.teleport or cell.lift:
+                self.say("The %s is too heavy for the %s." % (v.name, "pad" if cell.teleport else "lift"), "dim")
+                return False
+            m = self.monster_at(nx, ny)
+            if m is not None and not m.barrel and not m.spec.get("boss") and not m.float:
+                return self.stomp(m, nx, ny)
+        if cell.crate and cell.heavy and v is None:
+            self.say("A container: it will not budge for you. Something with hydraulics might move it.", "dim")
+            self.sfx("locked")
+            return False
         if cell.crate:
             return self.push(cell, nx - p.x, ny - p.y)
         if cell.solid:
@@ -832,7 +997,9 @@ class Level:
             self.say("A wall." if cell.kind == "wall" else "Something is in the way.", "dim")
             return False
         m = self.monster_at(nx, ny)
-        if m is not None and m.barrel:
+        if m is not None and m.vehicle and v is None:
+            return self.board(m)
+        if m is not None and m.barrel and not m.vehicle:
             return self.push_barrel(m, nx - p.x, ny - p.y)
         if m is not None:
             self.say("%s is in the way." % m.tag, "dim")
@@ -857,7 +1024,10 @@ class Level:
             return True
         # silent unless the game or its sound set has them; a step into acid is "wade", or else a footstep
         wet = self.cell(nx, ny).toxic
-        self.sfx("wade", "footstep") if wet else self.sfx("footstep")
+        if v is not None:
+            self.sfx((v.vehicle.get("sounds") or {}).get("step") or "footstep", "footstep")
+        else:
+            self.sfx("wade", "footstep") if wet else self.sfx("footstep")
         drops = (Bits(self.vrng).burst(nx + (nx - ox) * 0.45, ny + (ny - oy) * 0.45, 0.0,
                                       [(90, 230, 70), (150, 255, 110), (40, 150, 40)], n=10, speed=0.6, up=1.4,
                                       size=0.8).frames(4, 0.05) if wet else [()] * 4)
@@ -929,25 +1099,26 @@ class Level:
             self.say("The crate will not move: something is behind it.", "dim")
             self.sfx("locked")
             return False
-        cell.crate = False
+        heavy = cell.heavy
+        cell.crate = cell.heavy = False
         ox, oy = p.x, p.y
         p.x, p.y = cell.x, cell.y
-        path = [(cell.x, cell.y), (bx, by)] + ([] if beyond.toxic else self.slide_path(bx, by, dx, dy, crate=True))
+        path = [(cell.x, cell.y), (bx, by)] + ([] if beyond.toxic or heavy else self.slide_path(bx, by, dx, dy, crate=True))
         bx, by = path[-1]
         beyond = self.cell(bx, by)
-        beyond.crate = True
+        beyond.crate, beyond.heavy = True, heavy
         self.sfx("push", "drop")
         n = len(path) - 1
         frames = 4 * n
         self.anim([FX(cam=(ox + dx * ease(min(1.0, i / 4.0)), oy + dy * ease(min(1.0, i / 4.0))),
                       crates={(bx, by): self.along(path, i / float(frames))}) for i in range(1, frames + 1)], 0.035)
         if beyond.toxic:
-            beyond.crate, beyond.toxic, beyond.sunk = False, False, True
+            beyond.crate, beyond.heavy, beyond.toxic, beyond.sunk = False, False, False, True
             self.marks_version += 1
-            self.say("The crate sinks into the acid and settles: a step you can stand on.", "good")
+            self.say("The %s sinks into the acid and settles: a step you can stand on." % ("container" if heavy else "crate"), "good")
             self.sfx("wade", "drop")
         else:
-            self.say("You push the crate.", "dim")
+            self.say("The loader shoves the container on." if heavy else "You push the crate.", "dim")
         self.update_seen()
         self.arrive()
         self.end_beat()
@@ -1115,6 +1286,10 @@ class Level:
         x, y = self.ahead()
         cell = self.cell(x, y)
         p = self.player
+        if p.vehicle is not None and cell.kind != "exit":           # in the cage, Enter climbs down
+            if cell.kind == "door":
+                self.say("The %s will not fit through the door: you climb down." % p.vehicle.name, "dim")
+            return self.leave()
         here = self.cell(p.x, p.y)
         if here.lift and not (cell.kind in ("door", "exit") and not cell.pressed and cell.open < 1.0):
             return self.ride(here)
@@ -1252,6 +1427,8 @@ class Level:
 
     def fire(self, tag=None):
         p, rng = self.player, self.rng
+        if p.vehicle is not None:
+            return self.claw()
         w = self.weapons.get(p.weapon) or WEAPONS["1"]
         if w.get("ammo") and p.ammo.get(w["ammo"], 0) <= 0:
             self.say("Click. No %s." % w["ammo"], "hurt")
@@ -1271,8 +1448,22 @@ class Level:
             cone = self.cone()
             foes = [m for m in cone if not m.barrel]
             far_barrels = [m for m in cone if m.barrel and self.dist(m) > 1     # never one at arm's length,
-                           and abs(self.rel(m.x, m.y)[0]) < 0.5]                 # only one straight ahead
+                           and abs(self.rel(m.x, m.y)[0]) < 0.5 and not m.vehicle]   # only one straight ahead
             target = (foes or far_barrels or [None])[0]
+        if w.get("kind") in ("rocket", "grenade"):
+            if w.get("ammo"):
+                p.ammo[w["ammo"]] = max(0, p.ammo[w["ammo"]] - 1)
+            self.stats["fired"] += 1
+            self.noise(p.x, p.y)
+            if w["kind"] == "rocket":
+                self.launch(w, target)
+            else:
+                self.lob(w, target)
+            if self.over:
+                return True
+            self.after_shot(w)
+            self.end_beat()
+            return True
         if melee:
             ax, ay = self.ahead()
             if target is None or (target.x, target.y) != (ax, ay):
@@ -1341,6 +1532,10 @@ class Level:
             self.sfx((target.spec.get("sounds") or {}).get("hit") or (None if target.barrel else "hit_body"))
         elif not melee:
             self.sfx("hit_wall")                    # it flies past, into what is behind
+        if not melee:                               # what missed goes on into the wall behind: a hole
+            fired = int(w.get("burst", 1)) * int(w.get("pellets", 1))
+            for _ in range(min(3, fired if target not in hits else fired // 3)):
+                self.stray(target.x, target.y, 0.6 if w.get("pellets", 1) > 1 else 0.3)
         if hits:
             sound = w.get("text", {"melee": "THUD."}.get(w.get("kind"), "BLAM." if w.get("pellets", 1) > 1 else "BANG."))
             self.damage(sorted(hits.items(), key=lambda kv: kv[0] is not target), lead=sound)
@@ -1369,7 +1564,8 @@ class Level:
             self.say("Out of %s." % w["ammo"], "alert")
             order = list(self.weapons)
             ready = [k for k in p.weapons if k in self.weapons and (not self.weapons[k].get("ammo")
-                                                                     or p.ammo.get(self.weapons[k]["ammo"], 0) > 0)]
+                                                                     or p.ammo.get(self.weapons[k]["ammo"], 0) > 0)
+                     and self.weapons[k].get("kind") not in ("rocket", "grenade")]   # never explosives by itself
             best = max(ready or ["1"], key=lambda k: (bool((self.weapons.get(k) or {}).get("ammo")),
                                                       order.index(k) if k in order else -1))
             self.switch(best)
@@ -1386,6 +1582,10 @@ class Level:
                 if cell.kind == "panel" and cell.panel == "shoot":
                     self.open_panel(cell)
                 else:
+                    n = DIRS.index((-fx, -fy))
+                    for _ in range(min(4, int(w.get("pellets", 1)) * int(w.get("burst", 1)))):
+                        spread = 0.36 if w.get("pellets", 1) > 1 else 0.22
+                        self.hole(x, y, n, self.vrng.uniform(-spread, spread), self.vrng.uniform(0.32, 0.62))
                     self.sfx("hit_wall")
                     self.say("Your shot hits the %s." % ("crate" if cell.crate else "door" if cell.kind == "door" else "wall"), "dim")
                     sparks = Bits(self.vrng).burst(x - fx * 0.52, y - fy * 0.52, 0.55, [(255, 230, 140), (255, 180, 60), (255, 255, 230)],
@@ -1475,32 +1675,201 @@ class Level:
 
     def explode(self, b):
         self.say("%s explodes!" % b.tag, "alert")
-        self.sfx("explosion")
-        bits = Bits(self.vrng).burst(b.x, b.y, 0.3, [(70, 74, 82), (40, 120, 40), (255, 160, 40), (255, 220, 120)],
-                                     n=26, speed=2.4, up=2.2, size=1.1).frames(7, 0.045)
-        self.anim([FX(booms=[(b.x, b.y, k)], shake=(1 if i % 2 else -1) if k < 0.5 else 0, parts=bits[i])
-                   for i, k in enumerate((0.0, 0.12, 0.25, 0.4, 0.55, 0.7, 0.85))], 0.045)
-        self.noise(b.x, b.y)
-        p = self.player
         dmg = int((b.attack or {}).get("damage", 40)) if isinstance((b.attack or {}).get("damage"), int) else 40
-        victims = [(m, dmg) for m in self.monsters if not m.dead and not m.gone and m is not b
-                   and max(abs(m.x - b.x), abs(m.y - b.y)) <= 1]
+        self.blast(b.x, b.y, dmg, by=b, colours=[(70, 74, 82), (40, 120, 40), (255, 160, 40), (255, 220, 120)])
+
+    def blast(self, x, y, dmg, by=None, lead="The blast:", colours=None):
+        """An explosion - a barrel's, a rocket's, a grenade's: everything within a cell takes ``dmg`` (the player
+        three quarters of it), crates and monsters are thrown a cell away, oil next to it catches fire, other
+        grenades next to it go off, and the floor is left scorched."""
+        self.sfx("explosion")
+        bits = Bits(self.vrng).burst(x, y, 0.3, colours or [(90, 88, 84), (60, 58, 56), (255, 160, 40), (255, 220, 120)],
+                                     n=26, speed=2.4, up=2.2, size=1.1).frames(7, 0.045)
+        self.anim([FX(booms=[(x, y, k)], shake=(1 if i % 2 else -1) if k < 0.5 else 0, parts=bits[i])
+                   for i, k in enumerate((0.0, 0.12, 0.25, 0.4, 0.55, 0.7, 0.85))], 0.045)
+        self.noise(x, y)
+        p = self.player
+        victims = [(m, dmg) for m in self.monsters if not m.dead and not m.gone and m is not by
+                   and max(abs(m.x - x), abs(m.y - y)) <= 1]
         if victims:
-            self.damage(victims, lead="The blast:")
-        self.blast_push(b.x, b.y)
-        self.ignite(b.x, b.y, 2)
+            self.damage(victims, lead=lead)
+        self.blast_push(x, y)
+        here = self.cell(x, y)
+        if here.kind == "floor" and not here.toxic and not here.solid and not here.scorched:
+            here.scorched = True                         # a black mark that stays
+            self.marks_version += 1
+        self.ignite(x, y, 2)
         for dx, dy in DIRS:
-            if self.cell(b.x + dx, b.y + dy).oil:
-                self.ignite(b.x + dx, b.y + dy, 2)
-        if max(abs(p.x - b.x), abs(p.y - b.y)) <= 1 and not self.over:
-            self.hurt(int(dmg * 0.75), "The blast catches you.", by=b)
+            if self.cell(x + dx, y + dy).oil:
+                self.ignite(x + dx, y + dy, 2)
+        if max(abs(p.x - x), abs(p.y - y)) <= 1 and not self.over:
+            self.hurt(int(dmg * 0.75), "The blast catches you.", by=by)
+        near = [g for g in self.grenades if max(abs(g.x - x), abs(g.y - y)) <= 1]
+        for g in near:                                   # it sets the grenades next to it off
+            if g in self.grenades and not self.over:
+                self.grenades.remove(g)
+                self.blast(g.x, g.y, g.blast, lead="Another grenade:")
+
+    # ---- rockets, grenades, holes ------------------------------------------ #
+    def line_ahead(self, target, n):
+        """The cells a missile flies through: towards the target and on past it, or straight ahead."""
+        p = self.player
+        if target is None:
+            fx, fy = DIRS[p.facing]
+            return [(p.x + fx * i, p.y + fy * i) for i in range(1, n + 1)]
+        path = bresenham(p.x, p.y, target.x, target.y)[1:]
+        dx, dy = target.x - p.x, target.y - p.y
+        k = max(abs(dx), abs(dy)) or 1
+        for i in range(1, n):
+            path.append((target.x + int(round(dx / float(k) * i)), target.y + int(round(dy / float(k) * i))))
+        return path[:n]
+
+    def launch(self, w, target):
+        """A rocket flies along the line until it meets a monster, a barrel or a wall, and bursts there:
+        the one it hits takes ``damage``, everything within a cell ``blast`` - you too, if you are that close."""
+        p = self.player
+        self.sfx(w.get("sound") or "rocket")
+        path = self.line_ahead(target, fp.SIGHT + 4)
+        at, hit, prev = None, None, (p.x, p.y)
+        for (x, y) in path:
+            if self.cell(x, y).solid:
+                at = prev                                # it bursts against the wall's face
+                break
+            m = self.monster_at(x, y)
+            if m is not None:
+                at, hit = (x, y), m
+                break
+            prev = (x, y)
+        way = [(p.x, p.y)] + (path[:path.index(at) + 1] if at in path else (path if at is None else []))
+        if len(way) > 1:
+            n = max(2, int(round(len(way) * 1.5)))
+            smoke, frames = [], []
+            for i in range(1, n + 1):
+                x, y = self.along(way, i / float(n))
+                smoke = [(sx, sy, h + 0.03, (min(255, c[0] + 6),) * 3, size) for sx, sy, h, c, size in smoke][-14:]
+                smoke.append((x - 0.2 * DIRS[p.facing][0], y - 0.2 * DIRS[p.facing][1], 0.5,
+                               (130, 128, 124), 0.8))
+                frames.append(FX(missiles=[(x, y, 0.5, "rocket", (255, 150, 50))], parts=list(smoke),
+                                 muzzle=i <= 1, recoil=2 if i <= 2 else 0))
+            self.anim(frames, 0.03)
+        if at is None:
+            self.say("%s The rocket streaks off into the dark." % w.get("text", "FWOOSH."), "dim")
+            return
+        if at == (p.x, p.y):
+            self.say("You fire a rocket into the wall at arm's length.", "alert")
+        if hit is not None:
+            lo, hi = w.get("damage", [30, 50])
+            self.stats["hits"] += 1
+            self.damage([(hit, self.rng.randint(lo, hi))], lead="%s The rocket hits:" % w.get("text", "FWOOSH."))
+            if hit.barrel and hit.dead:
+                return                                   # it set the barrel off: that was the blast
+        elif at != (p.x, p.y):
+            self.say("%s The rocket bursts on the wall." % w.get("text", "FWOOSH."), "hit")
+        if not self.over:
+            self.blast(at[0], at[1], int(w.get("blast", 40)))
+
+    def lob(self, w, target):
+        """A grenade, thrown in an arc ``range`` cells ahead (or as far as the one aimed at): off a wall it
+        bounces back, before a monster it drops; on slick floor it slides on, on a belt it rides, and when
+        its ``fuse`` (beats) is out it goes off."""
+        p = self.player
+        fx, fy = DIRS[p.facing]
+        reach = int(w.get("range", 3))
+        if target is not None:
+            a, z = self.rel(target.x, target.y)
+            if 1 <= z <= reach + 1:
+                reach = z
+        x, y, dx, dy, left, notes = p.x, p.y, fx, fy, reach, []
+        way = [(x, y)]
+        while left > 0:
+            nx, ny = x + dx, y + dy
+            if self.cell(nx, ny).solid:
+                dx, dy, left = -dx, -dy, left - 1        # off the wall, back the way it came
+                notes.append("bounces off the %s" % ("crate" if self.cell(nx, ny).crate else "wall"))
+                self.sfx("bounce", "hit_wall")
+                continue
+            m = self.monster_at(nx, ny)
+            if m is not None and not m.float:
+                notes.append("drops at %s's feet" % m.tag)
+                break
+            x, y, left = nx, ny, left - 1
+            way.append((x, y))
+        slid = self.slide_path(x, y, dx, dy) if (x, y) != (p.x, p.y) else []
+        if slid:
+            notes.append("skids on along the %s" % ("oil" if self.cell(x, y).oil else "slick floor"))
+        n = max(3, 3 * (len(way) - 1))
+        frames = []
+        for i in range(1, n + 1):
+            k = i / float(n)
+            gx, gy = self.along(way, k) if len(way) > 1 else way[0]
+            frames.append(FX(missiles=[(gx, gy, 0.45 * (1 - k) + 1.1 * k * (1 - k), "grenade", None)],
+                             recoil=-2 if i <= 2 else 0))
+        for i, k in enumerate((0.34, 0.67, 1.0) * (1 if slid else 0)):
+            gx, gy = self.along([(x, y)] + slid, k)
+            frames.append(FX(missiles=[(gx, gy, 0.0, "grenade", None)]))
+        self.anim(frames, 0.035)
+        if slid:
+            x, y = slid[-1]
+        g = Grenade(x, y, int(w.get("fuse", 2)), int(w.get("blast", 50)))
+        self.grenades.append(g)
+        where = "at your feet!" if (x, y) == (p.x, p.y) else "%d cell%s away." % (
+            max(abs(x - p.x), abs(y - p.y)), "" if max(abs(x - p.x), abs(y - p.y)) == 1 else "s")
+        self.say("%s The grenade %slands %s" % (w.get("text", "Tink."), "".join(t + ", " for t in notes), where),
+                 "alert" if (x, y) == (p.x, p.y) else "dim")
+
+    def fuses(self):
+        """Grenades' fuses burn down a beat; the ones out go off."""
+        for g in list(self.grenades):
+            g.fuse -= 1
+        for g in [g for g in self.grenades if g.fuse <= 0]:
+            if g in self.grenades and not self.over:
+                self.grenades.remove(g)
+                self.blast(g.x, g.y, g.blast, lead="The grenade:")
+
+    def hole(self, x, y, n, along, down):
+        """A bullet hole in the face of wall (x, y) turned towards ``DIRS[n]``: ``along`` it (-0.5..0.5,
+        sideways in the direction ``DIRS[n + 1]``) and ``down`` it (0 at the top, 1 at the floor)."""
+        c = self.cell(x, y)
+        if c.kind not in ("wall", "panel", "exit") or c.crate or c is VOID:
+            return
+        self.holes.append((x, y, n, max(-0.45, min(0.45, along)), max(0.05, min(0.95, down))))
+        del self.holes[:-HOLES]
+
+    def stray(self, tx, ty, spread=0.3):
+        """A shot that missed (tx, ty) goes on behind it: a hole where it meets a wall (within 14 cells)."""
+        p, r = self.player, self.vrng
+        dx, dy = tx - p.x + r.uniform(-spread, spread), ty - p.y + r.uniform(-spread, spread)
+        d = math.hypot(dx, dy) or 1.0
+        ux, uy = dx / d, dy / d
+        px_, py_ = float(p.x), float(p.y)
+        cx, cy = p.x, p.y
+        for i in range(1, 14 * 16):
+            x, y = p.x + ux * i / 16.0, p.y + uy * i / 16.0
+            ix, iy = int(math.floor(x + 0.5)), int(math.floor(y + 0.5))
+            if (ix, iy) != (cx, cy):
+                if self.cell(ix, iy).solid:
+                    if ix != cx and iy != cy:                # through a corner: the face that is open
+                        ix, iy = (ix, cy) if self.cell(ix, cy).solid else (cx, iy)
+                    if ix != cx:
+                        n = DIRS.index((1 if cx > ix else -1, 0))
+                        face = ix + 0.5 * DIRS[n][0]
+                        y = py_ + uy * (face - px_) / ux if ux else y
+                        along = (y - iy) * DIRS[(n + 1) % 4][1]
+                    else:
+                        n = DIRS.index((0, 1 if cy > iy else -1))
+                        face = iy + 0.5 * DIRS[n][1]
+                        x = px_ + ux * (face - py_) / uy if uy else x
+                        along = (x - ix) * DIRS[(n + 1) % 4][0]
+                    self.hole(ix, iy, n, along, r.uniform(0.34, 0.6))
+                    return
+                cx, cy = ix, iy
 
     def blast_push(self, x0, y0):
         """A blast throws crates and monsters next to it a cell further away, if there is room."""
         sign = lambda v: (v > 0) - (v < 0)                    # noqa: E731
         moved, slid = [], {}
         for c in [self.cell(x, y) for y in range(y0 - 1, y0 + 2) for x in range(x0 - 1, x0 + 2)]:
-            if not c.crate:
+            if not c.crate or c.heavy:
                 continue
             dx, dy = sign(c.x - x0), sign(c.y - y0)
             t = self.cell(c.x + dx, c.y + dy)
@@ -1530,6 +1899,8 @@ class Level:
     def acid(self):
         """A beat on toxic floor: it wears the boots down, or burns."""
         p = self.player
+        if p.vehicle is not None and p.vehicle.vehicle.get("wades", True):
+            return                                       # steel feet
         if p.boots:
             p.boots -= 1
             if not p.boots:
@@ -1547,6 +1918,18 @@ class Level:
         p = self.player
         if p.sudo:
             self.say(text + "  (root shrugs it off)", "root")
+            return
+        v = p.vehicle
+        if v is not None:                                # the machine takes it
+            v.hp -= dmg
+            self.say("%s  The %s takes %d (%d left)" % (text, v.name, dmg, max(0, v.hp)), "hurt")
+            self.sfx("hit_wall")
+            self.anim([FX(shake=s, hurt=h) for s, h in ((1, 0.25), (-1, 0.12), (0, 0.0))], 0.05)
+            self.interrupt = self.interrupt or "the loader was hit"
+            if v.hp <= 0:
+                self.wreck()
+            elif v.hp <= 40 and v.hp + dmg > 40:
+                self.say("The %s's hydraulics are failing. Get out before it goes." % v.name, "alert")
             return
         if p.armor:
             saved = min(p.armor, dmg // 3)
@@ -1647,12 +2030,16 @@ class Level:
         self.convey()
         if self.over:
             return
+        self.fuses()
+        if self.over:
+            return
         self.plates()
         self.burn()
         if self.over:
             return
         burning = [(m, int(self.cfg.get("toxic_damage", 5))) for m in self.monsters if not m.dead and not m.gone
-                   and not m.float and not m.spec.get("boss") and self.cell(m.x, m.y).toxic]
+                   and not m.float and not m.spec.get("boss") and self.cell(m.x, m.y).toxic
+                   and not (m.vehicle and m.vehicle.get("wades", True))]
         if burning and not self.over:
             self.damage(burning, lead="The acid:")
         cell = self.cell(p.x, p.y)
@@ -1712,7 +2099,7 @@ class Level:
             self.hurt(dmg, "You are standing in fire!", by=None)
             if self.over:
                 return
-        caught = [(m, 99 if m.barrel else dmg) for m in self.monsters if not m.dead and not m.gone and not m.float
+        caught = [(m, 99 if m.barrel and not m.vehicle else dmg) for m in self.monsters if not m.dead and not m.gone and not m.float
                   and not m.spec.get("boss") and (m.x, m.y) in self.fires]
         if caught:
             self.damage(caught, lead="The fire:")
@@ -1757,13 +2144,14 @@ class Level:
                     p.x, p.y = tx, ty
             elif c.crate:
                 if self.room(tx, ty, crate=True):
-                    c.crate = False
+                    heavy = c.heavy
+                    c.crate = c.heavy = False
                     t = self.cell(tx, ty)
                     if t.toxic:
                         t.toxic, t.sunk = False, True
                         self.marks_version += 1
                     else:
-                        t.crate = True
+                        t.crate, t.heavy = True, heavy
                         crates[(tx, ty)] = (c.x, c.y)
             elif m is not None and not m.float and not m.spec.get("boss"):
                 if self.room(tx, ty):
@@ -1773,6 +2161,10 @@ class Level:
                 if not it.taken and (it.x, it.y) == (c.x, c.y) and not self.cell(tx, ty).solid:
                     items.append((it, it.x, it.y))
                     it.x, it.y = tx, ty
+            for g in self.grenades:                      # a grenade rides a belt, its fuse burning
+                if (g.x, g.y) == (c.x, c.y) and not self.cell(tx, ty).solid and g not in items:
+                    items.append(g)
+                    g.x, g.y = tx, ty
         if moves or crates or cam or items:
             self.anim([FX(cam=(cam[0][0] + (cam[1][0] - cam[0][0]) * k, cam[0][1] + (cam[1][1] - cam[0][1]) * k) if cam else None,
                           pos={m.id: (x0 + (m.x - x0) * k, y0 + (m.y - y0) * k) for m, x0, y0 in moves},
@@ -2301,7 +2693,9 @@ class FrameConsole:
         face = self.face(lv, fx)
         segs = [(" %s %d" % (g["heart"], p.hp), "hurt" if fx.hurt or p.hp < 30 else "text"),
                 ("  %s %d" % (g["armor"], p.armor), "dim" if not p.armor else "key_x" if p.armor > 100 else "good"), bar,
-                ("%s %s " % (lv.slot_of(p.weapon), w.get("name", "?")), "text"), (ammo, "ammo"), bar] + keys + [
+                ] + ([("%s %d" % (p.vehicle.name, max(0, p.vehicle.hp)), "alert" if p.vehicle.hp <= 40 else "key_w"), bar]
+                     if p.vehicle is not None else
+                     [("%s %s " % (lv.slot_of(p.weapon), w.get("name", "?")), "text"), (ammo, "ammo"), bar]) + keys + [
                 bar, (g["facing"][p.facing] + " " + FACE_NAMES[p.facing][0].upper(), "text"), bar,
                 ("%d/%d" % (lv.stats["kills"], lv.total_kills), "dim"), bar, (face, "root" if p.sudo else "title")]
         out = [sc.paint.text(segs, W, g["ell"])]
@@ -2578,6 +2972,8 @@ class TextConsole:
         p = lv.player
         w = lv.weapons.get(p.weapon) or {}
         ammo = (" %s %d" % (w["ammo"], p.ammo.get(w["ammo"], 0))) if w.get("ammo") else ""
+        if p.vehicle is not None:
+            ammo += " | riding the %s %d" % (p.vehicle.name, max(0, p.vehicle.hp))
         power = "".join(" | %s %d" % (n, v) for n, v in (("root", p.sudo), ("boots", p.boots),
                                                           ("goggles" if p.goggles_on else "goggles off", p.goggles)) if v)
         self.write("-- hp %d  armour %d | %s%s | keys %s%s | facing %s | beat %d --" % (
@@ -2697,8 +3093,8 @@ def validate(data):
         if not isinstance(w, dict):
             problems.append("weapon '%s' should be an object" % wid)
             continue
-        if w.get("kind") not in (None, "", "gun", "melee"):
-            problems.append("weapon '%s': kind should be gun or melee, not '%s'" % (wid, w.get("kind")))
+        if w.get("kind") not in (None, "", "gun", "melee", "rocket", "grenade"):
+            problems.append("weapon '%s': kind should be gun, melee, rocket or grenade, not '%s'" % (wid, w.get("kind")))
         d = w.get("damage")
         if d is not None and not (isinstance(d, list) and len(d) == 2 and all(isinstance(v, (int, float)) for v in d)):
             problems.append("weapon '%s': damage should be [least, most]" % wid)

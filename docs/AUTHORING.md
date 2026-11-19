@@ -1171,6 +1171,8 @@ The rules move a cell at a time, a beat at a time:
 - **Crates** (`{"crate": true}`, `&`): walking into one pushes it a cell on, if nothing
   is behind it (a wall, a monster, an item, a pad or a lift). A crate blocks the way, sight
   and shots - it is cover. Pushed into toxic floor it sinks and makes a step to stand on.
+  A **container** (`{"crate": "heavy"}`) is a crate only a vehicle can shove; blasts do
+  not throw it, and it does not slide. The game's sprite `container` draws it.
 - **Pressure plates** (`{"plate": name}`, `^`): down while something heavy stands on it -
   a crate, the player, a monster that does not float. A door or a wall with
   `"open_while": name` is open only while a plate of that name is down, and shuts again
@@ -1193,6 +1195,25 @@ The rules move a cell at a time, a beat at a time:
   monsters, or into the acid.
 - **Monsters use teleporters**: a pad that leads closer to the player is a step on their
   way, and one that walks on to a pad is taken to the next, like the player.
+- **Vehicles**: a monster with a `"vehicle"` block (and the `barrel` attack, so it stands
+  still and goes up when it is wrecked) is a machine to ride. Walking into it climbs in;
+  Enter, or `out`, climbs down behind or beside it, and it stays where it stands. While
+  riding, the picture shows its cage and its `cockpit` sprite instead of a gun; Space is its
+  `claw` (damage to what is right ahead, which is thrown a cell back and loses a beat; a
+  hollow wall breaks); walking into a monster treads on it (`stomp` damage - crushed, if
+  that kills it, else thrown back); it shoves containers, and with `"wades": true` (the
+  default) acid does not hurt it. It goes through no doors and onto no pads or lifts. What
+  would hurt the player hurts it, armour or not; at 0 it throws him clear and bursts for
+  its attack's `damage`. Its texts are `board`, `leave` and `wreck`; its `sounds` are `step`,
+  `board` and `claw`.
+
+```json
+"loader": {"name": "cargo loader", "tag": "v", "sprite": "loader", "hp": 150, "size": 1.35, "kind": "barrel",
+           "attack": {"kind": "barrel", "damage": 30},
+           "vehicle": {"claw": [30, 50], "stomp": 40, "cockpit": "w_loader", "wades": true,
+                       "board": "You strap into the loader's cage. Space: claw. ...",
+                       "sounds": {"step": "loader_step", "board": "loader_board", "claw": "claw"}}}
+```
 
 ### Floors and fire
 
@@ -1240,7 +1261,7 @@ between), hears a shot (gunfire carries 12 cells through open space), is hurt, o
 | `projectile` | raises a burning hand (an orange `!`), then throws fire at where the player stood; it flies `speed` cells a beat, so a step aside dodges it; `claw` when close |
 | `melee` | comes `speed` cells a beat and bites when next to the player |
 | `spawner` | every `every` beats makes a `spawn` (a monster id), up to `max` at a time |
-| `barrel` | does nothing until hit; then bursts for `damage` on everything next to it |
+| `barrel` | does nothing until hit; then bursts for `damage` on everything next to it (a vehicle has this attack too) |
 | `flame` | levels its nozzle (an orange `!`) when the player is in its row or column within `range`, then sprays fire along the line: `damage` to everything in it, and the floor burns for `burn` beats |
 | `cron` | a boss that works to a schedule (see below) |
 
@@ -1336,7 +1357,26 @@ beats: no aim, no step - not a boss); `"ready_sound"` plays when it is taken in 
 
 A shot goes for what is in sight, nearest and most central first; a barrel only when it is
 straight ahead and not at arm's length. `pellets` spread to monsters next to the target
-(`spread`); `burst` fires (and spends) that many rounds a beat. `view` is how the level is
+(`spread`); `burst` fires (and spends) that many rounds a beat. What misses goes on into
+the wall behind and leaves a bullet hole there, as does a shot into a wall (the last 60
+holes of a level are kept).
+
+Two more kinds throw something that bursts - a **blast**: everything within a cell takes
+its damage (the player three quarters of it), crates and monsters are thrown a cell away,
+oil next to it catches fire, grenades next to it go off, and the floor keeps a black mark.
+
+```json
+"5": {"name": "rocket launcher", "ammo": "rockets", "kind": "rocket", "damage": [30, 50], "blast": 40, ...},
+"6": {"name": "grenades", "ammo": "grenades", "kind": "grenade", "blast": 50, "fuse": 2, "range": 3, ...}
+```
+
+A `rocket` flies the line to the target (or straight ahead) until it meets a monster, a
+barrel or a wall: the one it hits takes `damage`, and then the blast. A `grenade` is
+thrown `range` cells ahead, or to the row of the one aimed at; it bounces back off a wall
+(a cell lost), drops before a monster, slides on slick floor, rides a belt, and bursts when
+its `fuse` (beats) is out - thrown now, it goes off at the end of the next beat. Run out of
+ammunition and the next gun is taken up, never one of these. The sprites `rocket` and
+`grenade` draw them flying (the engine has its own). `view` is how the level is
 drawn: `pixel` (half blocks), `dots` or `dots-fill` (braille); `--view` overrides it.
 `"detail"` is how fine the floor and ceiling are: `"high"`, `"low"` (half width, half the
 work - for a slow machine or a very wide window) or `"auto"` (the default: low only for a
@@ -1368,14 +1408,16 @@ editor the end screen is in the **Game** form, drawn beside it as the game draws
 **A secret exit**: an exit switch with `{"exit": "secret"}` (Rootless puts one behind the
 goggles' closet in E1M1) ends the level too, but then the scene's `"on_secret_exit"`
 effects run instead of `"on_level_exit"` - usually a story text and a `goto` to a scene
-with a secret level of its own:
+with a secret level of its own, whose exit leads back to the next level:
 
 ```json
 {"id": "boot_sector", "level": "e1m1",
- "on_level_exit": [{"story": "e1_end"}, {"win": "outro_demo"}],
+ "on_level_exit": [{"story": "e1_end"}, {"goto": "dynamic_loader"}],
  "on_secret_exit": [{"story": "e1m9_intro"}, {"goto": "swap_partition"}]},
 {"id": "swap_partition", "level": "e1m9",
- "on_level_exit": [{"story": "e1m9_end"}, {"win": "outro_demo"}]}
+ "on_level_exit": [{"story": "e1m9_end"}, {"goto": "dynamic_loader"}]},
+{"id": "dynamic_loader", "level": "e1m2",
+ "on_level_exit": [{"story": "e1m2_end"}, {"win": "outro_demo"}]}
 ```
 
 ### Sprites for a level
@@ -1444,8 +1486,8 @@ the single keys off; `"keymap"` in `first_person` (key name -> command line) cha
 The window can be resized at any time; the picture is drawn again at once.
 
 A simple player (`engine/levelbot.py`) can walk a level: it follows the level's `"bot"`
-list of goals - item ids or map characters, the exit `E` last - fights what it sees and
-steps out of fire. If it can finish, a person can. `python tests/levelbot.py 10 rootless
+list of goals - item ids or map characters, the exit `E` last; `board` climbs into the
+nearest vehicle and `out` climbs down - fights what it sees and steps out of fire. If it can finish, a person can. `python tests/levelbot.py 10 rootless
 e1m1` lets it play ten times; the editor does the same.
 
 ### Levels in the editor

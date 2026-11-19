@@ -160,6 +160,24 @@ game, RØØTLESS, shows them.
   `low` draws a level's floor and ceiling at half width - half their work, which is most of a
   frame - and `auto`, the default, does so only for a very big picture (the goggles' dots in
   a wide window).
+- **Rockets and grenades** (weapon kinds `rocket` and `grenade`): a rocket flies the line to
+  its target and bursts on what it meets; a grenade is thrown a few cells ahead, bounces back
+  off walls, slides on slick floor, rides belts and goes off a beat later. Their **blast** is
+  a barrel's - everything within a cell, the player too, thrown back, oil set alight - and
+  leaves the floor scorched; grenades next to a blast go off with it. Running out of bullets
+  never puts an explosive in the player's hands.
+- **Bullet holes**: a shot into a wall, and a shot that misses and goes on into the wall
+  behind, leaves a hole in that wall's face, kept in place as the player walks round (the
+  last 60 of a level).
+- **Vehicles**: a monster with a `"vehicle"` block can be ridden - walk into it to climb in,
+  Enter or `out` to climb down. It takes the hits instead of the player, treads on monsters,
+  has a claw for a weapon, shoves heavy **containers** (`{"crate": "heavy"}`) that the
+  player alone cannot move, wades through acid, fits through no door, and bursts when it is
+  wrecked. The picture shows its cage and claws. The level bot can `board` and get `out`.
+- **RØØTLESS E1M2 *Dynamic Loader***: the cargo dock where everything the facility runs is
+  loaded first - containers, a belt of crates feeding an acid channel, the w key across it,
+  and a cargo loader in its bay; three secrets; the rocket launcher and grenades; its own
+  music. E1M1's exit leads there, and so does the secret level's.
 
 ### Changed
 

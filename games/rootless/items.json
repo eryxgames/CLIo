@@ -163,5 +163,43 @@
    "sound": "chainsaw_up",
    "text": "A chainsaw from a damage-control locker. It starts first pull. (Key 1; again for the next.)"
   }
+ },
+ "rocket_launcher": {
+  "name": "rocket launcher",
+  "description": "A shoulder tube from the facility's own armoury. Do not stand near what you hit.",
+  "pickup": {
+   "weapon": 5,
+   "ammo": {
+    "rockets": 2
+   },
+   "sprite": "rocket_launcher",
+   "size": 0.8,
+   "text": "You got the rocket launcher! (5)  Mind the blast: it reaches a cell round what you hit."
+  }
+ },
+ "rockets": {
+  "name": "rockets",
+  "description": "Two rockets in a sling.",
+  "pickup": {
+   "ammo": {
+    "rockets": 2
+   },
+   "sprite": "rockets",
+   "size": 0.5,
+   "text": "Two rockets."
+  }
+ },
+ "grenades": {
+  "name": "grenades",
+  "description": "A box of three fragmentation grenades.",
+  "pickup": {
+   "weapon": 6,
+   "ammo": {
+    "grenades": 3
+   },
+   "sprite": "grenade_box",
+   "size": 0.5,
+   "text": "A box of grenades. (6)  Thrown three cells ahead; they bounce off walls and go off a beat later."
+  }
  }
 }

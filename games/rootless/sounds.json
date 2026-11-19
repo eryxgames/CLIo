@@ -556,5 +556,125 @@
    22,
    0.08
   ]
- }
+ },
+ "rocket": [
+  {
+   "wave": "noise",
+   "noise_rate": 3200,
+   "freq": 0,
+   "dur": 0.55,
+   "vol": 0.42,
+   "decay": 0.45,
+   "sustain": 0.5
+  },
+  {
+   "wave": "saw",
+   "freq": [
+    90,
+    40
+   ],
+   "dur": 0.4,
+   "vol": 0.3
+  }
+ ],
+ "throw": [
+  {
+   "wave": "noise",
+   "noise_rate": 5000,
+   "freq": 0,
+   "dur": 0.12,
+   "vol": 0.15,
+   "decay": 0.1,
+   "sustain": 0
+  },
+  {
+   "wave": "square",
+   "freq": [
+    1500,
+    1400
+   ],
+   "dur": 0.05,
+   "vol": 0.12
+  }
+ ],
+ "bounce": [
+  {
+   "wave": "triangle",
+   "freq": [
+    900,
+    700
+   ],
+   "dur": 0.08,
+   "vol": 0.3
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 3000,
+   "freq": 0,
+   "dur": 0.05,
+   "vol": 0.12,
+   "decay": 0.04,
+   "sustain": 0
+  }
+ ],
+ "loader_step": [
+  {
+   "wave": "noise",
+   "noise_rate": 400,
+   "freq": 0,
+   "dur": 0.22,
+   "vol": 0.5,
+   "decay": 0.2,
+   "sustain": 0
+  },
+  {
+   "wave": "saw",
+   "freq": [
+    70,
+    52
+   ],
+   "dur": 0.28,
+   "vol": 0.22
+  }
+ ],
+ "loader_board": [
+  {
+   "wave": "noise",
+   "noise_rate": 6000,
+   "freq": 0,
+   "dur": 0.35,
+   "vol": 0.18,
+   "decay": 0.3,
+   "sustain": 0.3
+  },
+  {
+   "wave": "square",
+   "freq": [
+    110,
+    220
+   ],
+   "dur": 0.3,
+   "vol": 0.16
+  }
+ ],
+ "claw": [
+  {
+   "wave": "noise",
+   "noise_rate": 700,
+   "freq": 0,
+   "dur": 0.14,
+   "vol": 0.6,
+   "decay": 0.12,
+   "sustain": 0
+  },
+  {
+   "wave": "square",
+   "freq": [
+    180,
+    90
+   ],
+   "dur": 0.16,
+   "vol": 0.22
+  }
+ ]
 }

@@ -4,7 +4,7 @@
   "show_once": true
  },
  "e1_end": {
-  "text": "The exit switch takes your weight and the lift drops into the dark.\n\nSomewhere below, a clock is ticking that was not ticking before. Cron got away. It does not chase, it schedules - and it has put you on its list.\n\nFor a moment the sim thins out: the inside of the pod's lid, a red light, someone shouting a number that might be yours. Then the dark comes back.\n\nNext: User Space.",
+  "text": "The exit switch takes your weight and the lift drops into the dark.\n\nSomewhere below, a clock is ticking that was not ticking before. Cron got away. It does not chase, it schedules - and it has put you on its list.\n\nFor a moment the sim thins out: the inside of the pod's lid, a red light, someone shouting a number that might be yours. Then the dark comes back.\n\nThe lift stops with a bang at a loading dock. Containers to the roof, and something big and yellow parked in a bay.",
   "show_once": false
  },
  "outro_demo": {
@@ -19,6 +19,10 @@
   "text": "Behind the goggles' closet, a switch nobody labelled. You throw it anyway. The floor drops: a service lift, old and loud, going down past the boot bay into the swap partition.\n\nThis part of the simulatron was not in the briefing."
  },
  "e1m9_end": {
-  "text": "The last page is swapped back in. Somewhere above, Cron's schedule skips a beat - it knows a process got out of its queue.\n\nThe instructor bot cuts in, too loud and too late: \"Recruit, that sector is not part of your training. Do not disconnect.\" A lift takes you up to the dark, and the dark goes on."
+  "text": "The last page is swapped back in. Somewhere above, Cron's schedule skips a beat - it knows a process got out of its queue.\n\nThe instructor bot cuts in, too loud and too late: \"Recruit, that sector is not part of your training. Do not disconnect.\" A lift takes you up through the dark, and lets you out at a loading dock."
+ },
+ "e1m2_end": {
+  "text": "The control room's switch drops the dock's gantry. Every container in that bay held a library something needs; the loader links each one to where it runs. You have just been linked too - into whatever runs beneath the hardware.\n\nThe instructor bot's voice comes through broken: \"...pod six... pod six is not answering...\" Your pod is six.\n\nNext: User Space.",
+  "show_once": false
  }
 }

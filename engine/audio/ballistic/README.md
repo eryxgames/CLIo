@@ -24,7 +24,7 @@ How a game uses it is in [docs/AUTHORING.md](../../../docs/AUTHORING.md), under 
 ## The C engine
 
 [Ballistic Engine](https://github.com/eigensoundlab/ballistic-engine) is the same engine in C, checked against the
-JavaScript sample for sample. Where its library is found - `CLIO_BALLISTIC_LIB`, else `lib/` here, else the system's
+JavaScript sample for sample; its releases have the library built for Linux, macOS, Windows and Android. Where its library is found - `CLIO_BALLISTIC_LIB`, else `lib/` here, else the system's
 library path - `__init__.py` renders through it (ctypes, in the game's process) every kind it has ported, and uses
 Node for the rest. It must follow the same Ballistic commit as `engine.js` (`ENGINE_COMMIT`); a library that follows
 another is not used, and the `sound` command says so.

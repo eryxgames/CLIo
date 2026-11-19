@@ -283,6 +283,11 @@ class CEngine:
                 ("be_reference", C, [])):
             fn = getattr(lib, name)
             fn.restype, fn.argtypes = res, args
+        self.loops = hasattr(lib, "be_is_loop") and hasattr(lib, "be_finish_loop")    # 0.3.0 and later
+        if self.loops:
+            lib.be_is_loop.restype, lib.be_is_loop.argtypes = I, [P]
+            lib.be_finish_loop.restype = I
+            lib.be_finish_loop.argtypes = [S, C, ctypes.POINTER(C), ctypes.POINTER(D), I]
         self.lib = lib
         self.path = path
         self.version = lib.be_version().decode()
@@ -334,14 +339,15 @@ class CEngine:
             if st:
                 return {"ok": False, "error": lib.be_status_text(st).decode()}
             a = req.get("action")
+            finish = lib.be_finish_loop if self.loops and lib.be_is_loop(h) else lib.be_finish   # a hum stays a loop
             if isinstance(a, str) and a not in ("", "none"):
-                st = lib.be_finish(ctypes.byref(s), a.encode(), None, None, 0)
+                st = finish(ctypes.byref(s), a.encode(), None, None, 0)
                 if st:
                     return {"ok": False, "error": 'Ballistic has no action preset called "%s"' % a}
             elif isinstance(a, dict) and a:
                 keys = (ctypes.c_char_p * len(a))(*[k.encode() for k in a])
                 vals = (ctypes.c_double * len(a))(*[float(v) for v in a.values()])
-                st = lib.be_finish(ctypes.byref(s), None, keys, vals, len(a))
+                st = finish(ctypes.byref(s), None, keys, vals, len(a))
                 if st:
                     return {"ok": False, "error": "Ballistic has no action parameter %s" % ", ".join(a)}
             lib.be_cut(ctypes.byref(s), _num(req.get("length"), 3, 0.05, 30), 0.04)

@@ -70,9 +70,10 @@ game, RØØTLESS, shows them.
   silent unless a game gives them. RØØTLESS has a Ballistic set for its weapons, hits,
   fire, souls, explosions and Cron: `python clio.py rootless --sounds ballistic`. 17 more tests.
 - **Ballistic's C engine** ([Ballistic Engine](https://github.com/eigensoundlab/ballistic-engine)): where its library
-  is found (`CLIO_BALLISTIC_LIB`, or `engine/audio/ballistic/lib/`), Ballistic sounds of the kinds it has ported
-  (shots, explosions, blasters: 10 of RØØTLESS's 14) render through it, in the game's process, without Node.js;
-  Node renders the rest. `sound` says which renders what. 4 more tests, run when the library is there.
+  is found (`CLIO_BALLISTIC_LIB`, or `engine/audio/ballistic/lib/`; download it from its releases), Ballistic sounds
+  of the kinds it has ported (all but rockets and rotors since its 0.3.0: every one of RØØTLESS's) render through it,
+  in the game's process, without Node.js; Node renders the rest. A field's hum stays a seamless loop. `sound` says
+  which renders what. 5 more tests, run when the library is there.
 
 ### Changed
 

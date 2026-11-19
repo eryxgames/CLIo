@@ -699,10 +699,12 @@ listed in its page, and in `engine/audio/ballistic/engine.js` under `PRESETS`) a
 
 Ballistic's engine is JavaScript, so the takes are rendered by [Node.js](https://nodejs.org) when one is
 installed (`CLIO_NODE` points at another; `CLIO_NODE=none` turns it off). Faster, and without Node: its C port,
-[Ballistic Engine](https://github.com/eigensoundlab/ballistic-engine). Build it (`cmake -S . -B build && cmake
---build build`) and put `libballistic.so` (`libballistic.dylib`, `ballistic.dll`) in `engine/audio/ballistic/lib/`,
-or point `CLIO_BALLISTIC_LIB` at it. CLIo then renders with it every kind it has ported - shots, explosions,
-blasters - and uses Node for the rest; the takes are the same either way. `sound` says which renders what. A game starts rendering every take
+[Ballistic Engine](https://github.com/eigensoundlab/ballistic-engine). Download the zip for your system from its
+[releases](https://github.com/eigensoundlab/ballistic-engine/releases) (`ballistic-engine-VERSION-linux-x64.zip`,
+`-macos-universal`, `-windows-x64`, and others) and put the library from its `lib/` folder - `libballistic.so`,
+`libballistic.dylib` or `ballistic.dll` - in `engine/audio/ballistic/lib/`, or point `CLIO_BALLISTIC_LIB` at it.
+CLIo then renders with it every kind it has ported (all but rockets and rotors since 0.3.0) and uses Node for the
+rest; the takes are the same either way. `sound` says which renders what. A game starts rendering every take
 of the set in the background as soon as it begins, the first take of each sound first; the takes are kept in
 the audio cache, so a second run renders nothing. A typical shot takes 10 to 50 ms to render.
 

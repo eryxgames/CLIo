@@ -359,7 +359,7 @@ class CEngineTests(unittest.TestCase):
 
     def test_it_renders_without_node(self):
         a = audio(sets={"b": {"pistol": SHOT, "rail": {"ballistic": "railgun", "p": {"D": 30}, "length": 0.8},
-                              "arc": {"ballistic": "tesla", "length": 0.5}}}, sounds={"arc": CHIP}, env=self.env())
+                              "rotor": {"ballistic": "quadpass", "length": 0.5}}}, sounds={"rotor": CHIP}, env=self.env())
         a.set_sound_set("b")
         self.assertTrue(a.sfx("pistol"))
         path = a.backend.log[-1][1]
@@ -370,7 +370,7 @@ class CEngineTests(unittest.TestCase):
         self.assertAlmostEqual(peak, 0.5 * a.sfx_volume, delta=0.01)
         self.assertTrue(a.sfx("rail"))
         self.assertEqual(a.ballistic.rendered_c, 2)
-        a.sfx("arc")                                              # a kind the C engine has not yet: the game's own
+        a.sfx("rotor")                                            # a kind the C engine has not yet: the game's own
         self.assertFalse(os.path.basename(a.backend.log[-1][1]).startswith("ballistic-"))
         status = " ".join(a.status())
         self.assertIn("C engine", status)
@@ -384,6 +384,15 @@ class CEngineTests(unittest.TestCase):
         ch, rate, _w, _s, peak = frames(a.backend.log[-1][1])
         self.assertEqual((ch, rate), (1, 48000))
         self.assertAlmostEqual(peak, 0.5 * a.sfx_volume, delta=0.01)
+        a.shutdown()
+
+    def test_a_hum_stays_a_loop(self):
+        if not CLIB.loops:
+            self.skipTest("this C engine has no loops (0.3.0 and later have)")
+        a = audio(sets={"b": {"hum": {"ballistic": "shield", "action": "game", "length": 8}}}, env=self.env())
+        a.set_sound_set("b")
+        a.sfx("hum")
+        self.assertAlmostEqual(frames(a.backend.log[-1][1])[3], 4.0, places=3)     # one seamless period
         a.shutdown()
 
     @unittest.skipUnless(NODE, "Node.js is not installed")
@@ -413,7 +422,7 @@ class CEngineTests(unittest.TestCase):
         self.assertEqual(CLIB.call({"preset": "pistol", "action": "loudest", "out": where})["error"],
                          'Ballistic has no action preset called "loudest"')
         self.assertTrue(CLIB.supports({"preset": "railgun", "p": {"D": 3}}))
-        self.assertFalse(CLIB.supports({"preset": "tesla"}))
+        self.assertFalse(CLIB.supports({"preset": "quadpass"}))
         self.assertFalse(CLIB.supports({"preset": "knockfire"}))  # needs a recording
 
 

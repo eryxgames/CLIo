@@ -28,7 +28,9 @@ import math
 from .frame import mix, shade, lum
 
 DECAY = 0.64                 # apparent size falls to 64% with each cell of distance
-FAR = 7                      # cells drawn ahead
+FAR = 10                     # cells of walls drawn ahead (a wall further off is under a pixel high)
+SIGHT = 7                    # cells of things drawn ahead - and seen, aimed at, shot at (the level's rules)
+BACK = 4                     # cells behind the player whose walls still show at the edges of the picture
 REF_H, REF_W = 18, 12        # the yardstick: a sprite this big is a person's size
 DIRS = ((0, -1), (1, 0), (0, 1), (-1, 0))          # north, east, south, west
 STYLES = {"pixel": (1, 2), "dots": (2, 4), "dots-fill": (2, 4)}
@@ -42,6 +44,29 @@ def noise(i, j, k):
     h = (i * 374761393 + j * 668265263 + k * 2246822519) & 0xFFFFFFFF
     h = ((h ^ (h >> 13)) * 1274126177) & 0xFFFFFFFF
     return ((h ^ (h >> 16)) & 0xFFFF) / 65536.0
+
+
+def recolour(px, fn):
+    """Every pixel through ``fn`` - worked out once for each colour: a picture has a few hundred, not thousands."""
+    done = {}
+    out = []
+    for row in px:
+        new = []
+        for c in row:
+            v = done.get(c)
+            if v is None:
+                v = done[c] = fn(c)
+            new.append(v)
+        out.append(new)
+    return out
+
+
+def _goggled(c):
+    """A colour through the TTY goggles: green, but for what is purple (the hollow walls)."""
+    if c[2] > c[1] + 40 and c[0] > c[1]:
+        return c
+    v = lum(c)
+    return int(v * 0.35), min(255, int(v * 1.25) + 18), int(v * 0.45)
 
 
 def _avg(cols):
@@ -260,6 +285,8 @@ def tile_data(name):
 FLOOR_A, FLOOR_B, FLOOR_LINE = (68, 61, 53), (58, 53, 47), (94, 86, 72)
 CEIL, CEIL_LINE, LIGHT = (30, 30, 36), (24, 24, 29), (168, 162, 122)
 TOXIC, TOXIC_HI = (36, 140, 54), (130, 240, 110)
+HAZE = (16, 16, 20)
+AUTO_LOW = 40000             # pixels in a picture above which "auto" detail draws the floor and ceiling at half width
 
 
 class FX:
@@ -397,11 +424,14 @@ def vslide(old, new, k, down, gap=3):
 class View:
     """The picture of a level from the player's place, ``W`` x ``VR`` characters."""
 
-    def __init__(self, W, VR, style="pixel"):
+    def __init__(self, W, VR, style="pixel", detail="high"):
         self.style = style if style in STYLES else "pixel"
         self.sx, self.sy = STYLES[self.style]
         self.W, self.VR = W, VR
         self.PW, self.PH = W * self.sx, VR * self.sy
+        if detail == "auto":                                  # a big picture's floor at half width: half the work
+            detail = "low" if self.PW * self.PH > AUTO_LOW else "high"
+        self.detail = "low" if detail == "low" else "high"
         self.yh = round(self.PH * 0.40)                       # the horizon, in pixel rows
         self.FS = self.PH - self.yh                           # floor height on screen at distance 0
         self.CH = self.FS * 0.92                              # ceiling height
@@ -434,19 +464,34 @@ class View:
         return [r[:] for r in rows]
 
     def _backdrop(self, lv, cx, cy, f, phase):
+        """The floor and ceiling, per pixel.  The hot loop of a frame: what depends only on a cell is
+        worked out once per cell, and a colour in a row's fog once per row."""
         fx, fy = DIRS[f]
         rx, ry = DIRS[(f + 1) % 4]
-        PW, PH = self.PW, self.PH
+        PW, PH, half = self.PW, self.PH, self.half
         floor_tile, ceiling_tile = getattr(lv, "floor_tile", None), getattr(lv, "ceiling_tile", None)
-        fires = getattr(lv, "fires", None)
-        drawings = {}
+        fires = getattr(lv, "fires", None) or ()
+        marks, cell_at, fixture, floor_ = lv.marks, lv.cell, self.fixture, math.floor
+        drawings, below, above = {}, {}, {}
+        step = 2 if self.detail == "low" else 1                # low: every other pixel, each drawn twice
 
-        def sample(name, ux, uy):                            # a floor or ceiling tile, fixed to the world
+        def drawing(name):                                   # a floor or ceiling tile, fixed to the world
             tex = drawings.get(name)
             if tex is None:
                 tex = drawings[name] = self.texture(lv, name, phase)
-            th, tw = len(tex), len(tex[0])
-            return tex[min(th - 1, int((uy + 0.5) * th))][min(tw - 1, int((ux + 0.5) * tw))]
+            return tex
+
+        def under(ix, iy):                                   # how a cell's floor is drawn
+            cell = cell_at(ix, iy)
+            if cell is None:
+                return None, None, False, False, False, marks.get((ix, iy))
+            tile = getattr(cell, "floor", None) or (None if cell.toxic else floor_tile)
+            fixed = bool(getattr(cell, "plate", None) or getattr(cell, "sunk", False) or getattr(cell, "teleport", None)
+                         or getattr(cell, "lift", None) or getattr(cell, "conveyor", None) is not None
+                         or getattr(cell, "oil", False) or getattr(cell, "slick", False)
+                         or getattr(cell, "scorched", False))
+            return (cell, drawing(tile) if tile else None, fixed, cell.toxic, (ix, iy) in fires,
+                    marks.get((ix, iy)))
 
         out = []
         for y in range(PH):
@@ -455,32 +500,45 @@ class View:
             else:
                 t, floor = (self.yh - y - 0.5) / self.CH, False
             z = math.log(t) / LN
+            if z > FAR + 0.5:                                # beyond the walls drawn: the dark far away
+                out.append([HAZE] * PW)
+                continue
             fog = 0.18 + 0.82 * min(1.0, t) ** 0.75
             span = self.LW * t
+            bx, by = cx + fx * z, cy + fy * z
+            fogged, acid = {}, {}                            # colours in this row's fog
             row = [None] * PW
-            for x in range(PW):
-                a = (x + 0.5 - self.half) / span
-                wx, wy = cx + fx * z + rx * a, cy + fy * z + ry * a
-                ix, iy = int(math.floor(wx + 0.5)), int(math.floor(wy + 0.5))
+            lx = ly = None                                   # the cell of the pixel before: most pixels share it
+            for x in range(0, PW, step):
+                a = (x + 0.5 * step - half) / span
+                wx, wy = bx + rx * a, by + ry * a
+                ix, iy = int(floor_(wx + 0.5)), int(floor_(wy + 0.5))
                 ux, uy = wx - ix, wy - iy
-                cell = lv.cell(ix, iy)
                 if floor:
-                    mark = lv.marks.get((ix, iy))
-                    tile = None
-                    if cell is not None:
-                        tile = getattr(cell, "floor", None) or (None if cell.toxic else floor_tile)
-                    c = sample(tile, ux, uy) if tile else None
-                    if c is None and cell is not None:
-                        c = self.fixture(cell, ux, uy, phase)
-                    if c is None and cell is not None and cell.toxic:
+                    if ix != lx or iy != ly:
+                        lx, ly = ix, iy
+                        info = below.get((ix, iy))
+                        if info is None:
+                            info = below[(ix, iy)] = under(ix, iy)
+                        cell, tex, fixed, toxic, fire, mark = info
+                    c = None
+                    if tex is not None:
+                        th, tw = len(tex), len(tex[0])
+                        c = tex[min(th - 1, int((uy + 0.5) * th))][min(tw - 1, int((ux + 0.5) * tw))]
+                    if c is None and fixed:
+                        c = fixture(cell, ux, uy, phase)
+                    if c is None and toxic:
                         c = TOXIC_HI if noise(int(ux * 8) + ix * 8, int(uy * 8) + iy * 8, phase) < 0.07 else TOXIC
-                        row[x] = shade(c, 0.45 + 0.55 * fog)
+                        v = acid.get(c)
+                        if v is None:
+                            v = acid[c] = shade(c, 0.45 + 0.55 * fog)
+                        row[x] = v
                         continue
                     if c is None:
                         c = FLOOR_A if (ix + iy) & 1 else FLOOR_B
                         if abs(ux) > 0.46 or abs(uy) > 0.46:
                             c = FLOOR_LINE
-                    if fires and (ix, iy) in fires:
+                    if fire:
                         c = mix(c, (255, 120, 30), 0.3 + 0.25 * noise(int(ux * 6) + ix * 6, int(uy * 6) + iy * 6, phase))
                     if mark == "warn":                   # fire is scheduled here: hatched and glowing
                         hatch = int((ux + uy + 1.0) * 6) % 2 == 0
@@ -492,17 +550,30 @@ class View:
                         c = (255, 230, 120) if k < 0.25 else (255, 140, 40) if k < 0.7 else (200, 50, 20)
                         row[x] = c
                         continue
-                    row[x] = shade(c, fog)
                 else:
-                    tile = (getattr(cell, "ceiling", None) if cell is not None else None) or ceiling_tile
-                    c = sample(tile, ux, uy) if tile else None
+                    if ix != lx or iy != ly:
+                        lx, ly = ix, iy
+                        tex = above.get((ix, iy), 0)
+                        if tex == 0:
+                            cell = cell_at(ix, iy)
+                            tile = (getattr(cell, "ceiling", None) if cell is not None else None) or ceiling_tile
+                            tex = above[(ix, iy)] = drawing(tile) if tile else None
+                    c = None
+                    if tex is not None:
+                        th, tw = len(tex), len(tex[0])
+                        c = tex[min(th - 1, int((uy + 0.5) * th))][min(tw - 1, int((ux + 0.5) * tw))]
                     if c is None:
                         c = CEIL
                         if abs(ux) > 0.47 or abs(uy) > 0.47:
                             c = CEIL_LINE
                         elif (ix * 7 + iy * 3) % 4 == 0 and abs(ux) < 0.24 and abs(uy) < 0.24:
                             c = LIGHT
-                    row[x] = shade(c, fog)
+                v = fogged.get(c)
+                if v is None:
+                    v = fogged[c] = shade(c, fog)
+                row[x] = v
+            if step == 2:
+                row[1::2] = row[0:PW - 1:2]
             out.append(row)
         return out
 
@@ -606,6 +677,7 @@ class View:
         tw, th = x1 - x0, y1 - y0
         TH, TW = len(tex), len(tex[0])
         us = [min(TW - 1, int((x + 0.5 - x0) / tw * TW)) for x in range(X0, X1)]
+        fogged = {}                                    # a texture's few colours, each in this face's fog once
         for y in range(Y0, Y1):
             v = (y + 0.5 - y0) / th + opened
             trow = tex[min(TH - 1, max(0, int(v * TH)))]
@@ -613,21 +685,24 @@ class View:
             for i, x in enumerate(range(X0, X1)):
                 c = trow[us[i]]
                 if c is not None:
-                    row[x] = shade(c, fog)
+                    s = fogged.get(c)
+                    if s is None:
+                        s = fogged[c] = shade(c, fog)
+                    row[x] = s
         self._mark_cover(X0, X1, Y0, Y1, z - 0.5)
         return (x0 + x1) / 2, y0, y1, t
 
-    def side_face(self, px, a, z, tex, opened=0.0):
+    def side_face(self, px, a, z, tex, opened=0.0, to_edge=False):
         edge = a - 0.5 if a > 0 else a + 0.5          # the face turned towards the middle
         if abs(edge) < 1e-6:
             return
-        zn, zf = max(z - 0.5, -0.45), z + 0.5
-        if zn >= zf:
-            return
+        # The face runs from z - 0.5 to z + 0.5. Beside and behind the player it is still drawn - this
+        # picture widens with nearness, so walls behind him show at the edges, each with its own tile.
+        # With ``to_edge`` it is the last of a wall that goes on past the player: it runs to the picture's
+        # edge (its tile repeating), so that the room behind him does not show through at the side.
+        zn, zf = z - 0.5, z + 0.5
         xa, xb = self.X(edge, zf), self.X(edge, zn)
-        if z - 0.5 <= 0.0:
-            # The face reaches the player: a wall beside him runs off the edge of the picture and hides
-            # everything beyond it (a corridor's walls, a door's jambs), the texture going on behind him.
+        if to_edge:
             xb = float(self.PW + 1) if edge > 0 else -1.0
         lo, hi = (xa, xb) if xa < xb else (xb, xa)
         X0, X1 = max(0, int(math.ceil(lo - 0.5))), min(self.PW, int(math.ceil(hi - 0.5)))
@@ -646,11 +721,15 @@ class View:
                 Y1 = min(Y1, int(y0 + (y1 - y0) * (1 - opened)))
             fog = (0.18 + 0.82 * min(1.0, t) ** 0.75) * 0.72
             th = y1 - y0
+            fogged = {}
             for y in range(Y0, Y1):
                 v = (y + 0.5 - y0) / th + opened
                 c = tex[min(TH - 1, max(0, int(v * TH)))][u]
                 if c is not None:
-                    px[y][x] = shade(c, fog)
+                    s = fogged.get(c)
+                    if s is None:
+                        s = fogged[c] = shade(c, fog)
+                    px[y][x] = s
             self._mark_cover(x, x + 1, Y0, Y1, zc)
 
     # ---- one picture ---------------------------------------------------- #
@@ -673,60 +752,66 @@ class View:
 
         items = []
         icx, icy = int(round(cx)), int(round(cy))
-        for y in range(icy - FAR - 1, icy + FAR + 2):
-            for x in range(icx - FAR - 1, icx + FAR + 2):
+        sub_a, sub_z = rel(icx, icy)                          # the camera between cells, while it moves
+        for dz in range(-BACK, FAR + 2):                      # every cell that can show: the picture widens with distance
+            reach = int(self.half / (self.LW * DECAY ** (dz + 0.5))) + 2
+            for da in range(-reach, reach + 1):
+                x, y = icx + fx_ * dz + rx * da, icy + fy_ * dz + ry * da
                 cell = lv.cell(x, y)
                 if cell is None or not cell.drawn_as_wall(fx.doors.get((x, y))):
                     continue
-                a, z = rel(x, y)
-                if z < -0.5 or z > FAR + 0.5:                 # a wall wholly behind the player is not seen
+                a, z = da + sub_a, dz + sub_z
+                if z < -BACK - 0.5 or z > FAR + 0.5:
                     continue
-                if abs(a) - 0.5 > (self.half / (self.LW * DECAY ** max(z - 0.5, -0.45))) + 0.5:
+                edge = abs(a) - 0.5                           # its nearest side to the middle of the picture
+                if edge > 0 and self.half + edge * self.LW * DECAY ** (z + 0.5) > self.PW + 1:
+                    continue                                  # wholly off the side of the picture
+                if z < -0.5 and edge <= 0:                    # behind the player, with no side turned to him
                     continue
                 items.append((z, 0, -abs(a), "wall", (cell, a, x, y)))
         for x, y, pic in lv.decals:
             a, z = rel(x, y)
-            if -0.3 < z <= FAR:
+            if -0.3 < z <= SIGHT:
                 items.append((z + 0.02, 1, 0, "decal", (a, pic)))
         for it in lv.items:
             if it.taken:
                 continue
             a, z = rel(it.x, it.y)
-            if -0.3 < z <= FAR:
+            if -0.3 < z <= SIGHT:
                 items.append((z, 2, 0, "item", (a, it)))
         for (x, y) in getattr(lv, "crate_cells", lambda: ())():
             cx_, cy_ = fx.crates.get((x, y), (x, y))
             a, z = rel(cx_, cy_)
-            if -0.3 < z <= FAR + 0.5:
+            if -0.3 < z <= SIGHT + 0.5:
                 items.append((z, 2, 0, "crate", a))
         for (x, y), left in (getattr(lv, "fires", None) or {}).items():
             a, z = rel(x, y)
-            if 0.1 < z <= FAR + 0.5:
+            if 0.1 < z <= SIGHT + 0.5:
                 items.append((z - 0.01, 3, 0, "flame", (a, x, y, left)))
                 for k in range(3):                           # embers going up, in the redraw's own time
                     h = ((phase * 0.29 + k * 0.37 + x * 0.13 + y * 0.07) % 1.0) * 1.1
                     ea, ez = rel(x + (noise(x, y, k) - 0.5) * 0.6, y + (noise(y, x, k + 3) - 0.5) * 0.6)
-                    if 0.12 < ez <= FAR:
+                    if 0.12 < ez <= SIGHT:
                         items.append((ez - 0.02, 6, 0, "part", (ea, h, (255, 190, 80) if k % 2 else (255, 120, 40), 0.5)))
         for wx, wy, h, col, size in fx.parts:
             a, z = rel(wx, wy)
-            if 0.12 < z <= FAR:
+            if 0.12 < z <= SIGHT:
                 items.append((z - 0.005, 6, 0, "part", (a, h, col, size)))
         for m in lv.monsters:
             if m.gone or (m.dead and m.id not in fx.dissolve):
                 continue
             mx, my = fx.pos.get(m.id, (m.x, m.y))
             a, z = rel(mx, my)
-            if -0.4 < z <= FAR + 0.5:
+            if -0.4 < z <= SIGHT + 0.5:
                 items.append((z, 3, 0, "mob", (a, m)))
         shots = fx.shots if fx.shots is not None else [(s.x, s.y) for s in lv.shots]
         for sx_, sy_ in shots:
             a, z = rel(sx_, sy_)
-            if -0.4 < z <= FAR:
+            if -0.4 < z <= SIGHT:
                 items.append((z, 4, 0, "shot", a))
         for bx, by, k in fx.booms:
             a, z = rel(bx, by)
-            if -0.5 < z <= FAR:
+            if -0.5 < z <= SIGHT:
                 items.append((z - 0.01, 5, 0, "boom", (a, k)))
         items.sort(key=lambda it: (-it[0], it[1], it[2]))
 
@@ -745,12 +830,18 @@ class View:
                 cell, a, x, y = obj
                 opened = fx.doors.get((x, y), cell.open if cell.kind == "door" else 0.0)
                 tex = self.texture(lv, cell.texture(), phase)
-                if cell.kind == "panel" and getattr(p, "goggles", 0):       # the goggles show what is hollow
+                if cell.kind == "panel" and getattr(p, "nightvision", False):       # the goggles show what is hollow
                     tex = [[None if c is None else mix(c, (200, 110, 255), 0.55) for c in row] for row in tex]
                 if abs(a) > 0.02:
                     k = 1 if a > 0 else -1
                     if not solid(x - k * rx, y - k * ry):
-                        self.side_face(px, a, z, tex, opened)
+                        last = False
+                        if z - 0.5 <= 0.0:                      # it reaches the player: does the wall go on behind?
+                            bx, by = x - fx_, y - fy_
+                            behind = lv.cell(bx, by)
+                            last = (z - 1 < -BACK or behind is None or not behind.drawn_as_wall(fx.doors.get((bx, by)))
+                                    or solid(bx - k * rx, by - k * ry))
+                        self.side_face(px, a, z, tex, opened, last)
                 # the face towards the player, if it is in front of him and nothing stands before it
                 if z - 0.5 > 0.0 and not solid(x - fx_, y - fy_):
                     hit = self.front_face(px, a, z, tex, opened)
@@ -804,18 +895,17 @@ class View:
                 self.boom(px, self.X(a, z), self.yh + self.FS * t - 7 * t * self.K, (4 + 19 * k) * t * self.K, k)
         self.weapon(px, lv, fx)
         if any(k < 0.2 for _x, _y, k in fx.booms):
-            px = [[shade(c, 1.35) for c in row] for row in px]
+            px = recolour(px, lambda c: shade(c, 1.35))
         if lv.player.sudo:
-            px = [[mix(c, (255 - int(lum(c)),) * 3, 0.85) for c in row] for row in px]
-        if getattr(lv.player, "goggles", 0):
-            px = [[c if c[2] > c[1] + 40 and c[0] > c[1] else (int(lum(c) * 0.35), min(255, int(lum(c) * 1.25) + 18),
-                                                              int(lum(c) * 0.45)) for c in row] for row in px]
+            px = recolour(px, lambda c: mix(c, (255 - int(lum(c)),) * 3, 0.85))
+        if getattr(lv.player, "nightvision", False):
+            px = recolour(px, _goggled)
         if fx.hurt:
             self.vignette(px, fx.hurt, fx.hurt_dir)
         if fx.whiten:
-            px = [[mix(c, (255, 255, 255), fx.whiten) for c in row] for row in px]
+            px = recolour(px, lambda c: mix(c, (255, 255, 255), fx.whiten))
         if fx.fade:
-            px = [[mix(c, (40, 0, 0), fx.fade) for c in row] for row in px]
+            px = recolour(px, lambda c: mix(c, (40, 0, 0), fx.fade))
         if fx.shake:
             s = fx.shake * self.sx
             black = (0, 0, 0)
@@ -995,6 +1085,7 @@ class View:
     def braille(self, px, over):
         fill = self.style == "dots-fill"
         cells = []
+        level, bright, lums_of = {}, {}, {}                  # per colour, once: how lit, its dot colour, luminance
         for r in range(self.VR):
             four = px[4 * r: 4 * r + 4]
             out = []
@@ -1007,7 +1098,12 @@ class View:
                     out.append((o[0], o[1], bg))
                     continue
                 if fill:
-                    lums = [lum(b[0]) for b in block]
+                    lums = []
+                    for b in block:
+                        v = lums_of.get(b[0])
+                        if v is None:
+                            v = lums_of[b[0]] = lum(b[0])
+                        lums.append(v)
                     lo, hi = min(lums), max(lums)
                     if hi - lo < 9:
                         out.append((" ", None, _avg([b[0] for b in block])))
@@ -1024,16 +1120,20 @@ class View:
                 else:
                     bits, lit = 0, []
                     for colour, dy, dx in block:
-                        v = min(1.0, (lum(colour) / 255.0) ** 1.15 * 2.1)
-                        if v * 8 > BAYER_2X4[dy][dx] + 0.5:
+                        v8 = level.get(colour)
+                        if v8 is None:
+                            v8 = level[colour] = min(1.0, (lum(colour) / 255.0) ** 1.15 * 2.1) * 8
+                        if v8 > BAYER_2X4[dy][dx] + 0.5:
                             bits |= BRAILLE_BIT[dy][dx]
                             lit.append(colour)
                     if not bits:
                         out.append((" ", None, None))
                         continue
-                    mean = _avg(lit)
-                    k = min(1.9, 215.0 / max(1, max(mean)))
-                    out.append((chr(0x2800 + bits), shade(mean, k), None))
+                    mean = lit[0] if lit.count(lit[0]) == len(lit) else _avg(lit)
+                    fg = bright.get(mean)
+                    if fg is None:
+                        fg = bright[mean] = shade(mean, min(1.9, 215.0 / max(1, max(mean))))
+                    out.append((chr(0x2800 + bits), fg, None))
             cells.append(out)
         return cells
 

@@ -1295,8 +1295,10 @@ walking onto it:
 (armour soaks a third of every hurt), `ammo`, `key`, `weapon`, `power: "sudo"` (nothing
 hurts the player for `beats`; the picture inverts), `power: "boots"` (toxic floor does not
 hurt for `beats` spent on it - they wear down only there, show under the picture, and go
-on to the next level), `power: "goggles"` (for `beats` the level is drawn in braille dots,
-in green, and secret walls show). `size` is the picture's size on the floor (0.55 if not said).
+on to the next level), `power: "goggles"` (the level is drawn in braille dots, in green,
+and secret walls show, for `beats` - F2 or `goggles` takes them off and puts them on again,
+and the battery runs down only while they are on). `size` is the picture's size on the
+floor (0.55 if not said).
 
 The weapons are in weapons.json, by the key that picks them (`"weapons"` in game.json's
 `first_person` works too; weapons.json comes over it):
@@ -1336,6 +1338,10 @@ A shot goes for what is in sight, nearest and most central first; a barrel only 
 straight ahead and not at arm's length. `pellets` spread to monsters next to the target
 (`spread`); `burst` fires (and spends) that many rounds a beat. `view` is how the level is
 drawn: `pixel` (half blocks), `dots` or `dots-fill` (braille); `--view` overrides it.
+`"detail"` is how fine the floor and ceiling are: `"high"`, `"low"` (half width, half the
+work - for a slow machine or a very wide window) or `"auto"` (the default: low only for a
+very big picture); `--detail` overrides it. Walls are drawn 10 cells ahead; monsters, items
+and shots count within 7.
 
 ### The end of a game of levels
 

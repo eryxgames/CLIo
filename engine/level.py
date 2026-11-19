@@ -54,7 +54,7 @@ KEYMAP = {
     "home": "h", "pgup": "l", "end": "turn around", "pgdn": "use",
     "space": "f", "insert": "f", "enter": "use", "tab": "map", "center": "w", "delete": "w",
     "1": "1", "2": "2", "3": "3", "4": "4", "5": "5", "6": "6", "7": "7",
-    "?": "help", "f1": "help",
+    "?": "help", "f1": "help", "f2": "goggles",
 }
 
 WEAPONS = {
@@ -72,13 +72,17 @@ HELP = [
     ("↑ ↓  step forward, back      ← →  turn", "text"),
     ("Ctrl+← →  or  , .  strafe     space  fire", "text"),
     ("Enter  open, press   Tab  map   1-7  weapons", "text"),
+    ("F2  TTY goggles on/off (the battery lasts while off)", "text"),
     ("", "text"),
     ("Typed: k j h l, turn left/right/around, use,", "dim"),
     ("f [x], kill [-9] x, t x, w [n], map, ps, man x,", "dim"),
-    ("history, alias n='...', keys, whoami, sound, q", "dim"),
+    ("goggles [on|off], history, alias n='...', keys,", "dim"),
+    ("whoami, sound, q", "dim"),
     ("a; b   a && b   a || b   !!  !3  !f   as in a shell", "dim"),
     ("A surprise stops a line, as ^C would.", "dim"),
 ]
+
+DETAILS = ("auto", "high", "low")     # a level's picture: "low" draws the floor and ceiling at half width
 
 STATE_MARK = {"aim": "!", "windup": "!", "charge": "»", "spin": "!!"}
 STATE_ROLE = {"aim": "aim", "windup": "wind", "charge": "charge", "spin": "aim"}
@@ -247,7 +251,14 @@ class Player:
         self.keys = set()
         self.sudo = 0
         self.boots = int(start.get("boots", 0))      # beats on toxic floor the boots have left
-        self.goggles = 0                             # beats the TTY goggles have left
+        self.goggles = 0                             # beats the TTY goggles' battery has left
+        self.goggles_on = False                      # worn: the battery runs down only while they are on
+        self.had_goggles = False
+
+    @property
+    def nightvision(self):
+        """Seeing through the goggles: they are on and the battery is not flat."""
+        return bool(self.goggles and self.goggles_on)
 
     def keep(self):
         """What goes on to the next level (keys and root do not; boots do)."""
@@ -487,7 +498,7 @@ class Level:
 
     def in_view(self, x, y):
         a, z = self.rel(x, y)
-        return 1 <= z <= fp.FAR and abs(a) <= z + 0.5
+        return 1 <= z <= fp.SIGHT and abs(a) <= z + 0.5
 
     def update_seen(self):
         p = self.player
@@ -495,7 +506,7 @@ class Level:
             m.seen = (not m.dead and not m.gone and self.in_view(m.x, m.y)
                       and self.line_of_sight(p.x, p.y, m.x, m.y))
             m.targeted = m is self.target
-        R = fp.FAR
+        R = fp.SIGHT
         for y in range(p.y - R, p.y + R + 1):
             for x in range(p.x - R, p.x + R + 1):
                 a, z = self.rel(x, y)
@@ -753,6 +764,9 @@ class Level:
                 self.console.page(self, [(l, "text") for l in self.audio.status()] +
                                   ([("sound set NAME plays another set of sounds", "dim")] if self.audio.sets else []))
             return True
+        m = re.fullmatch(r"(?:goggles|nv)(?:\s+(on|off))?", t)
+        if m:
+            return self.goggles(m.group(1))
         if t == "whoami":
             self.say("rootless   (uid 1000; root was revoked)" if not self.player.sudo else "root   (for now)", "dim")
             if self.player.boots:
@@ -774,6 +788,27 @@ class Level:
         raise StopLine()
 
     # ---- the player's actions --------------------------------------------- #
+    def goggles(self, how=None):
+        """Put the TTY goggles on or take them off (a free action, as turning is): their battery lasts longer."""
+        p = self.player
+        if not p.goggles:
+            self.say("The goggles' battery is flat." if p.had_goggles else "You have no goggles.", "dim")
+            return True
+        want = (not p.goggles_on) if how is None else how == "on"
+        if want == p.goggles_on:
+            self.say("The goggles are already %s." % ("on" if want else "off"), "dim")
+            return True
+        p.goggles_on = want
+        if want:
+            self.sfx("goggles_on")
+            self.say("Goggles on: the world in dots, and what is hollow shows. (%d beats of battery)" % p.goggles,
+                     "secret")
+        else:
+            self.sfx("goggles_off", "click")
+            self.say("Goggles off. The battery keeps %d beats." % p.goggles, "dim")
+        self.update_seen()
+        return True
+
     def turn(self, d):
         p = self.player
         old_cells = self.console.snapshot(self) if self.console else None
@@ -1063,6 +1098,7 @@ class Level:
             p.boots = max(p.boots, int(pk.get("beats", 20)))
         if pk.get("power") == "goggles":
             p.goggles = max(p.goggles, int(pk.get("beats", 30)))
+            p.goggles_on = p.had_goggles = True
         it.taken = True
         self.stats["items"] += 1
         self.say(pk.get("text") or "You pick up the %s." % name, "root" if pk.get("power") else "good")
@@ -1343,7 +1379,7 @@ class Level:
         p = self.player
         fx, fy = DIRS[p.facing]
         x, y = p.x, p.y
-        for _ in range(fp.FAR + 2):
+        for _ in range(fp.SIGHT + 2):
             x, y = x + fx, y + fy
             cell = self.cell(x, y)
             if cell.solid:
@@ -1622,10 +1658,13 @@ class Level:
         cell = self.cell(p.x, p.y)
         if cell.toxic and not self.over:
             self.acid()
-        if p.goggles:
+        if p.nightvision:
             p.goggles -= 1
             if not p.goggles:
+                p.goggles_on = False
                 self.say("The goggles flicker out. Colours come back.", "dim")
+            elif p.goggles == 5:
+                self.say("The goggles' battery is low: 5 more beats. (goggles off saves it)", "alert")
         if p.sudo:
             p.sudo -= 1
             if not p.sudo:
@@ -2208,13 +2247,14 @@ class Level:
 class FrameConsole:
     """Frame mode: the first-person picture, redrawn in place; keys act at once."""
 
-    def __init__(self, term, style="pixel", keys=True, keymap=None, animate=True, speed=1.0):
+    def __init__(self, term, style="pixel", keys=True, keymap=None, animate=True, speed=1.0, detail="auto"):
         from .frame import Screen
         from .keys import KeyReader
         self.screen = Screen(term, KeyReader() if keys else None, keymap or KEYMAP, animate, speed)
         self.keymap = self.screen.keymap
         self.keys = self.screen.keys
         self.style = style
+        self.detail = detail if detail in DETAILS else "auto"   # how fine the floor is: see View
         self.view = None
         self.views = {}
         self.size = None
@@ -2235,17 +2275,17 @@ class FrameConsole:
         VR = max(6, min(H - 7, 34))
         if (W, VR) != self.size:
             self.size = (W, VR)
-            self.view = View(W, VR, self.style)
+            self.view = View(W, VR, self.style, self.detail)
             self.views = {}
         return W, H, VR
 
     def view_for(self, lv, style=None):
         """The view to draw with: the game's style, or another for a moment (a teleport), or the goggles' dots."""
-        style = style or ("dots" if lv.player.goggles else None)
+        style = style or ("dots" if lv.player.nightvision else None)
         if not style or style == self.style:
             return self.view
         if style not in self.views:
-            self.views[style] = View(self.size[0], self.size[1], style)
+            self.views[style] = View(self.size[0], self.size[1], style, self.detail)
         return self.views[style]
 
     def rows(self, lv, fx=None, cells=None, page=None, automap=False):
@@ -2270,7 +2310,7 @@ class FrameConsole:
         else:
             if cells is None:
                 cells = self.view_for(lv, fx.style).render(lv, fx, self.phase)
-            out += [sc.paint.cells(r, sc.unicode) for r in cells]
+            out += [list(r) for r in cells]                # painted by the screen: only what changed
         out.append(self.legend(lv, W))
         log = lv.log[-3:]
         log = [("", "text")] * (3 - len(log)) + log
@@ -2314,7 +2354,8 @@ class FrameConsole:
         if lv.player.boots:
             segs.append(("  boots: %d" % lv.player.boots, "toxic"))
         if lv.player.goggles:
-            segs.append(("  goggles: %d" % lv.player.goggles, "secret"))
+            segs.append(("  goggles: %d" % lv.player.goggles, "secret") if lv.player.goggles_on else
+                        ("  goggles off: %d" % lv.player.goggles, "dim"))
         return sc.paint.text(segs, W, g["ell"])
 
     def page_rows(self, lv, lines, W, VR, automap):
@@ -2537,7 +2578,8 @@ class TextConsole:
         p = lv.player
         w = lv.weapons.get(p.weapon) or {}
         ammo = (" %s %d" % (w["ammo"], p.ammo.get(w["ammo"], 0))) if w.get("ammo") else ""
-        power = "".join(" | %s %d" % (n, v) for n, v in (("root", p.sudo), ("boots", p.boots), ("goggles", p.goggles)) if v)
+        power = "".join(" | %s %d" % (n, v) for n, v in (("root", p.sudo), ("boots", p.boots),
+                                                          ("goggles" if p.goggles_on else "goggles off", p.goggles)) if v)
         self.write("-- hp %d  armour %d | %s%s | keys %s%s | facing %s | beat %d --" % (
             p.hp, p.armor, w.get("name", "?"), ammo, "".join(sorted(p.keys)) or "-", power, FACE_NAMES[p.facing],
             lv.beat))
@@ -2577,6 +2619,7 @@ def play_scene(game, scene):
         keymap.update(cfg.get("keymap") or {})
         keymap.update(settings.get("keymap") or {})
         console = FrameConsole(term, settings.get("view") or cfg.get("view", "pixel"),
+                               detail=settings.get("detail") or cfg.get("detail", "auto"),
                                keys=not settings.get("lines"), keymap=keymap, animate=term.animate,
                                speed=max(0.0, float(term.speed or 1.0)))
     else:

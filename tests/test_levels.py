@@ -454,9 +454,53 @@ class PhysicsTests(unittest.TestCase):
         flying = View(80, 17, "pixel").render(lv, FX(parts=bits[1], casing=0.5), 0)
         self.assertNotEqual(plain, flying)
         self.assertTrue(any((255, 0, 255) in c for row in flying for c in row))
-        lv.player.goggles = 5
+        lv.player.goggles, lv.player.goggles_on = 5, True
         green = View(80, 17, "dots").render(lv, FX(), 0)
         self.assertEqual(len(green), 17)
+
+    def test_low_detail_draws_the_floor_at_half_width(self):
+        lv = level()
+        put(lv, 15, 22, 0)
+        high = View(120, 20, "pixel", "high")
+        low = View(120, 20, "pixel", "low")
+        self.assertEqual(View(120, 20, "pixel").render(lv, FX(), 0), high.render(lv, FX(), 0))   # high by default
+        floor = low._backdrop(lv, 15, 22, 0, 0)
+        row = floor[-1]
+        self.assertTrue(all(row[x] == row[x + 1] for x in range(0, len(row) - 1, 2)))         # pairs of pixels
+        self.assertNotEqual(floor, high._backdrop(lv, 15, 22, 0, 0))
+        self.assertEqual(len(low.render(lv, FX(), 0)[0]), 120)
+        self.assertEqual(View(120, 20, "pixel", "auto").detail, "high")                          # a small picture
+        self.assertEqual(View(300, 34, "dots", "auto").detail, "low")                            # 600 x 136 dots
+        from engine.level import FrameConsole
+        con = FrameConsole(Term(out=io.StringIO(), width=80, height=24, color=3, unicode=True, animate=False,
+                                env={}), "pixel", keys=False, detail="nonsense")
+        self.assertEqual(con.detail, "auto")
+
+    def test_the_goggles_go_on_and_off(self):
+        lv = level()
+        p = lv.player
+        lv.run_line("goggles")
+        self.assertIn("no goggles", told(lv))
+        p.goggles, p.goggles_on, p.had_goggles = 10, True, True
+        self.assertTrue(p.nightvision)
+        lv.run_line("w")
+        self.assertEqual(p.goggles, 9)                         # on: the battery runs down
+        lv.run_line("goggles off")
+        self.assertFalse(p.nightvision)
+        beat = lv.beat
+        lv.run_line("w; w; w")
+        self.assertEqual((p.goggles, lv.beat), (9, beat + 3))  # off: it keeps; taking them off costs no beat
+        lv.run_line("goggles")                                 # a toggle
+        self.assertTrue(p.nightvision)
+        lv.run_line("goggles on")
+        self.assertIn("already on", told(lv))
+        p.goggles = 1
+        lv.run_line("w")
+        self.assertFalse(p.goggles or p.goggles_on)
+        lv.run_line("goggles")
+        self.assertIn("battery is flat", told(lv))
+        from engine.level import KEYMAP
+        self.assertEqual(KEYMAP["f2"], "goggles")
 
 
 def room_with(rows, legend=None, monsters=None, seed=1):

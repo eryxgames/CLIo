@@ -129,7 +129,7 @@
    "sprite": "goggles",
    "size": 0.45,
    "sound": "goggles_on",
-   "text": "TTY goggles! You see the world the way the terminal does - and what is hollow shows."
+   "text": "TTY goggles! You see the world the way the terminal does - and what is hollow shows. (F2 or `goggles` takes them off and saves the battery.)"
   }
  },
  "key_w": {

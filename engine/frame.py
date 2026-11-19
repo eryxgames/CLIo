@@ -66,6 +66,24 @@ class Painter:
     def __init__(self, depth):
         self.depth = depth
         self.cache = {}
+        self.fgs, self.bgs = {}, {}
+
+    def part(self, c, bg=False):
+        """One colour's part of an escape code, as foreground or background; None is the terminal's own."""
+        if c is None:
+            return "49" if bg else "39"
+        parts = self.bgs if bg else self.fgs
+        s = parts.get(c)
+        if s is None:
+            if self.depth == 3:
+                s = ("48;2;%d;%d;%d" if bg else "38;2;%d;%d;%d") % c
+            elif self.depth == 2:
+                s = ("48;5;%d" if bg else "38;5;%d") % rgb_to_256(*c)
+            else:
+                i = rgb_to_16(*c)
+                s = str((40 if bg else 30) + i if i < 8 else (92 if bg else 82) + i)
+            parts[c] = s
+        return s
 
     def sgr(self, fg, bg):
         key = (fg, bg)
@@ -109,9 +127,14 @@ class Painter:
         return "".join(out) + (CSI + "0m" if self.depth else "")
 
     def cells(self, row, unicode=True):
-        """A row of cells ``(char, fg, bg)`` as escape codes; char None = two pixels (fg over bg)."""
-        out, cur = [], None
+        """A row of cells ``(char, fg, bg)`` as escape codes; char None = two pixels (fg over bg).
+
+        The first colour is set in full (so the row can go anywhere); after it only what changes:
+        the foreground or the background or both - and a space needs no foreground at all."""
+        out, first = [], True
         depth = self.depth
+        cf = cb = None
+        part = self.part
         for ch, fg, bg in row:
             if ch is None:
                 if depth == 0 or not unicode:
@@ -122,12 +145,23 @@ class Painter:
                     ch, fg = " ", None
                 else:
                     ch = "▀"
-            elif depth == 0:
-                fg = bg = None
-            key = (fg, bg)
-            if key != cur:
+            if depth == 0:
+                out.append(ch)
+                continue
+            if first:
                 out.append(self.sgr(fg, bg))
-                cur = key
+                cf, cb, first = fg, bg, False
+            else:
+                if ch == " " and fg is None:
+                    fg = cf                            # a blank shows only its background
+                if fg != cf or bg != cb:
+                    if fg != cf and bg != cb:
+                        out.append(CSI + part(fg) + ";" + part(bg, True) + "m")
+                    elif fg != cf:
+                        out.append(CSI + part(fg) + "m")
+                    else:
+                        out.append(CSI + part(bg, True) + "m")
+                    cf, cb = fg, bg
             out.append(ch)
         return "".join(out)
 
@@ -153,6 +187,7 @@ class Screen:
         self.prompt_text = ""
         self.last_size = None
         self.started = False
+        self.shown = {}                   # what each row of the screen holds now: written again only if it changed
 
     # ---- the terminal --------------------------------------------------- #
     def write(self, s):
@@ -160,6 +195,7 @@ class Screen:
         self.out.flush()
 
     def start(self):
+        self.shown = {}
         self.write(CSI + "?1049h" + CSI + "?25l" + CSI + "2J")
         if self.keys:
             self.keys.start()
@@ -183,14 +219,22 @@ class Screen:
         return self.size() != self.last_size
 
     # ---- drawing -------------------------------------------------------- #
-    def frame(self, rows, prompt=None, status=None, footer=None):
-        """Write ``rows`` (escape-coded lines) from the top; then the prompt line (or a status
-        line) and a footer below it - which also keeps Enter from scrolling the screen."""
+    def frame(self, rows, prompt=None, status=None, footer=None, whole=False):
+        """Write ``rows`` from the top; then the prompt line (or a status line) and a footer below
+        it - which also keeps Enter from scrolling the screen.
+
+        A row is an escape-coded line, or a list of cells ``(char, fg, bg)`` (a picture's row,
+        painted here).  Only what changed since the last frame is written: a line that is the
+        same is left alone, and of a row of cells only the stretch from its first changed cell to
+        its last - in an animation most of the screen often stays as it was.  ``whole`` writes
+        everything (as a new size does)."""
         W, H = self.size()
         clear = ""
         if (W, H) != self.last_size:
             clear = CSI + "2J"
             self.last_size = (W, H)
+        if clear or whole:
+            self.shown = {}
         rows = list(rows)
         self.prompt_row = min(H - 1, len(rows) + 1)
         if prompt is not None:
@@ -202,7 +246,26 @@ class Screen:
         if footer is not None and self.prompt_row < H:
             rows.insert(self.prompt_row, footer)
         buf = [CSI + "?25l", clear]
+        shown = self.shown
         for i, r in enumerate(rows[:H]):
+            old = shown.get(i)
+            shown[i] = r
+            if isinstance(r, list):
+                if isinstance(old, list) and len(old) == len(r):
+                    a = 0
+                    for a, (x, y) in enumerate(zip(r, old)):
+                        if x != y:
+                            break
+                    else:
+                        continue                           # not a cell changed
+                    b = len(r) - 1
+                    while r[b] == old[b]:
+                        b -= 1
+                    buf.append("%s%d;%dH%s%s0m" % (CSI, i + 1, a + 1, self.paint.cells(r[a:b + 1], self.unicode), CSI))
+                    continue
+                r = self.paint.cells(r, self.unicode)
+            elif r == old:
+                continue
             buf.append("%s%d;1H%s%s0m%sK" % (CSI, i + 1, r, CSI, CSI))
         if prompt is not None:
             buf.append("%s%d;%dH%s?25h" % (CSI, self.prompt_row, min(W, len(prompt) + len(self.typed) + 1), CSI))
@@ -212,6 +275,7 @@ class Screen:
         """Only the line being typed: cheap enough for every key."""
         W = self.last_size[0] if self.last_size else self.size()[0]
         line = self.paint.text([(self.prompt_text, "prompt"), (self.typed, "text")], W, self.glyphs["ell"])
+        self.shown.pop(self.prompt_row - 1, None)
         self.write("%s%d;1H%s%s0m%sK%s%d;%dH" % (CSI, self.prompt_row, line, CSI, CSI, CSI, self.prompt_row,
                                               min(W, len(self.prompt_text) + len(self.typed) + 1)))
 
@@ -222,6 +286,7 @@ class Screen:
         ``redraw()`` draws the whole frame with the prompt; it is called at the
         start and whenever the window changes size.  None at the end of input."""
         self.skip = False
+        self.shown = {}                   # each new line starts from a whole frame: nothing can stay amiss
         if self.keys is None:
             self.typed = ""
             redraw()
@@ -234,6 +299,7 @@ class Screen:
             k, self.pending = self.pending or self.keys.get(0.1), None
             if k is None:
                 if self.resized():
+                    self.shown = {}
                     redraw()
                 continue
             if not self.typed and k in self.keymap:
@@ -256,6 +322,7 @@ class Screen:
     def wait(self, redraw):
         """Wait for Enter (or Space, Esc, q) on a page."""
         self.typed = ""
+        self.shown = {}
         if self.keys is None:
             redraw()
             try:
@@ -323,12 +390,27 @@ class Screen:
                     pass
 
     def play(self, frames, draw, dt):
-        """Show animation frames: ``draw(fx)`` for each, ``dt`` seconds apart.  Ctrl-C skips the rest."""
+        """Show animation frames: ``draw(fx)`` for each, ``dt`` seconds apart.  Ctrl-C skips the rest.
+
+        The animation keeps its time on a slow machine or in a big window: the time a frame took
+        to draw comes off the wait after it, and a frame whose turn is already over when it comes
+        is left out (never the last, where the animation rests)."""
         if not self.animate or self.skip:
             return
+        frames = list(frames)
+        step = dt * self.speed
         try:
-            for fx in frames:
+            if step <= 0:
+                for fx in frames:
+                    draw(fx)
+                return
+            start, last = time.monotonic(), len(frames) - 1
+            for i, fx in enumerate(frames):
+                if i < last and time.monotonic() > start + (i + 1) * step:
+                    continue
                 draw(fx)
-                time.sleep(dt * self.speed)
+                wait = start + (i + 1) * step - time.monotonic()
+                if wait > 0:
+                    time.sleep(wait)
         except KeyboardInterrupt:
             self.skip = True

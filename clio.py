@@ -362,6 +362,9 @@ def main(argv=None):
     ap.add_argument("--no-art", action="store_true", help="hide ASCII art and sprites")
     ap.add_argument("--view", choices=("pixel", "dots", "dots-fill"),
                     help="how first-person levels are drawn: pixel (half blocks), dots or dots-fill (braille)")
+    ap.add_argument("--detail", choices=("auto", "high", "low"),
+                    help="first-person levels: low draws the floor and ceiling at half width (faster in a big "
+                         "window); auto (the default) does so only for a very big picture")
     ap.add_argument("--lines", action="store_true", help="in first-person levels: typed lines only, no single keys")
     ap.add_argument("--scroll", action="store_true", help="play first-person levels in scrolling text")
     ap.add_argument("--fast", action="store_true", help="no text animation")
@@ -453,6 +456,8 @@ def main(argv=None):
             settings["art"] = False
         if args.view:
             settings["view"] = args.view
+        if args.detail:
+            settings["detail"] = args.detail
         if args.lines:
             settings["lines"] = True
         if args.scroll:

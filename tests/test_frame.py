@@ -59,6 +59,57 @@ class ScreenTests(unittest.TestCase):
         sc.typeahead([";", "space", "f"])
         self.assertEqual((sc.pending, sc.typed), (None, "; f"))
 
+    def test_only_what_changed_is_written(self):
+        sc = self.screen([])
+        red, blue = (200, 0, 0), (0, 0, 200)
+        row = [(None, red, blue)] * 30
+        sc.frame([row, "a line"], prompt=None, status="")
+        whole = sc.out.getvalue()
+        self.assertIn("▀", whole)
+        sc.out.seek(0)
+        sc.out.truncate()
+        sc.frame([list(row), "a line"], prompt=None, status="")
+        self.assertNotIn("▀", sc.out.getvalue())                 # the same: not written again
+        self.assertNotIn("a line", sc.out.getvalue())
+        sc.out.seek(0)
+        sc.out.truncate()
+        changed = list(row)
+        changed[7] = changed[9] = (None, blue, red)
+        sc.frame([changed, "a line"], prompt=None, status="")
+        out = sc.out.getvalue()
+        self.assertIn("\x1b[1;8H", out)                         # from its first changed cell...
+        self.assertEqual(out.count("▀"), 3)                     # ...to its last
+        sc.out.seek(0)
+        sc.out.truncate()
+        sc.frame([changed, "a line"], prompt=None, status="", whole=True)
+        self.assertEqual(sc.out.getvalue().count("▀"), 30)       # whole: all of it
+
+    def test_colours_are_set_as_they_change(self):
+        from engine.frame import Painter
+        p = Painter(3)
+        red, blue = (200, 0, 0), (0, 0, 200)
+        out = p.cells([("a", red, blue), ("b", red, blue), ("c", blue, blue), (" ", None, red), ("d", None, red)])
+        self.assertEqual(out, "\x1b[0;38;2;200;0;0;48;2;0;0;200mab\x1b[38;2;0;0;200mc"
+                              "\x1b[48;2;200;0;0m \x1b[39md")    # a blank keeps the foreground it has
+        plain = Painter(0).cells([("a", red, blue), (None, red, blue)])
+        self.assertEqual((plain[0], len(plain), "\x1b" in plain), ("a", 2, False))   # no colours: a shade of ink
+
+    def test_an_animation_keeps_its_time(self):
+        import time
+        sc = self.screen([])
+        sc.animate, drawn = True, []
+
+        def slow(fx):
+            drawn.append(fx)
+            time.sleep(0.03)
+        sc.play(range(8), slow, 0.01)                           # each frame takes three turns to draw
+        self.assertEqual(drawn[0], 0)
+        self.assertEqual(drawn[-1], 7)                           # the last is never left out
+        self.assertLess(len(drawn), 8)
+        drawn[:] = []
+        sc.play(range(5), drawn.append, 0.01)
+        self.assertEqual(drawn, [0, 1, 2, 3, 4])                 # in time: every frame
+
 
 class SpriteTests(unittest.TestCase):
     def test_far_versions_keep_the_eyes(self):

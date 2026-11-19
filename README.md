@@ -92,6 +92,7 @@ python clio.py [game] [options]
   --seed N        reproducible random numbers (same seed, same dungeon)
   --mode NAME     game mode, for games that have several (depths: story, rogue)
   --view STYLE    how first-person levels are drawn: pixel, dots, dots-fill
+  --detail D      first-person levels: low draws the floor at half width (faster), auto (default), high
   --lines         in a level, every command is typed and ended with Enter (no single keys)
   --scroll        play levels in scrolling text instead of a redrawn picture
   --check         validate a game's data files and exit
@@ -216,7 +217,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 271 tests, under a minute
+python -m unittest discover -s tests     # 276 tests, under a minute
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 python tests/levelbot.py 10              # an automatic player walks Rootless's E1M1 ten times

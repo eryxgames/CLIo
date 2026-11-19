@@ -153,9 +153,30 @@ game, RØØTLESS, shows them.
   alarm and computer, pickups, coins, healing and boots put on, the player's pain, and the sight, attack and
   death calls of its zombies, orphan, daemon and spawner.
 
+- **TTY goggles on and off**: F2, or `goggles [on|off]` typed (`nv` for short), puts them
+  on or takes them off, free as turning is. Their battery runs down only while they are on;
+  the line under the picture says `goggles: 12` or `goggles off: 12`, and warns at 5.
+- **`detail`** (`--detail auto|high|low`, or `"detail"` in game.json's `first_person`):
+  `low` draws a level's floor and ceiling at half width - half their work, which is most of a
+  frame - and `auto`, the default, does so only for a very big picture (the goggles' dots in
+  a wide window).
+
 ### Changed
 
 - The banner font has `Ø`, `ø`, `Æ`, `æ`; in plain ASCII they become `0`, `o`, `AE`, `ae`.
+- **The far end of a room**: walls are drawn 10 cells ahead (monsters and items are still
+  seen, aimed at and shot at within 7), and wide rooms are drawn to the edges of the
+  picture, so a far wall no longer shows the floor through it. The walls beside and behind
+  the player are drawn from the cells they are, each with its own tile, so a panel beside
+  him (the shooting target, the exit switch) is no longer drawn three times. Beyond the
+  walls is a dark haze.
+- **Faster frames**: the floor and ceiling work out what depends on a cell once per cell
+  and each colour's fog once per row; walls, the dots of the braille view and whole-picture
+  tints (the goggles' green, root's inverse) work each colour out once - the dots view
+  draws in about half the time. The screen writes only what changed since the last frame
+  (in an animation, often a small part), with colour codes that set only the colour that
+  changed: a whole frame is about a quarter smaller. An animation keeps its time: a slow
+  frame shortens the wait after it, and one that comes too late is left out (never the last).
 
 ## 2.2.2 - 2026-11-18
 

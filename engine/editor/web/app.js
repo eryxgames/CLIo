@@ -163,6 +163,7 @@ function renderList() {
   $("filter").hidden = single;
   $("add").hidden = single;
   $("workshop").hidden = !kind || kind.key !== "characters";
+  $("sheet").hidden = !kind || !["sprites", "tiles", "monsters"].includes(kind.key);
   if (!kind) { $("things").replaceChildren(); return; }
   if (!single) $("add-id").placeholder = `id for a new ${kind.one}`;
   const q = state.filter.trim().toLowerCase();
@@ -180,6 +181,7 @@ function select(kindKey, id) {
   state.kind = kindKey;
   state.id = id;
   state.workshop = null;
+  state.sheet = null;
   state.finish = false;
   if (kindOf(kindKey).shape !== "object" && id === null) state.filter = $("filter").value = "";
   renderKinds(); renderList(); renderForm();
@@ -196,12 +198,12 @@ function fits(f, value) {
   if (value === undefined) return true;
   if (f.type === "number") return typeof value === "number";
   if (f.type === "bool") return typeof value === "boolean";
-  if (f.type === "tags" || f.type === "refs") return Array.isArray(value) && value.every((v) => typeof v === "string");
+  if (f.type === "tags" || f.type === "refs" || f.type === "lines") return Array.isArray(value) && value.every((v) => typeof v === "string");
   if (f.type === "sprite") return typeof value === "string";
   if (f.type === "range") return Array.isArray(value) && value.length === 2 && value.every((v) => typeof v === "number");
   if (f.type === "effects") return Array.isArray(value) || isObject(value);
   if (f.type === "condition") return typeof value === "string" || Array.isArray(value) || isObject(value);
-  if (f.type === "group" || f.type === "banner") return isObject(value);
+  if (f.type === "group" || f.type === "banner" || f.type === "endscreen") return isObject(value);
   if (f.type === "map") return isObject(value) && Object.values(value).every(isObject);
   if (f.type === "rows") return Array.isArray(value) && value.every(isObject);
   return typeof value === "string";
@@ -463,6 +465,7 @@ function control(kind, f, thing, path) {
   if (f.type === "effects") return effectsControl(kind, f, thing);
   if (f.type === "condition") return conditionControl(kind, f, thing);
   if (f.type === "banner") return bannerField(kind, f, thing, path);
+  if (f.type === "endscreen") return endScreenField(kind, f, thing, path);
   if (f.type === "group") {
     if (!isObject(value)) return el("button", { type: "button", class: "quiet", onclick: () => { thing[f.key] = {}; state.open.add(`${state.kind}/${state.id}/${path}`); again(); } }, `Add ${f.label.toLowerCase()}`);
     return el("div", { class: "group" }, ...subform(kind, f.fields, value, path));
@@ -523,6 +526,11 @@ function control(kind, f, thing, path) {
     area.value = typeof value === "string" ? value : "";
     return area;
   }
+  if (f.type === "lines") {                                  // a list of lines, one a line (commas and all)
+    const area = el("textarea", { rows: "3", oninput: (e) => change(e.target.value.split("\n").map((x) => x.trim()).filter(Boolean)) });
+    area.value = Array.isArray(value) ? value.join("\n") : "";
+    return area;
+  }
   if (f.type === "tags") {
     return el("input", { type: "text", class: "code", value: Array.isArray(value) ? value.join(", ") : "", placeholder: "words, separated by commas",
       oninput: (e) => change(e.target.value.split(",").map((s) => s.trim()).filter(Boolean)) });
@@ -559,6 +567,7 @@ function control(kind, f, thing, path) {
 function renderForm() {
   const host = $("form");
   if (state.workshop) return renderWorkshop(host);
+  if (state.sheet) return renderSheet(host);
   if (state.finish) return renderFinish(host);
   const kind = state.kind && kindOf(state.kind);
   const hit = kind && state.id !== null ? find(kind, state.id) : null;
@@ -1022,6 +1031,90 @@ function bannerField(kind, f, thing, path) {
   group.addEventListener("change", later);
   show();
   return el("div", { class: "banner-field" }, group, el("div", { class: "banner-preview" }, canvas, el("div", { class: "row" }, sizes, play), note));
+}
+
+// The end screen of a game of levels: its settings, and the screen as the game draws it (numbers made up).
+function endScreenField(kind, f, thing, path) {
+  const value = thing[f.key];
+  if (!isObject(value)) {
+    return el("button", { type: "button", class: "quiet", onclick: () => { thing[f.key] = { heading: "THE END" }; touched(kind); renderForm(); } }, `Add ${f.label.toLowerCase()}`);
+  }
+  const canvas = el("canvas", { class: "banner-canvas", role: "img", "aria-label": "The end screen, as the game draws it" });
+  const note = el("p", { class: "note" });
+  let drawn = null, timer = null, wait = null, at = 0;
+  function paint() {
+    clearTimeout(timer);
+    if (!drawn || !drawn.frames.length) return;
+    paintCells(canvas, drawn.frames[at % drawn.frames.length], drawn.size[0], drawn.size[1]);
+    if (drawn.every > 0 && drawn.frames.length > 1 && canvas.isConnected) timer = setTimeout(() => { at += 1; paint(); }, drawn.every * 1000);
+  }
+  async function show() {
+    try { drawn = await api("/api/endscreen", { pending: pending(), width: 100, height: 34 }); } catch (err) { note.textContent = "It cannot be drawn: " + err.message; return; }
+    at = 0;
+    note.textContent = drawn.frames.length ? `On a screen 100×34. The numbers are made up; the game counts the real ones.` +
+      (drawn.every > 0 && drawn.frames.length > 1 ? ` The pictures take turns, ${drawn.every} seconds each.` : "") : "Nothing to draw yet.";
+    paint();
+  }
+  const group = el("div", { class: "group" }, ...subform(kind, f.fields, value, path));
+  const later = () => { clearTimeout(wait); wait = setTimeout(show, 300); };
+  group.addEventListener("input", later);
+  group.addEventListener("change", later);
+  show();
+  return el("div", { class: "banner-field" }, group, el("div", { class: "banner-preview" }, canvas, note));
+}
+
+// A sheet of the game's pictures, to look at or to take to another program: a PNG, and an atlas of where each one is.
+const SHEETS = { monsters: "Monsters: standing, steps, attack", sprites: "Every sprite", tiles: "Tiles (the game's and the engine's)" };
+
+async function apiBlob(path, body) {
+  if (HOSTED) return api(path, body);
+  const res = await fetch(path, { method: "POST", headers: { "X-CLIo-Token": KEY, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
+  return res.blob();
+}
+
+function renderSheet(host) {
+  const sh = state.sheet;
+  const img = el("img", { class: "sheet-image", alt: "The sheet" });
+  const note = el("p", { class: "note" });
+  const ask = () => ({ pending: pending(), what: sh.what, scale: sh.scale, labels: sh.labels, background: sh.dark ? "dark" : "clear" });
+  async function show() {
+    note.textContent = "Drawing…";
+    try {
+      const blob = await apiBlob("/api/sheet", ask());
+      if (sh.url) URL.revokeObjectURL(sh.url);
+      sh.url = URL.createObjectURL(new Blob([blob], { type: "image/png" }));
+      img.src = sh.url;
+      const atlas = await api("/api/sheet", Object.assign(ask(), { format: "atlas" }));
+      const size = atlas.meta.size;
+      note.textContent = `${Object.keys(atlas.frames).length} pictures on ${size.w}×${size.h} pixels, each ${sh.scale} times as big.` +
+        " The atlas lists where each one is (the JSON form many engines read).";
+    } catch (err) { note.textContent = "It cannot be drawn: " + err.message; }
+  }
+  const pick = (label, control) => el("label", { class: "row" }, label, " ", control);
+  const what = el("select", { onchange: (e) => { sh.what = e.target.value; show(); } },
+    ...Object.entries(SHEETS).map(([k, label]) => el("option", { value: k, selected: k === sh.what }, label)));
+  const scale = el("select", { onchange: (e) => { sh.scale = Number(e.target.value); show(); } },
+    ...[1, 2, 3, 4, 6, 8].map((n) => el("option", { value: String(n), selected: n === sh.scale }, `${n}×`)));
+  const labels = el("input", { type: "checkbox", checked: sh.labels, onchange: (e) => { sh.labels = e.target.checked; show(); } });
+  const dark = el("input", { type: "checkbox", checked: sh.dark, onchange: (e) => { sh.dark = e.target.checked; show(); } });
+  const name = () => `${state.game.id}-${sh.what}`;
+  const save = el("button", { type: "button", onclick: async () => {
+    try { download(name() + ".png", new Blob([await apiBlob("/api/sheet", ask())], { type: "image/png" })); status(`The sheet was downloaded as ${name()}.png.`); }
+    catch (err) { status("Could not download: " + err.message, true); }
+  } }, "Download the PNG");
+  const atlas = el("button", { type: "button", class: "quiet", onclick: async () => {
+    try {
+      const a = await api("/api/sheet", Object.assign(ask(), { format: "atlas" }));
+      download(name() + ".json", new Blob([JSON.stringify(a, null, 1)], { type: "application/json" }));
+      status(`The atlas was downloaded as ${name()}.json.`);
+    } catch (err) { status("Could not download: " + err.message, true); }
+  } }, "Download the atlas (JSON)");
+  host.replaceChildren(el("h2", {}, "A sheet of pictures"),
+    el("p", { class: "note" }, "The game's pictures laid out on one image - to look over, to print, or to take to another program. Unsaved changes are on it too."),
+    el("div", { class: "row" }, pick("What:", what), pick("Size:", scale), pick("Names under them", labels), pick("Dark background", dark)),
+    el("div", { class: "row" }, save, atlas), note, el("div", { class: "sheet-box" }, img));
+  show();
 }
 
 // Drawing a sprite: a grid of palette letters, painted with the mouse (or the arrow keys and Space).
@@ -2129,6 +2222,12 @@ function theme(next) {
 }
 
 // ---------------------------------------------------------------------- start
+$("sheet").addEventListener("click", () => {
+  state.id = null;
+  state.workshop = null;
+  state.sheet = { what: state.kind === "tiles" ? "tiles" : state.kind === "sprites" ? "sprites" : "monsters", scale: state.kind === "tiles" ? 2 : 4, labels: true, dark: false, url: null };
+  renderList(); renderForm();
+});
 $("workshop").addEventListener("click", () => {
   state.id = null;
   state.workshop = { like: "", floor: null, rank: "regular", lean: 0, name: "", result: null };
@@ -2212,7 +2311,7 @@ function wake() {                                                    // once; op
 
 async function hostedApi(path, body) {
   const out = await ask("api", { game: tab.game, path, body: JSON.stringify(body || {}) });
-  if (out.bytes) return new Blob([out.bytes], { type: "application/zip" });
+  if (out.bytes) return new Blob([out.bytes], { type: out.bytes[0] === 0x89 ? "image/png" : "application/zip" });
   const answer = JSON.parse(out.json);
   if (!answer.ok) throw new Error(answer.error);
   if (path === "/api/walkthrough" && body && "text" in body) await kept();

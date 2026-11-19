@@ -834,8 +834,16 @@ class EndScreenTests(unittest.TestCase):
         self.assertIn("next run in", strip_ansi(ending.tick_line(spec, 1.2, Painter(3), 80)))
         self.assertLessEqual(len(ending.picture(Game.data, "cron", 10)), 10)    # shrunk to fit
         self.assertEqual(len(ending.picture(Game.data, "cron", 16)), 15)         # at its own size
-        self.assertEqual(Game.cfg["end_screen"]["picture"], "recruit")             # the hero, not his enemies
-        self.assertEqual(len(ending.picture(Game.data, "recruit", 14)), 14)
+        self.assertEqual(Game.cfg["end_screen"]["picture"], ["helmet_recruit", "helmet_hazmat"])   # the hero's helmet
+        self.assertEqual(len(ending.picture(Game.data, "helmet_recruit", 14)), 13)
+        spec = dict(Game.cfg["end_screen"])
+        first, later = ending.pictures(Game.data, spec, 20, 0.0), ending.pictures(Game.data, spec, 20, 4.5)
+        self.assertNotEqual(first, later)                                          # in turn, every 4 seconds
+        self.assertEqual((len(first), len(first[0])), (len(later), len(later[0]))) # on the same block: the text stays
+        both = ending.pictures(Game.data, dict(spec, picture_every=0), 20)
+        self.assertEqual(len(both[0]), 30 + 2 + 28)                                # side by side
+        big = ending.pictures(Game.data, dict(spec, picture="helmet_recruit", picture_lines=28), 40)
+        self.assertEqual(len(big), 26)                                             # twice as big, when it fits
 
     def test_piped_the_usual_ending(self):
         from engine.game import Game

@@ -81,4 +81,10 @@ def handle(game_dir, path, body=None):
         return levels.check(game_dir, str(body.get("level") or ""), pending, body.get("runs") or 5)
     if path == "/api/archive":                              # the whole game folder as a zip file
         return archive(game_dir)
+    if path == "/api/sheet":                                # a sheet of pictures as PNG, or where each one is on it
+        return looks.sheet(game_dir, str(body.get("what") or "monsters"), body.get("scale") or 4,
+                           body.get("labels", True), body.get("background") or "clear", body.get("format") or "png",
+                           pending)
+    if path == "/api/endscreen":                            # the end screen of a game of levels, as the game draws it
+        return looks.end_screen(game_dir, pending, body.get("width") or 100, body.get("height") or 34)
     raise Unknown("Nothing here.")

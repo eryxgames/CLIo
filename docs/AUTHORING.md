@@ -1332,16 +1332,21 @@ drawn: `pixel` (half blocks), `dots` or `dots-fill` (braille); `--view` override
 enough for a level:
 
 ```json
-"end_screen": {"heading": "EPISODE 1: KNEE-DEEP IN THE SHELL", "picture": "recruit",
+"end_screen": {"heading": "EPISODE 1: KNEE-DEEP IN THE SHELL",
+               "picture": ["helmet_recruit", "helmet_hazmat"], "picture_every": 4,
                "next": "Next: User Space", "credits": ["RØØTLESS - a game by ..."],
                "tick": "*/3 * * * *  cron  rain --on rootless"}
 ```
 
-The title banner, the `picture` (a sprite, or a list of them standing side by side), the `heading`, every level's kills, items,
+The title banner, the `picture` (a sprite, or a list of them: standing side by side, or
+taking turns for `picture_every` seconds each), the `heading`, every level's kills, items,
 secrets, beats against par and accuracy added up and counted up, the ending's text, what
 comes `next`, the `credits`, and the `tick` line at the bottom, which keeps counting down
 to its next run. A key goes on to the usual "THE END". Piped or on a small screen the usual
-ending is all there is.
+ending is all there is. A picture is at most `picture_lines` lines high (14 - 28 pixels);
+a small one is drawn two, three or four times as big where that fits, a big one smaller.
+A portrait about 28 pixels high, with few colours and a bold outline, reads best. In the
+editor the end screen is in the **Game** form, drawn beside it as the game draws it.
 
 **A secret exit**: an exit switch with `{"exit": "secret"}` (Rootless puts one behind the
 goggles' closet in E1M1) ends the level too, but then the scene's `"on_secret_exit"`
@@ -1446,6 +1451,18 @@ plays it five times and says how far it got.
 player's hands, with *Fire* to see a shot. **Monsters** are listed like everything else;
 sprites can be grown on a body plan, and their far versions seen, made again and painted
 (see [Pictures](#pictures)).
+
+**A sheet of pictures…** (below the list of sprites, tiles or monsters) lays the game's
+pictures out on one PNG image, each drawn 1 to 8 times as big with its name under it: the
+monsters with their steps and their attack, every sprite, or the tiles (the game's and the
+engine's). *Download the PNG* saves the image; *Download the atlas* saves where each
+picture is on it, in the JSON form many engines and tools read (TexturePacker's "hash",
+with each monster's walk as an animation). The same from the command line:
+
+```
+python clio.py rootless --sheet monsters --scale 4      # rootless-monsters.png and .json
+python clio.py rootless --sheet tiles --export walls.png
+```
 
 ## Coming from CLIo 1
 

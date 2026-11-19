@@ -10,9 +10,14 @@ at the bottom that keeps ticking - a crontab line, say.  Any key goes on to the
 usual "THE END".  Piped, or on a small screen, nothing is shown here and the
 usual ending says it all.
 
-    "end_screen": {"heading": "EPISODE 1 COMPLETE", "picture": ["marine", "cron"],
-                   "next": "Next: User Space", "credits": ["..."],
+    "end_screen": {"heading": "EPISODE 1 COMPLETE", "picture": ["helmet_recruit", "helmet_hazmat"],
+                   "picture_every": 4, "next": "Next: User Space", "credits": ["..."],
                    "tick": "*/3 * * * *  cron  rain"}
+
+``picture`` is a sprite, or a list of them: side by side, or one at a time for
+``picture_every`` seconds each. ``picture_lines`` is how many lines high a picture
+may be (14); a small one is drawn two, three or four times as big when that fits.
+:func:`preview` draws the screen for the editor.
 """
 from __future__ import annotations
 
@@ -84,20 +89,7 @@ def rows_of(game, spec, body, t, k, now, W, H, paint):
         out.append(" " * max(0, (W - visible_len(line)) // 2) + line)
     out.append("")
     room = H - len(out) - 4
-    names = spec.get("picture")
-    pics = [picture(data, n, min(14, room)) for n in (names if isinstance(names, list) else [names])]
-    pics = [p_ for p_ in pics if p_]
-    pic = []                                                  # several pictures stand side by side, feet level
-    if pics:
-        tall = max(len(p_) for p_ in pics)
-        for i in range(tall):
-            row = []
-            for j, p_ in enumerate(pics):
-                if j:
-                    row += [(" ", None, DARK)] * 2
-                off = tall - len(p_)
-                row += p_[i - off] if i >= off else [(None, DARK, DARK)] * len(p_[0])
-            pic.append(row)
+    pic = pictures(data, spec, room, now)
     pw = len(pic[0]) if pic else 0
     right = W - pw - (4 if pic else 2) - 1
     lines = [(spec.get("heading") or "THE END", "title"), ("", "text")]
@@ -129,6 +121,83 @@ def rows_of(game, spec, body, t, k, now, W, H, paint):
         for c in spec.get("credits") or []:
             out.append(" " * max(0, (W - len(str(c))) // 2) + paint.text([(str(c), "dim")], W))
     return out[:H - 2]
+
+
+def names_of(spec):
+    names = spec.get("picture")
+    return [str(n) for n in (names if isinstance(names, list) else [names]) if n]
+
+
+def pictures(data, spec, room, now=0.0):
+    """The picture block: the pictures side by side, feet level - or, with ``picture_every``, one at a
+    time, each on a block as big as the biggest, so that the text beside it does not move."""
+    try:
+        lines = int(spec.get("picture_lines") or 14)
+    except (TypeError, ValueError):
+        lines = 14
+    pics = [p_ for p_ in (picture(data, n, max(0, min(lines, room))) for n in names_of(spec)) if p_]
+    if not pics:
+        return []
+    tall, wide = max(len(p_) for p_ in pics), max(len(p_[0]) for p_ in pics)
+    try:
+        every = float(spec.get("picture_every") or 0)
+    except (TypeError, ValueError):
+        every = 0
+    if every > 0 and len(pics) > 1:
+        one = pics[int(now // max(0.5, every)) % len(pics)]
+        left = (wide - len(one[0])) // 2
+        blank = [(None, DARK, DARK)]
+        return [blank * wide if i < tall - len(one) else
+                blank * left + one[i - (tall - len(one))] + blank * (wide - left - len(one[0]))
+                for i in range(tall)]
+    block = []
+    for i in range(tall):
+        row = []
+        for j, p_ in enumerate(pics):
+            if j:
+                row += [(" ", None, DARK)] * 2
+            off = tall - len(p_)
+            row += p_[i - off] if i >= off else [(None, DARK, DARK)] * len(p_[0])
+        block.append(row)
+    return block
+
+
+def preview(data, width=100, height=34, body=None):
+    """The end screen as the editor shows it: ``{"lines": [[line, ...] for each picture], "every": seconds}``,
+    lines in truecolour, with numbers made up for the totals."""
+    import io
+    from . import banner
+    from .term import Term
+    from .theme import load_theme
+    spec = data.config.get("end_screen")
+    if not isinstance(spec, dict):
+        return {"lines": [], "every": 0}
+    term = Term(out=io.StringIO(), width=width, height=height, color=3, unicode=True, env={})
+    theme = load_theme(data.theme, getattr(data, "dir", None))
+    cfg = data.config
+
+    class Shim:
+        pass
+    game = Shim()
+    game.data, game.cfg, game.term = data, cfg, term
+    game.make_banner = lambda spec_, text=None, max_width=None, max_height=None: banner.make(
+        dict(spec_ if isinstance(spec_, dict) else {"text": spec_}), max_width, max_height, text=text, theme=theme,
+        palettes=cfg.get("palettes"), defaults=cfg.get("banner_defaults"))
+    paint = Painter(3)
+    t = dict.fromkeys(("kills", "kills_total", "items", "items_total", "secrets", "secrets_total", "beats", "par",
+                       "fired", "hits", "taken"), 0)
+    t.update(kills=41, kills_total=45, items=28, items_total=33, secrets=4, secrets_total=6, beats=231, par=260,
+             fired=180, hits=121)
+    try:
+        every = float(spec.get("picture_every") or 0)
+    except (TypeError, ValueError):
+        every = 0
+    shown = max(1, len(names_of(spec))) if every > 0 else 1
+    frames = []
+    for i in range(shown):
+        frames.append(rows_of(game, spec, body, t, 1.0, i * max(0.5, every), width, height, paint)
+                      + [tick_line(spec, 1.0, paint, width)])
+    return {"lines": frames, "every": every if shown > 1 else 0}
 
 
 def tick_line(spec, now, paint, W):

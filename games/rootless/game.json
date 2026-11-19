@@ -59,7 +59,11 @@
  "license": "All rights reserved - see LICENSE.md in this game's folder",
  "end_screen": {
   "heading": "EPISODE 1: KNEE-DEEP IN THE SHELL",
-  "picture": "recruit",
+  "picture": [
+   "helmet_recruit",
+   "helmet_hazmat"
+  ],
+  "picture_every": 4,
   "next": "Next: User Space",
   "credits": [
    "RØØTLESS - a game by Daniel Sandner",

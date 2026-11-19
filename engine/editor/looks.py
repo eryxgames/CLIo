@@ -8,6 +8,7 @@ its name (``engine.sprite.generate``).  ``grow`` returns that same creature as
 data that can be written into ``sprites.json`` and then drawn over by hand.
 """
 import io
+import os
 import re
 
 from .. import sprite
@@ -177,3 +178,36 @@ def picture(game_dir, name, pending=None):
             "reveals": reveals, "style": sp.get("style") or "pixel",
             "effect": (art.effect or {}).get("name") or ("frames" if art.frames else None),
             "size": list(art.size("art")), "small": list(art.size("small")) if "small" in art.variants else None}
+
+
+def sheet(game_dir, what="monsters", scale=4, labels=True, background="clear", fmt="png", pending=None):
+    """A sheet of the game's pictures (see :mod:`engine.sheets`): the PNG's bytes, or its atlas."""
+    from .. import sheets
+    from ..data import GameData
+    from . import EditorError, workdir
+    if what not in sheets.WHAT:
+        raise EditorError("A sheet is of %s." % ", ".join(sheets.WHAT))
+    try:
+        scale = max(1, min(16, int(scale)))
+    except (TypeError, ValueError):
+        raise EditorError("The scale is a whole number, 1 to 16.")
+    with workdir(game_dir, pending) as work:
+        data = GameData(work)
+        if data.id == os.path.basename(work):                # no id of its own: the folder's name
+            data.id = os.path.basename(os.path.abspath(game_dir))
+    png, atlas = sheets.sheet(data, what, scale, bool(labels), sheets.DARK if background == "dark" else None)
+    return atlas if fmt == "atlas" else png
+
+
+def end_screen(game_dir, pending=None, width=100, height=34):
+    """The end screen of game.json as the game draws it: ``{"frames": [rows per picture], "every": seconds,
+    "size": [w, h]}``, with made-up numbers for the totals (the game counts the real ones)."""
+    from .. import ending
+    from ..data import GameData
+    from . import workdir
+    width, height = max(50, min(160, int(width or 100))), max(18, min(60, int(height or 34)))
+    with workdir(game_dir, pending) as work:
+        data = GameData(work)
+        shown = ending.preview(data, width, height)
+    return {"frames": [[cells(l) for l in lines] for lines in shown["lines"]], "every": shown["every"],
+            "size": [width, height]}

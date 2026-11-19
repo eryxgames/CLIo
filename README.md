@@ -100,6 +100,8 @@ python clio.py [game] [options]
   --banner TEXT   draw TEXT in a style (--banner-style, --palette, --effect) or
                   write it as an .art file (--export FILE)
   --edit          open the game in the editor, a page in your browser
+  --sheet WHAT    the game's pictures on one PNG with an atlas: monsters, sprites, tiles
+                  (--scale N, --export FILE)
   --export-text F write every line a player can read to a CSV file
   --import-text F put the texts of such a file back into the game
 ```
@@ -214,7 +216,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 249 tests, under a minute
+python -m unittest discover -s tests     # 256 tests, under a minute
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 python tests/levelbot.py 10              # an automatic player walks Rootless's E1M1 ten times

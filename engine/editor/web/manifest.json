@@ -23,6 +23,7 @@
   "engine/quests.py",
   "engine/records.py",
   "engine/schema.py",
+  "engine/sheets.py",
   "engine/sprite.py",
   "engine/term.py",
   "engine/theme.py",

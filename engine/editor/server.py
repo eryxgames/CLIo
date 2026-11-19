@@ -97,7 +97,7 @@ def make_server(game_dir, port=None):
             except Exception as err:
                 return self.reply(500, {"error": "%s: %s" % (type(err).__name__, err)})
             if isinstance(result, bytes):
-                return self.reply(200, result, "application/zip")
+                return self.reply(200, result, "image/png" if result[:8] == b"\x89PNG\r\n\x1a\n" else "application/zip")
             self.reply(200, result)
 
     try:                                                    # the same address every time, when it is free: the

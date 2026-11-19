@@ -277,6 +277,30 @@ def display_test(term, logo_name=None):
     return 0
 
 
+def write_sheet(game_dir, what, scale, out=None):
+    """``--sheet``: the game's pictures on one PNG, and its atlas beside it."""
+    import json
+    from engine import sheets
+    try:
+        data = GameData(game_dir)
+    except GameDataError as e:
+        print("Cannot read the game: %s" % e)
+        return 2
+    png, atlas = sheets.sheet(data, what, scale)
+    out = out or "%s-%s.png" % (data.id, what)
+    if not out.lower().endswith(".png"):
+        out += ".png"
+    atlas["meta"]["image"] = os.path.basename(out)
+    with open(out, "wb") as f:
+        f.write(png)
+    side = out[:-4] + ".json"
+    with open(side, "w", encoding="utf-8") as f:
+        json.dump(atlas, f, indent=1)
+    size = atlas["meta"]["size"]
+    print("Wrote %s (%d pictures, %dx%d) and %s." % (out, len(atlas["frames"]), size["w"], size["h"], side))
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="clio", description="CLIo - a stylish command-line game engine.")
     ap.add_argument("game", nargs="?", help="game folder name or path")
@@ -317,7 +341,11 @@ def main(argv=None):
     ap.add_argument("--banner", metavar="TEXT", help="draw TEXT in a graphic style and exit")
     ap.add_argument("--banner-style", metavar="NAME", help="with --banner: the style (see --looks)")
     ap.add_argument("--palette", metavar="NAME", help="with --banner: the colours (see --looks), or '#fff07a,#ff6f91'")
-    ap.add_argument("--export", metavar="FILE", help="with --banner: write it as an .art file to edit by hand")
+    ap.add_argument("--export", metavar="FILE",
+                    help="with --banner: write it as an .art file to edit by hand; with --sheet: the PNG's name")
+    ap.add_argument("--sheet", choices=("monsters", "sprites", "tiles"),
+                    help="write a sheet of the game's pictures as PNG, with an atlas (JSON) of where each one is, and exit")
+    ap.add_argument("--scale", type=int, default=4, help="with --sheet: how many times as big the pictures are (4)")
     ap.add_argument("--version", action="version",
                     version="CLIo %s - %s, %s" % (__version__, __author__, __url__))
     args = ap.parse_args(argv)
@@ -360,6 +388,8 @@ def main(argv=None):
         return walkthrough(game_dir)
     if args.export_text or args.import_text:
         return text_table(game_dir, args.export_text, args.import_text)
+    if args.sheet:
+        return write_sheet(game_dir, args.sheet, args.scale, args.export)
     if args.bake_sounds:
         try:
             return bake_sounds(game_dir, args.bake_sounds)

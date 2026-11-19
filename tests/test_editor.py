@@ -1,17 +1,21 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2024-2026 Daniel Sandner
 """The editor: reading, checking and writing a game's files, and the local server."""
+import contextlib
 import inspect
+import io
 import json
 import os
 import re
 import shutil
+import struct
 import sys
 import tempfile
 import threading
 import unittest
 import urllib.error
 import urllib.request
+import zlib
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from helpers import ROOT                                        # noqa: E402
@@ -22,7 +26,7 @@ from engine.editor import hosted, service                       # noqa: E402
 from engine.editor.server import make_server                    # noqa: E402
 
 TYPES = {"text", "long", "number", "bool", "choice", "tags", "ref", "refs", "sprite", "group", "rows", "map",
-         "effects", "condition", "banner", "range"}
+         "effects", "condition", "banner", "range", "lines", "endscreen"}
 
 
 def copy_of(name):
@@ -624,6 +628,80 @@ class BannerTests(unittest.TestCase):
         self.assertEqual(looks.cells("\x1b[1;7;38;2;255;0;0mA")[0][1:], ["#0b0e14", "#ff0000", True])
 
 
+class SheetAndEndScreenTests(unittest.TestCase):
+    def test_a_sheet_of_monsters_with_their_steps(self):
+        folder = os.path.join(ROOT, "games", "rootless")
+        png = service.handle(folder, "/api/sheet", {"what": "monsters", "scale": 2})
+        self.assertEqual(png[:8], b"\x89PNG\r\n\x1a\n")
+        atlas = service.handle(folder, "/api/sheet", {"what": "monsters", "scale": 2, "format": "atlas"})
+        frames = atlas["frames"]
+        self.assertIn("zombie", frames)
+        self.assertEqual(atlas["animations"]["zombie/walk"], ["zombie/step1", "zombie/step2"])
+        self.assertIn("shred/attack", frames)
+        self.assertNotIn("barrel/step1", frames)                     # a barrel does not walk
+        z = frames["zombie"]["frame"]
+        self.assertEqual((z["w"], z["h"]), (2 * 12, 2 * 18))         # twice as big as it is drawn
+        w, h = struct.unpack(">II", png[16:24])
+        self.assertEqual((w, h), (atlas["meta"]["size"]["w"], atlas["meta"]["size"]["h"]))
+        for f in frames.values():                                    # all of each picture on the image
+            r = f["frame"]
+            self.assertTrue(0 <= r["x"] and r["x"] + r["w"] <= w and 0 <= r["y"] and r["y"] + r["h"] <= h)
+        self.assertEqual(atlas["meta"]["image"], "rootless-monsters.png")
+
+    def test_sheets_of_sprites_and_tiles(self):
+        folder = copy_of("rootless")
+        cfg = GameData(folder).sprites
+        cfg = dict(cfg, unsaved={"pixels": ["ab", "ba"], "palette": {"a": "#ff0000", "b": "#0000ff"}})
+        atlas = service.handle(folder, "/api/sheet", {"what": "sprites", "format": "atlas", "pending": {"sprites": cfg}})
+        self.assertIn("unsaved", atlas["frames"])                    # what is not saved yet is on it too
+        tiles = service.handle(folder, "/api/sheet", {"what": "tiles", "scale": 1, "format": "atlas"})["frames"]
+        self.assertIn("grate", tiles)                                # the game's own
+        self.assertIn("steel", tiles)                                # and the engine's
+        self.assertEqual(tiles["steel"]["frame"]["w"], 32)
+        with self.assertRaises(editor.EditorError):
+            service.handle(folder, "/api/sheet", {"what": "music"})
+
+    def test_the_png_reads_back(self):
+        from engine import sheets
+        img = [[(255, 0, 0, 255), (0, 0, 0, 0)], [(0, 255, 0, 128), (1, 2, 3, 255)]]
+        data = sheets.png(img)
+        self.assertEqual(data[12:16], b"IHDR")
+        raw = zlib.decompress(data[data.index(b"IDAT") + 4:data.index(b"IEND") - 8])
+        self.assertEqual(raw, bytes([0, 255, 0, 0, 255, 0, 0, 0, 0, 0, 0, 255, 0, 128, 1, 2, 3, 255]))
+
+    def test_the_end_screen_as_the_game_draws_it(self):
+        folder = os.path.join(ROOT, "games", "rootless")
+        shown = service.handle(folder, "/api/endscreen", {"width": 100, "height": 34})
+        self.assertEqual(len(shown["frames"]), 2)                    # two helmets, in turn
+        self.assertEqual(shown["every"], 4)
+        text = ["".join(run[0] for run in row) for row in shown["frames"][0]]
+        self.assertTrue(any("41 / 45" in t for t in text))           # numbers made up
+        self.assertTrue(any("Next: User Space" in t for t in text))
+        self.assertNotEqual(shown["frames"][0], shown["frames"][1])
+        self.assertTrue(all(len(t) <= 100 for t in text))
+        game = dict(GameData(folder).config)
+        game.pop("end_screen")
+        self.assertEqual(service.handle(folder, "/api/endscreen", {"pending": {"game": game}})["frames"], [])
+
+    def test_a_sheet_from_the_command_line(self):
+        import clio
+        out = os.path.join(tempfile.mkdtemp(prefix="clio-sheet-"), "tiles")
+        with contextlib.redirect_stdout(io.StringIO()) as said:
+            self.assertEqual(clio.main([os.path.join(ROOT, "games", "rootless"), "--sheet", "tiles", "--scale", "1",
+                                        "--export", out]), 0)
+        self.assertIn("tiles.png", said.getvalue())
+        with open(out + ".png", "rb") as f:
+            self.assertEqual(f.read(4), b"\x89PNG")
+        with open(out + ".json", encoding="utf-8") as f:
+            self.assertEqual(json.load(f)["meta"]["image"], "tiles.png")
+
+    def test_the_game_form_has_the_end_screen(self):
+        game = next(k for k in schema.KINDS if k["key"] == "game")
+        end = next(f for f in game["fields"] if f["key"] == "end_screen")
+        self.assertEqual(end["type"], "endscreen")
+        self.assertEqual({f["key"]: f["type"] for f in end["fields"]}["credits"], "lines")
+
+
 class HostedTests(unittest.TestCase):
     """The editor opened from a web address: the same service, a game held in memory, a list of files to fetch."""
 
@@ -785,6 +863,13 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(code, 400)
         self.assertIn("JSON list", json.loads(body)["error"])
         self.assertEqual(self.ask("/api/nothing", {})[0], 404)
+
+    def test_a_sheet_goes_out_as_an_image(self):
+        req = urllib.request.Request(self.base + "/api/sheet", data=json.dumps({"what": "tiles", "scale": 1}).encode("utf-8"))
+        req.add_header("X-CLIo-Token", self.key)
+        with urllib.request.urlopen(req, timeout=20) as res:
+            self.assertEqual(res.headers["Content-Type"], "image/png")
+            self.assertEqual(res.read()[:4], b"\x89PNG")
 
     def test_texts_and_archive_through_the_server(self):
         code, body = self.ask("/api/texts", {})

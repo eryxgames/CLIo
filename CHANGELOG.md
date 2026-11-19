@@ -75,8 +75,14 @@ game, RØØTLESS, shows them.
   on it; a weapon can also be typed by its id). Melee options `accuracy`, `shove` (throws
   the target back) and `stagger` (a bitten monster loses its turn); `ready_sound`.
 - **An end screen** (`"end_screen"` in game.json): a won game of levels ends on a screen
-  of its own - banner, pictures side by side, the totals counting up, the ending, what
-  comes next, credits and a crontab line still ticking.
+  of its own - banner, pictures (side by side, or taking turns: `picture_every`; as big as
+  `picture_lines`), the totals counting up, the ending, what comes next, credits and a
+  crontab line still ticking. In the editor it is part of the Game form, drawn as the
+  game draws it.
+- **Sheets of pictures**: the monsters with their steps and attack, every sprite, or the
+  tiles, on one PNG with an atlas (JSON, the form many engines read) - from the editor
+  (*A sheet of pictures…*) or `--sheet monsters|sprites|tiles` (`--scale`, `--export`).
+  The PNG is written with the standard library.
 - **Tiles** (`tiles.json`): the walls, floors and ceilings of levels drawn from a game's own
   pictures, in the sprites' format and of any size; a tile named like one of the engine's
   takes its place; `frames` change a beat at a time; clear pixels show what is behind a
@@ -102,15 +108,15 @@ game, RØØTLESS, shows them.
   oil depot guarded by flamethrowers, a coolant room of slick floor with a crate puzzle,
   and a minigun holding the exit. Five new enemies - shred (flamethrower), kworker
   (dodging gunner), kswapd (heavy gunner), crawler (fast, three red eyes), spinlock
-  (minigun) - drawn in the game's own style, and the recruit, the game's hero, on the end
-  screen. A shovel (E1M1) and a chainsaw (E1M9's closet) share key 1 with the fist. The
+  (minigun) - drawn in the game's own style; the recruit, the game's hero; and two helmet
+  portraits (his, and a hazmat mask) taking turns on the end screen. A shovel (E1M1) and a chainsaw (E1M9's closet) share key 1 with the fist. The
   story is framed: a recruit of the Terran Ascendancy Mandate in a simulator pod, his
-  first battle simulation. Two riffs, sounds (chip and Ballistic), 39 sprites, a tile.
+  first battle simulation. Two riffs, sounds (chip and Ballistic), 41 sprites, a tile.
 - `--view STYLE`, `--lines` (every command typed, no single keys), `--scroll`.
   `--check` also counts levels and monsters, and checks their maps and references.
 - `engine/levelbot.py`: a simple player that walks a level by its `"bot"` goals - if it can
   finish, a person can (`python tests/levelbot.py`, and in the editor). It plans slides,
-  keeps off fire, steps out of a flamethrower's line and ducks a spun-up minigun. 72 more
+  keeps off fire, steps out of a flamethrower's line and ducks a spun-up minigun. 79 more
   tests.
 - **Sound sets** (`sounds.NAME.json`): other sets of sound effects over a game's own, chosen
   with `--sounds NAME`, `CLIO_SOUNDS`, `"sound_set"` in game.json, or `sound set NAME` while

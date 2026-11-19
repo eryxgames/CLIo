@@ -141,6 +141,12 @@ BANNER = [F("text", label="Text (the game's title if left empty)"),
           F("palette", "choice", "Colours (the game's own palettes come first)", options=list(_banner.PALETTES)),
           F("effect", "choice", "Animation", options=list(_fx.NAMES)),
           F("scale", "number", "Scale (1 or 2)")]
+END_SCREEN = [F("heading", label="Heading (THE END if left empty)"),
+              F("picture", "refs", "Pictures (sprites)", of="sprites"),
+              F("picture_every", "number", "Seconds each picture is shown (0: side by side)"),
+              F("picture_lines", "number", "Lines high a picture may be (14)"),
+              F("next", label="What comes next"), F("credits", "lines", "Credits, a line each"),
+              F("tick", label="A line at the bottom that keeps ticking (a crontab line, say)")]
 PALETTE = [F("colors", "tags", "Colours, top to bottom (#rrggbb, #rrggbb, ...)"),
            F("accent", "tags", "Colours for lower-case letters (optional)")]
 
@@ -159,7 +165,8 @@ KINDS = [
         R("lose_banner", "banner", "Banner when the player loses", fields=BANNER),
         R("banner_defaults", "banner", "The game's banner style (for every banner)", fields=BANNER),
         R("palettes", "map", "The game's own colour palettes", one="palette", fields=PALETTE),
-        R("on_start", "effects", "When a new game starts")]},
+        R("on_start", "effects", "When a new game starts"),
+        R("end_screen", "endscreen", "The end screen of a game of levels", fields=END_SCREEN)]},
     {"key": "scenes", "file": "scenes", "label": "Scenes", "one": "scene", "shape": "list", "title": "name", "fields": [
         F("name"), F("area"), F("description", "long"), F("first_visit", "long"), F("art"),
         F("music", "ref", of="music"), F("enter_sfx", label="Sound on entering"),

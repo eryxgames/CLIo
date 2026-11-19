@@ -301,6 +301,40 @@ def write_sheet(game_dir, what, scale, out=None):
     return 0
 
 
+def read_sheet(game_dir, png_file):
+    """``--import-sheet``: an edited sheet back into the game - only the pictures that were changed."""
+    import json
+    from engine import editor, sheets
+    side = (png_file[:-4] if png_file.lower().endswith(".png") else png_file) + ".json"
+    try:
+        with open(png_file, "rb") as f:
+            _w, _h, rows = sheets.read_png(f.read())
+        with open(side, encoding="utf-8") as f:
+            atlas = json.load(f)
+        result = sheets.import_sheet(editor.current(game_dir), rows, atlas)
+    except (OSError, ValueError) as err:
+        print("Cannot take the sheet back: %s" % err)
+        return 2
+    report = result["report"]
+    if result["files"]:
+        problems = editor.check(game_dir, result["files"])
+        if problems:
+            print("Nothing was changed: with these pictures the game would have problems.")
+            for p in problems:
+                print("  ! " + p["text"])
+            return 1
+    for key, data in result["files"].items():
+        editor.save(game_dir, key, data)
+    print("%d picture(s) changed, %d the same." % (len(report["changed"]), report["same"]))
+    for name in report["changed"]:
+        print("  * " + name)
+    for note in report["skipped"]:
+        print("  ? left out: " + note)
+    for name in report["unknown"]:
+        print("  ? not in the game: " + name)
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="clio", description="CLIo - a stylish command-line game engine.")
     ap.add_argument("game", nargs="?", help="game folder name or path")
@@ -346,6 +380,8 @@ def main(argv=None):
     ap.add_argument("--sheet", choices=("monsters", "sprites", "tiles"),
                     help="write a sheet of the game's pictures as PNG, with an atlas (JSON) of where each one is, and exit")
     ap.add_argument("--scale", type=int, default=4, help="with --sheet: how many times as big the pictures are (4)")
+    ap.add_argument("--import-sheet", metavar="FILE",
+                    help="take an edited sheet (FILE.png, with FILE.json beside it) back into the game and exit")
     ap.add_argument("--version", action="version",
                     version="CLIo %s - %s, %s" % (__version__, __author__, __url__))
     args = ap.parse_args(argv)
@@ -390,6 +426,8 @@ def main(argv=None):
         return text_table(game_dir, args.export_text, args.import_text)
     if args.sheet:
         return write_sheet(game_dir, args.sheet, args.scale, args.export)
+    if args.import_sheet:
+        return read_sheet(game_dir, args.import_sheet)
     if args.bake_sounds:
         try:
             return bake_sounds(game_dir, args.bake_sounds)

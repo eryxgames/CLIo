@@ -1054,6 +1054,17 @@ a creature grown from the character's name - the same words always grow the same
 - *Grow a monster* grows an enemy for a [first-person level](#first-person-levels) on a
   body plan - biped, beast, floater, crawler or brute - as tall as you say, from the words
   above it; it replaces the drawing and makes its far versions.
+- *From a picture* (for sprites and tiles) makes a drawing from any picture file - a PNG,
+  a JPEG, a screenshot. A pixel picture drawn bigger (each pixel a square) comes back to
+  its own pixels; anything higher than *Height* is made smaller; it gets at most *Colours*
+  colours, the sprite's own letters kept for the colours it already has. *Clear the
+  background* takes away the commonest colour round the picture's edges, as far as it
+  reaches; a click on the picture clears the colour there too (a checkerboard needs a
+  click on each of its colours), and dust left apart is swept away. *A dark outline* draws
+  a line round it, as the game's own monsters have. *Use it* puts it in place of the
+  drawing shown (the next drawings keep the sprite's size). Nothing is written until you
+  save; drawn pictures are best brought in at their own size, painted ones need the most
+  touching up.
 - *Far away, in a first-person level* shows the sprite one to six cells away as a level
   draws it. *Letters to keep far away* (`keep`) are the colours that must survive the
   shrinking - eyes, a mouth. *Keep them, to draw over* stores the far versions in the
@@ -1462,6 +1473,21 @@ with each monster's walk as an animation). The same from the command line:
 ```
 python clio.py rootless --sheet monsters --scale 4      # rootless-monsters.png and .json
 python clio.py rootless --sheet tiles --export walls.png
+```
+
+**Take an edited sheet back in**: draw over the sheet in any paint program - keep each
+picture where it is and as big as it is, and paint in squares of the sheet's size (at
+`--scale 4`, a square of 4 x 4 is one pixel) - then choose the PNG and its atlas together
+in the sheet panel. Only the pictures that were painted over come back (the atlas keeps a
+check of each one as it was written, so an old sheet does not undo newer work), with any
+new colours added to their palettes. A monster's step that was changed keeps both steps
+in the sprite (`walk`); a tile of the engine's that was changed becomes the game's own.
+A sheet saved without see-through pixels, on its background, comes back too. Nothing is
+written until you save. From the command line it is written at once, if the game then
+has no problems:
+
+```
+python clio.py rootless --import-sheet rootless-monsters.png    # with rootless-monsters.json beside it
 ```
 
 ## Coming from CLIo 1

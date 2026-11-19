@@ -8,6 +8,7 @@ its name (``engine.sprite.generate``).  ``grow`` returns that same creature as
 data that can be written into ``sprites.json`` and then drawn over by hand.
 """
 import io
+import json
 import os
 import re
 
@@ -211,3 +212,58 @@ def end_screen(game_dir, pending=None, width=100, height=34):
         shown = ending.preview(data, width, height)
     return {"frames": [[cells(l) for l in lines] for lines in shown["lines"]], "every": shown["every"],
             "size": [width, height]}
+
+
+def _pixels_of(body):
+    """The picture a request carries: ``png`` (the file, base64) or ``rgba`` (base64) with ``w`` and ``h``."""
+    import base64
+    from .. import sheets
+    from . import EditorError
+    try:
+        if body.get("png"):
+            _w, _h, rows = sheets.read_png(base64.b64decode(body["png"]))
+            return rows
+        if body.get("rgba"):
+            return sheets.from_rgba(base64.b64decode(body["rgba"]), body.get("w"), body.get("h"))
+    except sheets.PictureError as err:
+        raise EditorError(str(err))
+    except (ValueError, TypeError):
+        raise EditorError("The picture did not come through whole.")
+    raise EditorError("No picture was sent.")
+
+
+def from_image(body):
+    """A picture made a sprite (see :func:`engine.sheets.to_sprite`)."""
+    from .. import sheets
+    from . import EditorError
+    rows = _pixels_of(body)
+    try:
+        made = sheets.to_sprite(rows, height=body.get("height") or None, colours=body.get("colours") or 16,
+                                clear=body.get("clear") or "alpha", base=body.get("base") or None,
+                                outline=bool(body.get("outline")), clear_at=body.get("clear_at") or (),
+                                specks=body.get("specks", True), limit=int(body.get("limit") or 64))
+    except sheets.PictureError as err:
+        raise EditorError(str(err))
+    made["size"] = [len(made["pixels"][0]), len(made["pixels"])]
+    made["source"] = [len(rows[0]), len(rows)]
+    return made
+
+
+def sheet_back(game_dir, body, pending=None):
+    """An edited sheet taken back: ``{"files": {key: data that changed}, "report"}`` - nothing written."""
+    from .. import sheets
+    from . import EditorError, current
+    rows = _pixels_of(body)
+    atlas = body.get("atlas")
+    if isinstance(atlas, str):
+        try:
+            atlas = json.loads(atlas)
+        except ValueError:
+            raise EditorError("The atlas is not JSON: take the .json written with the sheet.")
+    if not isinstance(atlas, dict):
+        raise EditorError("The atlas (the .json written with the sheet) is needed too.")
+    files = current(game_dir, pending)
+    try:
+        return sheets.import_sheet(files, rows, atlas)
+    except sheets.PictureError as err:
+        raise EditorError(str(err))

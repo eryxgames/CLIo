@@ -278,3 +278,7 @@ button.pal .unused { color: var(--ink-2); }
 
 .sheet-box { overflow: auto; max-height: 70vh; border: 1px solid var(--line, #8884); background: repeating-conic-gradient(#8882 0 25%, transparent 0 50%) 0 0 / 16px 16px; }
 .sheet-image { display: block; image-rendering: pixelated; }
+.sprite-small.pick { cursor: crosshair; max-width: 220px; image-rendering: pixelated; }
+.pic-pair { align-items: flex-start; gap: 0.75rem; }
+.changes { margin: 0.25rem 0 0.5rem 1.2rem; font-family: ui-monospace, monospace; font-size: 0.9em; }
+.changes .warn { color: var(--bad, #b3261e); }

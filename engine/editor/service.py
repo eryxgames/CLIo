@@ -85,6 +85,10 @@ def handle(game_dir, path, body=None):
         return looks.sheet(game_dir, str(body.get("what") or "monsters"), body.get("scale") or 4,
                            body.get("labels", True), body.get("background") or "clear", body.get("format") or "png",
                            pending)
+    if path == "/api/fromimage":                            # a picture (a PNG, or a browser's pixels) made a sprite
+        return looks.from_image(body)
+    if path == "/api/sheetimport":                          # an edited sheet taken back: what changed, not written
+        return looks.sheet_back(game_dir, body, pending)
     if path == "/api/endscreen":                            # the end screen of a game of levels, as the game draws it
         return looks.end_screen(game_dir, pending, body.get("width") or 100, body.get("height") or 34)
     raise Unknown("Nothing here.")

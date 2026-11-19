@@ -83,6 +83,14 @@ game, RØØTLESS, shows them.
   tiles, on one PNG with an atlas (JSON, the form many engines read) - from the editor
   (*A sheet of pictures…*) or `--sheet monsters|sprites|tiles` (`--scale`, `--export`).
   The PNG is written with the standard library.
+- **The way back**: an edited sheet is taken back in (the sheet panel, or
+  `--import-sheet FILE.png`): only the pictures painted over, checked against the atlas,
+  with new colours added to the palettes - a monster's steps and attack too, an engine
+  tile becoming the game's own. **From a picture** in the sprite and tile editors makes a
+  drawing of any picture file: a pixel picture drawn bigger back to its own pixels, made
+  smaller, its colours fewer, its background cleared (the commonest edge colour, or a
+  click), dust swept away, an outline if wanted. PNG files are read with the standard
+  library (every colour type and depth; not interlaced).
 - **Tiles** (`tiles.json`): the walls, floors and ceilings of levels drawn from a game's own
   pictures, in the sprites' format and of any size; a tile named like one of the engine's
   takes its place; `frames` change a beat at a time; clear pixels show what is behind a
@@ -116,7 +124,7 @@ game, RØØTLESS, shows them.
   `--check` also counts levels and monsters, and checks their maps and references.
 - `engine/levelbot.py`: a simple player that walks a level by its `"bot"` goals - if it can
   finish, a person can (`python tests/levelbot.py`, and in the editor). It plans slides,
-  keeps off fire, steps out of a flamethrower's line and ducks a spun-up minigun. 79 more
+  keeps off fire, steps out of a flamethrower's line and ducks a spun-up minigun. 94 more
   tests.
 - **Sound sets** (`sounds.NAME.json`): other sets of sound effects over a game's own, chosen
   with `--sounds NAME`, `CLIO_SOUNDS`, `"sound_set"` in game.json, or `sound set NAME` while

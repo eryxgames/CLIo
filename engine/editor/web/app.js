@@ -1066,6 +1066,29 @@ function endScreenField(kind, f, thing, path) {
 // A sheet of the game's pictures, to look at or to take to another program: a PNG, and an atlas of where each one is.
 const SHEETS = { monsters: "Monsters: standing, steps, attack", sprites: "Every sprite", tiles: "Tiles (the game's and the engine's)" };
 
+function base64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let text = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(text);
+}
+
+// A picture file as the editor sends it: a PNG as it is (its colours exact), anything else - or a PNG too big
+// to send whole - as the pixels the browser reads from it, made at most 512 pixels on a side.
+async function pictureOf(file) {
+  const bitmap = await createImageBitmap(file);
+  const big = Math.max(bitmap.width, bitmap.height);
+  if (file.type === "image/png" && big <= 512) return { send: { png: base64(await file.arrayBuffer()) }, bitmap, w: bitmap.width, h: bitmap.height };
+  const k = Math.min(1, 512 / big);
+  const w = Math.max(1, Math.round(bitmap.width * k)), h = Math.max(1, Math.round(bitmap.height * k));
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const g = c.getContext("2d");
+  g.imageSmoothingEnabled = k < 1;
+  g.drawImage(bitmap, 0, 0, w, h);
+  return { send: { rgba: base64(g.getImageData(0, 0, w, h).data.buffer), w, h }, bitmap, w, h };
+}
+
 async function apiBlob(path, body) {
   if (HOSTED) return api(path, body);
   const res = await fetch(path, { method: "POST", headers: { "X-CLIo-Token": KEY, "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -1110,10 +1133,41 @@ function renderSheet(host) {
       status(`The atlas was downloaded as ${name()}.json.`);
     } catch (err) { status("Could not download: " + err.message, true); }
   } }, "Download the atlas (JSON)");
+  const backNote = el("p", { class: "note" });
+  const backList = el("ul", { class: "changes" });
+  function told(said, r) {                                   // kept on the panel: taking changes in draws it again
+    sh.back = { said, r };
+    backNote.textContent = said;
+    backList.replaceChildren(...(r ? [...r.changed.map((n) => el("li", {}, n)),
+      ...r.skipped.map((n) => el("li", { class: "warn" }, "left out: " + n)),
+      ...r.unknown.map((n) => el("li", { class: "warn" }, "not in the game: " + n))] : []));
+  }
+  if (sh.back) told(sh.back.said, sh.back.r);
+  const back = el("input", { type: "file", accept: ".png,.json,image/png,application/json", multiple: true, hidden: true, onchange: async (e) => {
+    const files = [...e.target.files];
+    e.target.value = "";
+    const png = files.find((f) => /\.png$/i.test(f.name)), json = files.find((f) => /\.json$/i.test(f.name));
+    if (!png || !json) { told("Choose both: the sheet's PNG and the atlas (.json) written with it."); return; }
+    told("Reading the sheet…");
+    try {
+      const result = await api("/api/sheetimport", { pending: pending(), png: base64(await png.arrayBuffer()), atlas: await json.text() });
+      const r = result.report;
+      told(r.changed.length ? `${r.changed.length} picture${r.changed.length === 1 ? "" : "s"} changed, ${r.same} the same. Nothing is written until you save.`
+        : `No picture was changed (${r.same} the same).`, r);
+      if (Object.keys(result.files).length) adopt(result);
+      else show();
+    } catch (err) { told("It cannot be taken back: " + err.message); }
+  } });
   host.replaceChildren(el("h2", {}, "A sheet of pictures"),
     el("p", { class: "note" }, "The game's pictures laid out on one image - to look over, to print, or to take to another program. Unsaved changes are on it too."),
     el("div", { class: "row" }, pick("What:", what), pick("Size:", scale), pick("Names under them", labels), pick("Dark background", dark)),
-    el("div", { class: "row" }, save, atlas), note, el("div", { class: "sheet-box" }, img));
+    el("div", { class: "row" }, save, atlas), note, el("div", { class: "sheet-box" }, img),
+    el("h3", {}, "Take an edited sheet back in"),
+    el("p", { class: "note" }, "Drawn over in another program? Choose the PNG and its atlas (.json) together: the pictures that were changed come back - " +
+      "a monster's steps and attack too - with their colours added to the palettes. Keep each picture's place and size; paint in its squares " +
+      "(a square of the sheet's size is one pixel). A tile of the engine's that was changed becomes the game's own."),
+    el("div", { class: "row" }, back, el("button", { type: "button", class: "quiet", onclick: () => back.click() }, "Choose the PNG and the atlas…")),
+    backNote, backList);
   show();
 }
 
@@ -1170,6 +1224,7 @@ function spriteEditor(kind, thing) {
   // the sprite as the engine draws it, in its style: asked again a moment after each change
   async function show() {
     clearTimeout(timer);
+    if (!grid.isConnected) return;                           // another page is shown now: nothing to draw for
     if (tile) return tileShow();
     try { drawn = await api("/api/picture", { pending: pending(), name: state.id }); } catch (err) { shownNote.textContent = "It cannot be drawn: " + err.message; return; }
     const [w, h] = drawn.size;
@@ -1318,6 +1373,82 @@ function spriteEditor(kind, thing) {
   const farNote = el("p", { class: "note" });
   function farLater() { if (!tile) { clearTimeout(farWait); farWait = setTimeout(farAway, 400); } }
 
+  // ---- from a picture: any picture file made a drawing, its background cleared, its colours few
+  const fromPic = { picture: null, made: null, points: [] };
+  const picFile = el("input", { type: "file", accept: "image/*", hidden: true, onchange: async (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    try { fromPic.picture = await pictureOf(file); fromPic.points = []; fromPic.name = file.name; await picMake(); }
+    catch (err) { picNote.textContent = "That picture cannot be read: " + err.message; }
+  } });
+  const picHigh = el("input", { type: "number", min: "4", max: "64", class: "short", value: String(tile ? 32 : Math.max(8, Math.min(64, thing.pixels.length))), "aria-label": "Height in pixels", onchange: () => picMake() });
+  const picColours = el("input", { type: "number", min: "2", max: "62", class: "short", value: "16", "aria-label": "Colours at most", onchange: () => picMake() });
+  const picCorners = el("input", { type: "checkbox", checked: !tile, onchange: () => picMake() });
+  const picOutline = el("input", { type: "checkbox", onchange: () => picMake() });
+  const picSource = el("canvas", { class: "sprite-small pick", role: "img", "aria-label": "The picture: click its background to clear it", title: "Click the background to clear it" });
+  const picResult = el("canvas", { class: "sprite-small", role: "img", "aria-label": "What it makes" });
+  const picNote = el("p", { class: "note" });
+  const picUse = el("button", { type: "button", disabled: true, onclick: () => picTake() }, "Use it");
+  const picUndo = el("button", { type: "button", class: "quiet small", disabled: true, onclick: () => { fromPic.points.pop(); picMake(); } }, "Undo the last click");
+  picSource.addEventListener("click", (e) => {
+    const p = fromPic.picture;
+    if (!p) return;
+    const box = picSource.getBoundingClientRect();
+    fromPic.points.push([Math.floor((e.clientX - box.left) / box.width * p.w), Math.floor((e.clientY - box.top) / box.height * p.h)]);
+    picMake();
+  });
+  async function picMake() {
+    const p = fromPic.picture;
+    if (!p) return;
+    const k = Math.min(1, 220 / Math.max(p.w, p.h)) * Math.max(1, Math.floor(220 / Math.max(p.w, p.h)));
+    picSource.width = Math.round(p.w * k); picSource.height = Math.round(p.h * k);
+    const g = picSource.getContext("2d");
+    g.imageSmoothingEnabled = false;
+    g.clearRect(0, 0, picSource.width, picSource.height);
+    g.drawImage(p.bitmap, 0, 0, picSource.width, picSource.height);
+    g.fillStyle = "#ff2fd0";
+    for (const [x, y] of fromPic.points) g.fillRect(Math.floor((x + 0.5) * k) - 2, Math.floor((y + 0.5) * k) - 2, 5, 5);
+    picUndo.disabled = !fromPic.points.length;
+    picNote.textContent = "Making it…";
+    try {
+      fromPic.made = await api("/api/fromimage", Object.assign({}, p.send, { height: Number(picHigh.value) || null, colours: Number(picColours.value) || 16,
+        clear: picCorners.checked ? "edges" : "alpha", clear_at: fromPic.points, outline: picOutline.checked, base: thing.palette }));
+      const m = fromPic.made;
+      paintSprite(picResult, m.pixels, m.palette, Math.max(2, Math.floor(160 / Math.max(m.size[0], m.size[1]))));
+      picNote.textContent = `${fromPic.name}: ${m.source[0]}×${m.source[1]} pixels` + (m.scale > 1 ? `, drawn ${m.scale} times as big` : "") +
+        ` - makes ${m.size[0]}×${m.size[1]} in ${m.colours} colours. Click the picture where it should be clear (its background), as often as it needs.`;
+      picUse.disabled = false;
+    } catch (err) { picNote.textContent = "It cannot be made: " + err.message; picUse.disabled = true; }
+  }
+  function picTake() {
+    const m = fromPic.made;
+    if (!m) return;
+    const drawing = at === 0 ? "the drawing" : `drawing ${at + 1}`;
+    if (cur().join("").replace(/\./g, "") && !confirm(`Replace ${drawing} with this picture?`)) return;
+    const shared = (thing.frames || []).length || thing.walk || thing.attack || thing.lod;    // other drawings use its letters
+    thing.palette = Object.assign({}, shared ? thing.palette : {}, m.palette);
+    if (at === 0) thing.pixels = m.pixels.slice();
+    else {                                                   // another drawing: put it on the sprite's own size, feet down
+      const w = width(), h = thing.pixels.length;
+      const rows = m.pixels.slice(Math.max(0, m.pixels.length - h)).map((r) => {
+        const left = Math.max(0, Math.floor((w - r.length) / 2));
+        return (CLEAR.repeat(left) + r).slice(0, w).padEnd(w, CLEAR);
+      });
+      while (rows.length < h) rows.unshift(CLEAR.repeat(w));
+      thing.frames[at - 1] = rows;
+    }
+    even();
+    coloursOf(thing.palette).then((c) => { colours = c; pen = Object.keys(thing.palette)[0] || CLEAR; changed(); sizes(); frameTabs(); palette(); draw(); farAway(); });
+    status(`The picture is ${drawing} now. Nothing is written until you save.`);
+  }
+  const fromPicture = el("div", {},
+    el("div", { class: "row" }, picFile, el("button", { type: "button", class: "quiet", onclick: () => picFile.click() }, "Choose a picture…"),
+      el("label", {}, "Height ", picHigh), el("label", {}, "Colours ", picColours)),
+    el("div", { class: "row" }, el("label", { class: "tick" }, picCorners, " Clear the background (the commonest colour at its edges)"), el("label", { class: "tick" }, picOutline, " A dark outline")),
+    el("div", { class: "row pic-pair" }, picSource, picResult),
+    el("div", { class: "row" }, picUse, picUndo), picNote);
+
   // ---- a tile: as a level draws it, repeated, or started from one of the engine's
   const where = el("select", { "aria-label": "Shown as", onchange: () => show() },
     ...[["wall", "on the walls"], ["floor", "on the floor"], ["ceiling", "on the ceiling"]].map(([v, l]) => el("option", { value: v }, l)));
@@ -1415,7 +1546,8 @@ function spriteEditor(kind, thing) {
         el("h3", {}, "Paint"), swatches, el("div", { class: "row" }, picker, el("label", { class: "tick" }, tick, " Mirror left and right")),
         el("h3", {}, "Size"), size,
         el("h3", {}, "Drawings"), tabs,
-        el("h3", {}, "Start from the engine's"), el("div", { class: "row" }, engineTile, fromEngine))),
+        el("h3", {}, "Start from the engine's"), el("div", { class: "row" }, engineTile, fromEngine),
+        el("h3", {}, "From a picture"), fromPicture)),
       el("h3", {}, "In a level"), el("div", { class: "row" }, where, play),
       el("div", { class: "banner-preview" }, shown, shownNote),
       el("h3", {}, "Repeated"), repeated,
@@ -1430,7 +1562,8 @@ function spriteEditor(kind, thing) {
       el("h3", {}, "Size"), size,
       el("h3", {}, "Drawings"), tabs,
       el("h3", {}, "Grow one from words"), el("div", { class: "row" }, seed, grow),
-      el("h3", {}, "Grow a monster"), el("div", { class: "row" }, body, tall, growMonster))),
+      el("h3", {}, "Grow a monster"), el("div", { class: "row" }, body, tall, growMonster),
+      el("h3", {}, "From a picture"), fromPicture)),
     el("h3", {}, "As the game draws it"),
     el("div", { class: "banner-preview" }, shown, el("div", { class: "row" }, play), shownNote),
     el("h3", {}, "Far away, in a first-person level"),

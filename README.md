@@ -82,6 +82,7 @@ python clio.py [game] [options]
   --style NAME    default, elegant, minimal, modern, retro, techno, console
   --no-sound      run silently
   --sounds SET    another set of sound effects (rootless: ballistic, which needs Node.js or baked takes)
+  --get-ballistic install Ballistic's C engine for this machine in your data folder (renders without Node.js)
   --no-color      plain text
   --ascii         no box-drawing or block characters
   --glyphs MODE   full, safe (frames stay, symbols become plain) or ascii
@@ -219,7 +220,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 301 tests, under a minute
+python -m unittest discover -s tests     # 306 tests, under a minute
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 python tests/levelbot.py 10              # an automatic player walks Rootless's E1M1 ten times

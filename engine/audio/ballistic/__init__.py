@@ -246,7 +246,8 @@ def find_node(env=None):
 
 def find_clib(env=None):
     """The C engine's library: ``CLIO_BALLISTIC_LIB`` if set (``none`` for none), else one in
-    engine/audio/ballistic/lib/, else ``ballistic`` where the system keeps libraries."""
+    engine/audio/ballistic/lib/ (a build of your own), else the one ``clio.py --get-ballistic`` put in the
+    user's data folder, else ``ballistic`` where the system keeps libraries."""
     env = os.environ if env is None else env
     want = env.get("CLIO_BALLISTIC_LIB")
     if want:
@@ -256,6 +257,10 @@ def find_clib(env=None):
         p = os.path.join(HERE, "lib", name)
         if os.path.isfile(p):
             return p
+    from . import fetch
+    got = fetch.installed(env)
+    if got:
+        return got
     return ctypes.util.find_library("ballistic")
 
 
@@ -823,7 +828,7 @@ class Sounds:
         c = self.clib
         if not c and not self.node:
             return ["Ballistic sounds: neither Node.js nor the C engine found - the game's own sounds play instead "
-                    "(install Node.js, or set CLIO_BALLISTIC_LIB to libballistic)"]
+                    "(python clio.py --get-ballistic installs the C engine; or install Node.js)"]
         if not c and self.broken:
             return ["Ballistic sounds: not working (%s) - the game's own sounds play instead" % self.broken]
         if c:

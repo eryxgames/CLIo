@@ -351,6 +351,8 @@ def main(argv=None):
     ap.add_argument("--no-sound", action="store_true", help="run silently")
     ap.add_argument("--sounds", metavar="SET",
                     help="play another set of sound effects, from the game's sounds.SET.json (also CLIO_SOUNDS)")
+    ap.add_argument("--get-ballistic", action="store_true",
+                    help="download Ballistic Engine's library for this machine into your data folder and exit")
     ap.add_argument("--bake-sounds", metavar="SET",
                     help="render the set's Ballistic sounds into the game as WAV files (needs Node.js) and exit")
     ap.add_argument("--no-color", action="store_true", help="plain text, no colours")
@@ -404,6 +406,9 @@ def main(argv=None):
                 glyphs=args.glyphs)
     if args.looks:
         return looks()
+    if args.get_ballistic:
+        from engine.audio.ballistic import fetch
+        return fetch.get()
     if args.banner:
         return draw_banner(term, args.banner, args.banner_style, args.palette, args.effect, args.export)
     if args.logo:

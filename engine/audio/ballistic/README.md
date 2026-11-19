@@ -10,6 +10,7 @@ world: liquids, doors and machines, heat, fire, footsteps, creature and robot vo
 | `engine.js` | A copy of Ballistic's `src/engine.js`, unchanged: version 0.1.0, commit `3603078` (2026-11-19) |
 | `render.cjs` | Runs the engine in Node.js: a request per line in, an answer per line out, a WAV per take |
 | `__init__.py` | The Python side: which takes are ready, which to play next, rendering in the background, baking |
+| `fetch.py` | `clio.py --get-ballistic`: the C engine's library for this machine, from its release, into the data folder |
 
 How a game uses it is in [docs/AUTHORING.md](../../../docs/AUTHORING.md), under *Sound and music*.
 
@@ -25,8 +26,11 @@ How a game uses it is in [docs/AUTHORING.md](../../../docs/AUTHORING.md), under 
 ## The C engine
 
 [Ballistic Engine](https://github.com/eigensoundlab/ballistic-engine) is the same engine in C, checked against the
-JavaScript sample for sample; its releases have the library built for Linux, macOS, Windows and Android. Where its library is found - `CLIO_BALLISTIC_LIB`, else `lib/` here, else the system's
-library path - `__init__.py` renders through it (ctypes, in the game's process) every kind it has ported, and uses
+JavaScript sample for sample; its releases have the library built for Linux, macOS, Windows and Android.
+`python clio.py --get-ballistic` (`fetch.py`) downloads the release CLIo follows (`fetch.RELEASE`, checked against
+`fetch.SHA256`) into the user's data folder. Where its library is found - `CLIO_BALLISTIC_LIB`, else `lib/` here
+(a build of your own; git ignores it), else the one `--get-ballistic` installed, else the system's library path -
+`__init__.py` renders through it (ctypes, in the game's process) every kind it has ported, and uses
 Node for the rest. It must follow the same Ballistic commit as `engine.js` (`ENGINE_COMMIT`); a library that follows
 another is not used, and the `sound` command says so.
 

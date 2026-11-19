@@ -174,6 +174,11 @@ game, RØØTLESS, shows them.
   has a claw for a weapon, shoves heavy **containers** (`{"crate": "heavy"}`) that the
   player alone cannot move, wades through acid, fits through no door, and bursts when it is
   wrecked. The picture shows its cage and claws. The level bot can `board` and get `out`.
+- **`python clio.py --get-ballistic`**: installs Ballistic's C engine for this machine - the release CLIo
+  follows (0.5.0: Linux x64/arm64, macOS, Windows x64/arm64, Android), checked against the SHA-256 CLIo keeps,
+  only the library with its LICENSE and NOTICE, in the user's data folder (`~/.local/share/clio/ballistic/`,
+  `%APPDATA%\clio\ballistic\`, or `CLIO_DATA`) rather than CLIo's or a game's. CLIo looks for it after
+  `CLIO_BALLISTIC_LIB` and `engine/audio/ballistic/lib/`; `sound` suggests it when no engine is found.
 - **Saving in levels**: `save [name]` (F5), `load [name]` (F9) and `saves` in a first-person
   level. A save is the world as the level began and every line played since; loading
   builds the level again and plays them back unseen (a whole level in about a tenth of a

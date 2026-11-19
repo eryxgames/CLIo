@@ -7,8 +7,8 @@ differs.  Started with ``--edit``, the local server passes each request here.
 Opened from a web address, the page runs Python in the browser itself and calls
 this function directly - there is no server, and the game never leaves the tab.
 """
-from . import (EditorError, advice, archive, balance, check, finish, load, looks, put_texts, save, text_table, texts,
-               views)
+from . import (EditorError, advice, archive, balance, check, finish, levels, load, looks, put_texts, save, text_table,
+               texts, views)
 
 
 class Unknown(EditorError):
@@ -66,6 +66,19 @@ def handle(game_dir, path, body=None):
         return looks.picture(game_dir, str(body.get("name") or ""), pending)
     if path == "/api/banner":                               # a banner of game.json, drawn as the game draws it
         return looks.banner(game_dir, str(body.get("key") or "title_banner"), body.get("width") or 78, pending)
+    if path == "/api/levels":                               # what map characters mean, tiles, monsters and items
+        return levels.info(game_dir, pending)
+    if path == "/api/tile":                                 # one of the engine's tiles, as data to draw over
+        return levels.engine_tile(body.get("name") or "steel")
+    if path == "/api/view":                                 # a level seen from a cell
+        return levels.view(game_dir, str(body.get("level") or ""), body.get("x"), body.get("y"), body.get("facing"),
+                           body.get("style") or "pixel", pending, body.get("width") or 80)
+    if path == "/api/tileview":                             # a tile on the walls (floor, ceiling) of a small room
+        return levels.tile_view(game_dir, str(body.get("name") or ""), body.get("where") or "wall", pending)
+    if path == "/api/weaponview":                           # a weapon in the hands, and one shot of it
+        return levels.weapon_view(game_dir, str(body.get("weapon") or ""), pending)
+    if path == "/api/levelcheck":                           # the level bot plays the level a few times
+        return levels.check(game_dir, str(body.get("level") or ""), pending, body.get("runs") or 5)
     if path == "/api/archive":                              # the whole game folder as a zip file
         return archive(game_dir)
     raise Unknown("Nothing here.")

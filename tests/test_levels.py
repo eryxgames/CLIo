@@ -280,7 +280,108 @@ class PictureTests(unittest.TestCase):
         self.assertFalse(any(m.seen for m in lv.monsters if m.kind == "zombie"))
 
 
+def with_level(lv_spec, tiles=None, weapons=None):
+    """Rootless's data with one more level (and tiles, weapons) in it, as the editor's demo room does."""
+    data = GameData(ROOTLESS)
+    data.levels = dict(data.levels, t=lv_spec)
+    if tiles is not None:
+        data.tiles = dict(data.tiles, **tiles)
+    if weapons is not None:
+        data.weapons = weapons
+    return data
+
+
+SOLID = {"pixels": ["aa", "aa"], "palette": {"a": "#ff0000"}}
+
+
+class TileTests(unittest.TestCase):
+    ROOM = ["#####", "#...#", "#...#", "#.@.#", "#####"]
+
+    def picture(self, data, style="pixel"):
+        lv = Level(data, "t", seed=1)
+        lv.weapons = {}
+        return View(80, 17, style).render(lv, FX(), 0)
+
+    def test_the_engines_tiles_as_data_and_back(self):
+        from engine.firstperson import TEXTURES, tile_data, tile_frames
+        for name in ("steel", "door_x", "hazard", "exit"):
+            self.assertEqual(tile_frames(tile_data(name))[0], TEXTURES[name], name)
+
+    def test_a_games_tile_on_walls_floor_and_ceiling(self):
+        reds = lambda cells: sum(1 for row in cells for c in row for col in c[1:] if col and col[0] > 2 * (col[1] + col[2]) and col[0] > 60)  # noqa: E731
+        plain = reds(self.picture(with_level({"map": self.ROOM})))
+        self.assertEqual(plain, 0)
+        walls = reds(self.picture(with_level({"map": self.ROOM, "legend": {"#": {"wall": "red"}}}, {"red": SOLID})))
+        floor = reds(self.picture(with_level({"map": self.ROOM, "floor": "red"}, {"red": SOLID})))
+        ceiling = reds(self.picture(with_level({"map": self.ROOM, "ceiling": "red"}, {"red": SOLID})))
+        mine = reds(self.picture(with_level({"map": self.ROOM}, {"steel": SOLID})))     # the engine's steel, replaced
+        self.assertTrue(walls > 1000 and floor > 300 and ceiling > 300 and mine > 1000, (walls, floor, ceiling, mine))
+        self.assertGreater(walls, floor)
+
+    def test_clear_pixels_show_what_is_behind(self):
+        bars = {"pixels": ["a.a.", "a.a.", "a.a.", "a.a."], "palette": {"a": "#808080"}}
+        room = ["#####", "#...#", "#=#=#", "#.@.#", "#####"]
+        solid = self.picture(with_level({"map": room, "legend": {"=": {"wall": "steel"}}}))
+        seen = self.picture(with_level({"map": room, "legend": {"=": {"wall": "bars"}}}, {"bars": bars}))
+        self.assertNotEqual(solid, seen)
+        lv = Level(with_level({"map": room, "legend": {"=": {"wall": "bars"}}}, {"bars": bars}), "t")
+        self.assertIn("bars", lv.see_through)
+        self.assertTrue(lv.cell(1, 2).solid)                  # it still stops the player, shots and sight
+
+    def test_tiles_change_a_beat_at_a_time(self):
+        blink = {"pixels": ["a"], "frames": [["b"]], "palette": {"a": "#ff0000", "b": "#0000ff"}}
+        lv = Level(with_level({"map": self.ROOM, "legend": {"#": {"wall": "blink"}}}, {"blink": blink}), "t")
+        self.assertEqual(View.texture(lv, "blink", 0), [[(255, 0, 0)]])
+        self.assertEqual(View.texture(lv, "blink", 1), [[(0, 0, 255)]])
+
+    def test_problems_with_tiles_and_weapons(self):
+        data = with_level({"map": ["#####", "#.@.E", "#####"], "legend": {".": {"floor": "nowhere"}}, "ceiling": "nada"},
+                          {"odd": {"pixels": ["ab"], "palette": {"a": "#fff"}}},
+                          {"9": {"name": "x", "damage": 5, "kind": "laser", "sprite": "w_none"}})
+        said = " | ".join(validate(data))
+        for words in ("unknown tile 'nowhere'", "unknown tile 'nada'", "tile 'odd' uses letters", "damage should be",
+                      "kind should be gun or melee", "no sprite 'w_none'"):
+            self.assertIn(words, said)
+
+    def test_weapons_json_over_game_json(self):
+        data = GameData(ROOTLESS)
+        self.assertNotIn("weapons", data.config["first_person"])
+        lv = Level(data, "e1m1")
+        self.assertEqual(lv.weapons["3"]["pellets"], 7)
+        data.weapons = dict(data.weapons, **{"5": {"name": "nail gun", "ammo": "nails", "damage": [3, 6]}})
+        self.assertEqual(Level(data, "e1m1").weapons["5"]["name"], "nail gun")
+
+    def test_the_bot_finds_an_exit_on_any_wall(self):
+        from engine import levelbot
+        data = with_level({"map": ["#######", "#.....#", "#.@...E", "#######"]})
+        outcome, lv = levelbot.play(data, "t", 1)
+        self.assertEqual(outcome, "exit")
+
+
 class EditorTests(unittest.TestCase):
+    def test_level_pictures_and_checks(self):
+        from engine.editor import service
+        info = service.handle(ROOTLESS, "/api/levels")
+        self.assertTrue(info["tiles"]["grate"]["own"] and not info["tiles"]["steel"]["own"])
+        self.assertEqual(info["things"]["zombie"]["kind"], "monster")
+        self.assertEqual(info["legend"]["~"], {"toxic": True})
+        v = service.handle(ROOTLESS, "/api/view", {"level": "e1m1", "x": 15, "y": 22, "facing": "w"})
+        self.assertEqual((v["cols"], v["lines"], len(v["rows"]), v["facing"], v["inside"]), (80, 17, 17, "w", False))
+        self.assertEqual(sum(len(run[0]) for run in v["rows"][0]), 80)
+        self.assertTrue(service.handle(ROOTLESS, "/api/view", {"level": "e1m1", "x": 0, "y": 0})["inside"])
+        t = service.handle(ROOTLESS, "/api/tileview", {"name": "grate", "where": "floor"})
+        self.assertEqual(len(t["rows"]), 17)
+        w = service.handle(ROOTLESS, "/api/weaponview", {"weapon": "1"})
+        self.assertEqual((len(w["frames"]), w["drawn"]), (4, True))
+        self.assertEqual(len(service.handle(ROOTLESS, "/api/tile", {"name": "steel"})["pixels"]), 32)
+        c = service.handle(ROOTLESS, "/api/levelcheck", {"level": "e1m1", "runs": 1})
+        self.assertEqual((c["runs"], c["secrets"], c["games"][0]["outcome"]), (1, 4, "exit"))
+        from engine import schema
+        self.assertEqual(schema.BY_FILE["levels"]["editor"], "level")
+        self.assertIn("tiles", schema.BY_FILE)
+        self.assertIn("weapons", schema.BY_FILE)
+
+
     def test_monster_far_versions_and_distances(self):
         from engine.editor import service
         made = service.handle(ROOTLESS, "/api/monster", {"seed": "x", "body": "floater", "size": 20})

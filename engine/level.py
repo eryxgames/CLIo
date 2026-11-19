@@ -91,11 +91,13 @@ class StopLine(Exception):
 # --------------------------------------------------------------------------- #
 class Cell:
     __slots__ = ("x", "y", "ch", "kind", "tex", "key", "panel", "toxic", "open", "opens_on", "closes_on",
-                 "on_enter", "sealed", "pressed", "label", "label_role", "secret", "found")
+                 "on_enter", "sealed", "pressed", "label", "label_role", "secret", "found", "floor", "ceiling")
 
     def __init__(self, x, y, ch, spec):
         self.x, self.y, self.ch = x, y, ch
         self.tex = spec.get("wall") or spec.get("texture") or "steel"
+        self.floor = spec.get("floor")                  # tiles under and over this cell, else the level's
+        self.ceiling = spec.get("ceiling")
         self.key = spec.get("key")
         self.panel = spec.get("panel")
         self.toxic = bool(spec.get("toxic"))
@@ -263,7 +265,9 @@ class Level:
         self.rng = random.Random(seed if seed is not None else level_id)
         self.name = spec.get("name", level_id)
         self.par = int(spec.get("par", 0))
-        self.weapons = {str(k): v for k, v in (self.cfg.get("weapons") or WEAPONS).items()}
+        own = {str(k): v for k, v in (getattr(data, "weapons", None) or {}).items() if isinstance(v, dict)}
+        self.weapons = {str(k): v for k, v in (self.cfg.get("weapons") or ({} if own else WEAPONS)).items()}
+        self.weapons.update(own)                         # weapons.json, over game.json's first_person "weapons"
         self.player = Player(player, self.cfg)
         self.monsters, self.items, self.shots, self.decals = [], [], [], []
         self.marks, self.marks_version = {}, 0
@@ -286,6 +290,7 @@ class Level:
         self._ids = 0
         self.parse_map()
         self.load_sprites()
+        self.load_tiles()
         self.update_seen()
 
     # ---- building ------------------------------------------------------- #
@@ -375,6 +380,18 @@ class Level:
             pal = {k: _rgb(v) for k, v in (data.get("palette") or {}).items()}
             far = None if data.get("lod") else far_versions(data["pixels"], data.get("keep", ""))
             self.sprites[name] = Picture.from_data(data, pal, far)
+
+    def load_tiles(self):
+        """The game's own tiles (tiles.json) over the engine's, and the level's floor and ceiling."""
+        from .firstperson import tile_frames
+        self.tiles, self.see_through = {}, set()
+        for name, data in (getattr(self.data, "tiles", None) or {}).items():
+            frames = tile_frames(data) if isinstance(data, dict) else []
+            if frames:
+                self.tiles[name] = frames
+                if any(c is None for f in frames for r in f for c in r):
+                    self.see_through.add(name)
+        self.floor_tile, self.ceiling_tile = self.spec.get("floor"), self.spec.get("ceiling")
 
     # ---- the grid ------------------------------------------------------- #
     def cell(self, x, y):
@@ -1934,10 +1951,38 @@ def validate(data):
         sp = spec.get("sprite") or kind
         if sp not in sprites:
             problems.append("monster '%s': no sprite '%s' in sprites.json" % (kind, sp))
+    from .firstperson import TEXTURES
+    tiles = getattr(data, "tiles", None) or {}
+    for name, t in tiles.items():
+        if not isinstance(t, dict) or not isinstance(t.get("pixels"), list) or not t["pixels"] \
+                or not all(isinstance(r, str) for r in t["pixels"]):
+            problems.append("tile '%s' should have pixels: rows of letters" % name)
+            continue
+        pal = t.get("palette") or {}
+        for d in [t["pixels"]] + [f for f in t.get("frames") or [] if isinstance(f, list)]:
+            odd = sorted(set("".join(r for r in d if isinstance(r, str))) - set(pal) - {"."})
+            if odd:
+                problems.append("tile '%s' uses letters its palette does not have: %s" % (name, " ".join(odd)))
+                break
+    known_tiles = set(TEXTURES) | set(tiles)
+    for wid, w in (getattr(data, "weapons", None) or {}).items():
+        if not isinstance(w, dict):
+            problems.append("weapon '%s' should be an object" % wid)
+            continue
+        if w.get("kind") not in (None, "", "gun", "melee"):
+            problems.append("weapon '%s': kind should be gun or melee, not '%s'" % (wid, w.get("kind")))
+        d = w.get("damage")
+        if d is not None and not (isinstance(d, list) and len(d) == 2 and all(isinstance(v, (int, float)) for v in d)):
+            problems.append("weapon '%s': damage should be [least, most]" % wid)
+        if w.get("sprite") and w["sprite"] not in sprites:
+            problems.append("weapon '%s': no sprite '%s' in sprites.json" % (wid, w["sprite"]))
     for lid, lv in (data.levels or {}).items():
         if not isinstance(lv, dict):
             problems.append("level '%s' should be an object" % lid)
             continue
+        for key in ("floor", "ceiling"):
+            if lv.get(key) and lv[key] not in known_tiles:
+                problems.append("level '%s': its %s is an unknown tile '%s'" % (lid, key, lv[key]))
         rows = lv.get("map")
         if not isinstance(rows, list) or not rows or not all(isinstance(r, str) for r in rows):
             problems.append("level '%s': map should be a list of rows of text" % lid)
@@ -1965,4 +2010,7 @@ def validate(data):
                 problems.append("level '%s': '%s' is an unknown monster '%s'" % (lid, ch, spec["monster"]))
             if spec.get("item") and spec["item"] not in items:
                 problems.append("level '%s': '%s' is an unknown item '%s'" % (lid, ch, spec["item"]))
+            for key in ("wall", "texture", "floor", "ceiling"):
+                if spec.get(key) and spec[key] not in known_tiles:
+                    problems.append("level '%s': '%s' has an unknown tile '%s'" % (lid, ch, spec[key]))
     return problems

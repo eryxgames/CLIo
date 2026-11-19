@@ -15,14 +15,15 @@ A kind has a ``shape``:
 A field has a ``type``: ``text``, ``long`` (several lines), ``number``,
 ``bool``, ``choice`` (one of ``options``), ``tags`` (a list of words), ``ref``
 (the id of a thing of kind ``of``), ``refs`` (a list of such ids), ``sprite``
-(the name of a pixel sprite, or ``auto``).  Four types hold fields of their
+(the name of a pixel sprite, or ``auto``), ``range`` (two numbers, least and
+most: a weapon's damage).  Four types hold fields of their
 own, in ``fields``: ``group`` (an object: stats), ``banner`` (a group that is
 also drawn, as the game would draw it: title banners), ``rows`` (a list of
 objects: exits, moves, quest stages) and ``map`` (objects by name: dialogue
 nodes, item states).  ``effects`` is what happens (the lists under ``do``) and
 ``condition`` what is asked (``if``), built from the vocabularies ``EFFECTS``
 and ``CONDITIONS`` below.  Anything else is edited as JSON.  A kind with ``"editor"`` gets a
-tool of its own in the page (``sprite``: the pixel editor).
+tool of its own in the page (``sprite``: the pixel editor; ``level``: the map painter).
 """
 
 from . import banner as _banner, fx as _fx, pixels as _pixels
@@ -226,10 +227,21 @@ KINDS = [
                 F("effect", "choice", "Animation when it is shown", options=list(_fx.NAMES)),
                 F("fps", "number", "Drawings a second"), F("loops", "number", "Times the drawings play")]},
     {"key": "dungeon", "file": "dungeon", "label": "Dungeon", "one": "dungeon", "shape": "object", "fields": []},
-    {"key": "levels", "file": "levels", "label": "Levels", "one": "level", "shape": "map", "title": "name", "fields": [
+    {"key": "levels", "file": "levels", "label": "Levels", "one": "level", "shape": "map", "title": "name",
+     "editor": "level", "fields": [
         F("name"), F("title", label="Title shown when it starts"), F("par", "number", "Par (beats)"),
         F("music", "ref", of="music"), F("facing", "choice", "The player starts facing", options=["n", "e", "s", "w"]),
         R("death_text", "ref", "Text when the player dies", of="texts")]},
+    {"key": "tiles", "file": "tiles", "label": "Tiles", "one": "tile", "shape": "map", "editor": "sprite", "fields": []},
+    {"key": "weapons", "file": "weapons", "label": "Weapons", "one": "weapon", "shape": "map", "title": "name",
+     "editor": "weapon", "fields": [
+        F("name"), F("kind", "choice", "Kind", options=["gun", "melee"]),
+        F("ammo", label="Ammunition it uses (bullets, shells...; none for a fist)"),
+        F("damage", "range", "Damage, least to most"), F("sprite", "sprite", "Sprite in the player's hands"),
+        F("sound", label="Sound of a shot"), F("text", label="A shot in words (BANG.)"),
+        R("pellets", "number", "Pellets a shot (a shotgun: 7)"),
+        R("spread", "number", "How far the pellets spread to monsters beside (0 to 1)"),
+        R("burst", "number", "Rounds fired a beat (a chaingun: 2)")]},
     {"key": "monsters", "file": "monsters", "label": "Monsters", "one": "monster", "shape": "map", "title": "name",
      "fields": [
         F("name"), F("role"), F("tag", label="Tag letter (z: z1, z2...)"), F("sprite", "sprite", "Sprite"),

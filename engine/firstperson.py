@@ -215,6 +215,44 @@ def _make_textures():
 
 
 TEXTURES = _make_textures()
+TILE_LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+
+def tile_frames(data):
+    """A game's tile (tiles.json: ``pixels``, ``palette``, ``frames`` - the sprites' format, any size) as
+    drawings of colours, one for each frame; ``None`` is clear (what is behind the wall shows through)."""
+    from .sprite import _rgb
+    pal = {k: _rgb(v) for k, v in (data.get("palette") or {}).items()}
+    out = []
+    for drawing in [data.get("pixels") or []] + list(data.get("frames") or []):
+        rows = [[pal.get(ch) for ch in r] for r in drawing if isinstance(r, str)]
+        w = max((len(r) for r in rows), default=0)
+        if rows and w:
+            out.append([r + [None] * (w - len(r)) for r in rows])
+    return out
+
+
+def tile_data(name):
+    """One of the engine's own tiles as tiles.json data (letters and a palette), or None: to draw over."""
+    rows = TEXTURES.get(name)
+    if rows is None:
+        return None
+    letters, pixels = {}, []
+    for r in rows:
+        line = ""
+        for c in r:
+            if c not in letters:
+                if len(letters) < len(TILE_LETTERS):
+                    letters[c] = TILE_LETTERS[len(letters)]
+                else:                                    # more colours than letters: the nearest one already named
+                    near = min(letters, key=lambda k: sum((a - b) ** 2 for a, b in zip(k, c)))
+                    letters[c] = letters[near]
+            line += letters[c]
+        pixels.append(line)
+    palette = {}
+    for c, ch in letters.items():
+        palette.setdefault(ch, "#%02x%02x%02x" % tuple(c))
+    return {"pixels": pixels, "palette": palette}
 
 FLOOR_A, FLOOR_B, FLOOR_LINE = (68, 61, 53), (58, 53, 47), (94, 86, 72)
 CEIL, CEIL_LINE, LIGHT = (30, 30, 36), (24, 24, 29), (168, 162, 122)
@@ -268,6 +306,14 @@ class View:
     def X(self, a, z):
         return self.half + a * self.LW * DECAY ** z
 
+    @staticmethod
+    def texture(lv, name, phase=0):
+        """The drawing of a tile: the game's own (tiles.json, a frame a beat), else the engine's."""
+        frames = (getattr(lv, "tiles", None) or {}).get(name)
+        if not frames:
+            return TEXTURES.get(name) or TEXTURES["steel"]
+        return frames[phase % len(frames)]
+
     # ---- the room ------------------------------------------------------- #
     def backdrop(self, lv, cx, cy, f, phase):
         key = (round(cx, 3), round(cy, 3), f, phase, lv.marks_version)
@@ -282,6 +328,16 @@ class View:
         fx, fy = DIRS[f]
         rx, ry = DIRS[(f + 1) % 4]
         PW, PH = self.PW, self.PH
+        floor_tile, ceiling_tile = getattr(lv, "floor_tile", None), getattr(lv, "ceiling_tile", None)
+        drawings = {}
+
+        def sample(name, ux, uy):                            # a floor or ceiling tile, fixed to the world
+            tex = drawings.get(name)
+            if tex is None:
+                tex = drawings[name] = self.texture(lv, name, phase)
+            th, tw = len(tex), len(tex[0])
+            return tex[min(th - 1, int((uy + 0.5) * th))][min(tw - 1, int((ux + 0.5) * tw))]
+
         out = []
         for y in range(PH):
             if y >= self.yh:
@@ -297,16 +353,21 @@ class View:
                 wx, wy = cx + fx * z + rx * a, cy + fy * z + ry * a
                 ix, iy = int(math.floor(wx + 0.5)), int(math.floor(wy + 0.5))
                 ux, uy = wx - ix, wy - iy
+                cell = lv.cell(ix, iy)
                 if floor:
                     mark = lv.marks.get((ix, iy))
-                    cell = lv.cell(ix, iy)
-                    if cell is not None and cell.toxic:
+                    tile = None
+                    if cell is not None:
+                        tile = getattr(cell, "floor", None) or (None if cell.toxic else floor_tile)
+                    c = sample(tile, ux, uy) if tile else None
+                    if c is None and cell is not None and cell.toxic:
                         c = TOXIC_HI if noise(int(ux * 8) + ix * 8, int(uy * 8) + iy * 8, phase) < 0.07 else TOXIC
                         row[x] = shade(c, 0.45 + 0.55 * fog)
                         continue
-                    c = FLOOR_A if (ix + iy) & 1 else FLOOR_B
-                    if abs(ux) > 0.46 or abs(uy) > 0.46:
-                        c = FLOOR_LINE
+                    if c is None:
+                        c = FLOOR_A if (ix + iy) & 1 else FLOOR_B
+                        if abs(ux) > 0.46 or abs(uy) > 0.46:
+                            c = FLOOR_LINE
                     if mark == "warn":                   # fire is scheduled here: hatched and glowing
                         hatch = int((ux + uy + 1.0) * 6) % 2 == 0
                         c = mix(c, (255, 90, 30) if hatch else (150, 30, 20), 0.55 + 0.2 * (phase % 2))
@@ -319,11 +380,14 @@ class View:
                         continue
                     row[x] = shade(c, fog)
                 else:
-                    c = CEIL
-                    if abs(ux) > 0.47 or abs(uy) > 0.47:
-                        c = CEIL_LINE
-                    elif (ix * 7 + iy * 3) % 4 == 0 and abs(ux) < 0.24 and abs(uy) < 0.24:
-                        c = LIGHT
+                    tile = (getattr(cell, "ceiling", None) if cell is not None else None) or ceiling_tile
+                    c = sample(tile, ux, uy) if tile else None
+                    if c is None:
+                        c = CEIL
+                        if abs(ux) > 0.47 or abs(uy) > 0.47:
+                            c = CEIL_LINE
+                        elif (ix * 7 + iy * 3) % 4 == 0 and abs(ux) < 0.24 and abs(uy) < 0.24:
+                            c = LIGHT
                     row[x] = shade(c, fog)
             out.append(row)
         return out
@@ -387,13 +451,16 @@ class View:
             return
         fog = 0.18 + 0.82 * min(1.0, t) ** 0.75
         tw, th = x1 - x0, y1 - y0
-        us = [min(TS - 1, int((x + 0.5 - x0) / tw * TS)) for x in range(X0, X1)]
+        TH, TW = len(tex), len(tex[0])
+        us = [min(TW - 1, int((x + 0.5 - x0) / tw * TW)) for x in range(X0, X1)]
         for y in range(Y0, Y1):
             v = (y + 0.5 - y0) / th + opened
-            trow = tex[min(TS - 1, max(0, int(v * TS)))]
+            trow = tex[min(TH - 1, max(0, int(v * TH)))]
             row = px[y]
             for i, x in enumerate(range(X0, X1)):
-                row[x] = shade(trow[us[i]], fog)
+                c = trow[us[i]]
+                if c is not None:
+                    row[x] = shade(c, fog)
         self._mark_cover(X0, X1, Y0, Y1, z - 0.5)
         return (x0 + x1) / 2, y0, y1, t
 
@@ -412,13 +479,14 @@ class View:
         lo, hi = (xa, xb) if xa < xb else (xb, xa)
         X0, X1 = max(0, int(math.ceil(lo - 0.5))), min(self.PW, int(math.ceil(hi - 0.5)))
         span = edge * self.LW
+        TH, TW = len(tex), len(tex[0])
         for x in range(X0, X1):
             t = (x + 0.5 - self.half) / span
             if t <= 0:
                 continue
             zc = math.log(t) / LN
             v = zc - (z - 0.5)
-            u = int(v * TS) % TS if v < 0 else min(TS - 1, int(v * TS))
+            u = int(v * TW) % TW if v < 0 else min(TW - 1, int(v * TW))
             y0, y1 = self.yh - self.CH * t, self.yh + self.FS * t
             Y0, Y1 = max(0, int(math.ceil(y0 - 0.5))), min(self.PH, int(math.ceil(y1 - 0.5)))
             if opened:
@@ -427,7 +495,9 @@ class View:
             th = y1 - y0
             for y in range(Y0, Y1):
                 v = (y + 0.5 - y0) / th + opened
-                px[y][x] = shade(tex[min(TS - 1, max(0, int(v * TS)))][u], fog)
+                c = tex[min(TH - 1, max(0, int(v * TH)))][u]
+                if c is not None:
+                    px[y][x] = shade(c, fog)
             self._mark_cover(x, x + 1, Y0, Y1, zc)
 
     # ---- one picture ---------------------------------------------------- #
@@ -489,19 +559,21 @@ class View:
                 items.append((z - 0.01, 5, 0, "boom", (a, k)))
         items.sort(key=lambda it: (-it[0], it[1], it[2]))
 
+        see_through = getattr(lv, "see_through", ())
+
         def solid(x, y):                                     # a face turned to this cell cannot be seen
             c = lv.cell(x, y)
             if c is None:
                 return True
             if c.kind == "door":
-                return fx.doors.get((x, y), c.open) <= 0.0
-            return c.drawn_as_wall()
+                return fx.doors.get((x, y), c.open) <= 0.0 and c.texture() not in see_through
+            return c.drawn_as_wall() and c.texture() not in see_through
 
         for z, _o, _a, kind, obj in items:
             if kind == "wall":
                 cell, a, x, y = obj
                 opened = fx.doors.get((x, y), cell.open if cell.kind == "door" else 0.0)
-                tex = TEXTURES.get(cell.texture(), TEXTURES["steel"])
+                tex = self.texture(lv, cell.texture(), phase)
                 if abs(a) > 0.02:
                     k = 1 if a > 0 else -1
                     if not solid(x - k * rx, y - k * ry):

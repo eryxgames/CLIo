@@ -373,7 +373,8 @@ def main(argv=None):
             print("%s: %d scenes, %d items, %d characters, %d dialogues, %d quests%s"
                   % (data.title, len(data.scenes), len(data.items), len(data.characters),
                      len(data.dialogues), len(data.quests),
-                     (", %d levels, %d monsters" % (len(data.levels), len(data.monsters))) if data.levels else ""))
+                     (", %d levels, %d monsters, %d weapons, %d tiles" % (len(data.levels), len(data.monsters), len(data.weapons),
+                                                                         len(data.tiles))) if data.levels else ""))
             for p in problems:
                 print("  ! " + p)
             print("OK" if not problems else "%d problem(s)" % len(problems))

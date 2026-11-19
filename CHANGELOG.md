@@ -45,19 +45,30 @@ game, RØØTLESS, shows them.
   colours). The engine makes them when a level starts; a sprite can have its own.
 - **Monsters grown on a body plan**: `sprite.monster(seed, body, size)` - biped, beast,
   floater, crawler, brute - with eyes kept in the far versions.
-- **The editor**: Levels and Monsters are listed like everything else. Under Sprites,
-  *Grow a monster* grows one on a body plan, and *Far away, in a first-person level* shows
-  the sprite one to six cells away, keeps its far versions to paint over them pixel by
-  pixel, makes them again, or leaves them to the game.
+- **Tiles** (`tiles.json`): the walls, floors and ceilings of levels drawn from a game's own
+  pictures, in the sprites' format and of any size; a tile named like one of the engine's
+  takes its place; `frames` change a beat at a time; clear pixels show what is behind a
+  wall. A level's `"floor"` and `"ceiling"`, and a legend entry's, lay them.
+- **Weapons** in their own file, `weapons.json` (over `first_person` in game.json).
+- **The editor**: *Levels* opens a map painter - the map in its tiles with the monsters
+  and items drawn, a palette of the level's characters and the engine's, what each one
+  means made with a form (walls and their tiles, doors and keys, secrets, monsters,
+  items, events), the level seen from any cell and walked through, and the level bot
+  playing it five times. *Tiles* are painted like sprites, from the engine's own if you
+  like, and seen in a small room on walls, floor or ceiling. *Weapons* have a form and
+  are shown in the player's hands, firing. Under Sprites, *Grow a monster* grows one on a
+  body plan, and *Far away, in a first-person level* shows the sprite one to six cells
+  away, keeps its far versions to paint over them pixel by pixel, makes them again, or
+  leaves them to the game.
 - **RØØTLESS** (`games/rootless`), the third demo game: E1M1 *Boot Sector*, a first-person
   level with zombie processes, orphans, daemons, a spawner, barrels, four secrets (one of
   them hazmat boots), an acid vat with ring-0 armour across it, a locked arena and Cron,
   who rains fire on a schedule and escapes to be the final boss of the whole game (the
-  flag `cron_escaped`). Its own riff, sounds and 26 sprites.
+  flag `cron_escaped`). Its own riff, sounds, 26 sprites and a tile.
 - `--view STYLE`, `--lines` (every command typed, no single keys), `--scroll`.
   `--check` also counts levels and monsters, and checks their maps and references.
-- `tests/levelbot.py`: a simple player that walks a level by its `"bot"` goals - if it can
-  finish, a person can. 28 more tests.
+- `engine/levelbot.py`: a simple player that walks a level by its `"bot"` goals - if it can
+  finish, a person can (`python tests/levelbot.py`, and in the editor). 39 more tests.
 - **Sound sets** (`sounds.NAME.json`): other sets of sound effects over a game's own, chosen
   with `--sounds NAME`, `CLIO_SOUNDS`, `"sound_set"` in game.json, or `sound set NAME` while
   playing (in levels too).

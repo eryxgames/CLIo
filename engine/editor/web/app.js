@@ -198,6 +198,7 @@ function fits(f, value) {
   if (f.type === "bool") return typeof value === "boolean";
   if (f.type === "tags" || f.type === "refs") return Array.isArray(value) && value.every((v) => typeof v === "string");
   if (f.type === "sprite") return typeof value === "string";
+  if (f.type === "range") return Array.isArray(value) && value.length === 2 && value.every((v) => typeof v === "number");
   if (f.type === "effects") return Array.isArray(value) || isObject(value);
   if (f.type === "condition") return typeof value === "string" || Array.isArray(value) || isObject(value);
   if (f.type === "group" || f.type === "banner") return isObject(value);
@@ -535,6 +536,12 @@ function control(kind, f, thing, path) {
       known ? null : el("option", { value: String(value), selected: true }, `${value} (not found)`));
   }
   if (f.type === "sprite") return spriteField(kind, f, thing, change);
+  if (f.type === "range") {
+    const pair = Array.isArray(value) ? value.slice() : [0, 0];
+    const num = (i, label) => el("input", { type: "number", step: "any", class: "short", "aria-label": label, value: Array.isArray(value) ? String(pair[i]) : "",
+      oninput: (e) => { pair[i] = Number(e.target.value) || 0; change(pair.slice()); } });
+    return el("span", { class: "pair" }, num(0, "Least"), " to ", num(1, "Most"));
+  }
   if (f.type === "refs") {
     const list = Array.isArray(value) ? value : [];
     const all = idsOf(f.of);
@@ -570,7 +577,9 @@ function renderForm() {
     && (thing.palette === undefined || (thing.palette && typeof thing.palette === "object" && !Array.isArray(thing.palette)))
     && (thing.frames === undefined || (Array.isArray(thing.frames) && thing.frames.every(rowsOk)))
     && (thing.lod === undefined || (Array.isArray(thing.lod) && thing.lod.every((l) => l && rowsOk(l.pixels) && l.pixels.length)));
-  const known = new Set(fields.map((f) => f.key).concat(kind.shape === "list" ? ["id"] : [], drawn ? ["palette", "pixels", "frames", "lod", "keep"] : []));
+  const mapped = kind.editor === "level" && (thing.map === undefined || rowsOk(thing.map)) && (thing.legend === undefined || isObject(thing.legend));
+  const known = new Set(fields.map((f) => f.key).concat(kind.shape === "list" ? ["id"] : [], drawn ? ["palette", "pixels", "frames", "lod", "keep"] : [],
+    mapped ? ["map", "legend", "events", "bot", "floor", "ceiling"] : []));
   const parts = [];
 
   const head = el("div", { class: "head" }, el("h2", {}, single ? kind.label : titleOf(kind, hit)));
@@ -600,10 +609,13 @@ function renderForm() {
   for (const f of laid.now) parts.push(field(f.label, control(kind, f, thing)));
   if (laid.more) parts.push(laid.more);
   if (drawn) parts.push(spriteEditor(kind, thing));
+  if (mapped) parts.push(levelEditor(kind, thing, hit.id));
+  if (kind.editor === "weapon") parts.push(weaponSheet(kind, thing, hit.id));
 
   // everything the schema does not describe is still here, as JSON
   const rest = restArea(kind, thing, known, kind.fields.length || drawn ? "" : "This kind has no form yet: edit it as JSON.");
   parts.push(field(kind.fields.length || drawn ? "Everything else" : "Content", rest.area, rest.note));
+  if (mapped && rest.empty) parts[parts.length - 1].hidden = true;
 
   if (!single) {
     const places = uses(hit.id);
@@ -1014,13 +1026,17 @@ function bannerField(kind, f, thing, path) {
 
 // Drawing a sprite: a grid of palette letters, painted with the mouse (or the arrow keys and Space).
 function spriteEditor(kind, thing) {
-  if (!Array.isArray(thing.pixels)) thing.pixels = Array(12).fill(CLEAR.repeat(12));
+  const tile = kind.key === "tiles";                         // a wall, floor or ceiling of a first-person level
+  if (!Array.isArray(thing.pixels)) {
+    thing.pixels = tile ? Array(32).fill("a".repeat(32)) : Array(12).fill(CLEAR.repeat(12));
+    if (tile && !isObject(thing.palette)) thing.palette = { a: "#3a3e48" };
+  }
   if (!thing.palette || typeof thing.palette !== "object") thing.palette = {};
   if (thing.frames !== undefined && !Array.isArray(thing.frames)) delete thing.frames;
   const MAX = 64;
   let colours = {};
   let pen = Object.keys(thing.palette)[0] || CLEAR;
-  let mirror = true, cursor = [0, 0], painting = false, at = 0, drawn = null, timer = null, wait = null, farWait = null;
+  let mirror = !tile, cursor = [0, 0], painting = false, at = 0, drawn = null, timer = null, wait = null, farWait = null;
   // drawing 0 is "pixels"; the others are "frames", played in turn after it
   const all = () => [thing.pixels].concat(thing.frames || []);
   const cur = () => all()[at] || thing.pixels;
@@ -1061,6 +1077,7 @@ function spriteEditor(kind, thing) {
   // the sprite as the engine draws it, in its style: asked again a moment after each change
   async function show() {
     clearTimeout(timer);
+    if (tile) return tileShow();
     try { drawn = await api("/api/picture", { pending: pending(), name: state.id }); } catch (err) { shownNote.textContent = "It cannot be drawn: " + err.message; return; }
     const [w, h] = drawn.size;
     paintCells(shown, drawn.rows, w + 4, h + 2);
@@ -1073,6 +1090,15 @@ function spriteEditor(kind, thing) {
   function animate() {
     if (!drawn || !drawn.frames.length) return;
     clearTimeout(timer);
+    if (tile) {                                                // a tile's drawings change a beat at a time
+      let k = 0;
+      const beat = () => {
+        if (k >= drawn.frames.length) { paintCells(shown, drawn.rows, drawn.cols, drawn.lines); return; }
+        paintCells(shown, drawn.frames[k++], drawn.cols, drawn.lines);
+        timer = setTimeout(beat, 400);
+      };
+      return beat();
+    }
     const [w, h] = drawn.size;
     let i = 0;
     const step = () => {
@@ -1173,7 +1199,7 @@ function spriteEditor(kind, thing) {
       changed(); sizes(); frameTabs(); palette(); draw();
     } catch (err) { status("Could not grow a sprite: " + err.message, true); }
   } }, "Grow");
-  const tick = el("input", { type: "checkbox", checked: true, onchange: (e) => { mirror = e.target.checked; } });
+  const tick = el("input", { type: "checkbox", checked: mirror, onchange: (e) => { mirror = e.target.checked; } });
 
   // ---- a monster grown on a body plan, and how it looks far away in a first-person level
   const body = el("select", { "aria-label": "Body plan" }, ...["biped", "beast", "floater", "crawler", "brute"].map((b) => el("option", { value: b }, b)));
@@ -1197,8 +1223,45 @@ function spriteEditor(kind, thing) {
     oninput: (e) => { if (e.target.value.trim()) thing.keep = e.target.value.trim(); else delete thing.keep; changed(); } });
   const farBox = el("div", { class: "far" });
   const farNote = el("p", { class: "note" });
-  function farLater() { clearTimeout(farWait); farWait = setTimeout(farAway, 400); }
+  function farLater() { if (!tile) { clearTimeout(farWait); farWait = setTimeout(farAway, 400); } }
+
+  // ---- a tile: as a level draws it, repeated, or started from one of the engine's
+  const where = el("select", { "aria-label": "Shown as", onchange: () => show() },
+    ...[["wall", "on the walls"], ["floor", "on the floor"], ["ceiling", "on the ceiling"]].map(([v, l]) => el("option", { value: v }, l)));
+  const repeated = el("canvas", { class: "sprite-small", role: "img", "aria-label": "The tile repeated" });
+  const engineTile = el("select", { "aria-label": "One of the engine's tiles" });
+  if (tile) {
+    levelsInfo(true).then((info) => {
+      engineTile.replaceChildren(...Object.keys(info.tiles).filter((t) => !info.tiles[t].own || info.tiles[t].engine).sort()
+        .map((t) => el("option", { value: t, selected: t === state.id }, t)));
+    }).catch(() => {});
+  }
+  const fromEngine = el("button", { type: "button", class: "quiet", onclick: async () => {
+    if (!confirm(`Replace this drawing (and its colours) with the engine's "${engineTile.value}"?`)) return;
+    try {
+      const made = await api("/api/tile", { name: engineTile.value });
+      thing.palette = made.palette; thing.pixels = made.pixels; colours = Object.assign({}, made.palette);
+      delete thing.frames;
+      at = 0;
+      pen = Object.keys(thing.palette)[0] || CLEAR;
+      changed(); sizes(); frameTabs(); palette(); draw();
+    } catch (err) { status("Could not copy the tile: " + err.message, true); }
+  } }, "Draw over it");
+  async function tileShow() {
+    try { drawn = await api("/api/tileview", { pending: pending(), name: state.id, where: where.value }); }
+    catch (err) { shownNote.textContent = "It cannot be drawn: " + err.message; return; }
+    paintCells(shown, drawn.rows, drawn.cols, drawn.lines);
+    const frames = (thing.frames || []).length;
+    shownNote.textContent = `${width()}×${thing.pixels.length} pixels, in a small room ${where.value === "wall" ? "on every wall" : "on every " + where.value} cell` +
+      (frames ? `; ${frames + 1} drawings, one a beat` : "") + ".";
+    play.disabled = !drawn.frames.length;
+    const w = width(), h = thing.pixels.length, rows = [];
+    for (let y = 0; y < h * 2; y++) rows.push(thing.pixels[y % h].repeat(3));
+    paintSprite(repeated, rows, colours, Math.max(2, Math.floor((6 * 16) / Math.max(w, h))), "#0f1724");
+  }
+
   async function farAway() {
+    if (tile) return;
     let res;
     try { res = await api("/api/distances", { sprite: { pixels: thing.pixels, palette: colours, lod: thing.lod, keep: thing.keep } }); }
     catch (err) { farNote.textContent = "It cannot be drawn: " + err.message; return; }
@@ -1253,6 +1316,21 @@ function spriteEditor(kind, thing) {
     const form = grid.closest(".sheet") && grid.closest(".sheet").parentElement;
     if (form) { form.addEventListener("change", (e) => { if (!grid.contains(e.target)) later(); }); form.addEventListener("input", (e) => { if (e.target.type === "number") later(); }); }
   }, 0);
+  if (tile) {
+    return el("div", { class: "sheet sprite" },
+      el("div", { class: "sprite-row" }, grid, el("div", {},
+        el("h3", {}, "Paint"), swatches, el("div", { class: "row" }, picker, el("label", { class: "tick" }, tick, " Mirror left and right")),
+        el("h3", {}, "Size"), size,
+        el("h3", {}, "Drawings"), tabs,
+        el("h3", {}, "Start from the engine's"), el("div", { class: "row" }, engineTile, fromEngine))),
+      el("h3", {}, "In a level"), el("div", { class: "row" }, where, play),
+      el("div", { class: "banner-preview" }, shown, shownNote),
+      el("h3", {}, "Repeated"), repeated,
+      el("p", { class: "note" }, "Click or drag to paint, right button to rub out. A tile is drawn on a cell's face whatever its size (32×32 is the engine's). " +
+        `Use it in a level's legend: {"wall": "${state.id || "name"}"}, {"floor": ...} or {"ceiling": ...}, or as the floor or ceiling of a whole level. ` +
+        "A tile named like one of the engine's (steel, screens, hazard, door, door_x, sealed, exit, fist, shoot...) takes its place everywhere. " +
+        "Rubbed-out pixels show what is behind a wall (bars, windows); the wall still stops shots and sight. More drawings change one a beat."));
+  }
   return el("div", { class: "sheet sprite" },
     el("div", { class: "sprite-row" }, grid, el("div", {},
       el("h3", {}, "Paint"), swatches, el("div", { class: "row" }, picker, el("label", { class: "tick" }, tick, " Mirror left and right")),
@@ -1269,6 +1347,454 @@ function spriteEditor(kind, thing) {
       "More drawings play in turn after the first (how fast is set above); the one before shows faintly while you draw. " +
       `Use it as a picture anywhere art goes: "art": "${state.id || "name"}" in a scene or an item, "portrait" on a character, or name it "title" for the title screen; ` +
       "an enemy fights with it as its \"sprite\"."));
+}
+
+// ---------------------------------------------------------------------- first-person levels: the map painter
+// A level's map is rows of characters. What a character means comes from the level's legend, else from the engine's
+// (sent by /api/levels, with small pictures of the tiles and of the monsters' and items' sprites). The picture of the
+// level from any cell, and the level bot's play, come from the engine itself.
+let levelInfo = null;
+const levelUi = {};                                            // per level: pen, tool, the cell looked from, style
+const artCache = new Map();
+async function levelsInfo(fresh) {
+  if (!levelInfo || fresh) { levelInfo = await api("/api/levels", { pending: pending() }); artCache.clear(); }
+  return levelInfo;
+}
+const STEPS = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] };
+const TURN = "nesw";
+const FREE_CHARS = "abcdefghijklmnopqrstuvwxyzABCDFGHIJKLMNOQTUVYZ0123456789!$&*:;?^_|<>/";
+
+function specOf(thing, info, ch) {
+  const legend = isObject(thing.legend) ? thing.legend : {};
+  let spec = ch in legend ? legend[ch] : info.legend[ch];
+  if (spec === undefined || spec === null) return null;
+  if (typeof spec === "string") spec = info.things[spec] && info.things[spec].kind === "monster" ? { monster: spec } : { item: spec };
+  return isObject(spec) ? spec : null;
+}
+
+function sortOf(spec) {
+  if (!spec) return "unknown";
+  if (spec.monster) return "monster";
+  if (spec.item) return "item";
+  if (spec.start) return "start";
+  if (spec.exit) return "exit";
+  if (spec.door) return "door";
+  if (spec.panel) return "panel";
+  if (spec.toxic) return "toxic";
+  if (spec.wall || spec.texture || spec.opens_on) return "wall";
+  return "floor";
+}
+const SORTS = [["floor", "Floor"], ["toxic", "Toxic floor"], ["wall", "Wall"], ["door", "Door"], ["panel", "Secret wall"],
+  ["monster", "Monster"], ["item", "Item"], ["start", "Start"], ["exit", "Exit switch"]];
+const solidSort = (k) => ["wall", "panel", "exit", "unknown"].includes(k);
+
+function tileOf(spec) {                                        // the tile a wall-like cell is drawn with
+  const k = sortOf(spec);
+  if (k === "door") return spec.sealed || (spec.opens_on && !spec.key) ? "sealed" : spec.key ? "door_" + spec.key : "door";
+  if (k === "panel") return spec.panel === "shoot" ? "shoot" : "fist";
+  if (k === "exit") return "exit";
+  if (k === "wall") return spec.wall || spec.texture || "steel";
+  return null;
+}
+
+function describe(spec, info) {
+  if (!spec) return "not explained: add it to the legend";
+  const name = (id) => (info.things[id] ? info.things[id].name : `${id} (not found)`);
+  const k = sortOf(spec);
+  const what = {
+    monster: () => name(spec.monster) + (info.things[spec.monster] && info.things[spec.monster].boss ? " (boss)" : ""),
+    item: () => name(spec.item), start: () => "where the player starts", exit: () => "the exit switch",
+    door: () => (spec.key ? `door: needs the ${spec.key} key` : spec.sealed || spec.opens_on ? "sealed door" : "door") + (spec.open ? ", open" : ""),
+    panel: () => (spec.panel === "shoot" ? "dented vent: shoot it (secret)" : "hollow wall: punch it (secret)"),
+    toxic: () => "toxic floor", wall: () => `wall: ${spec.wall || spec.texture || "steel"}`, floor: () => "floor",
+  }[k]();
+  const more = [];
+  if (spec.on_enter) more.push(`sets off ${spec.on_enter}`);
+  if (spec.on_pickup) more.push(`taken: sets off ${spec.on_pickup}`);
+  if (spec.wake_on) more.push(`wakes on ${spec.wake_on}`);
+  if (spec.awake) more.push("awake");
+  if (spec.opens_on && k !== "door") more.push(`opens on ${spec.opens_on}`);
+  if (spec.opens_on && k === "door") more.push(`opens on ${spec.opens_on}`);
+  if (spec.closes_on) more.push(`shuts on ${spec.closes_on}`);
+  if (spec.floor) more.push(`floor ${spec.floor}`);
+  if (spec.ceiling) more.push(`ceiling ${spec.ceiling}`);
+  return what + (more.length ? "; " + more.join(", ") : "");
+}
+
+function tileArt(info, name, size) {
+  const key = `t/${name}/${size}`;
+  if (artCache.has(key)) return artCache.get(key);
+  const t = info.tiles[name] || info.tiles.steel;
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const g = c.getContext("2d");
+  const n = t.thumb.length || 1;
+  t.thumb.forEach((row, y) => row.forEach((col, x) => {
+    if (col) { g.fillStyle = col; g.fillRect(Math.floor((x * size) / n), Math.floor((y * size) / n), Math.ceil(size / n), Math.ceil(size / n)); }
+  }));
+  artCache.set(key, c);
+  return c;
+}
+
+function thingArt(info, id, size) {
+  const key = `s/${id}/${size}`;
+  if (artCache.has(key)) return artCache.get(key);
+  const t = info.things[id];
+  let c = null;
+  if (t && t.picture && t.picture.length) {
+    const h = t.picture.length, w = Math.max(...t.picture.map((r) => r.length));
+    const k = Math.min((size - 2) / h, (size - 2) / w);
+    c = document.createElement("canvas");
+    c.width = c.height = size;
+    const g = c.getContext("2d");
+    const ox = (size - w * k) / 2, oy = size - 1 - h * k;
+    t.picture.forEach((row, y) => row.forEach((col, x) => {
+      if (col) { g.fillStyle = col; g.fillRect(ox + x * k, oy + y * k, Math.max(1, k), Math.max(1, k)); }
+    }));
+  }
+  artCache.set(key, c);
+  return c;
+}
+
+function paintCell(g, info, thing, ch, x, y, cs) {
+  const spec = specOf(thing, info, ch);
+  const k = sortOf(spec);
+  const X = x * cs, Y = y * cs;
+  const tile = tileOf(spec);
+  if (tile) g.drawImage(tileArt(info, tile, cs), X, Y);
+  else {
+    const floor = (spec && spec.floor) || (k !== "toxic" ? thing.floor : null);
+    if (floor && info.tiles[floor]) g.drawImage(tileArt(info, floor, cs), X, Y);
+    else { g.fillStyle = k === "toxic" ? "#3a9a32" : (x + y) % 2 ? "#3d3830" : "#35312a"; g.fillRect(X, Y, cs, cs); }
+    if (k === "monster" || k === "item") {
+      const art = thingArt(info, spec.monster || spec.item, cs);
+      if (art) g.drawImage(art, X, Y);
+      else { g.fillStyle = k === "monster" ? "#ff6b5e" : "#f0c85a"; g.font = `${Math.round(cs * 0.8)}px ui-monospace, monospace`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(ch, X + cs / 2, Y + cs / 2 + 1); }
+    }
+    if (k === "start") {
+      const f = TURN.indexOf(String(thing.facing || "n")[0]);
+      g.fillStyle = "#ffffff"; g.font = `bold ${Math.round(cs * 0.85)}px ui-monospace, monospace`; g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText("▲►▼◄"[Math.max(0, f)], X + cs / 2, Y + cs / 2 + 1);
+    }
+  }
+  if (!spec) { g.fillStyle = "#c62828"; g.fillRect(X, Y, cs, cs); g.fillStyle = "#fff"; g.font = `bold ${Math.round(cs * 0.75)}px ui-monospace, monospace`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(ch === " " ? "·" : ch, X + cs / 2, Y + cs / 2 + 1); }
+  if (spec && EVENT_KEYS.some((key) => spec[key])) {             // something happens here: a corner, in the event's colour
+    g.fillStyle = "#ffd54a";
+    g.beginPath(); g.moveTo(X + cs, Y); g.lineTo(X + cs - Math.max(4, cs / 3), Y); g.lineTo(X + cs, Y + Math.max(4, cs / 3)); g.fill();
+  }
+  if (k === "panel") { g.fillStyle = "#c79bff"; g.fillRect(X + 1, Y + cs - 4, 3, 3); }
+}
+const EVENT_KEYS = ["on_enter", "on_pickup", "opens_on", "closes_on", "wake_on"];
+
+function levelEditor(kind, thing, id) {
+  if (!Array.isArray(thing.map) || !thing.map.length) {
+    thing.map = ["#####E#####", "#.........#", "#.........#", "#....@....#", "###########"];
+    touched(kind);
+  }
+  const ui = levelUi[id] = levelUi[id] || { pen: "#", tool: "paint", cam: null, style: "pixel" };
+  let info = null, cs = 16, painting = false, wait = null;
+  const W = () => Math.max(...thing.map.map((r) => r.length));
+  const grid = el("canvas", { class: "level-grid", tabindex: "0", role: "img", "aria-label": "The map. Click or drag to paint; right button paints floor." });
+  const hover = el("p", { class: "note" }, "Point at a cell to see what it is.");
+  const palette = el("div", { class: "palette-list" });
+  const editBox = el("div", { class: "legend-edit" });
+  const eventsBox = el("div", {});
+  const tilesBox = el("div", { class: "row" });
+  const sizeBox = el("span", { class: "row" });
+  const toolBox = el("span", { class: "row" });
+  const view = el("canvas", { class: "banner-canvas level-view", tabindex: "0", role: "img", "aria-label": "The level seen from the chosen cell. Arrow keys walk and turn." });
+  const viewNote = el("p", { class: "note" });
+  const styleSel = el("select", { "aria-label": "Drawn as", onchange: (e) => { ui.style = e.target.value; look(); } },
+    ...["pixel", "dots", "dots-fill"].map((s) => el("option", { value: s, selected: ui.style === s }, s)));
+  const checkOut = el("div", {});
+
+  const used = () => new Set(thing.map.join(""));
+  const legend = () => (isObject(thing.legend) ? thing.legend : (thing.legend = {}));
+  function changed() { touched(kind); clearTimeout(wait); wait = setTimeout(look, 350); }
+  function startCell() {
+    for (let y = 0; y < thing.map.length; y++) for (let x = 0; x < thing.map[y].length; x++) {
+      if (sortOf(specOf(thing, info, thing.map[y][x])) === "start") return [x, y];
+    }
+    return [1, 1];
+  }
+  function draw() {
+    const w = W(), h = thing.map.length;
+    cs = Math.max(8, Math.min(22, Math.floor(620 / Math.max(w, h))));
+    grid.width = w * cs; grid.height = h * cs;
+    const g = grid.getContext("2d");
+    g.imageSmoothingEnabled = false;
+    g.fillStyle = "#11141a"; g.fillRect(0, 0, grid.width, grid.height);
+    thing.map.forEach((row, y) => { for (let x = 0; x < w; x++) paintCell(g, info, thing, x < row.length ? row[x] : " ", x, y, cs); });
+    g.strokeStyle = "rgba(0,0,0,0.25)";
+    for (let x = 0; x <= w; x++) { g.beginPath(); g.moveTo(x * cs + 0.5, 0); g.lineTo(x * cs + 0.5, grid.height); g.stroke(); }
+    for (let y = 0; y <= h; y++) { g.beginPath(); g.moveTo(0, y * cs + 0.5); g.lineTo(grid.width, y * cs + 0.5); g.stroke(); }
+    if (ui.cam) {                                              // where the picture below is seen from
+      const [x, y, f] = [ui.cam.x, ui.cam.y, ui.cam.f];
+      g.strokeStyle = "#4fc3ff"; g.lineWidth = 2; g.strokeRect(x * cs + 1, y * cs + 1, cs - 2, cs - 2); g.lineWidth = 1;
+      const [dx, dy] = STEPS[f];
+      g.fillStyle = "#4fc3ff"; g.beginPath();
+      const cx = x * cs + cs / 2, cy = y * cs + cs / 2;
+      g.moveTo(cx + dx * cs * 0.45, cy + dy * cs * 0.45); g.lineTo(cx - dy * cs * 0.25, cy + dx * cs * 0.25); g.lineTo(cx + dy * cs * 0.25, cy - dx * cs * 0.25); g.fill();
+    }
+  }
+  function put(x, y, ch) {
+    if (y < 0 || y >= thing.map.length || x < 0 || x >= W()) return;
+    const row = thing.map[y].padEnd(W(), "#");
+    if (row[x] === ch) return;
+    thing.map[y] = row.slice(0, x) + ch + row.slice(x + 1);
+    changed(); draw(); swatches();
+  }
+  const cellAt = (e) => { const b = grid.getBoundingClientRect(); return [Math.floor((e.clientX - b.left) / (b.width / W())), Math.floor((e.clientY - b.top) / (b.height / thing.map.length))]; };
+  grid.addEventListener("pointerdown", (e) => {
+    const [x, y] = cellAt(e);
+    if (ui.tool === "look") { ui.cam = { x, y, f: ui.cam ? ui.cam.f : String(thing.facing || "n")[0] }; draw(); look(); return; }
+    painting = true; grid.setPointerCapture(e.pointerId); put(x, y, e.button === 2 ? "." : ui.pen);
+  });
+  grid.addEventListener("pointermove", (e) => {
+    const [x, y] = cellAt(e);
+    const ch = (thing.map[y] || "")[x];
+    if (ch !== undefined) hover.textContent = `(${x}, ${y})  ${ch === " " ? "space" : ch}: ${describe(specOf(thing, info, ch), info)}`;
+    if (painting) put(x, y, e.buttons === 2 ? "." : ui.pen);
+  });
+  grid.addEventListener("pointerup", () => { painting = false; });
+  grid.addEventListener("contextmenu", (e) => e.preventDefault());
+
+  function swatch(ch) {
+    const c = el("canvas", { width: "18", height: "18", "aria-hidden": "true" });
+    paintCell(c.getContext("2d"), info, thing, ch, 0, 0, 18);
+    return c;
+  }
+  function swatches() {
+    const own = Object.keys(legend());
+    const engine = Object.keys(info.legend).filter((ch) => ch !== " " && !own.includes(ch));
+    const inMap = used();
+    const button = (ch) => el("button", { type: "button", class: "pal" + (ui.pen === ch ? " on" : ""), title: describe(specOf(thing, info, ch), info),
+      onclick: () => { ui.pen = ch; ui.tool = "paint"; tools(); swatches(); edit(); } },
+      swatch(ch), el("code", {}, ch), el("span", { class: inMap.has(ch) ? "" : "unused" }, describe(specOf(thing, info, ch), info)));
+    const unknown = [...inMap].filter((ch) => !specOf(thing, info, ch));
+    palette.replaceChildren(
+      el("p", { class: "note" }, "This level's characters"), ...own.map(button),
+      el("button", { type: "button", class: "quiet small", onclick: () => {
+        const ch = [...FREE_CHARS].find((c) => !(c in legend()) && !(c in info.legend) && !inMap.has(c));
+        if (!ch) return;
+        legend()[ch] = {};
+        ui.pen = ch;
+        changed(); swatches(); edit();
+      } }, "Add a character"),
+      ...(unknown.length ? [el("p", { class: "note bad" }, `Not explained: ${unknown.map((c) => (c === " " ? "space" : c)).join(" ")}`)] : []),
+      el("p", { class: "note" }, "The engine's characters"), ...engine.map(button));
+  }
+  function tools() {
+    const radio = (value, label) => el("label", { class: "tick" }, el("input", { type: "radio", name: `tool-${id}`, checked: ui.tool === value,
+      onchange: () => { ui.tool = value; } }), " " + label);
+    toolBox.replaceChildren(radio("paint", "Paint"), radio("look", "Look from a cell"));
+  }
+  function sizes() {
+    const resize = (w, h) => {
+      w = Math.max(3, Math.min(120, w)); h = Math.max(3, Math.min(120, h));
+      thing.map = thing.map.slice(0, h).map((r) => r.padEnd(w, "#").slice(0, w));
+      while (thing.map.length < h) thing.map.push("#".repeat(w));
+      changed(); sizes(); draw();
+    };
+    sizeBox.replaceChildren("Width", el("input", { type: "number", min: "3", max: "120", value: String(W()), onchange: (e) => resize(Number(e.target.value) || W(), thing.map.length) }),
+      "Height", el("input", { type: "number", min: "3", max: "120", value: String(thing.map.length), onchange: (e) => resize(W(), Number(e.target.value) || thing.map.length) }));
+  }
+
+  // ---- what the chosen character is
+  const events = () => [...new Set([...Object.keys(isObject(thing.events) ? thing.events : {}),
+    ...Object.values(legend()).filter(isObject).flatMap((s) => EVENT_KEYS.map((k) => s[k]).filter(Boolean))])];
+  function tileSelect(value, set, none) {
+    return el("select", { onchange: (e) => set(e.target.value) }, el("option", { value: "", selected: !value }, none || "the engine's"),
+      ...Object.keys(info.tiles).sort().map((t) => el("option", { value: t, selected: t === value }, t + (info.tiles[t].own ? " (this game's)" : ""))),
+      value && !info.tiles[value] ? el("option", { value, selected: true }, `${value} (not found)`) : null);
+  }
+  function eventInput(value, set) {
+    const listId = `ev-${id}`;
+    return el("span", {}, el("input", { type: "text", class: "code short", list: listId, value: value || "", placeholder: "event", oninput: (e) => set(e.target.value.trim()) }),
+      el("datalist", { id: listId }, ...events().map((v) => el("option", { value: v }))));
+  }
+  function edit() {
+    const ch = ui.pen;
+    const mine = ch in legend();
+    const spec = specOf(thing, info, ch) || {};
+    const head = el("h3", {}, `${ch === " " ? "space" : ch}: ${describe(specOf(thing, info, ch), info)}`);
+    if (!mine) {
+      editBox.replaceChildren(head, el("p", { class: "note" }, "The engine's meaning. Give it another in this level:"),
+        el("button", { type: "button", class: "quiet", onclick: () => { legend()[ch] = JSON.parse(JSON.stringify(spec)); changed(); swatches(); edit(); } }, "Change its meaning here"));
+      return;
+    }
+    const raw = legend()[ch];
+    const s = typeof raw === "string" ? (info.things[raw] && info.things[raw].kind === "monster" ? { monster: raw } : { item: raw }) : Object.assign({}, raw);
+    const write = () => {                                     // a monster or an item with nothing more is written as its id alone
+      const keys = Object.keys(s).filter((k) => s[k] !== "" && s[k] !== false && s[k] !== undefined && s[k] !== null);
+      const clean = Object.fromEntries(keys.map((k) => [k, s[k]]));
+      legend()[ch] = keys.length === 1 && (clean.monster || clean.item) ? (clean.monster || clean.item) : clean;
+      changed(); draw(); swatches(); head.textContent = `${ch}: ${describe(specOf(thing, info, ch), info)}`;
+    };
+    const sort = sortOf(s);
+    const setSort = (k) => {
+      for (const key of Object.keys(s)) if (!EVENT_KEYS.includes(key) && key !== "floor" && key !== "ceiling") delete s[key];
+      if (k === "toxic") s.toxic = true;
+      if (k === "wall") s.wall = "steel";
+      if (k === "door") s.door = true;
+      if (k === "panel") s.panel = "fist";
+      if (k === "monster") s.monster = Object.keys(info.things).find((t) => info.things[t].kind === "monster") || "";
+      if (k === "item") s.item = Object.keys(info.things).find((t) => info.things[t].kind === "item") || "";
+      if (k === "start") s.start = true;
+      if (k === "exit") s.exit = true;
+      write(); edit();
+    };
+    const rows = [field("Is", el("select", { onchange: (e) => setSort(e.target.value) }, ...SORTS.map(([k, label]) => el("option", { value: k, selected: k === sort }, label))))];
+    const choose = (key, kindName) => el("select", { onchange: (e) => { s[key] = e.target.value; write(); } },
+      ...Object.keys(info.things).filter((t) => info.things[t].kind === kindName).map((t) => el("option", { value: t, selected: t === s[key] }, `${info.things[t].name} (${t})`)));
+    const evRow = (key, label) => rows.push(field(label, eventInput(s[key], (v) => { s[key] = v; write(); })));
+    if (sort === "monster") { rows.push(field("Monster", choose("monster", "monster"))); evRow("wake_on", "Wakes when this happens"); rows.push(field("Awake from the start", el("input", { type: "checkbox", checked: !!s.awake, onchange: (e) => { s.awake = e.target.checked; write(); } }))); }
+    if (sort === "item") { rows.push(field("Item", choose("item", "item"))); evRow("on_pickup", "Taking it sets off"); }
+    if (sort === "wall") { rows.push(field("Tile", tileSelect(s.wall || s.texture, (v) => { delete s.texture; s.wall = v || "steel"; write(); }, "steel"))); evRow("opens_on", "Opens (becomes floor) when this happens"); }
+    if (sort === "door") {
+      rows.push(field("Needs the key", el("select", { onchange: (e) => { s.key = e.target.value; write(); } }, ...["", "r", "w", "x"].map((k) => el("option", { value: k, selected: (s.key || "") === k }, k || "no key")))));
+      evRow("opens_on", "Opens when this happens (sealed until then)"); evRow("closes_on", "Shuts for good when this happens");
+      rows.push(field("Open from the start", el("input", { type: "checkbox", checked: !!s.open, onchange: (e) => { s.open = e.target.checked; write(); } })));
+    }
+    if (sort === "panel") rows.push(field("Opened by", el("select", { onchange: (e) => { s.panel = e.target.value; write(); } },
+      el("option", { value: "fist", selected: s.panel !== "shoot" }, "a punch (a hollow wall)"), el("option", { value: "shoot", selected: s.panel === "shoot" }, "a shot (a dented vent)"))));
+    if (!solidSort(sort) && sort !== "door") {
+      if (sort !== "item") evRow("on_enter", "Stepping here sets off");
+      rows.push(field("Floor tile", tileSelect(s.floor, (v) => { s.floor = v; write(); })));
+      rows.push(field("Ceiling tile", tileSelect(s.ceiling, (v) => { s.ceiling = v; write(); })));
+    }
+    const rename = el("input", { type: "text", class: "code short", maxlength: "1", value: ch, "aria-label": "The character", onchange: (e) => {
+      const next = e.target.value;
+      if (next.length !== 1 || next === ch) { e.target.value = ch; return; }
+      if (next in legend() || used().has(next)) { status(`"${next}" is in use already.`, true); e.target.value = ch; return; }
+      legend()[next] = legend()[ch]; delete legend()[ch];
+      thing.map = thing.map.map((r) => r.split(ch).join(next));
+      ui.pen = next; changed(); draw(); swatches(); edit();
+    } });
+    editBox.replaceChildren(head, field("Character", rename), ...rows,
+      el("button", { type: "button", class: "quiet small warn", onclick: () => {
+        if (used().has(ch) && !confirm(`The map uses "${ch}". Remove it from the legend anyway?`)) return;
+        delete legend()[ch]; ui.pen = "#"; changed(); draw(); swatches(); edit();
+      } }, "Remove from the legend"));
+  }
+  function eventsSheet() {
+    const texts = isObject(thing.events) ? thing.events : {};
+    const all = events();
+    eventsBox.replaceChildren(el("h3", {}, "Events"),
+      el("p", { class: "note" }, "An event is set off by a cell (stepping on it) or an item (taking it); then walls and doors set to open on it open, " +
+        "doors set to shut on it shut, and monsters set to wake on it wake. The text is shown when it happens."),
+      ...(all.length ? all.map((name) => field(name, el("input", { type: "text", value: texts[name] || "", placeholder: "shown when it happens (optional)",
+        oninput: (e) => { if (!isObject(thing.events)) thing.events = {}; if (e.target.value) thing.events[name] = e.target.value; else delete thing.events[name]; if (!Object.keys(thing.events).length) delete thing.events; touched(kind); } })))
+        : [el("p", { class: "note" }, "None yet: give a cell or an item an event below the palette.")]));
+  }
+  function levelTiles() {
+    tilesBox.replaceChildren(
+      el("label", {}, "Floor ", tileSelect(thing.floor, (v) => { if (v) thing.floor = v; else delete thing.floor; changed(); draw(); swatches(); })),
+      el("label", {}, "Ceiling ", tileSelect(thing.ceiling, (v) => { if (v) thing.ceiling = v; else delete thing.ceiling; changed(); })));
+  }
+
+  // ---- the level from a cell, as the engine draws it
+  async function look() {
+    if (!ui.cam) { const [x, y] = startCell(); ui.cam = { x, y, f: String(thing.facing || "n")[0] }; draw(); }
+    let res;
+    try { res = await api("/api/view", { pending: pending(), level: id, x: ui.cam.x, y: ui.cam.y, facing: ui.cam.f, style: ui.style }); }
+    catch (err) { viewNote.textContent = "It cannot be drawn: " + err.message; return; }
+    paintCells(view, res.rows, res.cols, res.lines);
+    viewNote.textContent = `From (${res.at[0]}, ${res.at[1]}) facing ${{ n: "north", e: "east", s: "south", w: "west" }[res.facing]}` +
+      (res.inside ? " - inside a wall" : "") + (res.seen.length ? `. In sight: ${res.seen.join(", ")}` : "") + ".";
+  }
+  function walk(cmd) {
+    if (!ui.cam) return;
+    const f = ui.cam.f;
+    if (cmd === "left" || cmd === "right") ui.cam.f = TURN[(TURN.indexOf(f) + (cmd === "left" ? 3 : 1)) % 4];
+    else {
+      const [dx, dy] = STEPS[f].map((v) => (cmd === "back" ? -v : v));
+      const ch = (thing.map[ui.cam.y + dy] || "")[ui.cam.x + dx];
+      if (ch === undefined || solidSort(sortOf(specOf(thing, info, ch)))) return;
+      ui.cam.x += dx; ui.cam.y += dy;
+    }
+    draw(); look();
+  }
+  view.addEventListener("keydown", (e) => {
+    const cmd = { ArrowUp: "step", ArrowDown: "back", ArrowLeft: "left", ArrowRight: "right" }[e.key];
+    if (cmd) { walk(cmd); e.preventDefault(); }
+  });
+  const walkButtons = el("span", { class: "row" },
+    ...[["left", "↶ Turn left"], ["step", "↑ Step"], ["back", "↓ Back"], ["right", "Turn right ↷"]].map(([c, label]) =>
+      el("button", { type: "button", class: "quiet small", onclick: () => walk(c) }, label)), styleSel);
+
+  // ---- the level bot plays it
+  const goals = el("input", { type: "text", class: "code", value: Array.isArray(thing.bot) ? thing.bot.join(", ") : "", placeholder: "item ids or map characters, in order; E last",
+    oninput: (e) => { const g = e.target.value.split(",").map((v) => v.trim()).filter(Boolean); if (g.length) thing.bot = g; else delete thing.bot; touched(kind); } });
+  const play = el("button", { type: "button", class: "quiet", onclick: async () => {
+    play.disabled = true;
+    checkOut.replaceChildren(el("p", { class: "note" }, "Playing…"));
+    try {
+      const r = await api("/api/levelcheck", { pending: pending(), level: id, runs: 5 });
+      const done = r.games.filter((g) => g.outcome === "exit").map((g) => g.beats);
+      checkOut.replaceChildren(
+        el("p", {}, `Finished ${r.finished} of ${r.runs}` + (done.length ? ` in ${Math.min(...done)} to ${Math.max(...done)} beats` : "") + (r.par ? ` (par ${r.par})` : "") +
+          `. The level holds ${r.monsters} monsters, ${r.items} items and ${r.secrets} secrets.`),
+        el("table", {}, el("thead", {}, el("tr", {}, ...["Game", "How it ended", "Beats", "Health", "Kills", "Secrets", "Where"].map((t) => el("th", {}, t)))),
+          el("tbody", {}, ...r.games.map((g) => el("tr", {}, el("td", {}, String(g.seed + 1)), el("td", {}, { exit: "at the exit", dead: "dead", stuck: "stuck" }[g.outcome] || g.outcome),
+            el("td", {}, String(g.beats)), el("td", {}, String(g.health)), el("td", {}, String(g.kills)), el("td", {}, String(g.secrets)),
+            el("td", {}, el("button", { type: "button", class: "link", onclick: () => { ui.cam = { x: g.where[0], y: g.where[1], f: ui.cam ? ui.cam.f : "n" }; draw(); look(); } }, `(${g.where[0]}, ${g.where[1]})`)))))),
+        el("p", { class: "note" }, "A simple player: it goes for its goals in order, fights what it sees and steps out of fire. If it can finish, a person can; " +
+          "if it dies or gets stuck, look where it ended."));
+    } catch (err) { checkOut.replaceChildren(el("p", { class: "note bad" }, err.message)); }
+    play.disabled = false;
+  } }, "Let the level bot play it");
+
+  const box = el("div", { class: "sheet level" }, el("p", { class: "lead" }, "Drawing the map…"));
+  levelsInfo(true).then((got) => {
+    info = got;
+    tools(); sizes(); swatches(); edit(); eventsSheet(); levelTiles(); draw(); look();
+    box.replaceChildren(
+      el("h3", {}, "Map"), el("div", { class: "row" }, sizeBox, toolBox),
+      el("div", { class: "level-row" }, el("div", {}, grid, hover), el("div", { class: "level-side" }, palette)),
+      editBox,
+      el("h3", {}, "Tiles of the whole level"), tilesBox,
+      el("h3", {}, "Seen from a cell"), view, walkButtons, viewNote,
+      el("p", { class: "note" }, "Choose \"Look from a cell\" and click the map to stand somewhere; the arrow keys (with the picture chosen) or the buttons walk and turn. " +
+        "Monsters are drawn where they start, asleep."),
+      eventsBox,
+      el("h3", {}, "The level bot"), field("Its goals", goals), play, checkOut);
+  }).catch((err) => box.replaceChildren(el("p", { class: "note bad" }, "The map cannot be drawn: " + err.message)));
+  return box;
+}
+
+// ---------------------------------------------------------------------- weapons: one in the hands
+function weaponSheet(kind, thing, id) {
+  const canvas = el("canvas", { class: "banner-canvas", role: "img", "aria-label": "The weapon in the player's hands" });
+  const note = el("p", { class: "note" });
+  let drawn = null, timer = null, wait = null;
+  async function show() {
+    clearTimeout(timer);
+    try { drawn = await api("/api/weaponview", { pending: pending(), weapon: id }); } catch (err) { note.textContent = "It cannot be drawn: " + err.message; return; }
+    paintCells(canvas, drawn.rows, drawn.cols, drawn.lines);
+    note.textContent = drawn.drawn ? "Fire it to see a shot (a punch, for a fist) as a level plays it." : `There is no sprite "${drawn.sprite || ""}": draw one under Sprites (a weapon sprite starts with w_ by custom).`;
+  }
+  function fire() {
+    if (!drawn) return;
+    clearTimeout(timer);
+    let i = 0;
+    const step = () => {
+      if (i >= drawn.frames.length) { paintCells(canvas, drawn.rows, drawn.cols, drawn.lines); return; }
+      paintCells(canvas, drawn.frames[i++], drawn.cols, drawn.lines);
+      timer = setTimeout(step, 60);
+    };
+    step();
+  }
+  const later = () => { clearTimeout(wait); wait = setTimeout(show, 300); };
+  setTimeout(() => {
+    const form = canvas.closest("#form");
+    if (form) { form.addEventListener("input", later); form.addEventListener("change", later); }
+  }, 0);
+  show();
+  return el("div", { class: "sheet" }, el("h3", {}, "In the player's hands"), canvas,
+    el("div", { class: "row" }, el("button", { type: "button", class: "quiet", onclick: fire }, "Fire"),
+      thing.sprite ? el("button", { type: "button", class: "quiet", onclick: () => select("sprites", thing.sprite) }, "Edit its sprite") : null), note,
+    el("p", { class: "note" }, `The id is the key that picks it in a level (${id}); a pick-up gives it with "weapon": "${id}".`));
 }
 
 // ---------------------------------------------------------------------- enemies: make one, try one

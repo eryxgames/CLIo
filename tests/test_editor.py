@@ -22,7 +22,7 @@ from engine.editor import hosted, service                       # noqa: E402
 from engine.editor.server import make_server                    # noqa: E402
 
 TYPES = {"text", "long", "number", "bool", "choice", "tags", "ref", "refs", "sprite", "group", "rows", "map",
-         "effects", "condition", "banner"}
+         "effects", "condition", "banner", "range"}
 
 
 def copy_of(name):

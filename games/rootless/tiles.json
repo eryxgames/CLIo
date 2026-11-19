@@ -1,0 +1,46 @@
+{
+ "grate": {
+  "pixels": [
+   "cccaaaaaaaaaaaaacccaaaaaaaaaaaaa",
+   "cccbbbbbbbbbbbbbcccbbbbbbbbbbbbb",
+   "cccaaaaaaaaaaaaacccaaaaaaaaaaaaa",
+   "abaddddddeddddddabaddddddddedddd",
+   "abadddeddddddddeabadddddeddddddd",
+   "abaeddddddddedddabaddedddddddded",
+   "abaddddddeddddddabaddddddddedddd",
+   "abadddeddddddddeabadddddeddddddd",
+   "abaeddddddddedddabaddedddddddded",
+   "abaddddddeddddddabaddddddddedddd",
+   "abadddeddddddddeabadddddeddddddd",
+   "abaeddddddddedddabaddedddddddded",
+   "abaddddddeddddddabaddddddddedddd",
+   "abadddeddddddddeabadddddeddddddd",
+   "abaeddddddddedddabaddedddddddded",
+   "abaddddddeddddddabaddddddddedddd",
+   "cccaaaaaaaaaaaaacccaaaaaaaaaaaaa",
+   "cccbbbbbbbbbbbbbcccbbbbbbbbbbbbb",
+   "cccaaaaaaaaaaaaacccaaaaaaaaaaaaa",
+   "abadddeddddddddeabadddddeddddddd",
+   "abaeddddddddedddabaddedddddddded",
+   "abaddddddeddddddabaddddddddedddd",
+   "abadddeddddddddeabadddddeddddddd",
+   "abaeddddddddedddabaddedddddddded",
+   "abaddddddeddddddabaddddddddedddd",
+   "abadddeddddddddeabadddddeddddddd",
+   "abaeddddddddedddabaddedddddddded",
+   "abaddddddeddddddabaddddddddedddd",
+   "abadddeddddddddeabadddddeddddddd",
+   "abaeddddddddedddabaddedddddddded",
+   "abaddddddeddddddabaddddddddedddd",
+   "abadddeddddddddeabadddddeddddddd"
+  ],
+  "palette": {
+   "a": "#2b2e35",
+   "b": "#5c616c",
+   "c": "#7d838f",
+   "d": "#1d3a1a",
+   "e": "#3f8f2f",
+   "f": "#121418"
+  }
+ }
+}

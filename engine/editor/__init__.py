@@ -23,9 +23,9 @@ _DEFAULT = {"scenes": "scenes.json", "items": "items.json", "characters": "chara
             "texts": "texts.json", "dialogues": "dialogues.json", "quests": "quests.json",
             "triggers": "triggers.json", "music": "music.json", "sounds": "sounds.json",
             "sprites": "sprites.json", "dungeon": "dungeon.json", "levels": "levels.json",
-            "monsters": "monsters.json"}
+            "monsters": "monsters.json", "tiles": "tiles.json", "weapons": "weapons.json"}
 _WHERE = {"scene": "scenes", "item": "items", "character": "characters", "dialogue": "dialogues",
-          "level": "levels", "monster": "monsters",
+          "level": "levels", "monster": "monsters", "tile": "tiles", "weapon": "weapons",
           "quest": "quests", "trigger": "triggers", "mode": "game", "floor": "dungeon", "dungeon": "dungeon",
           "initial_scene": "game"}
 

@@ -1128,9 +1128,12 @@ The map is rows of characters, north at the top. Without a legend entry a charac
 | `E` | the exit switch, on a wall |
 
 A legend entry is either the id of a monster or an item (`"m": "medkit"`), or an object:
-`{"monster": id}` or `{"item": id}` on a floor cell; `{"wall": texture}`; `{"door": true,
+`{"monster": id}` or `{"item": id}` on a floor cell; `{"wall": tile}`; `{"door": true,
 "key": "x"}`; `{"toxic": true}`; `{"panel": "fist"}` or `{"panel": "shoot"}`;
-`{"exit": true}`. Textures are `steel`, `screens`, `screens2`, `hazard`.
+`{"exit": true}`. A floor cell can also have `"floor"` and `"ceiling"` tiles. The engine's
+tiles are `steel`, `screens`, `screens2`, `hazard`; a game can draw its own (see
+[Tiles](#tiles)). `"floor"` and `"ceiling"` on the level itself lay a tile everywhere
+(toxic floor keeps its own look unless its cell names a tile).
 
 **Events** tie a level together. They have names you choose; a cell with
 `"on_enter": name` sets one off when the player steps on it, an item with
@@ -1209,18 +1212,23 @@ hurts the player for `beats`; the picture inverts), `power: "boots"` (toxic floo
 hurt for `beats` spent on it - they wear down only there, show under the picture, and go
 on to the next level). `size` is the picture's size on the floor (0.55 if not said).
 
-The weapons and the player's start are in game.json:
+The weapons are in weapons.json, by the key that picks them (`"weapons"` in game.json's
+`first_person` works too; weapons.json comes over it):
+
+```json
+{"1": {"name": "fist", "kind": "melee", "damage": [6, 14], "sprite": "w_fist", "sound": "punch", "text": "THUD."},
+ "2": {"name": "pistol", "ammo": "bullets", "damage": [8, 14], "sprite": "w_pistol", "sound": "pistol"},
+ "3": {"name": "shotgun", "ammo": "shells", "damage": [5, 9], "pellets": 7, "spread": 0.35, ...},
+ "4": {"name": "chaingun", "ammo": "bullets", "damage": [7, 12], "burst": 2, ...}}
+```
+
+The player's start is in game.json:
 
 ```json
 "first_person": {
   "view": "pixel",
   "start": {"health": 100, "weapons": ["1", "2"], "weapon": "2",
             "ammo": {"bullets": 50, "shells": 0}, "max_ammo": {"bullets": 200, "shells": 50}},
-  "weapons": {
-    "1": {"name": "fist", "kind": "melee", "damage": [6, 14], "sprite": "w_fist", "sound": "punch"},
-    "2": {"name": "pistol", "ammo": "bullets", "damage": [8, 14], "sprite": "w_pistol", "sound": "pistol"},
-    "3": {"name": "shotgun", "ammo": "shells", "damage": [5, 9], "pellets": 7, "spread": 0.35, ...},
-    "4": {"name": "chaingun", "ammo": "bullets", "damage": [7, 12], "burst": 2, ...}},
   "keymap": {"q": "turn left"}
 }
 ```
@@ -1240,6 +1248,25 @@ the letters in `"keep"` (say `"eE"` for the eyes), then the rarest colours - ins
 losing them as plain scaling would. To draw them yourself, put them in the sprite as
 `"lod": [{"pixels": [...]}, ...]`: the level uses the smallest that is not much smaller
 than what it needs.
+
+### Tiles
+
+The walls, floors and ceilings of levels are drawn with tiles: small pictures in the
+sprites' format, in tiles.json.
+
+```json
+{"grate": {"pixels": ["bbbaaa...", "..."], "palette": {"a": "#2b2e35", "b": "#5c616c"}},
+ "steel": {"pixels": [...], "palette": {...}},
+ "screens": {"pixels": [...], "frames": [[...], [...]], "palette": {...}}}
+```
+
+A tile may be any size (the engine's are 32 x 32); it is stretched over a wall's face or a
+cell of floor. A tile named like one of the engine's - `steel`, `screens`, `screens2`,
+`hazard`, `door`, `door_r`, `door_w`, `door_x`, `sealed`, `exit`, `exit_on`, `fist`,
+`shoot` - takes its place everywhere. `frames` are more drawings, shown in turn, one a beat.
+A clear pixel (`.`) shows what is behind a wall - bars, a window - though the wall still
+stops the player, shots and sight. In the editor a tile is painted like a sprite, with the
+engine's tiles to start from and a small room to see it in.
 
 ### Playing it
 
@@ -1267,13 +1294,30 @@ monster waking, fire coming - stops the rest of a line, as Ctrl-C would. `--line
 the single keys off; `"keymap"` in `first_person` (key name -> command line) changes them.
 The window can be resized at any time; the picture is drawn again at once.
 
-`python tests/levelbot.py 10 rootless e1m1` lets a simple player walk a level ten times
-(it follows the level's `"bot"` list of goals: item ids or map characters). If it can
-finish, a person can.
+A simple player (`engine/levelbot.py`) can walk a level: it follows the level's `"bot"`
+list of goals - item ids or map characters, the exit `E` last - fights what it sees and
+steps out of fire. If it can finish, a person can. `python tests/levelbot.py 10 rootless
+e1m1` lets it play ten times; the editor does the same.
 
-In the editor, **Levels** and **Monsters** are listed like everything else; the map is
-edited as text, row by row. Sprites can be grown on a body plan there, and their far
-versions seen, made again and painted (see [Pictures](#pictures)).
+### Levels in the editor
+
+**Levels** opens a map painter: the map drawn with its tiles and the pictures of its
+monsters and items, and a palette of its characters - the level's own legend first, then
+the engine's. Click or drag to paint with a character, the right button paints floor;
+pointing at a cell says what it is. Choosing a character opens what it means: floor,
+toxic floor, wall (and its tile), door (its key, the events that open and shut it),
+secret wall, monster (and the event that wakes it), item (and the event taking it sets
+off), start or exit, and the tiles above and below it. *Add a character* gives the legend a
+new one; *Change its meaning here* gives one of the engine's another meaning in this level.
+Below the map: the tiles of the whole level, the text of each event, and *Seen from a
+cell* - choose *Look from a cell*, click the map, and the engine draws what the player sees
+from there; the arrow keys (or the buttons) walk and turn. *Let the level bot play it*
+plays it five times and says how far it got.
+
+**Tiles** are painted like sprites; **Weapons** have a form and show the weapon in the
+player's hands, with *Fire* to see a shot. **Monsters** are listed like everything else;
+sprites can be grown on a body plan, and their far versions seen, made again and painted
+(see [Pictures](#pictures)).
 
 ## Coming from CLIo 1
 

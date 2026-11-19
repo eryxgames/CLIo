@@ -87,7 +87,7 @@ class GameData:
                     "texts": "texts.json", "dialogues": "dialogues.json", "quests": "quests.json",
                     "triggers": "triggers.json", "music": "music.json", "sounds": "sounds.json",
                     "sprites": "sprites.json", "dungeon": "dungeon.json", "levels": "levels.json",
-                    "monsters": "monsters.json"}
+                    "monsters": "monsters.json", "tiles": "tiles.json", "weapons": "weapons.json"}
 
         def load(key, required=False):
             name = files.get(key, defaults[key])
@@ -114,6 +114,8 @@ class GameData:
         self.dungeon = load("dungeon") or {}
         self.levels = load("levels") or {}             # first-person levels (engine/level.py)
         self.monsters = load("monsters") or {}
+        self.tiles = load("tiles") or {}               # walls, floors and ceilings of levels, over the engine's
+        self.weapons = load("weapons") or {}           # weapons in levels, over game.json's first_person ones
         self.art_dir = os.path.join(self.dir, cfg.get("art_dir", "art"))
 
         self.theme = cfg.get("style") or cfg.get("style_config") or "default"
@@ -298,7 +300,7 @@ class GameData:
         problems += self._validate_dungeon()
         problems += self._validate_looks()
         problems += self._validate_sounds()
-        if self.levels or self.monsters:
+        if self.levels or self.monsters or self.tiles or self.weapons:
             from . import level
             problems += level.validate(self)
             for sid, sc in self.scenes.items():

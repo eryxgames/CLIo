@@ -225,6 +225,26 @@ class PictureTests(unittest.TestCase):
         self.assertFalse(any(m.seen for m in lv.monsters if m.kind == "zombie"))
 
 
+class EditorTests(unittest.TestCase):
+    def test_monster_far_versions_and_distances(self):
+        from engine.editor import service
+        made = service.handle(ROOTLESS, "/api/monster", {"seed": "x", "body": "floater", "size": 20})
+        self.assertTrue(made["pixels"] and made["lod"])
+        self.assertIn("crawler", made["bodies"])
+        far = service.handle(ROOTLESS, "/api/far", {"pixels": made["pixels"], "keep": made["keep"]})
+        self.assertEqual(far["lod"], made["lod"])
+        seen = service.handle(ROOTLESS, "/api/distances", {"sprite": made})["distances"]
+        self.assertEqual([d["cells"] for d in seen], [1, 2, 3, 4, 5, 6])
+        heights = [len(d["pixels"]) for d in seen]
+        self.assertEqual(heights, sorted(heights, reverse=True))
+        self.assertTrue(any(d["drawing"] for d in seen))         # far away, a far version is used
+
+    def test_levels_and_monsters_are_kinds(self):
+        from engine import schema
+        self.assertIn("levels", schema.BY_FILE)
+        self.assertIn("monsters", schema.BY_FILE)
+
+
 class ChecksAndGameTests(unittest.TestCase):
     def test_validate_finds_mistakes(self):
         data = GameData(ROOTLESS)

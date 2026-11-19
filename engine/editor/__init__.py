@@ -22,8 +22,10 @@ BACKUP = ".editor-backup"
 _DEFAULT = {"scenes": "scenes.json", "items": "items.json", "characters": "characters.json",
             "texts": "texts.json", "dialogues": "dialogues.json", "quests": "quests.json",
             "triggers": "triggers.json", "music": "music.json", "sounds": "sounds.json",
-            "sprites": "sprites.json", "dungeon": "dungeon.json"}
+            "sprites": "sprites.json", "dungeon": "dungeon.json", "levels": "levels.json",
+            "monsters": "monsters.json"}
 _WHERE = {"scene": "scenes", "item": "items", "character": "characters", "dialogue": "dialogues",
+          "level": "levels", "monster": "monsters",
           "quest": "quests", "trigger": "triggers", "mode": "game", "floor": "dungeon", "dungeon": "dungeon",
           "initial_scene": "game"}
 

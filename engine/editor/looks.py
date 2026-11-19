@@ -26,6 +26,45 @@ def grow(seed, size=12):
             "pixels": list(made.pixels)}
 
 
+def monster(seed, body="biped", size=18):
+    """A figure grown from words on a body plan (``engine.sprite.BODIES``), as sprites.json data with far versions."""
+    made = sprite.monster(str(seed), body if body in sprite.BODIES else "biped", max(10, min(48, int(size or 18))))
+    made["bodies"] = dict(sprite.BODIES)
+    return made
+
+
+def far(pixels, keep=""):
+    """The smaller drawings a level shows from far away, made from ``pixels`` (``keep``: letters that must stay)."""
+    rows = [str(r) for r in pixels or [] if isinstance(r, str)]
+    return {"lod": [{"pixels": r} for r in sprite.far_versions(rows, str(keep or ""))] if rows else []}
+
+
+def distances(data, size=1.0, steps=6):
+    """How a sprite looks in a first-person level at 1..``steps`` cells: for each, the drawing used
+    (0 the sprite itself, 1.. its far versions) and the pixels as the level scales them, as colours."""
+    from ..firstperson import DECAY, Picture, View
+    data = data or {}
+    pal = {k: sprite._rgb(v) for k, v in (data.get("palette") or {}).items()}
+    pixels = [str(r) for r in data.get("pixels") or [] if isinstance(r, str)]
+    if not pixels:
+        return {"distances": []}
+    lod = data.get("lod") if isinstance(data.get("lod"), list) else None
+    drawings = [d.get("pixels") if isinstance(d, dict) else d for d in lod] if lod else \
+        sprite.far_versions(pixels, str(data.get("keep") or ""))
+    smaller = [Picture([[pal.get(ch) for ch in str(r)] for r in rows]) for rows in drawings if rows]
+    pic = Picture([[pal.get(ch) for ch in r] for r in pixels], [p for p in smaller if p.h and p.w])
+    view = View(80, 17, "pixel")
+    out = []
+    for d in range(1, steps + 1):
+        target = pic.h * DECAY ** d * view.K * float(size or 1.0)
+        pp = pic.pick(target)
+        s = target / pp.h
+        w, h = max(1, int(round(pp.w * s))), max(1, int(round(pp.h * s)))
+        rows = [[_hex(pp.rows[min(pp.h - 1, int(j / s))][min(pp.w - 1, int(i / s))]) for i in range(w)] for j in range(h)]
+        out.append({"cells": d, "drawing": 0 if pp is pic else 1 + smaller.index(pp), "made": not lod, "pixels": rows})
+    return {"distances": out}
+
+
 def colours(palette):
     """``{letter: "#rrggbb" or None}`` for a palette written in any way the engine accepts (names, numbers, hex)."""
     return {str(k): _hex(sprite._rgb(v)) for k, v in (palette or {}).items()}

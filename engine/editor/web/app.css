@@ -248,3 +248,11 @@ body.opening .tools, body.opening main, body.opening #save { display: none; }
 .banner-preview button[aria-pressed="true"] { border-color: var(--ink); font-weight: 600; }
 .frames button[aria-pressed="true"] { border-color: var(--ink); font-weight: 600; }
 .sheet.sprite .banner-preview { margin-top: 0.3rem; }
+
+/* far versions of a sprite, and the sprite cell by cell further away in a first-person level */
+.far-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; margin: 8px 0; }
+.far-one { margin: 0; text-align: center; }
+.far-one figcaption { font-size: 12px; color: #6b7280; margin-top: 2px; }
+canvas.far-view, canvas.lod { image-rendering: pixelated; border-radius: 3px; }
+canvas.lod { cursor: crosshair; }
+input.code.short { width: 6em; }

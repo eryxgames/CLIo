@@ -44,6 +44,10 @@ game, RØØTLESS, shows them.
   colours). The engine makes them when a level starts; a sprite can have its own.
 - **Monsters grown on a body plan**: `sprite.monster(seed, body, size)` - biped, beast,
   floater, crawler, brute - with eyes kept in the far versions.
+- **The editor**: Levels and Monsters are listed like everything else. Under Sprites,
+  *Grow a monster* grows one on a body plan, and *Far away, in a first-person level* shows
+  the sprite one to six cells away, keeps its far versions to paint over them pixel by
+  pixel, makes them again, or leaves them to the game.
 - **RØØTLESS** (`games/rootless`), the third demo game: E1M1 *Boot Sector*, a first-person
   level with zombie processes, orphans, daemons, a spawner, barrels, three secrets, a
   locked arena and Cron, who rains fire on a schedule and escapes to be the final boss of

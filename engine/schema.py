@@ -167,7 +167,9 @@ KINDS = [
         R("extra", "rows", "More to the description", one="line", fields=[F("if", "condition", "When"), F("text", "long")]),
         R("music_sound", "choice", "Generated music is played on", options=["chip", "rich"]),
         R("music_form", "text", "Form of generated music (long, or as (A) A B- A+)"),
-        R("on_first_enter", "effects", "On entering for the first time"), R("on_enter", "effects", "On entering")]},
+        R("on_first_enter", "effects", "On entering for the first time"), R("on_enter", "effects", "On entering"),
+        R("level", "ref", "A first-person level played here", of="levels"),
+        R("on_level_exit", "effects", "When its level is finished")]},
     {"key": "items", "file": "items", "label": "Items", "one": "item", "shape": "map", "title": "name", "fields": [
         F("name"), F("short", label="Short name"), F("description", "long"), F("aliases", "tags"),
         F("value", "number"), F("takeable", "bool"), F("usable", "bool"), F("use_text", "long"),
@@ -223,6 +225,17 @@ KINDS = [
                 F("effect", "choice", "Animation when it is shown", options=list(_fx.NAMES)),
                 F("fps", "number", "Drawings a second"), F("loops", "number", "Times the drawings play")]},
     {"key": "dungeon", "file": "dungeon", "label": "Dungeon", "one": "dungeon", "shape": "object", "fields": []},
+    {"key": "levels", "file": "levels", "label": "Levels", "one": "level", "shape": "map", "title": "name", "fields": [
+        F("name"), F("title", label="Title shown when it starts"), F("par", "number", "Par (beats)"),
+        F("music", "ref", of="music"), F("facing", "choice", "The player starts facing", options=["n", "e", "s", "w"]),
+        R("death_text", "ref", "Text when the player dies", of="texts")]},
+    {"key": "monsters", "file": "monsters", "label": "Monsters", "one": "monster", "shape": "map", "title": "name",
+     "fields": [
+        F("name"), F("role"), F("tag", label="Tag letter (z: z1, z2...)"), F("sprite", "sprite", "Sprite"),
+        F("hp", "number", "Health"), F("size", "number", "Size (1: a person)"),
+        F("float", "number", "Floats above the floor (0..1)"), F("sight", "number", "Sees this many cells"),
+        F("awake", "bool", "Awake from the start"), F("boss", "bool"), F("drops", "ref", "Drops", of="items"),
+        F("death", label="When it dies (%s: its tag)")]},
 ]
 
 BY_FILE = {k["file"]: k for k in KINDS}

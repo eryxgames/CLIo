@@ -56,6 +56,12 @@ def handle(game_dir, path, body=None):
         if "palette" in body:
             return {"colours": looks.colours(body.get("palette"))}
         return looks.grow(body.get("seed") or "nobody", body.get("size") or 12)
+    if path == "/api/monster":                              # a monster grown on a body plan, with its far versions
+        return looks.monster(body.get("seed") or "nobody", body.get("body") or "biped", body.get("size") or 18)
+    if path == "/api/far":                                  # far versions made from a drawing
+        return looks.far(body.get("pixels"), body.get("keep") or "")
+    if path == "/api/distances":                            # a sprite as a level draws it, cell by cell further away
+        return looks.distances(body.get("sprite"), body.get("size") or 1.0)
     if path == "/api/picture":                              # a sprite drawn in its style, as the game draws it
         return looks.picture(game_dir, str(body.get("name") or ""), pending)
     if path == "/api/banner":                               # a banner of game.json, drawn as the game draws it

@@ -568,8 +568,9 @@ function renderForm() {
   const rowsOk = (d) => Array.isArray(d) && d.every((r) => typeof r === "string");
   const drawn = kind.editor === "sprite" && (thing.pixels === undefined || rowsOk(thing.pixels))
     && (thing.palette === undefined || (thing.palette && typeof thing.palette === "object" && !Array.isArray(thing.palette)))
-    && (thing.frames === undefined || (Array.isArray(thing.frames) && thing.frames.every(rowsOk)));
-  const known = new Set(fields.map((f) => f.key).concat(kind.shape === "list" ? ["id"] : [], drawn ? ["palette", "pixels", "frames"] : []));
+    && (thing.frames === undefined || (Array.isArray(thing.frames) && thing.frames.every(rowsOk)))
+    && (thing.lod === undefined || (Array.isArray(thing.lod) && thing.lod.every((l) => l && rowsOk(l.pixels) && l.pixels.length)));
+  const known = new Set(fields.map((f) => f.key).concat(kind.shape === "list" ? ["id"] : [], drawn ? ["palette", "pixels", "frames", "lod", "keep"] : []));
   const parts = [];
 
   const head = el("div", { class: "head" }, el("h2", {}, single ? kind.label : titleOf(kind, hit)));
@@ -834,6 +835,17 @@ function paintSprite(canvas, pixels, colours, cell, screen) {
   }
 }
 
+// A picture given as colours, row by row (null: nothing there), on the dark of a screen.
+function paintColours(canvas, rows, cell) {
+  const h = rows.length, w = Math.max(1, ...rows.map((r) => r.length));
+  canvas.width = w * cell;
+  canvas.height = h * cell;
+  const c = canvas.getContext("2d");
+  c.fillStyle = "#0f1724";
+  c.fillRect(0, 0, canvas.width, canvas.height);
+  rows.forEach((r, y) => r.forEach((col, x) => { if (col) { c.fillStyle = col; c.fillRect(x * cell, y * cell, cell, cell); } }));
+}
+
 // The sprite a character will be drawn with: its own from sprites.json, or the one the game grows from its name.
 function spriteField(kind, f, thing, change) {
   const input = el("input", { type: "text", class: "code", value: thing[f.key] || "", placeholder: "auto, none, or the name of a sprite",
@@ -1008,7 +1020,7 @@ function spriteEditor(kind, thing) {
   const MAX = 64;
   let colours = {};
   let pen = Object.keys(thing.palette)[0] || CLEAR;
-  let mirror = true, cursor = [0, 0], painting = false, at = 0, drawn = null, timer = null, wait = null;
+  let mirror = true, cursor = [0, 0], painting = false, at = 0, drawn = null, timer = null, wait = null, farWait = null;
   // drawing 0 is "pixels"; the others are "frames", played in turn after it
   const all = () => [thing.pixels].concat(thing.frames || []);
   const cur = () => all()[at] || thing.pixels;
@@ -1071,7 +1083,7 @@ function spriteEditor(kind, thing) {
     };
     step();
   }
-  function changed() { touched(kind); later(); }
+  function changed() { touched(kind); later(); farLater(); }
   function set(x, y, letter) {
     const rows = cur();
     const put = (cx) => { if (cx >= 0 && cx < width() && y >= 0 && y < rows.length) rows[y] = rows[y].slice(0, cx) + letter + rows[y].slice(cx + 1); };
@@ -1163,8 +1175,76 @@ function spriteEditor(kind, thing) {
   } }, "Grow");
   const tick = el("input", { type: "checkbox", checked: true, onchange: (e) => { mirror = e.target.checked; } });
 
+  // ---- a monster grown on a body plan, and how it looks far away in a first-person level
+  const body = el("select", { "aria-label": "Body plan" }, ...["biped", "beast", "floater", "crawler", "brute"].map((b) => el("option", { value: b }, b)));
+  const tall = el("input", { type: "number", min: "10", max: "48", value: String(Math.max(12, Math.min(48, thing.pixels.length || 18))), "aria-label": "Height in pixels" });
+  const growMonster = el("button", { type: "button", class: "quiet", onclick: async () => {
+    if (thing.pixels.join("").replace(/\./g, "") && !confirm("Replace this drawing (and its colours) with a grown monster?")) return;
+    try {
+      const made = await api("/api/monster", { seed: seed.value || state.id || "nobody", body: body.value, size: Number(tall.value) || 18 });
+      thing.palette = made.palette; thing.pixels = made.pixels; thing.lod = made.lod;
+      if (made.keep) thing.keep = made.keep; else delete thing.keep;
+      keep.value = thing.keep || "";
+      colours = Object.assign({}, made.palette);
+      delete thing.frames;
+      at = 0;
+      pen = Object.keys(thing.palette)[0] || CLEAR;
+      changed(); sizes(); frameTabs(); palette(); draw(); farAway();
+    } catch (err) { status("Could not grow a monster: " + err.message, true); }
+  } }, "Grow a monster");
+  const keep = el("input", { type: "text", class: "code short", value: thing.keep || "", placeholder: "eE", spellcheck: "false",
+    "aria-label": "Letters that must stay in the far versions",
+    oninput: (e) => { if (e.target.value.trim()) thing.keep = e.target.value.trim(); else delete thing.keep; changed(); } });
+  const farBox = el("div", { class: "far" });
+  const farNote = el("p", { class: "note" });
+  function farLater() { clearTimeout(farWait); farWait = setTimeout(farAway, 400); }
+  async function farAway() {
+    let res;
+    try { res = await api("/api/distances", { sprite: { pixels: thing.pixels, palette: colours, lod: thing.lod, keep: thing.keep } }); }
+    catch (err) { farNote.textContent = "It cannot be drawn: " + err.message; return; }
+    const views = res.distances.map((d) => {
+      const c = el("canvas", { class: "far-view", role: "img",
+        title: `${d.cells} cell${d.cells === 1 ? "" : "s"} away: ${d.drawing ? "far version " + d.drawing + (d.made ? " (made by the game)" : "") : "the drawing itself"}` });
+      paintColours(c, d.pixels, 4);
+      return el("figure", { class: "far-one" }, c, el("figcaption", {}, `${d.cells}`));
+    });
+    const lods = (thing.lod || []).map((l, i) => lodCanvas(l, i));
+    farBox.replaceChildren(
+      el("div", { class: "far-row" }, ...views),
+      el("p", { class: "note" }, thing.lod
+        ? "Far versions, smallest last: click to paint with the chosen colour, right button to rub out."
+        : "No far versions are kept: the game makes them when it loads. Keep them to draw over them."),
+      el("div", { class: "far-row" }, ...lods),
+      el("div", { class: "row" },
+        el("button", { type: "button", class: "quiet small", onclick: async () => {
+          try { thing.lod = (await api("/api/far", { pixels: thing.pixels, keep: thing.keep || "" })).lod; touched(kind); later(); farAway(); }
+          catch (err) { status("Could not make far versions: " + err.message, true); }
+        } }, thing.lod ? "Make them again from the drawing" : "Keep them, to draw over"),
+        thing.lod ? el("button", { type: "button", class: "quiet small warn", onclick: () => { delete thing.lod; touched(kind); later(); farAway(); } },
+          "Let the game make them") : ""));
+    farNote.textContent = "1 to 6: the sprite one to six cells away, as a level draws it at 80 columns. " +
+      "Far away a sprite is drawn from a smaller drawing; the letters to keep (eyes, a mouth) win when it shrinks.";
+  }
+  function lodCanvas(l, i) {
+    const c = el("canvas", { class: "sprite-small lod", role: "img", "aria-label": `Far version ${i + 1}`, title: `Far version ${i + 1}: ${l.pixels[0].length}×${l.pixels.length}` });
+    const paint = () => paintSprite(c, l.pixels, colours, 8, "#0f1724");
+    paint();
+    c.addEventListener("pointerdown", (e) => {
+      const box = c.getBoundingClientRect();
+      const w = Math.max(...l.pixels.map((r) => r.length)), h = l.pixels.length;
+      const x = Math.floor((e.clientX - box.left) / (box.width / w)), y = Math.floor((e.clientY - box.top) / (box.height / h));
+      const letter = e.button === 2 ? CLEAR : pen;
+      const put = (cx) => { if (cx >= 0 && cx < w && y >= 0 && y < h) l.pixels[y] = l.pixels[y].padEnd(w, CLEAR).slice(0, cx) + letter + l.pixels[y].padEnd(w, CLEAR).slice(cx + 1); };
+      put(x);
+      if (mirror) put(w - 1 - x);
+      touched(kind); paint(); farLater();
+    });
+    c.addEventListener("contextmenu", (e) => e.preventDefault());
+    return el("figure", { class: "far-one" }, c, el("figcaption", {}, `${i + 1}`));
+  }
+
   even();
-  coloursOf(thing.palette).then((c) => { colours = c; palette(); draw(); });
+  coloursOf(thing.palette).then((c) => { colours = c; palette(); draw(); farAway(); });
   sizes();
   frameTabs();
   show();
@@ -1178,9 +1258,13 @@ function spriteEditor(kind, thing) {
       el("h3", {}, "Paint"), swatches, el("div", { class: "row" }, picker, el("label", { class: "tick" }, tick, " Mirror left and right")),
       el("h3", {}, "Size"), size,
       el("h3", {}, "Drawings"), tabs,
-      el("h3", {}, "Grow one from words"), el("div", { class: "row" }, seed, grow))),
+      el("h3", {}, "Grow one from words"), el("div", { class: "row" }, seed, grow),
+      el("h3", {}, "Grow a monster"), el("div", { class: "row" }, body, tall, growMonster))),
     el("h3", {}, "As the game draws it"),
     el("div", { class: "banner-preview" }, shown, el("div", { class: "row" }, play), shownNote),
+    el("h3", {}, "Far away, in a first-person level"),
+    el("div", { class: "row" }, el("label", {}, "Letters to keep far away ", keep)),
+    farBox, farNote,
     el("p", { class: "note" }, "Click or drag to paint, right button to rub out. With the keyboard: arrow keys move, Space paints, Delete rubs out. " +
       "More drawings play in turn after the first (how fast is set above); the one before shows faintly while you draw. " +
       `Use it as a picture anywhere art goes: "art": "${state.id || "name"}" in a scene or an item, "portrait" on a character, or name it "title" for the title screen; ` +

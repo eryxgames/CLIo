@@ -980,6 +980,15 @@ a creature grown from the character's name - the same words always grow the same
   times the drawings play are just above the board.
 - *As the game draws it* is the picture drawn by the engine, in its style, on a dark
   screen; *Play the animation* plays it.
+- *Grow a monster* grows an enemy for a [first-person level](#first-person-levels) on a
+  body plan - biped, beast, floater, crawler or brute - as tall as you say, from the words
+  above it; it replaces the drawing and makes its far versions.
+- *Far away, in a first-person level* shows the sprite one to six cells away as a level
+  draws it. *Letters to keep far away* (`keep`) are the colours that must survive the
+  shrinking - eyes, a mouth. *Keep them, to draw over* stores the far versions in the
+  sprite (`lod`) so they can be painted pixel by pixel like the drawing; *Make them again
+  from the drawing* replaces them; *Let the game make them* removes them, and the engine
+  makes them when the level starts.
 
 Banners in game.json (*The title drawn in a graphic style* and the others) are drawn the
 same way, as you type, on a desktop, a phone or a 24-column screen.
@@ -1189,6 +1198,10 @@ The window can be resized at any time; the picture is drawn again at once.
 `python tests/levelbot.py 10 rootless e1m1` lets a simple player walk a level ten times
 (it follows the level's `"bot"` list of goals: item ids or map characters). If it can
 finish, a person can.
+
+In the editor, **Levels** and **Monsters** are listed like everything else; the map is
+edited as text, row by row. Sprites can be grown on a body plan there, and their far
+versions seen, made again and painted (see [Pictures](#pictures)).
 
 ## Coming from CLIo 1
 

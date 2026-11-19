@@ -31,6 +31,7 @@
   "engine/audio/compose.py",
   "engine/audio/sfx.py",
   "engine/audio/synth.py",
+  "engine/audio/ballistic/__init__.py",
   "engine/editor/__init__.py",
   "engine/editor/balance.py",
   "engine/editor/finish.py",

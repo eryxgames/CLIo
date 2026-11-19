@@ -1475,7 +1475,11 @@ class Actions:
         if not words or words == ["status"]:
             for l in a.status():
                 self.say(l, "system")
-            self.say("{hint}Try: music off, sfx off, volume 50, sound test{/}", "hint")
+            self.say("{hint}Try: music off, sfx off, volume 50, sound test%s{/}" % (", sound set" if a.sets else ""),
+                     "hint")
+            return
+        if words[0] in ("set", "sets"):
+            self.say(a.choose_set(" ".join(words[1:])), "system")
             return
         if "test" in words:
             ok = a.sfx("quest_done")

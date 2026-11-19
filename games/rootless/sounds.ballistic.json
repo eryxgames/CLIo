@@ -1,0 +1,16 @@
+{
+ "pistol": {"ballistic": "pistol", "p": {"D": 0, "miss": 0.6, "target": "none", "env": "indoor", "trimWake": 0, "trimImpact": 0}, "action": "game", "vol": 1.0, "variations": 6, "length": 1.2},
+ "shotgun": {"ballistic": "ear", "p": {"v0": 400, "cal": 18.5, "mass": 0.032, "lenRatio": 1, "env": "indoor"}, "action": "game", "vol": 1.0, "variations": 6, "length": 1.4},
+ "chaingun": {"ballistic": "burst", "p": {"D": 0, "miss": 0.6, "env": "indoor", "seqCount": 2, "seqInterval": 0.08, "trimLaunch": 0}, "action": "game", "vol": 1.0, "variations": 6, "length": 1.3},
+ "punch": {"ballistic": "swing", "p": {"v0": 20, "pathLen": 0.3, "D": 0.3, "miss": 0.25, "cal": 20, "mass": 0.6, "lenRatio": 4}, "action": "game", "vol": 0.7, "variations": 4, "length": 0.5},
+ "hit_body": {"ballistic": "nailgun", "p": {"lnType": "none", "bvSpeed": 12, "bvCal": 45, "tgThick": 80, "tgSize": 0.8, "tgEnergy": 40, "targetDist": 0.05}, "action": "game", "vol": 0.8, "variations": 4, "length": 0.6},
+ "hit_wall": {"ballistic": "ricochet", "p": {"D": 2, "miss": 3, "env": "indoor"}, "action": "game", "vol": 0.7, "variations": 4, "length": 1.2},
+ "fly_by": {"ballistic": "pistol", "p": {"D": 10, "miss": 0.8, "target": "none", "env": "indoor"}, "action": "game", "vol": 0.8, "variations": 4, "length": 0.9},
+ "explosion": {"ballistic": "charge", "p": {"exW": 0.3, "exDist": 8, "exSurface": "concrete", "env": "indoor"}, "action": "game", "vol": 1.0, "variations": 3, "length": 3},
+ "fire_throw": {"ballistic": "plasmabolt", "p": {"D": 6, "miss": 1.5, "targetDist": 12, "env": "indoor"}, "action": "game", "vol": 0.8, "variations": 3, "length": 1.6},
+ "orphan_windup": {"ballistic": "spark", "p": {"dcEnergy": 2, "dcLength": 0.05, "dcDist": 3, "dcCharge": 0.9, "dcChargeHz": 6000, "dcSustain": 0.2}, "action": "game", "vol": 0.6, "variations": 3, "length": 1.4},
+ "soul": {"ballistic": "plasmabolt", "p": {"D": 3, "miss": 0.8, "bvTone": 1100, "bvSizzle": 0.9, "targetDist": 0, "tgMat": "none", "env": "indoor"}, "action": "game", "vol": 0.6, "variations": 3, "length": 0.8},
+ "soul_death": {"ballistic": "tube", "p": {"imDist": 3, "imGroan": 0}, "action": "game", "vol": 0.7, "variations": 3, "length": 1.4},
+ "cron_wake": {"ballistic": "tesla", "action": "game", "vol": 0.8, "variations": 2, "length": 1.8},
+ "teleport": {"ballistic": "shielddown", "action": "game", "vol": 0.35, "variations": 2, "length": 2}
+}

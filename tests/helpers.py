@@ -20,6 +20,7 @@ for _var, _prefix in (("CLIO_SAVES", "clio-test-saves-"), ("CLIO_CACHE", "clio-t
         _dir = tempfile.mkdtemp(prefix=_prefix)
         os.environ[_var] = _dir
         atexit.register(shutil.rmtree, _dir, True)
+os.environ.pop("CLIO_SOUNDS", None)             # games play their own sounds in the tests, whatever the shell says
 
 from engine.audio import Audio                      # noqa: E402
 from engine.audio.backends import NullBackend       # noqa: E402

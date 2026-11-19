@@ -14,6 +14,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import re
 
 from .automap import norm_dir
 
@@ -108,6 +109,7 @@ class GameData:
         self.triggers = triggers if isinstance(triggers, list) else list(triggers.values())
         self.songs = load("music") or {}
         self.sounds = load("sounds") or {}
+        self.sound_sets = self._sound_sets(cfg)        # name -> sounds played instead (sounds.<name>.json)
         self.sprites = load("sprites") or {}
         self.dungeon = load("dungeon") or {}
         self.levels = load("levels") or {}             # first-person levels (engine/level.py)
@@ -121,6 +123,54 @@ class GameData:
         self._legacy_fixups()
 
     # ------------------------------------------------------------------ #
+    def _sound_sets(self, cfg):
+        """Other sets of sound effects, to play instead of the game's own: every ``sounds.<name>.json`` in the
+        game's folder, and those game.json lists under ``"sound_sets"`` (name -> file)."""
+        found = {}
+        try:
+            names = sorted(os.listdir(self.dir))
+        except OSError:
+            names = []
+        for fn in names:
+            m = re.match(r"sounds\.([A-Za-z0-9_-]+)\.json$", fn)
+            if m:
+                found[m.group(1).lower()] = fn
+        listed = cfg.get("sound_sets")
+        if isinstance(listed, dict):
+            for name, fn in listed.items():
+                if isinstance(fn, str):
+                    found[str(name).lower()] = fn
+        self._missing_sets = []
+        sets = {}
+        for name, fn in found.items():
+            p = fn if os.path.isabs(fn) else os.path.join(self.dir, fn)
+            if os.path.isfile(p):
+                blob = read_json(p)
+                sets[name] = blob if isinstance(blob, dict) else {}
+            else:
+                self._missing_sets.append((name, fn))
+        return sets
+
+    def _validate_sounds(self):
+        """Sound sets, and the Ballistic sounds in them and in sounds.json."""
+        problems = []
+        for name, fn in getattr(self, "_missing_sets", []):
+            problems.append("game.json: sound set '%s' has no file %s" % (name, fn))
+        want = self.config.get("sound_set")
+        if want and str(want).lower() not in ("default", "none") and str(want).lower() not in self.sound_sets:
+            problems.append("game.json: unknown sound_set '%s' (there are: %s)"
+                            % (want, ", ".join(["default"] + sorted(self.sound_sets))))
+        try:
+            from .audio import ballistic
+        except ImportError:                         # an engine without its audio package (the editor in a browser)
+            return problems
+        tables = [("sounds.json", self.sounds)] + [("sounds.%s.json" % n, s) for n, s in sorted(self.sound_sets.items())]
+        for where, table in tables:
+            for sid, spec in (table or {}).items():
+                if ballistic.is_spec(spec):
+                    problems += ballistic.problems(spec, "%s: sound '%s'" % (where, sid))
+        return problems
+
     def _norm_scenes(self, raw):
         scenes = {}
         if isinstance(raw, dict) and "scenes" in raw and isinstance(raw["scenes"], (list, dict)):
@@ -247,6 +297,7 @@ class GameData:
         problems += self._validate_modes()
         problems += self._validate_dungeon()
         problems += self._validate_looks()
+        problems += self._validate_sounds()
         if self.levels or self.monsters:
             from . import level
             problems += level.validate(self)

@@ -73,7 +73,7 @@ HELP = [
     ("", "text"),
     ("Typed: k j h l, turn left/right/around, use,", "dim"),
     ("f [x], kill [-9] x, t x, w [n], map, ps, man x,", "dim"),
-    ("history, alias n='...', keys, whoami, q", "dim"),
+    ("history, alias n='...', keys, whoami, sound, q", "dim"),
     ("a; b   a && b   a || b   !!  !3  !f   as in a shell", "dim"),
     ("A surprise stops a line, as ^C would.", "dim"),
 ]
@@ -646,6 +646,16 @@ class Level:
             self.console.page(self, [("%-12s %s" % kv, "text") for kv in sorted(km.items())] if km
                               else [("No single keys here: type the commands.", "dim")])
             return True
+        m = re.fullmatch(r"sound(?:\s+(set)(?:\s+(\S+))?)?", t)
+        if m:
+            if self.audio is None:
+                self.say("No sound here.", "dim")
+            elif m.group(1):
+                self.say(self.audio.choose_set(m.group(2)), "dim")
+            else:
+                self.console.page(self, [(l, "text") for l in self.audio.status()] +
+                                  ([("sound set NAME plays another set of sounds", "dim")] if self.audio.sets else []))
+            return True
         if t == "whoami":
             self.say("rootless   (uid 1000; root was revoked)" if not self.player.sudo else "root   (for now)", "dim")
             return True
@@ -920,6 +930,9 @@ class Level:
                             hits[m] = hits.get(m, 0) + rng.randint(lo, hi)
         if target in hits:
             self.stats["hits"] += 1
+            self.sfx((target.spec.get("sounds") or {}).get("hit") or (None if target.barrel else "hit_body"))
+        elif not melee:
+            self.sfx("hit_wall")                    # it flies past, into what is behind
         if hits:
             sound = w.get("text", {"melee": "THUD."}.get(w.get("kind"), "BLAM." if w.get("pellets", 1) > 1 else "BANG."))
             self.damage(sorted(hits.items(), key=lambda kv: kv[0] is not target), lead=sound)
@@ -949,6 +962,7 @@ class Level:
                 if cell.kind == "panel" and cell.panel == "shoot":
                     self.open_panel(cell)
                 else:
+                    self.sfx("hit_wall")
                     self.say("Your shot hits the %s." % ("door" if cell.kind == "door" else "wall"), "dim")
                 return
         self.say("You fire into the dark.", "dim")
@@ -1301,6 +1315,7 @@ class Level:
         if total:
             self.hurt(total, "%s shoots you." % m.tag, by=m)
         else:
+            self.sfx("fly_by")
             self.say("%s's shot goes wide." % m.tag, "dim")
 
     def throw(self, m, foe):

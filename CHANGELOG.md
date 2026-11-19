@@ -56,6 +56,19 @@ game, RØØTLESS, shows them.
   `--check` also counts levels and monsters, and checks their maps and references.
 - `tests/levelbot.py`: a simple player that walks a level by its `"bot"` goals - if it can
   finish, a person can. 28 more tests.
+- **Sound sets** (`sounds.NAME.json`): other sets of sound effects over a game's own, chosen
+  with `--sounds NAME`, `CLIO_SOUNDS`, `"sound_set"` in game.json, or `sound set NAME` while
+  playing (in levels too).
+- **Sounds from Ballistic Foley Lab** (`engine/audio/ballistic`): a sound can be one of
+  Ballistic's physical models - shots, ricochets, blasts, impacts, arcs, energy fields - with
+  its parameters, its finishing for games (`"action": "game"`) and several takes that shots
+  in a row take turns with. Node.js renders them in the background into the audio cache;
+  `--bake-sounds SET` writes them into the game as WAV files that play without Node; with
+  neither, the game's own sound plays. `--check` knows Ballistic's presets and parameters.
+- Levels play `hit_body` (a shot or blow lands; a monster's own `sounds.hit` first),
+  `hit_wall` (a shot meets a wall, or misses) and `fly_by` (a monster's shot goes wide),
+  silent unless a game gives them. RØØTLESS has a Ballistic set for its weapons, hits,
+  fire, souls, explosions and Cron: `python clio.py rootless --sounds ballistic`. 17 more tests.
 
 ### Changed
 

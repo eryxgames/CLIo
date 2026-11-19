@@ -44,6 +44,12 @@ class Game(Actions):
             self.audio.songs = dict(self.data.songs)
         if not self.audio.sounds:
             self.audio.sounds = dict(self.data.sounds)
+        if not self.audio.sets:
+            self.audio.sets = dict(self.data.sound_sets)
+        # a set of sounds over the game's own: asked for (--sounds, CLIO_SOUNDS), else the game's choice
+        want = self.settings.get("sound_set") or os.environ.get("CLIO_SOUNDS") or self.data.config.get("sound_set")
+        if want and not self.audio.set_sound_set(want):
+            self.audio.last_error = "no sound set called '%s'" % want
         self.ui.audio = self.audio
         self.art = ArtLibrary(self.data.art_dir, ENGINE_ART, sprites=self.data.sprites)
         self.parser = Parser(self.data.config.get("verbs"))

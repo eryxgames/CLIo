@@ -8,6 +8,7 @@
     python clio.py --list          list the games
     python clio.py depths --seed 7 a reproducible dungeon
     python clio.py --looks         the logos, banner styles, palettes and animations
+    python clio.py rootless --sounds ballistic   play with another set of sound effects
     python clio.py --banner "The Hollow" --banner-style reflect --export art/title.art
 
 Needs only Python 3.8+.  Runs on Linux, macOS, Windows and Termux.
@@ -48,6 +49,45 @@ def walkthrough(game_dir):
         if cover["missing"]:
             print("No walkthrough reaches these %s: %s" % (what, ", ".join(cover["missing"])))
     return 0 if result["finished"] else 1
+
+
+def bake_sounds(game_dir, name):
+    """--bake-sounds: render a set's Ballistic sounds into the game as WAV files, which play without Node.js."""
+    from engine.audio import ballistic
+    data = GameData(game_dir)
+    want = name.strip().lower()
+    table = data.sounds if want == "default" else data.sound_sets.get(want)
+    if table is None:
+        print("'%s' has no sound set called '%s' (it has: %s)."
+              % (data.title, name, ", ".join(["default"] + sorted(data.sound_sets))))
+        return 2
+    found = [(n, s) for n, s in table.items() if ballistic.is_spec(s)]
+    if not found:
+        print("The %s sounds of %s have no Ballistic sounds to bake." % (want, data.title))
+        return 0
+    problems = [p for n, s in found for p in ballistic.problems(s, "sound '%s'" % n)]
+    if problems:
+        for p in problems:
+            print("  ! " + p)
+        print("Nothing was baked: %d problem(s)." % len(problems))
+        return 1
+    sounds = ballistic.Sounds(lambda: game_dir, lambda: game_dir, sync=True)
+    if not sounds.available():
+        print("Baking needs Node.js, which was not found. Install it, or set CLIO_NODE to the node program.")
+        return 2
+    folder = sounds.baked_dir(None if want == "default" else want)
+    near = os.path.relpath(folder)
+    print("Baking %d sounds into %s" % (len(found), folder if near.startswith("..") else near))
+    try:
+        bad = sounds.bake(None if want == "default" else want, found, report=lambda line: print("  " + line))
+    finally:
+        sounds.close()
+    for b in bad:
+        print("  ! " + b)
+    if bad:
+        return 1
+    print("Done. These files play without Node.js; bake again after changing a sound.")
+    return 0
 
 
 def text_table(game_dir, out_file=None, in_file=None):
@@ -251,6 +291,10 @@ def main(argv=None):
     ap.add_argument("--no-browser", action="store_true", help="with --edit: print the address, do not open it")
     ap.add_argument("--style", help="visual style (%s)" % ", ".join(available_themes()))
     ap.add_argument("--no-sound", action="store_true", help="run silently")
+    ap.add_argument("--sounds", metavar="SET",
+                    help="play another set of sound effects, from the game's sounds.SET.json (also CLIO_SOUNDS)")
+    ap.add_argument("--bake-sounds", metavar="SET",
+                    help="render the set's Ballistic sounds into the game as WAV files (needs Node.js) and exit")
     ap.add_argument("--no-color", action="store_true", help="plain text, no colours")
     ap.add_argument("--ascii", action="store_true", help="ASCII only (no box-drawing or block characters)")
     ap.add_argument("--glyphs", choices=("full", "safe", "ascii"),
@@ -316,6 +360,12 @@ def main(argv=None):
         return walkthrough(game_dir)
     if args.export_text or args.import_text:
         return text_table(game_dir, args.export_text, args.import_text)
+    if args.bake_sounds:
+        try:
+            return bake_sounds(game_dir, args.bake_sounds)
+        except GameDataError as e:
+            print("Cannot read the game: %s" % e)
+            return 2
     try:
         if args.check:
             data = GameData(game_dir)
@@ -338,11 +388,17 @@ def main(argv=None):
             settings["lines"] = True
         if args.scroll:
             settings["scroll_levels"] = True
+        if args.sounds:
+            settings["sound_set"] = args.sounds
         game = Game(game_dir, term=term, audio=audio, seed=args.seed, settings=settings, mode=args.mode)
         if args.mode and args.mode not in game.modes:
             print("'%s' has no mode called '%s'%s." % (
                 game.data.title, args.mode,
                 (" (it has: %s)" % ", ".join(game.modes)) if game.modes else ""))
+            return 2
+        if args.sounds and not game.audio.set_sound_set(args.sounds):
+            print("'%s' has no sound set called '%s' (it has: %s)." % (
+                game.data.title, args.sounds, ", ".join(["default"] + sorted(game.data.sound_sets))))
             return 2
         if args.style:
             game.ui.apply_theme(load_theme(args.style, game.data.dir))

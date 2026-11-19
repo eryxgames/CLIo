@@ -659,6 +659,68 @@ focus special flee enemy_down win lose explosion`. Add or replace them in `sound
 
 Rendered audio is cached in `~/.cache/clio/audio` (override with `CLIO_CACHE`).
 
+### Sound sets
+
+A game can have more than one set of sound effects. Every `sounds.NAME.json` in the game's folder is a set
+(or list them in `game.json`: `"sound_sets": {"loud": "audio/loud.json"}`). A set holds sounds by name, written
+as in `sounds.json`; a name it does not have plays the game's own sound. A sound in a set may also be just the
+name of another sound.
+
+Which set plays: `--sounds NAME` on the command line, else `CLIO_SOUNDS=NAME`, else `"sound_set"` in
+`game.json`, else the game's own. In the game, `sound set` lists the sets and `sound set NAME` changes to one
+(`sound set default` goes back); it works inside first-person levels too, so the same fight can be heard both ways.
+
+### Sounds from Ballistic
+
+A sound can come from the engine of [Ballistic Foley Lab](https://github.com/eigensoundlab/ballistic),
+which models shots, ricochets, blasts, impacts, electric arcs and energy fields from physics: the muzzle blast
+and the bullet's crack, the room it is fired in, the plate it hits. Name one of Ballistic's presets (they are
+listed in its page, and in `engine/audio/ballistic/engine.js` under `PRESETS`) and change what you need:
+
+```json
+"pistol":   {"ballistic": "pistol", "p": {"D": 0, "target": "none", "env": "indoor"}, "action": "game",
+             "vol": 1.0, "variations": 6, "length": 1.2},
+"hit_wall": {"ballistic": "ricochet", "p": {"D": 2, "env": "indoor"}, "action": "game", "vol": 0.7},
+"zap":      {"ballistic": {"kind": "discharge", "dcEnergy": 2, "dcDist": 3}, "fallback": "error"}
+```
+
+- `ballistic`: a preset, or an object of parameters (Ballistic's names; `--check` knows them all).
+- `p`: parameters to change in the preset: `D` is the distance to the listener in metres (0: the one who
+  fires), `env` the place (`indoor`, `urban`, `forest`, `field`, `valley`...), `target` or `tgMat` what the shot hits.
+- `action`: Ballistic's finishing for games - `"game"` adds punch, weight and loudness; also `"block"`,
+  `"slow"`, `"far"`, or an object of its action parameters (`punch`, `weight`, `drive`, `bite`, `tail`, `swell`,
+  `width`, `loud`, `slowmo`). Without it the sound is the physics alone, quieter beside chip sounds.
+- `vol`: the loudest point, 0 to 1 (default 0.7). `length`: seconds, cut with a short fade (default 2.5).
+  `channels`: 1 for mono (default 2).
+- `variations`: how many takes, 1 to 12 (default 4). Each is the same event with other chance; shots in a row
+  play different takes and never the same one twice running.
+- `fallback`: the sound to play when Ballistic cannot (see below). Without it, the game's own sound of the same
+  name plays.
+
+Ballistic's engine is JavaScript, so the takes are rendered by [Node.js](https://nodejs.org) when one is
+installed (`CLIO_NODE` points at another; `CLIO_NODE=none` turns it off). A game starts rendering every take
+of the set in the background as soon as it begins, the first take of each sound first; the takes are kept in
+the audio cache, so a second run renders nothing. A typical shot takes 10 to 50 ms to render.
+
+To ship a game whose players may not have Node, bake the takes into it:
+
+```bash
+python clio.py rootless --bake-sounds ballistic     # into games/rootless/sounds/ballistic/
+```
+
+They play without Node, at the effects volume. Bake again after changing a sound: with Node, a changed sound
+is rendered fresh rather than played from an old bake. With neither Node nor baked takes, the fallback plays,
+so a game never goes silent for want of Node. `sound` in the game says what was found.
+
+First-person levels play three more sounds a game may give, all silent unless it does: `hit_body` when the
+player's shot or blow lands (a monster's `"sounds": {"hit": ...}` replaces it), `hit_wall` when a shot meets a
+wall or misses, and `fly_by` when a monster's shot goes wide of the player. RØØTLESS's `sounds.ballistic.json`
+gives Ballistic's sounds to its weapons, hits, fire, souls, explosions and Cron:
+
+```bash
+python clio.py rootless --sounds ballistic
+```
+
 ## Generated dungeons
 
 ```json

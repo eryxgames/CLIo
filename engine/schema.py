@@ -152,6 +152,7 @@ KINDS = [
         R("title_effect", "choice", "Animation of the title picture", options=list(_fx.NAMES)),
         R("music_sound", "choice", "Generated music is played on", options=["chip", "rich"]),
         R("music_form", "text", "Form of generated music (long, or as (A) A B- A+)"),
+        R("sound_set", "text", "Sound effects from another set (sounds.NAME.json), unless the player picks one"),
         R("logo", "choice", "CLIo logo on the title screen", options=_logo_names()),
         R("win_banner", "banner", "Banner when the player wins", fields=BANNER),
         R("lose_banner", "banner", "Banner when the player loses", fields=BANNER),

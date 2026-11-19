@@ -7,6 +7,7 @@
     audio.music({"generate": {"mood": "dark", "seed": 7}})
     audio.music("music/theme.ogg")    # a real file, if a player can handle it
     audio.sfx("pickup")               # built-in or game-defined effect
+    audio.set_sound_set("ballistic")  # sounds.ballistic.json over the game's own sounds
 
 Everything is optional and failure-proof: with no audio player on the machine
 the calls simply do nothing.
@@ -19,7 +20,7 @@ import os
 import tempfile
 import threading
 
-from . import synth
+from . import ballistic, synth
 from .backends import INSTALL_HINTS, NullBackend, detect, platform_name
 from .compose import MOODS, SOUNDS, compose
 from .sfx import SFX, voice_blip
@@ -52,10 +53,13 @@ def default_cache_dir(env=None):
 
 class Audio:
     def __init__(self, game_dir=None, songs=None, sounds=None, enabled=True, backend=None,
-                 cache_dir=None, env=None):
+                 cache_dir=None, env=None, sound_sets=None):
         self.game_dir = game_dir
         self.songs = dict(songs or {})
         self.sounds = dict(sounds or {})
+        self.sets = dict(sound_sets or {})   # set name -> sounds played instead of the game's own
+        self.sound_set = None                # the set in use, if any
+        self._ballistic = None
         self.enabled = enabled
         self.music_on = True
         self.sfx_on = True
@@ -153,6 +157,30 @@ class Audio:
             return False
 
     def _sfx_path(self, name):
+        """``(path, volume_in_file)`` of the sound to play for a name, or ``(None, ...)``.  The sound set in use
+        comes first; where it has no sound for the name, or its sound cannot play here, the game's own does."""
+        if isinstance(name, str) and self.sound_set:
+            spec = (self.sets.get(self.sound_set) or {}).get(name)
+            if spec is not None:
+                path, baked = self._set_path(name, spec)
+                if path is not None:
+                    return path, baked
+        return self._own_path(name)
+
+    def _set_path(self, name, spec):
+        if isinstance(spec, str):                       # a file, or another of the game's sounds
+            f = self._file(spec)
+            if f:
+                return (f, False) if self.backend.can_play(f) else (None, False)
+            return self._own_path(spec) if spec != name else (None, False)
+        if ballistic.is_spec(spec):
+            path, baked = self._ballistic_path(name, spec, self.sound_set)
+            if path is None and spec.get("fallback") and spec.get("fallback") != name:
+                return self._own_path(spec["fallback"])
+            return path, baked
+        return self._synth_path(spec)
+
+    def _own_path(self, name):
         spec = name
         if isinstance(name, str):
             spec = self.sounds.get(name, None)
@@ -166,12 +194,84 @@ class Audio:
                 if f and self.backend.can_play(f):
                     return f, False
                 spec = SFX.get(spec) or SFX.get(name)
+            elif ballistic.is_spec(spec):               # sounds.json may have Ballistic's sounds too
+                path, baked = self._ballistic_path(name, spec, None)
+                if path is not None:
+                    return path, baked
+                fb = spec.get("fallback")
+                spec = self.sounds.get(fb) if fb and fb != name else None
+                if isinstance(spec, str) or ballistic.is_spec(spec):
+                    spec = None
+                spec = spec or SFX.get(fb) or SFX.get(name)
+        elif ballistic.is_spec(spec):
+            return self._ballistic_path("spec", spec, None)
+        return self._synth_path(spec)
+
+    def _synth_path(self, spec):
         if not spec:
             return None, False
         path = self._cached("sfx", spec, self.sfx_volume, lambda: synth.render_sfx(spec))
         if path and not self.backend.can_play(path):
             return None, True
         return path, True
+
+    # ------------------------------------------------------------------ #
+    # sound sets and Ballistic's sounds
+    # ------------------------------------------------------------------ #
+    @property
+    def ballistic(self):
+        """The takes of the game's Ballistic sounds (engine/audio/ballistic), made when first needed."""
+        if self._ballistic is None:
+            self._ballistic = ballistic.Sounds(lambda: self.cache_dir, lambda: self.game_dir,
+                                               sync=bool(getattr(self.backend, "record", False)), env=self.env)
+        return self._ballistic
+
+    def _ballistic_path(self, name, spec, set_name):
+        path, in_file = self.ballistic.path_for(name, spec, self.sfx_volume, set_name)
+        if path and not self.backend.can_play(path):
+            return None, False
+        return path, in_file
+
+    def _ballistic_sounds(self):
+        """``(name, spec)`` of every Ballistic sound that can play now: the set's, then the game's own."""
+        mine = (self.sets.get(self.sound_set) if self.sound_set else None) or {}
+        out = [(n, s) for n, s in mine.items() if ballistic.is_spec(s)]
+        out += [(n, s) for n, s in self.sounds.items() if ballistic.is_spec(s) and n not in mine]
+        return out
+
+    def prepare(self):
+        """Render the Ballistic sounds in use in the background, so the first shot need not wait."""
+        if not (self.enabled and self.available):
+            return 0
+        found = self._ballistic_sounds()
+        return self.ballistic.prepare(found, self.sfx_volume, self.sound_set) if found else 0
+
+    def set_sound_set(self, name):
+        """Play a sound set (``sounds.<name>.json``) over the game's own sounds; None or "default" for none.
+        False if the game has no such set."""
+        name = (name or "").strip().lower()
+        if name in ("", "default", "none", "off"):
+            self.sound_set = None
+        elif name in self.sets:
+            self.sound_set = name
+        else:
+            return False
+        self.prepare()
+        return True
+
+    def choose_set(self, want=None):
+        """The ``sound set`` command: switch to a set, or say which there are.  A line of text."""
+        names = ", ".join(["default"] + sorted(self.sets))
+        if not want:
+            if not self.sets:
+                return "This game has one set of sounds."
+            return "Sound set: %s. There are: %s." % (self.sound_set or "default", names)
+        if not self.set_sound_set(want):
+            return "There is no sound set called '%s'. There are: %s." % (want.strip(), names)
+        line = "Sound set: %s." % (self.sound_set or "default")
+        if self._ballistic_sounds() and not self.ballistic.available():
+            line += " Its Ballistic sounds need Node.js, which is not here: the game's own sounds play instead."
+        return line
 
     def voice(self, pitch=220, wave="square", seed=0):
         """A short babble in a character's 'voice'."""
@@ -302,7 +402,10 @@ class Audio:
 
     def set_volume(self, music=None, sfx=None):
         if sfx is not None:
+            was = self.sfx_volume
             self.sfx_volume = max(0.0, min(1.0, float(sfx)))
+            if self._ballistic is not None and abs(was - self.sfx_volume) > 1e-6:
+                self.prepare()
         if music is not None:
             self.music_volume = max(0.0, min(1.0, float(music)))
             self._start()
@@ -319,6 +422,12 @@ class Audio:
             lines.append("Output: %s" % (self.note or b.description))
         lines.append("Music: %s (volume %d%%)" % ("on" if self.music_on else "off", round(self.music_volume * 100)))
         lines.append("Effects: %s (volume %d%%)" % ("on" if self.sfx_on else "off", round(self.sfx_volume * 100)))
+        if self.sets:
+            lines.append("Sound set: %s (sets: %s)" % (self.sound_set or "default",
+                                                       ", ".join(["default"] + sorted(self.sets))))
+        found = self._ballistic_sounds()
+        if found:
+            lines.extend(self.ballistic.status(found))
         if self.wanted:
             lines.append("Track: %s" % self.wanted.split(":", 1)[-1])
         if self.last_error:
@@ -328,6 +437,8 @@ class Audio:
     def shutdown(self):
         with self._lock:
             self._token += 1
+        if self._ballistic is not None:
+            self._ballistic.close()
         if self._backend is not None:
             try:
                 self._backend.shutdown()

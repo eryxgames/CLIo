@@ -44,6 +44,8 @@ python clio.py rootless   # first-person shooter in a terminal
 - [x] Fights against groups: every enemy shows its intent, targets by number, area skills and items
 - [x] Character generator (name and class at the start of a game)
 - [x] Sounds and music: synthesizer, generative composer, optional audio files
+- [x] Sound sets, and physically modelled shots, ricochets and blasts from
+      [Ballistic Foley Lab](https://github.com/eigensoundlab/ballistic)'s engine (rendered with Node.js, or baked)
 - [x] Styling: seven themes, frames, typewriter / fade / glitch effects, HUD
 - [x] ASCII art with colour masks, half-block pixel sprites, procedural sprites
 - [x] Banners: a game's title (or any text) in nine graphic styles and thirteen palettes, with
@@ -77,6 +79,7 @@ python clio.py [game] [options]
   --list          list the games
   --style NAME    default, elegant, minimal, modern, retro, techno, console
   --no-sound      run silently
+  --sounds SET    another set of sound effects (rootless: ballistic, which needs Node.js or baked takes)
   --no-color      plain text
   --ascii         no box-drawing or block characters
   --glyphs MODE   full, safe (frames stay, symbols become plain) or ascii
@@ -185,6 +188,7 @@ engine/
   banner.py          text in graphic styles   fx.py       art animation
   automap.py         auto-map                 maze.py     dungeon generator
   audio/             synth, composer, sound effects, playback backends
+    ballistic/       Ballistic Foley Lab's sound engine, run in Node.js
   data.py            loading and normalising game files
   world.py           game state, save/load
   parser.py          command parser           actions.py  the verbs

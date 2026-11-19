@@ -10,7 +10,7 @@ at the bottom that keeps ticking - a crontab line, say.  Any key goes on to the
 usual "THE END".  Piped, or on a small screen, nothing is shown here and the
 usual ending says it all.
 
-    "end_screen": {"heading": "EPISODE 1 COMPLETE", "picture": "cron",
+    "end_screen": {"heading": "EPISODE 1 COMPLETE", "picture": ["marine", "cron"],
                    "next": "Next: User Space", "credits": ["..."],
                    "tick": "*/3 * * * *  cron  rain"}
 """
@@ -84,7 +84,20 @@ def rows_of(game, spec, body, t, k, now, W, H, paint):
         out.append(" " * max(0, (W - visible_len(line)) // 2) + line)
     out.append("")
     room = H - len(out) - 4
-    pic = picture(data, spec.get("picture"), min(14, room))
+    names = spec.get("picture")
+    pics = [picture(data, n, min(14, room)) for n in (names if isinstance(names, list) else [names])]
+    pics = [p_ for p_ in pics if p_]
+    pic = []                                                  # several pictures stand side by side, feet level
+    if pics:
+        tall = max(len(p_) for p_ in pics)
+        for i in range(tall):
+            row = []
+            for j, p_ in enumerate(pics):
+                if j:
+                    row += [(" ", None, DARK)] * 2
+                off = tall - len(p_)
+                row += p_[i - off] if i >= off else [(None, DARK, DARK)] * len(p_[0])
+            pic.append(row)
     pw = len(pic[0]) if pic else 0
     right = W - pw - (4 if pic else 2) - 1
     lines = [(spec.get("heading") or "THE END", "title"), ("", "text")]

@@ -55,9 +55,22 @@ game, RØØTLESS, shows them.
   sparks, acid splashing, spent cases, items bouncing out. TTY goggles (`power:
   "goggles"`): the level in green braille dots, secret walls showing. `push`, `plate` and
   `lift` sounds.
+- **Floors and fire**: slick floor (`;`, `"slick"`) - the player, a pushed crate or a
+  rolled barrel slides on until something stops it, picking up what it passes; oil (`:`,
+  `"oil"`), slick and burning - fire runs along it a cell a beat and leaves it scorched;
+  fire that stays a few beats on a cell and hurts what stands in it (`fire_damage`), set
+  off by blasts, flamethrowers and monsters whose tanks burst; belts (`"conveyor": "e"`)
+  that move the player, crates, barrels, monsters and items a cell a beat. Barrels roll
+  when walked into. Monsters take teleporters, and count a pad as a step on their way.
+- **New kinds of attack**: `flame` (levels its nozzle, then sprays fire three cells along
+  a row or a column), `spinup` (a minigun that spins up for beats, then fires every beat
+  while it sees you), `move_every` (heavy monsters that move every other beat), `dodge`
+  (a chance to sidestep a shot seen coming) and `burst_fire` (a death that burns).
+- **A secret exit**: `{"exit": "secret"}` runs the scene's `on_secret_exit` instead of
+  `on_level_exit`.
 - **An end screen** (`"end_screen"` in game.json): a won game of levels ends on a screen
-  of its own - banner, picture, the totals counting up, the ending, what comes next,
-  credits and a crontab line still ticking.
+  of its own - banner, pictures side by side, the totals counting up, the ending, what
+  comes next, credits and a crontab line still ticking.
 - **Tiles** (`tiles.json`): the walls, floors and ceilings of levels drawn from a game's own
   pictures, in the sprites' format and of any size; a tile named like one of the engine's
   takes its place; `frames` change a beat at a time; clear pixels show what is behind a
@@ -78,12 +91,19 @@ game, RØØTLESS, shows them.
   boots behind a vent, TTY goggles behind a door a crate must hold open), an acid vat with
   ring-0 armour on an island and a teleporter back, a lift from the boots down to the vat,
   a locked arena and Cron, who rains fire on a schedule and escapes to be the final boss
-  of the whole game (the flag `cron_escaped`); the exit is a lift down. Its own riff,
-  sounds, 28 sprites, a tile and an end screen.
+  of the whole game (the flag `cron_escaped`); the exit is a lift down. A secret exit in
+  the goggles' closet leads to E1M9 *Swap Partition*: a belt hall running into acid, an
+  oil depot guarded by flamethrowers, a coolant room of slick floor with a crate puzzle,
+  and a minigun holding the exit. Five new enemies drawn from pictures - shred
+  (flamethrower), kworker (dodging gunner), kswapd (heavy gunner), crawler (fast, three red
+  eyes), spinlock (minigun) - and a marine beside Cron on the end screen. Two riffs, sounds
+  (chip and Ballistic), 35 sprites, a tile.
 - `--view STYLE`, `--lines` (every command typed, no single keys), `--scroll`.
   `--check` also counts levels and monsters, and checks their maps and references.
 - `engine/levelbot.py`: a simple player that walks a level by its `"bot"` goals - if it can
-  finish, a person can (`python tests/levelbot.py`, and in the editor). 48 more tests.
+  finish, a person can (`python tests/levelbot.py`, and in the editor). It plans slides,
+  keeps off fire, steps out of a flamethrower's line and ducks a spun-up minigun. 63 more
+  tests.
 - **Sound sets** (`sounds.NAME.json`): other sets of sound effects over a game's own, chosen
   with `--sounds NAME`, `CLIO_SOUNDS`, `"sound_set"` in game.json, or `sound set NAME` while
   playing (in levels too).

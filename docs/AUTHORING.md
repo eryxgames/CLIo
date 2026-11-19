@@ -1129,11 +1129,15 @@ The map is rows of characters, north at the top. Without a legend entry a charac
 | `E` | the exit switch, on a wall |
 | `&` | a crate: walk into it to push it (see [Things that move](#things-that-move)) |
 | `^` | a pressure plate, named `plate` |
+| `:` | oil on the floor: slippery, and it burns (see [Floors and fire](#floors-and-fire)) |
+| `;` | slick floor (spilled coolant): what moves on to it slides on |
 
 A legend entry is either the id of a monster or an item (`"m": "medkit"`), or an object:
 `{"monster": id}` or `{"item": id}` on a floor cell; `{"wall": tile}`; `{"door": true,
 "key": "x"}`; `{"toxic": true}`; `{"panel": "fist"}` or `{"panel": "shoot"}`;
-`{"exit": true}`. A floor cell can also have `"floor"` and `"ceiling"` tiles. The engine's
+`{"exit": true}` (or `{"exit": "secret"}`, see [The end of a game of levels](#the-end-of-a-game-of-levels)).
+A floor cell can also have `"floor"` and `"ceiling"` tiles, and a surface: `"oil": true`,
+`"slick": true` or `"conveyor": "e"` (a belt). The engine's
 tiles are `steel`, `screens`, `screens2`, `hazard`; a game can draw its own (see
 [Tiles](#tiles)). `"floor"` and `"ceiling"` on the level itself lay a tile everywhere
 (toxic floor keeps its own look unless its cell names a tile).
@@ -1174,6 +1178,30 @@ The rules move a cell at a time, a beat at a time:
   not float burn on toxic floor like the player.
 - **A secret area**: a floor cell or a door with `"secret": true` counts as a secret when
   the player stands in it.
+- **Barrels** roll: walking into one pushes it a cell on, like a crate - into a crowd of
+  monsters, or into the acid.
+- **Monsters use teleporters**: a pad that leads closer to the player is a step on their
+  way, and one that walks on to a pad is taken to the next, like the player.
+
+### Floors and fire
+
+- **Slick floor** (`{"slick": true}`, `;`): the player, a pushed crate or a rolled barrel
+  that moves on to it goes on in the same direction until something stops it - a wall, a
+  crate, a monster, or dry floor, where it stops. What lies on the way is picked up as the
+  player goes over it. A puzzle of slick floor is a puzzle of where you can stop.
+- **Oil** (`{"oil": true}`, `:`): slick, and it burns. Fire on oil burns two beats longer
+  and runs to the oil next to it every beat; burned-out oil leaves a scorched floor that
+  is dry.
+- **Fire** stays on a cell a few beats and hurts what stands in it every beat:
+  `fire_damage` (6) in game.json's `first_person` for the player, the same for monsters
+  that do not float; a barrel in fire goes off. A barrel's blast sets its cell and the oil
+  next to it alight; a flamethrower's spray and its tanks bursting do too. Walls, acid and
+  closed doors do not burn.
+- **Belts** (`{"conveyor": "e"}` - n, e, s or w): at the end of every beat a belt moves
+  what is on it a cell on, if there is room: the player, crates, barrels and monsters
+  that do not float, and items. A belt into acid sinks the crates it carries (each makes
+  a step); a belt can carry a barrel to where it is wanted. Belts are drawn as chevrons
+  that move.
 
 What only flies in the picture - debris and fire from a barrel, a monster torn apart by a
 blast or by overkill, sparks where a shot hits a wall, acid splashing, a spent case thrown
@@ -1202,7 +1230,19 @@ between), hears a shot (gunfire carries 12 cells through open space), is hurt, o
 | `melee` | comes `speed` cells a beat and bites when next to the player |
 | `spawner` | every `every` beats makes a `spawn` (a monster id), up to `max` at a time |
 | `barrel` | does nothing until hit; then bursts for `damage` on everything next to it |
+| `flame` | levels its nozzle (an orange `!`) when the player is in its row or column within `range`, then sprays fire along the line: `damage` to everything in it, and the floor burns for `burn` beats |
 | `cron` | a boss that works to a schedule (see below) |
+
+More for the attacks:
+
+- `"spinup": 2` on a `hitscan` attack: a minigun. While it sees the player its barrels
+  spin up for that many beats (a red `!!`), then it fires every beat until it loses sight,
+  and winds down. Break its line of sight - a wall, a crate - and it has to start again.
+- `"move_every": 2`: a heavy one moves only every other beat (it still shoots).
+- `"dodge": 0.35` on the monster: the chance it sidesteps a shot it sees coming, from two
+  cells away or more (never at arm's length).
+- `"burst_fire": 3` on the monster: when it dies, its cell and the four next to it burn for
+  that many beats.
 
 Fire that hits a monster turns it on the thrower: monsters fight each other.
 
@@ -1279,16 +1319,29 @@ drawn: `pixel` (half blocks), `dots` or `dots-fill` (braille); `--view` override
 enough for a level:
 
 ```json
-"end_screen": {"heading": "EPISODE 1: KNEE-DEEP IN THE SHELL", "picture": "cron",
+"end_screen": {"heading": "EPISODE 1: KNEE-DEEP IN THE SHELL", "picture": ["marine", "cron"],
                "next": "Next: User Space", "credits": ["RØØTLESS - a game by ..."],
                "tick": "*/3 * * * *  cron  rain --on rootless"}
 ```
 
-The title banner, the `picture` (a sprite), the `heading`, every level's kills, items,
+The title banner, the `picture` (a sprite, or a list of them standing side by side), the `heading`, every level's kills, items,
 secrets, beats against par and accuracy added up and counted up, the ending's text, what
 comes `next`, the `credits`, and the `tick` line at the bottom, which keeps counting down
 to its next run. A key goes on to the usual "THE END". Piped or on a small screen the usual
 ending is all there is.
+
+**A secret exit**: an exit switch with `{"exit": "secret"}` (Rootless puts one behind the
+goggles' closet in E1M1) ends the level too, but then the scene's `"on_secret_exit"`
+effects run instead of `"on_level_exit"` - usually a story text and a `goto` to a scene
+with a secret level of its own:
+
+```json
+{"id": "boot_sector", "level": "e1m1",
+ "on_level_exit": [{"story": "e1_end"}, {"win": "outro_demo"}],
+ "on_secret_exit": [{"story": "e1m9_intro"}, {"goto": "swap_partition"}]},
+{"id": "swap_partition", "level": "e1m9",
+ "on_level_exit": [{"story": "e1m9_end"}, {"win": "outro_demo"}]}
+```
 
 ### Sprites for a level
 

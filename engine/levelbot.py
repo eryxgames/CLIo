@@ -46,45 +46,72 @@ class Bot(TextConsole):
         d = (want - lv.player.facing) % 4
         return None if d == 0 else {1: "turn right", 2: "turn around", 3: "turn left"}[d]
 
+    def step(self, lv, dx, dy):
+        """A step to (dx, dy) without turning: forwards, back, or to the side."""
+        f = lv.player.facing
+        return {DIRS[f]: "k", DIRS[(f + 1) % 4]: "l", DIRS[(f + 2) % 4]: "j", DIRS[(f + 3) % 4]: "h"}[(dx, dy)]
+
     def go(self, lv, x, y):
+        """The next command on the shortest way to (x, y), or None when there or there is no way.
+
+        It searches forward from where the player stands, so it knows that a step on to
+        slick floor or oil goes on until something stops it (and takes what lies on the way),
+        and it keeps off burning floor unless there is no other way."""
         p = lv.player
         if (p.x, p.y) == (x, y):
             return None
-        dist = {}
-        frontier = [(x, y)]
-        dist[(x, y)] = 0
-        while frontier:
-            nxt = []
-            for (cx, cy) in frontier:
-                for dx, dy in DIRS:
-                    n = (cx + dx, cy + dy)
-                    if n in dist:
-                        continue
-                    c = lv.cell(*n)
-                    if c.kind in ("wall", "panel", "exit") or c.crate or (c.kind == "door" and (c.sealed or c.open_while)):
-                        continue
-                    if c.kind == "door" and c.key and c.key not in p.keys and c.open < 1:
-                        continue
-                    m = lv.monster_at(*n)
-                    if m is not None and m.barrel:
-                        continue
-                    dist[n] = dist[(cx, cy)] + 1
-                    nxt.append(n)
-            frontier = nxt
-            if (p.x, p.y) in dist:
-                break
-        here = dist.get((p.x, p.y))
-        if here is None:
-            return None
-        for dx, dy in DIRS:
-            n = (p.x + dx, p.y + dy)
-            if dist.get(n, 999) < here and not lv.monster_at(*n):
+        for hot in (False, True):
+            first = {(p.x, p.y): None}
+            frontier = [(p.x, p.y)]
+            found = None
+            while frontier and found is None:
+                nxt = []
+                for (cx, cy) in frontier:
+                    for dx, dy in DIRS:
+                        n = (cx + dx, cy + dy)
+                        if not self.open_cell(lv, n, hot and n != (x, y)):
+                            continue
+                        way = [n] + lv.slide_path(n[0], n[1], dx, dy) if (cx, cy) == (p.x, p.y) else \
+                            [n] + self.slide(lv, n, dx, dy)
+                        end = way[-1]
+                        if end in first:
+                            if (x, y) in way and found is None:
+                                found = first[(cx, cy)] or (dx, dy)
+                            continue
+                        first[end] = first[(cx, cy)] or (dx, dy)
+                        if (x, y) in way:
+                            found = first[end]
+                            break
+                        nxt.append(end)
+                    if found:
+                        break
+                frontier = nxt
+            if found:
+                dx, dy = found
+                if lv.monster_at(p.x + dx, p.y + dy):           # blocked by a monster: face it and shoot
+                    return self.face(lv, dx, dy) or "f"
                 return self.face(lv, dx, dy) or "k"
-        for dx, dy in DIRS:                              # blocked by a monster: face it and shoot
-            n = (p.x + dx, p.y + dy)
-            if dist.get(n, 999) < here:
-                return self.face(lv, dx, dy) or "f"
         return None
+
+    def open_cell(self, lv, n, careful):
+        c = lv.cell(*n)
+        if c.kind in ("wall", "panel", "exit") or c.crate or (c.kind == "door" and (c.sealed or c.open_while)):
+            return False
+        if c.kind == "door" and c.key and c.key not in lv.player.keys and c.open < 1:
+            return False
+        m = lv.monster_at(*n)
+        if m is not None and m.barrel:
+            return False
+        return not (careful is False and n in getattr(lv, "fires", {}))
+
+    def slide(self, lv, n, dx, dy):
+        """Where a slide from ``n`` would go, walls and crates only (the bot plans ahead, monsters move)."""
+        out = []
+        x, y = n
+        while lv.cell(x, y).slick and len(out) < 40 and self.open_cell(lv, (x + dx, y + dy), True):
+            x, y = x + dx, y + dy
+            out.append((x, y))
+        return out
 
     def goal_cell(self, lv):
         while self.goals:
@@ -126,6 +153,28 @@ class Bot(TextConsole):
                     n = (p.x + rx * k, p.y + ry * k)
                     if lv.free(*n) and n not in [c for c in s.path[s.i:]] and n not in lv.marks:
                         return side
+        # out of the fire, and out of line of a flamethrower that levels its nozzle
+        fires = getattr(lv, "fires", {})
+        safe = [(dx, dy) for dx, dy in DIRS if lv.free(p.x + dx, p.y + dy) and (p.x + dx, p.y + dy) not in fires
+                and (p.x + dx, p.y + dy) not in lv.marks and not lv.cell(p.x + dx, p.y + dy).toxic]
+        if (p.x, p.y) in fires and safe:
+            return self.step(lv, *safe[0])
+        for m in lv.monsters:
+            a = m.spec.get("attack") or {}
+            if not m.dead and m.intent == "windup" and a.get("kind") == "flame" and (m.x == p.x or m.y == p.y) \
+                    and lv.dist(m) <= int(a.get("range", 3)) and lv.line_of_sight(m.x, m.y, p.x, p.y):
+                aside = [d for d in safe if p.x + d[0] != m.x and p.y + d[1] != m.y]
+                if aside:
+                    return self.step(lv, *aside[0])
+        # out of sight of a gun that has spun up: it winds down, and comes to the door
+        for m in lv.monsters:
+            if not m.dead and not m.gone and m.spun and lv.line_of_sight(m.x, m.y, p.x, p.y):
+                away = [d for d in safe if not lv.cell(p.x + d[0], p.y + d[1]).slick]
+                hidden = [d for d in away if not lv.line_of_sight(m.x, m.y, p.x + d[0], p.y + d[1])]
+                back = [d for d in away if abs(p.x + d[0] - m.x) + abs(p.y + d[1] - m.y) > abs(p.x - m.x) + abs(p.y - m.y)
+                        and lv.cell(p.x, p.y).kind == "door"]             # out of a doorway; in the open, fight
+                if hidden or back:
+                    return self.step(lv, *(hidden or back)[0])
         target = self.target(lv)
         if lv.cell(p.x, p.y).toxic and target:            # never stand on toxic floor: get across
             step = self.go(lv, *target)

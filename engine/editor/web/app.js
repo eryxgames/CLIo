@@ -1409,7 +1409,7 @@ function describe(spec, info) {
   const k = sortOf(spec);
   const what = {
     monster: () => name(spec.monster) + (info.things[spec.monster] && info.things[spec.monster].boss ? " (boss)" : ""),
-    item: () => name(spec.item), start: () => "where the player starts", exit: () => "the exit switch",
+    item: () => name(spec.item), start: () => "where the player starts", exit: () => (spec.exit === "secret" ? "the secret exit switch" : "the exit switch"),
     door: () => (spec.key ? `door: needs the ${spec.key} key` : spec.sealed || spec.opens_on ? "sealed door" : "door") + (spec.open ? ", open" : ""),
     panel: () => (spec.panel === "shoot" ? "dented vent: shoot it (secret)" : "hollow wall: punch it (secret)"),
     toxic: () => "toxic floor", wall: () => `wall: ${spec.wall || spec.texture || "steel"}`, floor: () => "floor",
@@ -1428,6 +1428,9 @@ function describe(spec, info) {
   if (spec.closes_on) more.push(`shuts on ${spec.closes_on}`);
   if (spec.open_while) more.push(`open while plate "${spec.open_while}" is down`);
   if (spec.secret && k !== "panel") more.push("a secret area");
+  if (spec.oil) more.push("oil on the floor (slippery, burns)");
+  else if (spec.slick) more.push("slick floor (things slide)");
+  if (spec.conveyor) more.push(`a belt moving ${({ n: "north", e: "east", s: "south", w: "west" })[String(spec.conveyor)[0]] || spec.conveyor}`);
   if (spec.floor) more.push(`floor ${spec.floor}`);
   if (spec.ceiling) more.push(`ceiling ${spec.ceiling}`);
   return what + (more.length ? "; " + more.join(", ") : "");
@@ -1482,6 +1485,15 @@ function paintCell(g, info, thing, ch, x, y, cs) {
       const art = thingArt(info, spec.monster || spec.item, cs);
       if (art) g.drawImage(art, X, Y);
       else { g.fillStyle = k === "monster" ? "#ff6b5e" : "#f0c85a"; g.font = `${Math.round(cs * 0.8)}px ui-monospace, monospace`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(ch, X + cs / 2, Y + cs / 2 + 1); }
+    }
+    if (spec && spec.oil) { g.fillStyle = "#211c24"; g.fillRect(X, Y, cs, cs); g.fillStyle = "#4a3a64"; g.fillRect(X + cs * 0.2, Y + cs * 0.55, cs * 0.35, Math.max(1, cs / 10)); }
+    else if (spec && spec.slick) { g.fillStyle = "#3e5462"; g.fillRect(X, Y, cs, cs); g.fillStyle = "#80a0b0"; g.fillRect(X + cs * 0.15, Y + cs * 0.3, cs * 0.5, Math.max(1, cs / 10)); }
+    if (spec && spec.conveyor && !["monster", "item", "crate"].includes(k)) {
+      const d = "nesw".indexOf(String(spec.conveyor)[0]);
+      g.fillStyle = "#2e3034"; g.fillRect(X, Y, cs, cs);
+      g.save(); g.translate(X + cs / 2, Y + cs / 2); g.rotate((Math.max(0, d) - 1) * Math.PI / 2);
+      g.strokeStyle = "#d6aa2c"; g.lineWidth = Math.max(1, cs / 7); g.beginPath();
+      g.moveTo(-cs * 0.22, -cs * 0.28); g.lineTo(cs * 0.12, 0); g.lineTo(-cs * 0.22, cs * 0.28); g.stroke(); g.restore(); g.lineWidth = 1;
     }
     if (k === "plate") { g.fillStyle = "#968046"; g.fillRect(X + cs * 0.2, Y + cs * 0.2, cs * 0.6, cs * 0.6); }
     if (k === "pad") { g.strokeStyle = "#4fd8ea"; g.lineWidth = Math.max(1, cs / 8); g.beginPath(); g.arc(X + cs / 2, Y + cs / 2, cs * 0.32, 0, 2 * Math.PI); g.stroke(); g.lineWidth = 1; }
@@ -1695,6 +1707,21 @@ function levelEditor(kind, thing, id) {
       rows.push(field("Its name (the two ends of a lift)", el("input", { type: "text", class: "code short", value: s.lift || "",
         oninput: (e) => { s.lift = e.target.value.trim() || "lift"; write(); } })));
       rows.push(field("Deck (the lower end rides down to it)", el("input", { type: "number", value: String(s.deck || 0), oninput: (e) => { s.deck = Number(e.target.value) || 0; write(); } })));
+    }
+    if (sort === "exit") rows.push(field("The secret exit (the scene's \"on_secret_exit\" runs)", el("input", { type: "checkbox", checked: s.exit === "secret",
+      onchange: (e) => { s.exit = e.target.checked ? "secret" : true; write(); } })));
+    if (!solidSort(sort) && !["door", "plate", "pad", "lift", "toxic"].includes(sort)) {
+      const now = s.conveyor ? "belt " + String(s.conveyor)[0] : s.oil ? "oil" : s.slick ? "slick" : "";
+      rows.push(field("Floor surface", el("select", { onchange: (e) => {
+        delete s.oil; delete s.slick; delete s.conveyor;
+        const v = e.target.value;
+        if (v === "oil") s.oil = true;
+        else if (v === "slick") s.slick = true;
+        else if (v.startsWith("belt ")) s.conveyor = v.slice(5);
+        write();
+      } }, ...[["", "plain"], ["oil", "oil (slippery; fire runs along it)"], ["slick", "slick (things slide until stopped)"],
+        ["belt n", "a belt moving north"], ["belt e", "a belt moving east"], ["belt s", "a belt moving south"], ["belt w", "a belt moving west"]]
+        .map(([v, label]) => el("option", { value: v, selected: v === now }, label)))));
     }
     if (sort === "floor" || sort === "door") rows.push(field("A secret area (counted when the player stands in it)",
       el("input", { type: "checkbox", checked: !!s.secret, onchange: (e) => { s.secret = e.target.checked; write(); } })));

@@ -12,6 +12,29 @@
    {
     "win": "outro_demo"
    }
+  ],
+  "on_secret_exit": [
+   {
+    "story": "e1m9_intro"
+   },
+   {
+    "goto": "swap_partition"
+   }
+  ]
+ },
+ {
+  "id": "swap_partition",
+  "name": "Swap Partition",
+  "area": "Episode 1 (secret)",
+  "description": "Below the boot bay, where pages go when there is no room for them.",
+  "level": "e1m9",
+  "on_level_exit": [
+   {
+    "story": "e1m9_end"
+   },
+   {
+    "win": "outro_demo"
+   }
   ]
  }
 ]

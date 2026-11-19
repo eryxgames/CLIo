@@ -14,5 +14,11 @@
  "outro_lose": {
   "text": "Process terminated. The daemons go back to their schedules. Try again: read the tells, use the barrels, step off the marked floor.",
   "show_once": false
+ },
+ "e1m9_intro": {
+  "text": "Behind the goggles' closet, a switch nobody labelled. You throw it anyway. The floor drops: a service lift, old and loud, going down past the boot bay into the swap partition."
+ },
+ "e1m9_end": {
+  "text": "The last page is swapped back in. Somewhere above, Cron's schedule skips a beat - it knows a process got out of its queue. A lift takes you up to the dark, and the dark goes on."
  }
 }

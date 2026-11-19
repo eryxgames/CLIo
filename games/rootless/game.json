@@ -54,7 +54,7 @@
  "license": "All rights reserved - see LICENSE.md in this game's folder",
  "end_screen": {
   "heading": "EPISODE 1: KNEE-DEEP IN THE SHELL",
-  "picture": "cron",
+  "picture": ["marine", "cron"],
   "next": "Next: User Space",
   "credits": [
    "RØØTLESS - a game by Daniel Sandner",

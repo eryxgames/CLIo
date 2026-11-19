@@ -62,5 +62,71 @@
    "A",
    "B"
   ]
+ },
+ "swap_partition": {
+  "title": "Swap Partition",
+  "tempo": 112,
+  "steps_per_beat": 4,
+  "instruments": {
+   "gtr": {
+    "wave": "saw",
+    "drive": 0.8,
+    "lowpass": 0.38,
+    "attack": 0.002,
+    "decay": 0.1,
+    "sustain": 0.5,
+    "release": 0.05,
+    "gate": 0.7,
+    "volume": 0.24
+   },
+   "bass": {
+    "wave": "square",
+    "duty": 0.5,
+    "lowpass": 0.3,
+    "volume": 0.4,
+    "gate": 0.55
+   },
+   "lead": {
+    "wave": "triangle",
+    "attack": 0.04,
+    "decay": 0.2,
+    "sustain": 0.7,
+    "release": 0.3,
+    "vibrato": [
+     4,
+     0.02
+    ],
+    "volume": 0.24,
+    "echo": [
+     0.32,
+     0.35
+    ]
+   },
+   "kit": {
+    "wave": "drums",
+    "volume": 0.65
+   }
+  },
+  "patterns": {
+   "A": {
+    "bass": "d1 d1 d2 d1 d1 d1 d2 d1 f1 f1 f2 f1 c1 c1 c2 c1 | d1 d1 d2 d1 d1 d1 d2 d1 a#1 a#1 a#2 a#1 a1 a1 a2 a1",
+    "gtr": "[d2 a2]:3 [d2 a2] r:4 [f2 c3]:3 [f2 c3] [c2 g2]:4 | [d2 a2]:3 [d2 a2] r:4 [a#1 f2]:4 [a1 e2]:4",
+    "kit": "k . . h s . . h k . k h s . h . | k . . h s . . h k . k h s s s h"
+   },
+   "B": {
+    "bass": "d1 d1 d2 d1 d1 d1 d2 d1 d1 d1 d2 d1 d1 d1 d2 d1 | a#1 a#1 a#2 a#1 a#1 a#1 a#2 a#1 a1 a1 a2 a1 c#2 c#2 c#3 c#2",
+    "gtr": "[d2 a2]:8 [d2 a2]:8 | [a#1 f2]:8 [a1 e2]:4 [c#2 g#2]:4",
+    "lead": "d4:6 f4:2 e4:4 c4:4 | d4:8 a3:4 c#4:4",
+    "kit": "k . h . s . h . k . h . s . h . | k . h . s . h k k . s . s s s s"
+   }
+  },
+  "sequence": [
+   "A",
+   "A",
+   "B",
+   "A",
+   "B",
+   "B"
+  ]
  }
 }

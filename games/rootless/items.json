@@ -131,5 +131,16 @@
    "sound": "goggles_on",
    "text": "TTY goggles! You see the world the way the terminal does - and what is hollow shows."
   }
+ },
+ "key_w": {
+  "name": "w key",
+  "description": "Write permission, on a yellow card.",
+  "pickup": {
+   "key": "w",
+   "sprite": "key_w",
+   "size": 0.45,
+   "sound": "unlock",
+   "text": "You have write permission: the -w- key."
+  }
  }
 }

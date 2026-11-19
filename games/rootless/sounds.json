@@ -340,5 +340,166 @@
   "tempo": 720,
   "wave": "square",
   "vol": 0.25
+ },
+ "flame": [
+  {
+   "wave": "noise",
+   "noise_rate": 2600,
+   "freq": 0,
+   "dur": 0.55,
+   "vol": 0.32,
+   "decay": 0.2,
+   "sustain": 0.75
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 600,
+   "freq": 0,
+   "dur": 0.55,
+   "vol": 0.18
+  }
+ ],
+ "flame_click": {
+  "wave": "square",
+  "freq": [
+   900,
+   700
+  ],
+  "dur": 0.05,
+  "vol": 0.2
+ },
+ "fire_burn": {
+  "wave": "noise",
+  "noise_rate": 4000,
+  "freq": 0,
+  "dur": 0.25,
+  "vol": 0.2,
+  "decay": 0.2,
+  "sustain": 0.3
+ },
+ "slide": {
+  "wave": "noise",
+  "noise_rate": 7000,
+  "freq": 0,
+  "dur": 0.3,
+  "vol": 0.12,
+  "decay": 0.28,
+  "sustain": 0.2
+ },
+ "spinup": {
+  "wave": "saw",
+  "freq": [
+   80,
+   420
+  ],
+  "dur": 0.7,
+  "vol": 0.2
+ },
+ "minigun": {
+  "notes": "c2:1 r c2:1 r c2:1 r c2:1 r c2:1 r c2:1",
+  "tempo": 1600,
+  "wave": "noise",
+  "vol": 0.35
+ },
+ "heavy_burst": {
+  "notes": "e2:1 r:1 e2:1 r:1 e2:1",
+  "tempo": 1100,
+  "wave": "noise",
+  "vol": 0.38
+ },
+ "cyborg_sight": [
+  {
+   "wave": "square",
+   "freq": [
+    220,
+    160
+   ],
+   "dur": 0.12,
+   "vol": 0.22
+  },
+  {
+   "wave": "square",
+   "freq": [
+    330,
+    120
+   ],
+   "dur": 0.18,
+   "vol": 0.2
+  }
+ ],
+ "cyborg_death": {
+  "wave": "saw",
+  "freq": [
+   300,
+   40
+  ],
+  "dur": 0.6,
+  "vol": 0.25
+ },
+ "heavy_sight": {
+  "wave": "saw",
+  "freq": [
+   90,
+   60
+  ],
+  "dur": 0.45,
+  "vol": 0.3
+ },
+ "shred_sight": {
+  "wave": "noise",
+  "noise_rate": 5000,
+  "freq": 0,
+  "dur": 0.4,
+  "vol": 0.22,
+  "decay": 0.35,
+  "sustain": 0.1
+ },
+ "shred_death": [
+  {
+   "wave": "noise",
+   "noise_rate": 1200,
+   "freq": 0,
+   "dur": 0.5,
+   "vol": 0.35
+  },
+  {
+   "wave": "saw",
+   "freq": [
+    200,
+    50
+   ],
+   "dur": 0.4,
+   "vol": 0.2
+  }
+ ],
+ "crawler_sight": {
+  "notes": "a5:1 e6:1 a5:1",
+  "tempo": 900,
+  "wave": "square",
+  "vol": 0.18
+ },
+ "crawler_bite": {
+  "wave": "square",
+  "freq": [
+   600,
+   200
+  ],
+  "dur": 0.08,
+  "vol": 0.25
+ },
+ "crawler_death": {
+  "notes": "e6:1 c6:1 a5:1 e5:2",
+  "tempo": 700,
+  "wave": "square",
+  "vol": 0.18
+ },
+ "spinlock_sight": {
+  "wave": "saw",
+  "freq": [
+   70,
+   50
+  ],
+  "dur": 0.6,
+  "vol": 0.3
  }
 }

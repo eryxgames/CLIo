@@ -459,6 +459,239 @@ class PhysicsTests(unittest.TestCase):
         self.assertEqual(len(green), 17)
 
 
+def room_with(rows, legend=None, monsters=None, seed=1):
+    """A small level of its own (Rootless's monsters, items and sounds), with the player told quietly."""
+    data = with_level({"map": rows, "legend": dict({"b": "barrel", "z": "zombie"}, **(legend or {}))})
+    if monsters:
+        data.monsters = dict(data.monsters, **monsters)
+    lv = Level(data, "t", seed=seed)
+    lv.console = Quiet()
+    return lv
+
+
+def told(lv):
+    return " | ".join(str(t) for t in lv.console.told)
+
+
+class FloorAndFireTests(unittest.TestCase):
+    def test_sliding_on_slick_floor(self):
+        lv = room_with(["########",
+                        "#@;;m;.#",
+                        "########"], {"m": {"item": "medkit", "slick": True}}, seed=1)
+        lv.player.facing, lv.player.hp = 1, 50
+        lv.run_line("k")                                       # on to the slick: on and on, to the dry floor
+        self.assertEqual((lv.player.x, lv.player.y), (6, 1))
+        self.assertGreater(lv.player.hp, 50)                   # the medkit on the way is taken
+        self.assertIn("You slide on the slick floor", told(lv))
+        put(lv, 6, 1, 3)
+        lv.run_line("k")
+        self.assertEqual((lv.player.x, lv.player.y), (1, 1))   # and back to the wall
+
+    def test_a_crate_slides_and_a_barrel_rolls(self):
+        lv = room_with(["#########",
+                        "#@&;;;..#",
+                        "#.b;;;..#",
+                        "#########"])
+        lv.player.facing = 1
+        lv.run_line("k")                                       # the crate slides across the slick part
+        self.assertTrue(lv.cell(6, 1).crate and not lv.cell(2, 1).crate)
+        b = next(m for m in lv.monsters if m.barrel)
+        put(lv, 1, 2, 1)
+        lv.run_line("k")                                       # a barrel rolls the same way
+        self.assertEqual(((b.x, b.y), (lv.player.x, lv.player.y)), ((6, 2), (2, 2)))
+        self.assertIn("You roll the barrel and it slides", told(lv))
+
+    def test_fire_runs_along_oil_and_burns_out(self):
+        lv = room_with(["#########",
+                        "#@.::::.#",
+                        "#########"])
+        self.assertTrue(lv.cell(3, 1).oil and lv.cell(3, 1).slick)
+        self.assertFalse(lv.ignite(0, 1))                      # walls do not burn
+        lv.ignite(3, 1)
+        self.assertEqual(lv.fires[(3, 1)], 5)                  # oil burns longer
+        lv.end_beat()
+        self.assertIn((4, 1), lv.fires)                        # along the oil...
+        self.assertNotIn((2, 1), lv.fires)                     # ...not over bare floor
+        for _ in range(12):
+            lv.end_beat()
+        self.assertFalse(lv.fires)
+        self.assertTrue(all(lv.cell(x, 1).scorched and not lv.cell(x, 1).oil for x in range(3, 7)))
+        self.assertIn("Fire runs along the oil", told(lv))
+
+    def test_standing_in_fire_and_a_barrel_in_it(self):
+        lv = room_with(["#######",
+                        "#@..b.#",
+                        "#######"])
+        hp = lv.player.hp
+        lv.ignite(1, 1)
+        lv.ignite(4, 1)
+        lv.end_beat()
+        self.assertEqual(lv.player.hp, hp - 6)
+        self.assertIn("standing in fire", told(lv))
+        self.assertTrue(next(m for m in lv.monsters if m.barrel).dead)    # it went off
+
+    def test_belts_carry_the_player_items_and_crates(self):
+        lv = room_with(["##########",
+                        "#@>>>>C>~#",
+                        "#...m....#",
+                        "##########"],
+                       {">": {"conveyor": "e"}, "C": {"crate": True, "conveyor": "e"},
+                        "m": {"item": "medkit", "conveyor": "w"}})
+        put(lv, 2, 1, 0)
+        lv.end_beat()
+        self.assertEqual((lv.player.x, lv.player.y), (3, 1))
+        self.assertTrue(lv.cell(7, 1).crate)                   # the crate one on
+        medkit = next(it for it in lv.items if it.iid == "medkit")
+        self.assertEqual((medkit.x, medkit.y), (3, 2))
+        lv.end_beat()
+        self.assertTrue(lv.cell(8, 1).sunk and not lv.cell(8, 1).toxic)   # into the acid: a step
+        self.assertIn("The belt carries you on", told(lv))
+
+    def test_a_monster_rides_a_teleporter(self):
+        lv = room_with(["###########",
+                        "#@.......z#",
+                        "#.#######T#",
+                        "#T........#",
+                        "###########"], {"T": {"teleport": "pad"}})
+        z = next(m for m in lv.monsters if m.tag == "z1")
+        z.awake = True
+        for _ in range(3):
+            lv.end_beat()
+            if (z.x, z.y) == (1, 3) or z.y == 3 and z.x < 4:
+                break
+        self.assertEqual(z.y, 3)                               # it took the pad by the player, not the long way
+        self.assertLess(z.x, 4)
+
+
+class NewEnemyTests(unittest.TestCase):
+    def test_the_flamethrower_sprays_when_in_line(self):
+        shred = copy.deepcopy(GameData(ROOTLESS).monsters["shred"])
+        shred["attack"]["eager"] = 1.0
+        lv = room_with(["########",
+                        "#@...f.#",
+                        "########"], {"f": "shred"}, {"shred": shred})
+        f = next(m for m in lv.monsters if m.kind == "shred")
+        f.awake = True
+        put(lv, 2, 1, 1)
+        hp = lv.player.hp
+        lv.end_beat()
+        self.assertEqual(f.intent, "windup")
+        self.assertIn("levels its nozzle", told(lv))
+        lv.end_beat()
+        self.assertLess(lv.player.hp, hp)
+        self.assertIn((3, 1), lv.fires)                        # the floor it sprayed burns on
+        f.hp = 1
+        lv.player.facing = 1
+        lv.run_line("f")
+        self.assertTrue(f.dead)
+        self.assertIn("tanks burst", told(lv))
+        self.assertIn((f.x, f.y), lv.fires)
+
+    def test_the_minigun_spins_up_and_winds_down(self):
+        lv = room_with(["##########",
+                        "#@......L#",
+                        "#.########",
+                        "##########"], {"L": "spinlock"})
+        L = next(m for m in lv.monsters if m.kind == "spinlock")
+        L.awake = L.seen = True
+        hp = lv.player.hp
+        lv.end_beat()
+        self.assertEqual((L.spin, L.spun, L.intent), (1, False, "spin"))
+        self.assertIn("barrels start to spin", told(lv))
+        lv.end_beat()
+        self.assertTrue(L.spun)
+        self.assertEqual(lv.player.hp, hp)                     # two beats of warning
+        put(lv, 1, 2, 0)                                       # out of its sight
+        lv.end_beat()
+        self.assertEqual((L.spin, L.spun), (0, False))       # unseen, so untold
+
+    def test_kworker_sidesteps(self):
+        kw = copy.deepcopy(GameData(ROOTLESS).monsters["kworker"])
+        kw["dodge"] = 1.0
+        lv = room_with(["#######",
+                        "#.....#",
+                        "#@..k.#",
+                        "#.....#",
+                        "#######"], {"k": "kworker"}, {"kworker": kw})
+        k = next(m for m in lv.monsters if m.kind == "kworker")
+        k.awake = True
+        put(lv, 1, 2, 1)
+        lv.run_line("f")
+        self.assertEqual(k.hp, kw["hp"])
+        self.assertIn("sidesteps your shot", told(lv))
+        self.assertEqual(k.x, 4)
+        self.assertNotEqual(k.y, 2)
+
+    def test_the_new_monsters_have_pictures_pages_and_sounds(self):
+        data = GameData(ROOTLESS)
+        for kind in ("shred", "kswapd", "kworker", "crawler", "spinlock"):
+            spec = data.monsters[kind]
+            self.assertIn(spec["sprite"], data.sprites)
+            self.assertTrue(spec["man"] and spec["death"])
+            for snd in (spec.get("sounds") or {}).values():
+                self.assertIn(snd, data.sounds, "%s: %s" % (kind, snd))
+        self.assertIn("marine", data.sprites)
+        self.assertEqual(validate(data), [])
+
+
+class SecretLevelTests(unittest.TestCase):
+    def test_the_secret_exit_switch(self):
+        lv = level()
+        self.assertEqual(lv.cell(25, 20).exit_kind, "secret")
+        put(lv, 24, 20, 1)
+        lv.run_line("use")
+        self.assertEqual(lv.exit_kind, "secret")
+
+    def test_the_secret_exit_leads_to_e1m9(self):
+        from unittest import mock
+        from engine import level as level_mod
+        from engine.audio import Silent
+        from engine.game import Game
+        term = Term(out=io.StringIO(), inp=lambda p: "", width=80, height=24, color=0, unicode=True, animate=False, env={})
+        g = Game(ROOTLESS, term=term, audio=Silent())
+        played = []
+
+        def run(lv, console):                                 # each level is left at once by its own exit
+            played.append(lv.id)
+            lv.exit_kind = "secret" if len(played) == 1 else "exit"
+            return "exit"
+        with mock.patch.object(level_mod.Level, "run", run):
+            level_mod.play_scene(g, g.world.scenes["boot_sector"])
+        self.assertEqual(played, ["e1m1", "e1m9"])
+        self.assertEqual(g.world.scene_id, "swap_partition")
+        self.assertEqual(g.over, "win")
+        self.assertIn("swap partition", term.out.getvalue().lower())
+
+    def test_the_bot_finishes_e1m9(self):
+        import levelbot
+        for seed in (1, 2, 3):
+            outcome, lv = levelbot.play("rootless", "e1m9", seed)
+            self.assertEqual(outcome, "exit", "seed %d" % seed)
+
+    def test_the_coolant_closet(self):
+        lv = Level(GameData(ROOTLESS), "e1m9", seed=1)
+        lv.console = Quiet()
+        for m in lv.monsters:
+            if not m.barrel:
+                m.dead = True
+        put(lv, 2, 11, 0)
+        lv.run_line("k")                                       # up the west wall: stops on the dry patch
+        put(lv, lv.player.x, lv.player.y, 1)
+        lv.run_line("k")                                       # east: slides up to the crate
+        lv.run_line("k")                                       # and pushes it across, on to the plate
+        self.assertTrue(lv.cell(10, 6).crate and lv.cell(10, 6).down and lv.cell(3, 2).open == 1.0)
+        put(lv, 3, 11, 0)
+        lv.run_line("k")
+        lv.run_line("k")
+        self.assertEqual(((lv.player.x, lv.player.y), lv.stats["secrets"]), ((3, 1), 1))
+
+    def test_problems_with_belts_and_exits(self):
+        data = with_level({"map": ["#####", "#@>E#", "#####"], "legend": {">": {"conveyor": "up"}, "E": {"exit": "maybe"}}})
+        said = " | ".join(validate(data))
+        self.assertIn("should be n, e, s or w", said)
+        self.assertIn("should be true or \"secret\"", said)
+
+
 class EndScreenTests(unittest.TestCase):
     def test_totals_and_the_screen(self):
         from engine import ending

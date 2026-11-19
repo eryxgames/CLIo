@@ -171,7 +171,8 @@ KINDS = [
         R("music_form", "text", "Form of generated music (long, or as (A) A B- A+)"),
         R("on_first_enter", "effects", "On entering for the first time"), R("on_enter", "effects", "On entering"),
         R("level", "ref", "A first-person level played here", of="levels"),
-        R("on_level_exit", "effects", "When its level is finished")]},
+        R("on_level_exit", "effects", "When its level is finished"),
+        R("on_secret_exit", "effects", "When its level is left by the secret exit")]},
     {"key": "items", "file": "items", "label": "Items", "one": "item", "shape": "map", "title": "name", "fields": [
         F("name"), F("short", label="Short name"), F("description", "long"), F("aliases", "tags"),
         F("value", "number"), F("takeable", "bool"), F("usable", "bool"), F("use_text", "long"),

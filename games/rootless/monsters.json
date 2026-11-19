@@ -297,5 +297,204 @@
    "It forks lost+found souls to keep you busy. Hurt it enough and it rewrites",
    "its own schedule. Nobody has ever seen it die."
   ]
+ },
+ "kworker": {
+  "name": "kworker",
+  "role": "dodging gunner",
+  "tag": "k",
+  "sprite": "kworker",
+  "hp": 25,
+  "sight": 9,
+  "dodge": 0.35,
+  "attack": {
+   "kind": "hitscan",
+   "damage": [
+    4,
+    8
+   ],
+   "range": 9,
+   "keep": [
+    3,
+    7
+   ],
+   "eager": 0.6,
+   "accuracy": [
+    0.9,
+    0.85,
+    0.75,
+    0.6,
+    0.5,
+    0.4,
+    0.3,
+    0.25,
+    0.2
+   ]
+  },
+  "drops": "clip",
+  "sounds": {
+   "sight": "cyborg_sight",
+   "attack": "pistol",
+   "death": "cyborg_death"
+  },
+  "death": "%s is reaped; its thread joins.",
+  "man": [
+   "A kernel worker with its cables out and a pistol in hand. Always busy.",
+   "",
+   "Dodges: it may sidestep a shot it sees coming, at two cells or more.",
+   "Up close it cannot - and a shotgun's spread finds it anyway."
+  ]
+ },
+ "kswapd": {
+  "name": "kswapd",
+  "role": "heavy gunner",
+  "tag": "w",
+  "sprite": "kswapd",
+  "hp": 70,
+  "size": 1.15,
+  "sight": 9,
+  "attack": {
+   "kind": "hitscan",
+   "damage": [
+    4,
+    8
+   ],
+   "pellets": 3,
+   "range": 8,
+   "keep": [
+    2,
+    7
+   ],
+   "eager": 0.55,
+   "move_every": 2,
+   "accuracy": [
+    0.95,
+    0.85,
+    0.7,
+    0.55,
+    0.4,
+    0.3,
+    0.22,
+    0.16
+   ]
+  },
+  "drops": "shells",
+  "sounds": {
+   "sight": "heavy_sight",
+   "attack": "heavy_burst",
+   "death": "cyborg_death"
+  },
+  "death": "%s is swapped out.",
+  "man": [
+   "Swaps you out of memory with a drum of slugs. Slow: it moves every other beat.",
+   "",
+   "Three shots a burst. When it takes aim (red !), break the line or close in."
+  ]
+ },
+ "shred": {
+  "name": "shred",
+  "role": "flamethrower",
+  "tag": "f",
+  "sprite": "shred",
+  "hp": 45,
+  "sight": 8,
+  "burst_fire": 3,
+  "attack": {
+   "kind": "flame",
+   "damage": [
+    8,
+    14
+   ],
+   "range": 3,
+   "burn": 3,
+   "eager": 0.75
+  },
+  "drops": "shells",
+  "sounds": {
+   "sight": "shred_sight",
+   "windup": "flame_click",
+   "attack": "flame",
+   "death": "shred_death"
+  },
+  "death": "%s is overwritten.",
+  "man": [
+   "Overwrites what it finds, then burns the copy.",
+   "",
+   "Sprays fire three cells along a row or a column - only when you are in line.",
+   "When it levels its nozzle (orange !), step out of the line. The fire stays a few beats.",
+   "Its tanks burst when it dies. Do not stand beside it, or on oil."
+  ]
+ },
+ "crawler": {
+  "name": "crawler",
+  "role": "fast melee",
+  "tag": "r",
+  "sprite": "crawler",
+  "hp": 30,
+  "sight": 9,
+  "attack": {
+   "kind": "melee",
+   "damage": [
+    6,
+    12
+   ],
+   "speed": 2
+  },
+  "sounds": {
+   "sight": "crawler_sight",
+   "attack": "crawler_bite",
+   "death": "crawler_death"
+  },
+  "death": "%s stops crawling.",
+  "man": [
+   "Indexes everything it can reach, three red eyes first.",
+   "",
+   "Fast: two cells a beat. Weak: one shotgun blast up close ends it."
+  ]
+ },
+ "spinlock": {
+  "name": "spinlock",
+  "role": "minigun",
+  "tag": "L",
+  "sprite": "spinlock",
+  "hp": 70,
+  "size": 1.25,
+  "sight": 10,
+  "attack": {
+   "kind": "hitscan",
+   "damage": [
+    2,
+    5
+   ],
+   "pellets": 4,
+   "range": 10,
+   "spinup": 2,
+   "move_every": 2,
+   "accuracy": [
+    0.9,
+    0.8,
+    0.65,
+    0.5,
+    0.4,
+    0.32,
+    0.25,
+    0.2,
+    0.15,
+    0.12
+   ]
+  },
+  "drops": "clip",
+  "sounds": {
+   "sight": "spinlock_sight",
+   "spinup": "spinup",
+   "attack": "minigun",
+   "death": "cyborg_death"
+  },
+  "death": "%s releases the lock.",
+  "man": [
+   "Holds the lock and will not let go.",
+   "",
+   "Spins up for two beats (red !!), then fires every beat while it sees you.",
+   "Break its line of sight - a wall, a crate - and the barrels wind down."
+  ]
  }
 }

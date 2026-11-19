@@ -346,6 +346,34 @@ def _crate_picture():
 CRATE = _crate_picture()
 
 
+def _flames():
+    """Three drawings of a flame, a frame a redraw: yellow at the root, orange, red at the tips."""
+    out = []
+    for f in range(3):
+        rows = []
+        H, W = 12, 9
+        for y in range(H):
+            row = []
+            up = (H - 1 - y) / float(H - 1)                    # 0 at the root, 1 at the tip
+            half = 4.2 * (1 - up) ** 0.8 + 0.6
+            lean = 0.9 * math.sin(f * 2.1 + up * 3.0) * up
+            for x in range(W):
+                d = abs(x - 4 - lean)
+                if d > half or (up > 0.75 and noise(x, y, f) < 0.45):
+                    row.append(None)
+                    continue
+                core = d < half * 0.45 and up < 0.55
+                c = (255, 244, 180) if core and up < 0.3 else (255, 206, 80) if core else \
+                    (255, 128, 30) if up < 0.7 else (210, 52, 20)
+                row.append(c)
+            rows.append(row)
+        out.append(Picture(rows))
+    return out
+
+
+FLAMES = _flames()
+
+
 def vslide(old, new, k, down, gap=3):
     """Cells of a lift's ride half done: the old view slides away, the shaft goes by, the new one comes."""
     H = len(old or new or [])
@@ -407,6 +435,7 @@ class View:
         rx, ry = DIRS[(f + 1) % 4]
         PW, PH = self.PW, self.PH
         floor_tile, ceiling_tile = getattr(lv, "floor_tile", None), getattr(lv, "ceiling_tile", None)
+        fires = getattr(lv, "fires", None)
         drawings = {}
 
         def sample(name, ux, uy):                            # a floor or ceiling tile, fixed to the world
@@ -448,6 +477,8 @@ class View:
                         c = FLOOR_A if (ix + iy) & 1 else FLOOR_B
                         if abs(ux) > 0.46 or abs(uy) > 0.46:
                             c = FLOOR_LINE
+                    if fires and (ix, iy) in fires:
+                        c = mix(c, (255, 120, 30), 0.3 + 0.25 * noise(int(ux * 6) + ix * 6, int(uy * 6) + iy * 6, phase))
                     if mark == "warn":                   # fire is scheduled here: hatched and glowing
                         hatch = int((ux + uy + 1.0) * 6) % 2 == 0
                         c = mix(c, (255, 90, 30) if hatch else (150, 30, 20), 0.55 + 0.2 * (phase % 2))
@@ -493,6 +524,22 @@ class View:
             if m > 0.42:
                 return (215, 175, 40) if int((ux + uy + 2) * 8) % 2 else (34, 32, 30)
             return (70, 74, 84) if int((ux + 0.5) * 8) % 4 else (52, 55, 62)
+        belt = getattr(cell, "conveyor", None)
+        if belt is not None:
+            dx, dy = DIRS[belt]
+            along, across = ux * dx + uy * dy, ux * -dy + uy * dx
+            if abs(across) > 0.4:
+                return (60, 62, 68)
+            chevron = (along * 3.0 - abs(across) * 2.0 - phase * 0.34) % 1.0
+            return (214, 170, 44) if chevron < 0.3 else (42, 42, 46)
+        if getattr(cell, "oil", False):
+            sheen = noise(int((ux + 0.5) * 10) + cell.x * 10, int((uy + 0.5) * 10) + cell.y * 10, phase // 2)
+            return (70, 56, 96) if sheen < 0.06 else (24, 22, 20) if sheen < 0.5 else (32, 28, 24)
+        if getattr(cell, "slick", False):
+            streak = int((ux - uy + 2) * 7) % 5 == 0                    # a film of coolant on the steel
+            return (128, 160, 176) if streak else (62, 84, 98)
+        if getattr(cell, "scorched", False):
+            return (26, 24, 22) if noise(int(ux * 9) + cell.x * 9, int(uy * 9) + cell.y * 9, 1) < 0.6 else (44, 38, 34)
         return None
 
     # ---- drawing helpers ------------------------------------------------ #
@@ -649,6 +696,15 @@ class View:
             a, z = rel(cx_, cy_)
             if -0.3 < z <= FAR + 0.5:
                 items.append((z, 2, 0, "crate", a))
+        for (x, y), left in (getattr(lv, "fires", None) or {}).items():
+            a, z = rel(x, y)
+            if 0.1 < z <= FAR + 0.5:
+                items.append((z - 0.01, 3, 0, "flame", (a, x, y, left)))
+                for k in range(3):                           # embers going up, in the redraw's own time
+                    h = ((phase * 0.29 + k * 0.37 + x * 0.13 + y * 0.07) % 1.0) * 1.1
+                    ea, ez = rel(x + (noise(x, y, k) - 0.5) * 0.6, y + (noise(y, x, k + 3) - 0.5) * 0.6)
+                    if 0.12 < ez <= FAR:
+                        items.append((ez - 0.02, 6, 0, "part", (ea, h, (255, 190, 80) if k % 2 else (255, 120, 40), 0.5)))
         for wx, wy, h, col, size in fx.parts:
             a, z = rel(wx, wy)
             if 0.12 < z <= FAR:
@@ -713,6 +769,10 @@ class View:
                                 lift=fx.lift_items.get(it, 0.0))
             elif kind == "crate":
                 self.draw_thing(px, lv.sprites.get("crate") or CRATE, obj, z, 0.75, None, fx, labels=None)
+            elif kind == "flame":
+                a, x, y, left = obj
+                pic = FLAMES[(phase + x * 7 + y * 3) % len(FLAMES)]
+                self.draw_thing(px, lv.sprites.get("flame") or pic, a, z, 0.45 + min(0.3, 0.07 * left), None, fx, labels=None)
             elif kind == "part":
                 a, h, col, size = obj
                 t = DECAY ** z

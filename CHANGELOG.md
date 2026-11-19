@@ -71,9 +71,15 @@ game, RØØTLESS, shows them.
   fire, souls, explosions and Cron: `python clio.py rootless --sounds ballistic`. 17 more tests.
 - **Ballistic's C engine** ([Ballistic Engine](https://github.com/eigensoundlab/ballistic-engine)): where its library
   is found (`CLIO_BALLISTIC_LIB`, or `engine/audio/ballistic/lib/`; download it from its releases), Ballistic sounds
-  of the kinds it has ported (all but rockets and rotors since its 0.3.0: every one of RØØTLESS's) render through it,
+  of the kinds it has ported (since its 0.4.0, every weapon, blast and energy kind) render through it,
   in the game's process, without Node.js; Node renders the rest. A field's hum stays a seamless loop. `sound` says
   which renders what. 5 more tests, run when the library is there.
+- **Ballistic's game sounds**: `engine.js` follows Ballistic 3603078, which adds liquids, mechanisms (doors, locks,
+  switches, turrets), heat, fire, footsteps, creature and robot voices, and handling (pickups, coins, potions). Its C
+  engine 0.5.0 follows the same commit; it renders RØØTLESS's weapons and Node renders these until they are ported.
+  A level plays `footstep` at every step, silent unless the game or its sound set has one. RØØTLESS's Ballistic set
+  gains 26 sounds: footsteps, its doors, secret walls, locks, switches, alarm and computer, pickups, coins and
+  healing, the player's pain, and the sight, attack and death calls of its zombies, orphan, daemon and spawner.
 
 ### Changed
 

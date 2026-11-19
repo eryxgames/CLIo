@@ -341,6 +341,8 @@ var ENVS = {
             taps: [{ ms: 480, g: 0.35, pan: 0.5 }, { ms: 900, g: 0.25, pan: -0.6 }, { ms: 1500, g: 0.15, pan: 0.2 }] },
   indoor: { name: 'Indoor range', delays: [9, 14, 17, 22, 30, 38, 48, 56], rt60: 1.1, damp: 6000, wet: -5 },
   water:  { name: 'Deep water', delays: [131, 197, 263, 347, 431, 523, 617, 733], rt60: 3.8, damp: 900, wet: -9 },
+  room:   { name: 'Small room', delays: [5, 7, 11, 13, 17, 19, 23, 29], rt60: 0.45, damp: 7000, wet: -12 },
+  cave:   { name: 'Cave', delays: [19, 27, 37, 47, 61, 73, 89, 103], rt60: 2.6, damp: 3500, wet: -6 },
   ir:     { name: 'Recorded room', ir: true }
 };
 
@@ -1747,6 +1749,1206 @@ function fieldLayers(pl, p, o, rnd, layers, ev, lab) {
 }
 function disruptName(pl) { return pl.plasma ? 'disruption' : 'collapse'; }
 
+/* ---------- liquids ----------
+   A bubble rings at the Minnaert frequency, f = sqrt(3 gamma P / rho) / (2 pi a), damped by radiation and heat
+   (van den Doel's fit for water, 2005) and by viscosity (2 mu / rho a^2), and climbs in pitch as it nears the surface.
+   In air we hear the surface it pushes: a source at a free surface, p = 2 rho_air a^3 eps w^2 k / r, where eps is its
+   relative swing and k how much of the swing reaches the surface. A bubble that bursts at the surface rings the open
+   cavity it leaves as a Helmholtz resonator, about 43 Hz m / a; in a viscous liquid the film over it swells into a
+   dome first and rings on the gas inside (Vergniolle and Brandeis, 1996). Collapsing vapour bubbles use the
+   Rayleigh-Plesset collapse of the implosion model. Every sound is an event, so one-shots and loops share the code. */
+var GRAV = 9.81, GAMMA = 1.4, LQ_CAP = 3000;
+var LIQUIDS = {
+  water: { rho: 998, mu: 1e-3, sigma: 0.072, gas: 0.0025 },
+  oil: { rho: 910, mu: 0.06, sigma: 0.032, gas: 0.003 },
+  mud: { rho: 1600, mu: 8, sigma: 0.07, gas: 0.02 },
+  lava: { rho: 2600, mu: 300, sigma: 0.4, gas: 0.08 },
+  acid: { rho: 1200, mu: 2e-3, sigma: 0.07, gas: 0.00025 }
+};
+function minnaert(a, lq, depth) { return Math.sqrt(3 * GAMMA * (P0 + lq.rho * GRAV * depth + 2 * lq.sigma / a) / lq.rho) / (TAU * a); }
+function bubbleDecay(f, a, lq) { return 0.043 * f + 0.0014 * Math.pow(f, 1.5) + 2 * lq.mu / (lq.rho * a * a); }
+function viscFrac(lq) { return lq.mu / (lq.mu + 1); }
+/* fall speed with quadratic drag toward the terminal speed ut */
+function fallSpeed(h, ut) { return ut * Math.sqrt(1 - Math.exp(-2 * GRAV * Math.max(h, 0) / (ut * ut))); }
+/* Gunn and Kinzer's terminal speed of a raindrop, from its radius */
+function dropTerminal(rd) { return Math.max(0.3, 9.65 - 10.3 * Math.exp(-1200 * rd)); }
+/* Oguz and Prosperetti's regular entrainment: 41.3 Fr^0.179 < We < 48.3 Fr^0.247, with We = Bo Fr for a given drop.
+   Large drops near terminal speed trap bubbles irregularly. Viscous liquids seldom ring. */
+function entrainChance(rd, U, lq) {
+  var d = 2 * rd, Bo = lq.rho * GRAV * d * d / lq.sigma, Fr = U * U / (GRAV * d), lo = Math.pow(41.3 / Bo, 1 / 0.821), hi = Math.pow(48.3 / Bo, 1 / 0.753);
+  var reg = hi > lo ? clamp(Math.min((Fr - 0.85 * lo) / (0.3 * lo), (1.15 * hi - Fr) / (0.3 * hi)), 0, 1) : 0;
+  var irr = clamp((d * 1000 - 2.2) / 2.5, 0, 0.7) * clamp((U - 1.5) / 3, 0, 1);
+  return Math.max(reg, irr) * (lq.mu > 0.02 ? 0.1 : 1);
+}
+/* events: 0 ringing bubble, 1 one-cycle click, 2 damped tone, 3 dome, 4 vapour collapse, 5 noise burst; g is the layer group */
+function evRing(g, t, a, depth, eps, k, xi, pan, lq) {
+  var f = minnaert(a, lq, depth), w = TAU * f;
+  return { k: 0, g: g, t: t, pan: pan, f: f, d: bubbleDecay(f, a, lq), xi: xi, amp: 2 * RHO * a * a * a * eps * w * w * k, a: a };
+}
+function evClick(g, t, w, amp, pan) { return { k: 1, g: g, t: t, pan: pan, w: Math.max(w, 3 / FS), amp: amp }; }
+function evTone(g, t, f, tau, amp, ph, pan) { return { k: 2, g: g, t: t, pan: pan, f: f, tau: tau, amp: amp, ph: ph }; }
+/* burst: the gas held at the surface tension and dome weight leaves through the opening hole and rings the cavity */
+function evBurst(g, t, a, lq, gain, pan) {
+  var vf = viscFrac(lq), fH = Math.min(42.9 / a, 16000), q = 1.5 + 4 * vf, dp = 4 * lq.sigma / a + 0.5 * lq.rho * GRAV * a * vf;
+  var dV = 2 / 3 * Math.PI * a * a * a * dp / (GAMMA * P0), w = TAU * fH;
+  return evTone(g, t, fH, q / (Math.PI * fH), RHO * dV * w * w / (4 * Math.PI) * gain, 0.25, pan);
+}
+/* dome: the viscous film over a bubble, a tenth of its radius thick, rings on the gas spring before it bursts */
+function domeHz(a, lq) { return Math.sqrt(3 * GAMMA * P0 / (0.1 * lq.rho)) / (TAU * a); }
+function evDome(g, t, a, lq, gain, pan) {
+  var vf = viscFrac(lq), f = domeHz(a, lq), Td = clamp(Math.sqrt(a / GRAV) * (1 + 2 * vf), 2 / f, 0.4);
+  var w = TAU * f, V = 2 / 3 * Math.PI * a * a * a;
+  return { k: 3, g: g, t: t, pan: pan, f: f, Td: Td, amp: RHO * 0.1 * vf * V * w * w / TAU * gain };
+}
+function evCollapse(g, t, a, amp, pan) { return { k: 4, g: g, t: t, pan: pan, st: clamp(0.005 / a, 0.5, 8), amp: amp }; }
+function evNoise(g, t, dur, hp, lp, amp, pan) { return { k: 5, g: g, t: t, pan: pan, dur: dur, hp: hp, lp: lp, amp: amp }; }
+
+function lqPut(mid, side, k, x, pan, wrap) {
+  var N = mid.length;
+  if (wrap) k = ((k % N) + N) % N; else if (k >= N) return false;
+  if (k >= 0) { mid[k] += x; side[k] += x * pan; }
+  return true;
+}
+function liquidSynth(evs, mids, sides, rnd, wrap) {
+  var bp = bubblePulse(), e, m, s, n0, n, i, x, ph, e1, dec, d, amp, fi, t, u, sn, cs, j, fr;
+  for (var q = 0; q < evs.length; q++) {
+    e = evs[q]; m = mids[e.g]; s = sides[e.g]; n0 = Math.round(e.t * FS);
+    if (e.k === 0) {
+      if (e.f > 20000) continue;
+      d = e.d; amp = e.amp;
+      if (d > 2 * e.f) { amp = amp * 2 * e.f / d; d = 2 * e.f; }
+      n = Math.min(Math.ceil(6.9 / d * FS), 3 * FS); ph = 0; e1 = amp; dec = Math.exp(-d / FS);
+      for (i = 0; i < n; i++) {
+        t = i / FS;
+        fi = Math.min(e.f * (1 + e.xi * d * t), 20000);
+        ph += fi / FS;
+        if (!lqPut(m, s, n0 + i, e1 * fsin(ph) * Math.min(1, i / 4), e.pan, wrap)) break;
+        e1 *= dec;
+      }
+    } else if (e.k === 1) {
+      n = Math.max(3, Math.round(e.w * FS));
+      for (i = 0; i < n; i++) if (!lqPut(m, s, n0 + i, e.amp * fsin(i / n), e.pan, wrap)) break;
+    } else if (e.k === 2) {
+      if (e.f > 20000) continue;
+      n = Math.min(Math.ceil(6.9 * e.tau * FS), FS); e1 = e.amp; dec = Math.exp(-1 / (e.tau * FS));
+      for (i = 0; i < n; i++) {
+        if (!lqPut(m, s, n0 + i, e1 * fsin(e.f * i / FS + e.ph) * Math.min(1, i / 2), e.pan, wrap)) break;
+        e1 *= dec;
+      }
+    } else if (e.k === 3) {
+      /* rises over Td to the burst at e.t, then falls silent within one period */
+      n = Math.round((e.Td + 1 / e.f) * FS); n0 = Math.round((e.t - e.Td) * FS);
+      for (i = 0; i < n; i++) {
+        t = i / FS;
+        u = t < e.Td ? Math.sin(Math.PI / 2 * t / e.Td) : Math.cos(Math.PI / 2 * (t - e.Td) * e.f);
+        x = e.amp * u * u * fsin(e.f * t);
+        if (!lqPut(m, s, n0 + i, x, e.pan, wrap)) break;
+      }
+    } else if (e.k === 4) {
+      n = Math.floor((bp.length - 1) / e.st);
+      for (i = 0; i < n; i++) {
+        u = i * e.st; j = Math.floor(u); fr = u - j;
+        if (!lqPut(m, s, n0 + i, e.amp * (bp[j] + (bp[j + 1] - bp[j]) * fr), e.pan, wrap)) break;
+      }
+    } else {
+      n = Math.ceil(e.dur * 5 * FS); var b = new Float32Array(n);
+      for (i = 0; i < n; i++) b[i] = rnd() * 2 - 1;
+      if (e.lp) { onePoleLP(b, e.lp); onePoleLP(b, e.lp); }
+      if (e.hp) onePoleHP(b, e.hp);
+      sn = peakOf(b) || 1; cs = e.amp / sn;
+      for (i = 0; i < n; i++) {
+        t = i / FS;
+        if (!lqPut(m, s, n0 + i, cs * b[i] * Math.exp(-t / e.dur) * Math.min(1, t / 0.0005), e.pan, wrap)) break;
+      }
+    }
+  }
+}
+/* noise for a bed, unit rms, band-passed round fpk; periodic beds wrap so the loop closes */
+function bedAdd(mid, side, x, env, amp, pan) { for (var i = 0; i < mid.length; i++) { var v = x[i] * env[i] * amp; mid[i] += v; side[i] += v * pan; } }
+
+/* a drop of radius rd falling h onto a liquid depth deep: the impact, maybe a bubble, maybe a droplet thrown back */
+function planDrop(pl, q, grnd) {
+  var lq = pl.lq, rd = q.lqDrop, U = fallSpeed(q.lqHeight, dropTerminal(rd)), shallow = q.lqDepth < 4 * rd, u, v, w;
+  pl.U = U; pl.rd = rd; pl.shallow = shallow; pl.chance = shallow ? 0 : entrainChance(rd, U, lq);
+  pl.evs.push(evClick(1, 0, rd / U, RHO * Math.PI * rd * U * U / TAU * (shallow ? 2 : 1), 0));
+  u = grnd(); v = grnd(); w = grnd();
+  pl.bub = null;
+  if (u < pl.chance) {
+    pl.bub = evRing(0, 4 * rd / U + 0.002, rd * (0.3 + 0.35 * v), rd, 0.06, 0.8, 0.12, 0, lq);
+    pl.evs.push(pl.bub);
+  }
+  pl.dur = 0.25;
+  if (!shallow && U > 1.2 && w < 0.5) {
+    /* the jet that rises after the impact pinches off a droplet; it falls back and may ring again */
+    var r2 = 0.35 * rd, v2 = 0.4 * U, t2 = 0.01 + 2 * v2 / GRAV, c2 = entrainChance(r2, v2, lq), u2 = grnd(), v3 = grnd();
+    pl.evs.push(evClick(2, t2, r2 / v2, RHO * Math.PI * r2 * v2 * v2 / TAU, 0.1));
+    if (u2 < c2) pl.evs.push(evRing(2, t2 + 4 * r2 / v2 + 0.002, r2 * (0.3 + 0.35 * v3), r2, 0.06, 0.8, 0.12, 0.1, lq));
+    pl.dur = t2 + 0.15;
+  }
+  if (shallow) pl.evs.push(evNoise(2, 0.0005, 0.004 + 0.002 * U, 2500, 12000, RHO * Math.PI * rd * U * U / TAU * 0.5, 0));
+  pl.tMain = pl.bub ? pl.bub.t : 0; pl.label = pl.bub ? 'bubble' : 'drop';
+}
+/* droplets thrown up by a splash, each landing as a small drop */
+function splashDroplets(pl, n, rdLo, rdHi, vLo, vHi, t0, grnd, gain) {
+  var lq = pl.lq, i, a, b, c, d, e, rd, v, th, tl, pan, ch, last = t0;
+  for (i = 0; i < n; i++) {
+    a = grnd(); b = grnd(); c = grnd(); d = grnd(); e = grnd();
+    rd = rdLo + (rdHi - rdLo) * a; v = vLo + (vHi - vLo) * b; th = 0.5 + 0.8 * c;
+    tl = t0 + 0.004 + 2 * v * Math.sin(th) / GRAV;
+    pan = (d * 2 - 1) * clamp(v * Math.cos(th) * (tl - t0) / (pl.r + 0.5), 0, 0.9);
+    pl.evs.push(evClick(2, tl, rd / v, RHO * Math.PI * rd * v * v / TAU * gain, pan));
+    ch = entrainChance(rd, v, lq);
+    if (e < ch) {
+      var f = grnd();
+      pl.evs.push(evRing(2, tl + 4 * rd / v + 0.002, rd * (0.3 + 0.35 * f), rd, 0.05, 0.8, 0.1, pan, lq));
+    }
+    if (tl > last) last = tl;
+    pl.drops.push({ t: tl, rd: rd, pan: pan });
+  }
+  return last;
+}
+/* an object of mass m, a stone at 2500 kg/m^3, entering at speed U: a slap, the air cavity it drags down pinches
+   off as one large bubble (the plunk), the jet that shoots up falls back, the crown throws droplets */
+function planSplash(pl, q, grnd) {
+  var lq = pl.lq, m = q.lqMass, R = Math.cbrt(3 * m / (4 * Math.PI * 2500)), ut = Math.sqrt(2 * m * GRAV / (RHO * 0.47 * Math.PI * R * R));
+  var U = fallSpeed(q.lqHeight, ut), vf = viscFrac(lq), depth = q.lqDepth, shallow = depth < 1.2 * R, tau = Math.max(0.5 * R / U, 3e-4);
+  var slap = RHO * Math.PI * R * R * U / tau / TAU * (lq.rho / 1000), last = 0;
+  pl.U = U; pl.R = R; pl.shallow = shallow; pl.drops = []; pl.cav = null;
+  pl.evs.push(evClick(1, 0, 2 * tau, slap, 0));
+  pl.evs.push(evNoise(1, 0.001, 0.02 + 0.04 * R, 1200, 9000, 0.3 * slap * (1 - 0.7 * vf), 0));
+  if (shallow) {
+    /* the object hits the bottom: a dull knock, and the liquid sprays out sideways */
+    pl.tBottom = depth / U;
+    pl.evs.push(evClick(1, pl.tBottom, 0.004 + 0.01 * R, 0.6 * slap, 0));
+    pl.evs.push(evNoise(2, pl.tBottom, 0.06, 1500, 10000, 0.25 * slap * (1 - 0.7 * vf), 0));
+    pl.tMain = 0; pl.label = 'splash';
+  } else {
+    var tp = 2.1 * Math.sqrt(R / GRAV) * (1 + 0.5 * vf), Lc = Math.min(0.5 * U * tp, depth - R), Vb = 0.18 * Math.PI * R * R * Lc;
+    var ac = Math.cbrt(3 * Vb / (4 * Math.PI)), kc = 1 / (1 + (Lc / (4 * ac)) * (Lc / (4 * ac)));
+    pl.cav = evRing(0, tp, ac, Lc, 0.15 * (1 - 0.8 * vf), kc, 0.04, 0, lq);
+    pl.evs.push(pl.cav);
+    pl.evs.push(evClick(1, tp, 0.002, 0.2 * slap, 0));
+    pl.tMain = tp; pl.label = 'pinch-off'; pl.tp = tp; pl.Lc = Lc;
+    /* the Worthington jet rises at about 0.6 U and falls back as a few drops */
+    var vj = 0.6 * U / (1 + 2 * vf), nj = Math.round(3 + 3 * (1 - vf));
+    last = splashDroplets(pl, nj, 0.0015, 0.004, 0.5 * vj, 0.8 * vj, tp + vj / GRAV * 0.6, grnd, 1);
+  }
+  var nc = Math.round(clamp(8 * Math.sqrt(m / 0.1) * U / 3, 2, 60) * (1 - 0.8 * vf));
+  last = Math.max(last, splashDroplets(pl, nc, 0.0008, 0.003, 0.15 * U, 0.6 * U, 0, grnd, 1));
+  pl.dur = Math.max(last, pl.tMain) + 0.6;
+}
+/* a stream poured into a vessel: bubbles and splash noise where it lands, and the air column above the liquid
+   ringing at c / 4(L + 0.6 r), rising as the vessel fills */
+function planPour(pl, q) {
+  var Q = q.lqFlow / 1000, U = fallSpeed(q.lqHeight, 9), H = q.lqVessel, rv = 0.225 * H, Av = Math.PI * rv * rv, f0 = 0.05, f1 = clamp(q.lqFill, 0.1, 0.95);
+  var P = clamp((f1 - f0) * H * Av / Q, 1, 12);
+  f1 = f0 + P * Q / (H * Av);
+  pl.U = U; pl.Q = Q; pl.rj = Math.sqrt(Q / (Math.PI * U)); pl.H = H; pl.rv = rv; pl.P = P; pl.f0 = f0; pl.f1 = Math.min(f1, 0.97);
+  pl.fRes0 = C / (4 * (H * (1 - pl.f0) + 0.6 * rv)); pl.fRes1 = C / (4 * (H * (1 - pl.f1) + 0.6 * rv));
+  pl.rate = 800 * Math.sqrt(Q / 1e-4) * clamp(U / 1.5, 0.3, 3);
+  pl.dur = P + 0.5; pl.tMain = P / 2; pl.label = 'pour';
+}
+function pourResonance(pl, t) {
+  var fill = pl.f0 + (pl.f1 - pl.f0) * clamp(t / pl.P, 0, 1);
+  return C / (4 * (pl.H * (1 - fill) + 0.6 * pl.rv));
+}
+/* bubble radii between lo and hi from Deane and Stokes' size law for entrained air: n(a) ~ a^-3/2 below the Hinze
+   scale (about 1 mm, where turbulence stops breaking bubbles up) and a^-10/3 above it; u in [0, 1) picks one */
+var HINZE = 0.001;
+function powerRadius(u, lo, hi) {
+  var xl = Math.min(lo, HINZE) / HINZE, xh = Math.max(hi, HINZE) / HINZE;
+  var I1 = lo < HINZE ? 2 * (Math.pow(xl, -0.5) - Math.pow(Math.min(hi, HINZE) / HINZE, -0.5)) : 0;
+  var x0 = Math.max(lo, HINZE) / HINZE, I2 = hi > HINZE ? 3 / 7 * (Math.pow(x0, -7 / 3) - Math.pow(xh, -7 / 3)) : 0, w = u * (I1 + I2);
+  if (w < I1) return HINZE * Math.pow(Math.pow(xl, -0.5) - w / 2, -2);
+  return HINZE * Math.pow(Math.pow(x0, -7 / 3) - 7 / 3 * (w - I1), -3 / 7);
+}
+function pourEvents(pl, rnd) {
+  var lq = pl.lq, n = Math.min(Math.round(pl.rate * pl.P), Math.round(LQ_CAP * pl.P)), wgt = Math.sqrt(pl.rate * pl.P / Math.max(1, n)), i, t, u, a, e, pan, hi = Math.max(0.001, 1.5 * pl.rj);
+  for (i = 0; i < n; i++) {
+    t = rnd() * pl.P; u = rnd(); e = rnd(); pan = (rnd() * 2 - 1) * 0.3;
+    a = powerRadius(u, 0.0003, hi);
+    pl.evs.push(evRing(0, 0.03 + t, a, 0.03, (0.02 + 0.03 * e) * wgt, 0.5, 0.08, pan, lq));
+  }
+}
+/* the stream's splash noise, then the column above the liquid excited by everything below it */
+function pourBeds(pl, mids, sides, rnd, ns) {
+  var nz = jetNoise(ns, clamp(1200 * pl.U / 2, 400, 6000), rnd, false), env = new Float32Array(ns), i, amp = 0.03 * Math.sqrt(pl.Q / 1e-4) * (pl.U / 2) * (pl.U / 2);
+  for (i = 0; i < ns; i++) { var t = i / FS - 0.03; env[i] = t < 0 ? 0 : Math.min(1, t / 0.05, Math.max(0, pl.P - t) / 0.08); }
+  bedAdd(mids[1], sides[1], nz, env, amp, 0);
+  /* air column: two-pole resonators at the quarter-wave pitch and its third harmonic, retuned every 32 samples */
+  var x = new Float32Array(ns), z = [0, 0, 0, 0], h = 0;
+  for (i = 0; i < ns; i++) x[i] = mids[0][i] + mids[1][i];
+  for (var b = 0; b < ns; b += 32) {
+    /* input gains set each peak to 3 times the sound under it, about +10 dB, whatever its pitch */
+    var f = pourResonance(pl, b / FS - 0.03), f3 = Math.min(3 * f, 18000), r1 = Math.exp(-Math.PI * f / (15 * FS)), r3 = Math.exp(-Math.PI * f3 / (20 * FS));
+    var c1 = 2 * r1 * Math.cos(TAU * f / FS), c3 = 2 * r3 * Math.cos(TAU * f3 / FS), g1 = 6 * (1 - r1) * Math.sin(TAU * f / FS), g3 = 3 * (1 - r3) * Math.sin(TAU * f3 / FS);
+    for (i = b; i < Math.min(ns, b + 32); i++) {
+      var y1 = c1 * z[0] - r1 * r1 * z[1] + g1 * x[i], y3 = c3 * z[2] - r3 * r3 * z[3] + g3 * x[i];
+      z[1] = z[0]; z[0] = y1; z[3] = z[2]; z[2] = y3;
+      h = y1 + y3; mids[3][i] += h;
+    }
+  }
+}
+/* hot steel into water. Film boiling holds a vapour blanket (a steady hiss and roar) until the surface falls below
+   the Leidenfrost point; then the film breaks, the heat flux jumps toward the critical flux and vapour bubbles
+   collapse in the cold water by the thousand (the crackle), easing off through nucleate boiling to silence. */
+var QUENCH = { tw: 20, tl: 380, tchf: 135, hf: 450, qchf: 2.5e6, c: 490, rho: 7800 };
+function quenchFlux(T) {
+  var Q = QUENCH;
+  if (T <= 100) return 900 * (T - Q.tw);
+  if (T <= Q.tchf) return Q.qchf * Math.pow((T - 100) / (Q.tchf - 100), 3);
+  var qL = Q.hf * (Q.tl - 100) + 5.67e-8 * 0.8 * (Math.pow(Q.tl + 273, 4) - Math.pow(373, 4));
+  if (T < Q.tl) return Math.exp(Math.log(Q.qchf) + (Math.log(qL) - Math.log(Q.qchf)) * (T - Q.tchf) / (Q.tl - Q.tchf));
+  return Q.hf * (T - 100) + 5.67e-8 * 0.8 * (Math.pow(T + 273, 4) - Math.pow(373, 4));
+}
+function planQuench(pl, q) {
+  var m = q.lqMass, V = m / QUENCH.rho, th = Math.max(q.lqThick, 5e-4), A = 2 * V / th + 4 * Math.sqrt(V / th) * th, T = q.lqTemp, n = 0, steps = 12000, i;
+  var temp = new Float32Array(steps), flux = new Float32Array(steps);
+  pl.A = A; pl.T0 = T; pl.tL = -1; pl.tEnd = 12; pl.qMax = 0;
+  var iMax = 0;
+  for (i = 0; i < steps; i++) {
+    var qf = quenchFlux(T);
+    temp[i] = T; flux[i] = T > 100 ? qf * A : 0;
+    if (flux[i] > pl.qMax) { pl.qMax = flux[i]; iMax = i; }
+    if (pl.tL < 0 && i > 0 && T < QUENCH.tl && temp[i - 1] >= QUENCH.tl) pl.tL = i / 1000;
+    T -= qf * A * 0.001 / (m * QUENCH.c);
+    n = i + 1;
+    /* nucleate boiling eases off as the cube of the superheat; past the peak, a hundredth of it is silence */
+    if (T < 101 || (i > iMax && flux[i] < 0.01 * pl.qMax)) { pl.tEnd = i / 1000; break; }
+  }
+  pl.temp = temp.slice(0, n); pl.flux = flux.slice(0, n);
+  pl.dur = Math.min(pl.tEnd + 0.6, 12.5); pl.tMain = Math.max(0, pl.tL); pl.label = pl.tL > 0 ? 'film breaks' : 'quench';
+  pl.evs.push(evClick(1, 0, 0.004, RHO * Math.PI * Math.pow(V, 2 / 3) * 2 / 0.004 / TAU * 0.3, 0));
+  pl.evs.push(evNoise(2, 0.002, 0.03, 1500, 9000, 0.02, 0));
+}
+function quenchEvents(pl, rnd) {
+  var lq = pl.lq, i, k, n = pl.flux.length, latent = 0.6 * 2.26e6;
+  for (i = 0; i < n; i++) {
+    var Qw = pl.flux[i], film = pl.temp[i] >= QUENCH.tl;
+    if (Qw <= 0) continue;
+    /* film boiling sheds bubbles of a few millimetres from the top of the blanket; below the Leidenfrost point
+       bubbles of about a millimetre form and collapse at the wall */
+    var a0 = film ? 0.0025 : 0.0008, rate = Qw / (latent * 4 / 3 * Math.PI * a0 * a0 * a0) * (film ? 0.2 : 1);
+    /* at most one film bubble or three collapses are drawn per millisecond; more stand in for the rest by energy */
+    var mean = rate * 0.001, cap = film ? 1 : 3, u = rnd(), cnt, wgt = 1;
+    if (mean > cap) { cnt = cap; wgt = Math.sqrt(mean / cap); } else cnt = Math.floor(mean) + (u < mean - Math.floor(mean) ? 1 : 0);
+    /* the last of the nucleate boiling would trickle on for seconds; it fades out over 0.4 s instead */
+    wgt *= clamp((pl.tEnd - i / 1000) / 0.4, 0, 1);
+    for (k = 0; k < cnt; k++) {
+      var t = (i + rnd()) / 1000, v = rnd(), pan = (rnd() * 2 - 1) * 0.25, a = a0 * (0.5 + v);
+      if (film) {
+        pl.evs.push(evRing(0, t, a, 0.05, 0.015 * wgt, 0.3, 0.03, pan, lq));
+        if (v < 0.3) pl.evs.push(evBurst(2, t + 0.15, a, lq, 0.5 * wgt, pan));
+      } else pl.evs.push(evCollapse(0, t, a, 0.02 * (a / 0.001) * wgt, pan));
+    }
+  }
+}
+function quenchBeds(pl, mids, sides, rnd, ns) {
+  var roar = jetNoise(ns, 350, rnd, false), hiss = jetNoise(ns, 5000, rnd, false), eR = new Float32Array(ns), eH = new Float32Array(ns), i, sr = 0, sh = 0;
+  var aR = Math.exp(-1 / (0.08 * FS)), aH = Math.exp(-1 / (0.05 * FS));
+  for (i = 0; i < ns; i++) {
+    var j = Math.floor(i / FS * 1000), Qw = j < pl.flux.length ? pl.flux[j] : 0, film = j < pl.temp.length && pl.temp[j] >= QUENCH.tl;
+    sr = (film ? Math.sqrt(Qw) : 0) + (sr - (film ? Math.sqrt(Qw) : 0)) * aR;
+    sh = Math.sqrt(Qw) + (sh - Math.sqrt(Qw)) * aH;
+    eR[i] = sr; eH[i] = sh * clamp((pl.tEnd - i / FS) / 0.4, 0, 1);
+  }
+  bedAdd(mids[1], sides[1], roar, eR, 2e-4, 0);
+  bedAdd(mids[3], sides[3], hiss, eH, 3e-4, 0);
+}
+/* rain on open water: Marshall and Palmer's drop sizes for a rain rate, each drop at its terminal speed. Drops near
+   a millimetre trap bubbles regularly and ring near 15 kHz; the large ones trap bubbles irregularly and ring lower. */
+function planRain(pl, q) {
+  var R = Math.max(0.1, q.lqRain), lam = 4.1 * Math.pow(R, -0.21), area = 2, cdf = [], tot = 0, D, k;
+  for (k = 0; k < 120; k++) {
+    D = 0.3 + 0.05 * k;
+    tot += 8000 * Math.exp(-lam * D) * dropTerminal(D / 2000) * 0.05 * area;
+    cdf.push(tot);
+  }
+  pl.flux = tot; pl.cdf = cdf; pl.lam = lam;
+  pl.dur = LOOP_S; pl.tMain = 0; pl.label = '';
+}
+function rainEvents(pl, rnd) {
+  var lq = pl.lq, n = Math.min(Math.round(pl.flux * LOOP_S), LQ_CAP * LOOP_S), wgt = Math.sqrt(pl.flux * LOOP_S / Math.max(1, n)), i, lo, hi, md;
+  for (i = 0; i < n; i++) {
+    var t = rnd() * LOOP_S, u = rnd() * pl.cdf[pl.cdf.length - 1], pan = (rnd() * 2 - 1) * 0.9, v = rnd(), w = rnd();
+    lo = 0; hi = pl.cdf.length - 1;
+    while (lo < hi) { md = (lo + hi) >> 1; if (pl.cdf[md] < u) lo = md + 1; else hi = md; }
+    var rd = (0.3 + 0.05 * lo + 0.05 * w) / 2000, U = dropTerminal(rd), reg = entrainChance(rd, U, lq);
+    pl.evs.push(evClick(1, t, rd / U, RHO * Math.PI * rd * U * U / TAU * wgt, pan));
+    if (v < reg) {
+      var big = rd > 0.0011, x = rnd();
+      pl.evs.push(evRing(0, t + 4 * rd / U + 0.001, big ? rd * (0.25 + 0.5 * x) : 0.00022 * (0.85 + 0.3 * x), 0.002, big ? 0.08 : 0.05, 0.8, 0.1, pan, lq));
+      pl.evs[pl.evs.length - 1].amp *= wgt;
+    }
+  }
+}
+/* running water: bubbles entrained by the flow, sizes by the power law, with the turbulent rush and droplets */
+function streamEvents(pl, q, rnd) {
+  var lq = pl.lq, rate = q.lqRate, n = Math.min(Math.round(rate * LOOP_S), LQ_CAP * LOOP_S), wgt = Math.sqrt(rate * LOOP_S / Math.max(1, n)), hi = 0.006 * q.lqSize, i;
+  for (i = 0; i < n; i++) {
+    var t = rnd() * LOOP_S, u = rnd(), e = rnd(), k = rnd(), pan = (rnd() * 2 - 1) * 0.8;
+    pl.evs.push(evRing(0, t, powerRadius(u, 0.0005, Math.max(0.001, hi)), 0.05, (0.015 + 0.025 * e) * wgt, 0.2 + 0.7 * k, 0.06, pan, lq));
+  }
+  var nd = Math.round(n * 0.5);
+  for (i = 0; i < nd; i++) {
+    var t2 = rnd() * LOOP_S, a2 = rnd(), pan2 = (rnd() * 2 - 1) * 0.8;
+    pl.evs.push(evClick(2, t2, 0.0001 + 0.0003 * a2, (0.002 + 0.006 * a2) * wgt, pan2));
+  }
+}
+/* gas rising through a liquid and bursting: boiling water or oil, bubbling mud, degassing lava, fizzing acid. Heat is
+   how far a pot on a steady flame has come: at first the bubbles that nucleate at the bottom collapse in the cooler
+   liquid above (the kettle sings, loudest just before the boil), then they survive and burst at the surface. */
+/* collapse level at 1 m for a 1 mm bubble, set so the kettle sings about 6 dB over its rolling boil, as measured kettles do */
+var COLLAPSE_PA = 0.3;
+function bubbleEvents(pl, q, rnd) {
+  var lq = pl.lq, vf = viscFrac(lq), hot = q.lqMedium === 'water' || q.lqMedium === 'oil', heat = hot ? clamp(q.lqHeat, 0, 1) : 1, fc = hot ? lqCollapse(heat) : 0;
+  var rate = q.lqRate * (hot ? heat * heat * (1 - fc) : 1), a0 = lq.gas * q.lqSize * (hot ? 0.6 + 0.8 * heat : 1), depth = 0.05, i, n, wgt;
+  n = Math.min(Math.round(rate * LOOP_S), LQ_CAP * LOOP_S); wgt = Math.sqrt(rate * LOOP_S / Math.max(1, n));
+  for (i = 0; i < n; i++) {
+    var t = rnd() * LOOP_S, u1 = rnd(), u2 = rnd(), u3 = rnd(), pan = (rnd() * 2 - 1) * 0.6;
+    var a = a0 * Math.exp(0.7 * (u1 + u2 + u3 - 1.5));
+    pl.evs.push(evRing(0, t, a, depth, 0.02 * (1 - vf) * wgt, 0.3, 0.05, pan, lq));
+    var vr = Math.min(0.25, 2 / 9 * lq.rho * GRAV * a * a / lq.mu), tb = t + depth / vr;
+    if (vf > 0.05) pl.evs.push(evDome(1, tb, a, lq, wgt, pan));
+    pl.evs.push(evBurst(2, tb, a, lq, wgt, pan));
+  }
+  /* small vapour bubbles at the bottom, ten for every one that later makes it up; they grow as the liquid warms */
+  var rc = hot ? 10 * q.lqRate * (0.2 + 0.8 * heat) * fc : 0, ac = lq.gas * q.lqSize * (0.15 + 0.5 * heat), nc = Math.min(Math.round(rc * LOOP_S), LQ_CAP * LOOP_S), wc = Math.sqrt(rc * LOOP_S / Math.max(1, nc));
+  for (i = 0; i < nc; i++) {
+    var tc = rnd() * LOOP_S, v1 = rnd(), pc = (rnd() * 2 - 1) * 0.6, a2 = ac * (0.6 + 0.8 * v1);
+    pl.evs.push(evCollapse(0, tc, a2, COLLAPSE_PA * (a2 / 0.001) * wc, pc));
+  }
+  if (q.lqMedium === 'lava') {
+    /* the crust cooling on top cracks: sparse glassy ticks */
+    for (i = 0; i < Math.round(5 * LOOP_S); i++) {
+      var tk = rnd() * LOOP_S, fq = rnd(), pk = (rnd() * 2 - 1) * 0.8, ak = rnd();
+      pl.evs.push(evTone(3, tk, 1800 + 4000 * fq, 0.004 + 0.01 * (1 - fq), 0.02 + 0.08 * ak, 0, pk));
+    }
+  }
+  pl.rate = rate; pl.rateC = rc;
+}
+/* share of bubbles the colder liquid above collapses before they reach the surface: all of them until the liquid is
+   half heated, none once it boils through */
+function lqCollapse(heat) { return clamp((0.85 - heat) / 0.35, 0, 1); }
+/* the expected spread of bubble pitches, for the diagram: quantiles of the size law, no random draws */
+function lqHist(pl, q) {
+  var lq = pl.lq, out = [], i, u, a;
+  for (i = 0; i < 200; i++) {
+    u = (i + 0.5) / 200;
+    if (pl.mode === 'stream') a = powerRadius(u, 0.0005, Math.max(0.001, 0.006 * q.lqSize));
+    else if (pl.mode === 'pour') a = powerRadius(u, 0.0003, Math.max(0.001, 1.5 * pl.rj));
+    else if (pl.mode === 'rain') a = 0.00022 * (0.85 + 0.3 * u);
+    else { var hot = q.lqMedium === 'water' || q.lqMedium === 'oil', heat = hot ? clamp(q.lqHeat, 0, 1) : 1; a = lq.gas * q.lqSize * (hot ? 0.6 + 0.8 * heat : 1) * Math.exp(0.7 * 1.73 * (u - 0.5)); }
+    out.push({ f: minnaert(a, lq, pl.mode === 'rain' ? 0.002 : 0.05), fb: Math.min(42.9 / a, 16000), fd: domeHz(a, lq) });
+  }
+  return out;
+}
+function planLiquid(q, grnd) {
+  var mode = q.lqMode, med = mode === 'quench' || mode === 'rain' || mode === 'stream' ? 'water' : q.lqMedium;
+  var pl = { mode: mode, med: med, lq: LIQUIDS[med] || LIQUIDS.water, r: Math.max(0.2, q.lqDist), loop: mode === 'stream' || mode === 'rain' || mode === 'bubble', evs: [], dur: LOOP_S, tMain: 0, label: '' };
+  if (mode === 'drop') planDrop(pl, q, grnd);
+  else if (mode === 'splash') planSplash(pl, q, grnd);
+  else if (mode === 'pour') planPour(pl, q);
+  else if (mode === 'quench') planQuench(pl, q);
+  else if (mode === 'rain') planRain(pl, q);
+  if (mode === 'stream' || mode === 'rain' || mode === 'bubble' || mode === 'pour') pl.hist = lqHist(pl, q);
+  if (mode === 'bubble') { var hot = q.lqMedium === 'water' || q.lqMedium === 'oil'; pl.heat = hot ? clamp(q.lqHeat, 0, 1) : 1; pl.fc = hot ? lqCollapse(pl.heat) : 0; }
+  return pl;
+}
+function lqBuffers(ns) { var m = [], s = [], k; for (k = 0; k < 4; k++) { m.push(new Float32Array(ns)); s.push(new Float32Array(ns)); } return { m: m, s: s }; }
+function liquidLayers(pl, p, o, rnd, layers, ev, lab) {
+  var ns = Math.ceil(pl.dur * FS), r = pl.r, tA = o.t0 + r / C, gs = [o.g1, o.g2, o.g3, o.g4], bf = lqBuffers(ns), k, i, pn = o.pan * 0.7;
+  if (pl.mode === 'pour') pourEvents(pl, rnd);
+  else if (pl.mode === 'quench') quenchEvents(pl, rnd);
+  liquidSynth(pl.evs, bf.m, bf.s, rnd, false);
+  if (pl.mode === 'pour') pourBeds(pl, bf.m, bf.s, rnd, ns);
+  else if (pl.mode === 'quench') quenchBeds(pl, bf.m, bf.s, rnd, ns);
+  for (k = 0; k < 4; k++) {
+    if (!(gs[k] > 0)) continue;
+    var L = new Float32Array(ns), R = new Float32Array(ns), m = bf.m[k], s = bf.s[k];
+    for (i = 0; i < ns; i++) { L[i] = (m[i] * (1 + pn) + s[i]) / r; R[i] = (m[i] * (1 - pn) - s[i]) / r; }
+    postLayer(L, r, o.ground); postLayer(R, r, o.ground);
+    layers.push({ L: L, R: R, t: tA, g: gs[k] });
+  }
+  ev.push({ k: 'impact', t: tA + pl.tMain, label: lab ? pl.label : '' });
+  if (pl.mode === 'splash' && pl.cav) ev.push({ k: 'launch', t: tA, label: lab ? 'slap' : '' });
+}
+function liquidSignal(pl, p, o, rnd, ns) {
+  var bf = lqBuffers(ns), gs = [o.g1, o.g2, o.g3, o.g4], mid = new Float32Array(ns), side = new Float32Array(ns), k, i, x, env = new Float32Array(ns);
+  pl.evs = [];
+  if (pl.mode === 'rain') rainEvents(pl, rnd);
+  else if (pl.mode === 'stream') streamEvents(pl, p, rnd);
+  else bubbleEvents(pl, p, rnd);
+  liquidSynth(pl.evs, bf.m, bf.s, rnd, true);
+  /* beds: the rush of a stream, the churn of a rolling boil, the hiss of an acid reaction; each wraps round */
+  var ph1 = rnd(), ph2 = rnd();
+  for (i = 0; i < ns; i++) env[i] = 1 + 0.3 * Math.sin(TAU * (2 * i / ns + ph1)) + 0.2 * Math.sin(TAU * (5 * i / ns + ph2));
+  if (pl.mode === 'stream') { x = jetNoise(ns, 700, rnd, true); bedAdd(bf.m[1], bf.s[1], x, env, 0.003 * Math.sqrt(p.lqRate / 300), 0); }
+  else if (pl.mode === 'bubble' && (pl.med === 'water' || pl.med === 'oil')) { x = jetNoise(ns, 450, rnd, true); bedAdd(bf.m[1], bf.s[1], x, env, 0.002 * Math.sqrt(p.lqRate / 100) * pl.heat * pl.heat, 0); }
+  else if (pl.mode === 'bubble' && pl.med === 'acid') { x = jetNoise(ns, 7000, rnd, true); bedAdd(bf.m[3], bf.s[3], x, env, 0.0015 * Math.sqrt(p.lqRate / 1000), 0); }
+  for (k = 0; k < 4; k++) for (i = 0; i < ns; i++) { mid[i] += bf.m[k][i] * gs[k]; side[i] += bf.s[k][i] * gs[k]; }
+  return { mid: mid, side: side };
+}
+
+/* ---------- mechanisms ----------
+   A door, lid, turret or switch is a drive, a path, a panel and two ends. The drive follows the speed profile: an
+   electric motor's slot and gear-mesh tones rise and fall with its speed, a hydraulic pump holds its pitch and works
+   harder under load, a pneumatic cylinder hisses while it moves and vents when it stops. The path rumbles on rails
+   or a slewing ring, and a dry hinge creaks by stick-slip, one slip each time the pin turns through a slip length,
+   so the creak climbs with speed. The panel rings at its plate modes, shaken by the drive. The ends are struck:
+   latches, end stops, seals and bolts, with the energy the panel still carries. */
+var MECH_MATS = {
+  steel: { spec: 'steel', rho: 7800, h: 0.004 },
+  aluminium: { spec: { f0: 600, ratios: [1, 1.58, 2.24, 2.92, 3.6, 4.71, 5.4, 6.8, 8.93], t60: 0.9, slope: 0.25, contact: 0.0001, eff: 0.9,
+    noise: { dur: 0.004, hp: 1800, lp: 16000, gain: 0.6 }, grains: null }, rho: 2700, h: 0.003 },
+  wood: { spec: 'wood', rho: 600, h: 0.025 },
+  plastic: { spec: { f0: 380, ratios: [1, 1.9, 2.8, 4.1, 5.5], t60: 0.06, slope: 0.4, contact: 0.0004, eff: 0.6,
+    noise: { dur: 0.006, hp: 800, lp: 9000, gain: 1 }, grains: null }, rho: 1200, h: 0.004 }
+};
+/* a hundredth of the energy the panel carries into a stop reaches its modes; the rest goes into frame and hinges */
+var STOP_EFF = 0.01, MECH_STOPS = { hard: { e: 1, lp: 0 }, rubber: { e: 0.35, lp: 1200 }, damped: { e: 0.15, lp: 400 } };
+function smoothstep(x) { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); }
+/* white noise through two low-pass and one high-pass pole, at unit rms */
+function unitNoise(n, rnd, lp, hp) {
+  var b = new Float32Array(n), e = 0, i;
+  for (i = 0; i < n; i++) b[i] = rnd() * 2 - 1;
+  if (lp) { onePoleLP(b, lp); onePoleLP(b, lp); }
+  if (hp) onePoleHP(b, hp);
+  for (i = 0; i < n; i++) e += b[i] * b[i];
+  scale(b, 1 / (Math.sqrt(e / n) || 1));
+  return b;
+}
+/* speed profile, unit peak: ramps up over rs, cruises, ramps down over re to 'end', the speed left at the stop */
+function mechShape(q) {
+  var d = q.mcDrive, close = q.mcAction === 'close';
+  if (q.mcType === 'switch') return { k: 0, rs: 0.3, re: 0, end: 1 };
+  if (d === 'electric') return { k: 0, rs: 0.2, re: 0.2, end: 0.12 };
+  if (d === 'hydraulic') return { k: 0, rs: 0.12, re: 0.3, end: 0.05 };
+  if (d === 'pneumatic') return { k: 0, rs: 0.04, re: 0.1, end: 0.35 };
+  /* by hand: a push that carries a closing door into its frame, or a swing that dies away as it opens */
+  return close ? { k: 1, rs: 0, re: 0, end: 1 } : { k: 2, rs: 0, re: 0, end: 0.05 };
+}
+function mechU(sh, x) {
+  if (sh.k === 1) return 0.4 + 0.6 * x;
+  if (sh.k === 2) return Math.max(sh.end, Math.pow(Math.sin(Math.PI * x), 0.7));
+  var u = sh.rs > 0 ? smoothstep(x / sh.rs) : 1;
+  if (sh.re > 0 && x > 1 - sh.re) u = Math.min(u, sh.end + (1 - sh.end) * smoothstep((1 - x) / sh.re));
+  return u;
+}
+function planMech(q, grnd) {
+  var mm = MECH_MATS[q.mcMat] || MECH_MATS.steel, M = Math.max(q.mcMass, 0.005), T = Math.max(q.mcTime, 0.005), type = q.mcType, sh = mechShape(q);
+  var L = clamp(Math.sqrt(M / (mm.rho * mm.h)), 0.03, 6), S, k, n = Math.max(2, Math.ceil(T * 1000) + 1), u = new Float32Array(n), area = 0;
+  for (k = 0; k < n; k++) { u[k] = mechU(sh, k / (n - 1)); area += u[k] * (k === 0 || k === n - 1 ? 0.5 : 1); }
+  area /= n - 1;
+  /* S in metres along the path; a turning part counts at its edge */
+  var Rr = type === 'rotate' ? clamp(0.15 * Math.cbrt(M), 0.02, 2) : L, ang = q.mcAngle * Math.PI / 180;
+  if (type === 'slide') S = q.mcStroke; else if (type === 'switch') S = 0.008 * Math.cbrt(M / 0.02); else S = ang * Rr;
+  var vmax = S / T / area, vel = new Float32Array(n);
+  for (k = 0; k < n; k++) vel[k] = vmax * u[k];
+  /* inertia seen at the edge: a door about its hinge, M/3; a turret as a disc, M/2; a slide carries all of it */
+  var Meff = type === 'hinge' ? M / 3 : type === 'rotate' ? M / 2 : M, mu = type === 'slide' ? 0.05 : 0.01, Pk = 0, pw = new Float32Array(n);
+  for (k = 0; k < n; k++) {
+    var acc = (vel[Math.min(n - 1, k + 1)] - vel[Math.max(0, k - 1)]) / (2 * T / (n - 1));
+    pw[k] = Math.abs((Meff * acc + mu * M * GRAV) * vel[k]);
+    if (pw[k] > Pk) Pk = pw[k];
+  }
+  var pre = q.mcDrive === 'hydraulic' ? 0.35 : 0.08, close = q.mcAction === 'close', bolt = q.mcLatch === 'bolt';
+  if (bolt && !close) pre += 0.45;
+  var vEnd = vmax * sh.end, Eend = 0.5 * Meff * vEnd * vEnd, mt = mm.spec === 'steel' ? MATERIALS.steel : mm.spec === 'wood' ? MATERIALS.wood : mm.spec;
+  var pl = { type: type, drive: q.mcDrive, close: close, M: M, Meff: Meff, T: T, n: n, vel: vel, pw: pw, Pk: Math.max(Pk, 0.5), vmax: vmax, S: S, L: L, Rr: Rr,
+    pre: pre, t0: pre, tEnd: pre + T, vEnd: vEnd, Eend: Eend, mm: mm, sc: clamp(0.6 / L, 0.15, 12), r: Math.max(0.3, q.mcDist), latch: q.mcLatch,
+    wear: clamp(q.mcWear, 0, 1), rpm: q.mcRpm, stop: MECH_STOPS[q.mcStop] || MECH_STOPS.hard, ang: ang };
+  pl.f0 = mt.f0 * pl.sc;
+  pl.fMotor = q.mcRpm / 60;
+  pl.tone = q.mcDrive === 'electric' ? 13 * pl.fMotor : q.mcDrive === 'hydraulic' ? 225 : 0;
+  pl.creak = type === 'hinge' && pl.wear > 0.15 ? vmax / pl.L * 0.006 / 15e-6 : 0;
+  pl.dur = pl.tEnd + (bolt && close ? 0.75 : 0.3) + (q.mcDrive === 'pneumatic' ? 0.9 : q.mcDrive === 'hydraulic' ? 0.5 : 0) + Math.min(mt.t60, 1.5) + 0.2;
+  return pl;
+}
+/* speed at time t, by linear reading of the millisecond table */
+function mechVel(pl, t) {
+  var x = (t - pl.t0) / pl.T * (pl.n - 1);
+  if (x < 0 || x > pl.n - 1) return 0;
+  var i = Math.floor(x), f = x - i;
+  return i + 1 < pl.n ? pl.vel[i] + (pl.vel[i + 1] - pl.vel[i]) * f : pl.vel[i];
+}
+function mechPow(pl, t) {
+  var x = (t - pl.t0) / pl.T * (pl.n - 1);
+  if (x < 0 || x > pl.n - 1) return 0;
+  return pl.pw[Math.min(pl.n - 1, Math.round(x))];
+}
+function addStrike(buf, t, spec, E, sc, rnd, lp, g) {
+  var h = modalHit(spec, E, sc, rnd), n0 = Math.round(t * FS), i;
+  if (lp) { onePoleLP(h, lp); onePoleLP(h, lp); }
+  for (i = 0; i < h.length && n0 + i < buf.length; i++) if (n0 + i >= 0) buf[n0 + i] += h[i] * g;
+}
+function mechLayers(pl, p, o, rnd, layers, ev, lab) {
+  var ns = Math.ceil(pl.dur * FS), r = pl.r, tA = o.t0 + r / C, i, k, t, drive = new Float32Array(ns), path = new Float32Array(ns), body = new Float32Array(ns), ends = new Float32Array(ns);
+  var spec = pl.mm.spec, w, v, ld;
+  /* ---- drive ---- */
+  if (pl.drive === 'electric') {
+    /* a gearmotor near 0.003 Pa per root watt at 1 m; slot tone, two gear meshes, shaft hum, brush hiss */
+    var Ae = 0.003 * Math.sqrt(pl.Pk), part = [[12, 1, 0], [24, 0.4, 0], [13, 1.4, 1], [26, 0.5, 1], [13 / 4.1, 0.8, 1], [1, 0.3, 0]], ph = new Float64Array(part.length);
+    var hiss = unitNoise(ns, rnd, 9000, 2000);
+    for (i = 0; i < ns; i++) {
+      t = i / FS; v = mechVel(pl, t); w = v / pl.vmax; ld = 0.3 + 0.7 * mechPow(pl, t) / pl.Pk;
+      var y = 0, fr = pl.fMotor * w;
+      for (k = 0; k < part.length; k++) {
+        var f = fr * part[k][0];
+        ph[k] += f / FS;
+        if (f < 18000 && f > 15) y += part[k][1] * (part[k][2] ? ld : 1) * fsin(ph[k]);
+      }
+      drive[i] = Ae * (y * Math.min(1, w * 6) + 0.3 * hiss[i] * w);
+    }
+    if (pl.M > 50) { addStrike(drive, pl.t0 - 0.04, 'steel', 0.002, 8, rnd, 0, 1); addStrike(drive, pl.tEnd + 0.06, 'steel', 0.002, 8, rnd, 0, 1); }
+  } else if (pl.drive === 'hydraulic') {
+    /* the power pack spools up before the valve opens; the pump's nine pistons at 1500 rev/min give 225 Hz */
+    var Ah = 0.004 * Math.sqrt(pl.Pk / 0.6), ph2 = new Float64Array(6), flow = unitNoise(ns, rnd, 4000, 800), relief = unitNoise(ns, rnd, 4500, 2500);
+    var tOn = pl.t0 - 0.3, tOff = pl.tEnd + 0.15;
+    for (i = 0; i < ns; i++) {
+      t = i / FS; v = mechVel(pl, t); w = v / pl.vmax;
+      var sp = t < tOn ? 0 : t < tOn + 0.25 ? smoothstep((t - tOn) / 0.25) : t < tOff ? 1 : Math.max(0, 1 - (t - tOff) / 0.3);
+      var pr = 0.4 + 0.6 * mechPow(pl, t) / pl.Pk + (t > pl.tEnd && t < pl.tEnd + 0.25 ? 0.8 : 0), y2 = 0;
+      for (k = 0; k < 6; k++) { ph2[k] += 225 * (k + 1) * sp / FS; y2 += fsin(ph2[k]) / Math.pow(k + 1, 0.7); }
+      drive[i] = Ah * (sp * pr * y2 + 0.8 * flow[i] * w * w + (t > pl.tEnd && t < pl.tEnd + 0.25 ? 1.5 * relief[i] * Math.sin(Math.PI * (t - pl.tEnd) / 0.25) : 0));
+    }
+    addStrike(drive, pl.t0 - 0.02, 'steel', 0.004, 5, rnd, 0, 1); addStrike(drive, tOff - 0.03, 'steel', 0.004, 5, rnd, 0, 1);
+  } else if (pl.drive === 'pneumatic') {
+    /* air at 6 bar fills a bore sized to move the panel; it hisses in, cushions at the end and vents after the stop,
+       the vent at 0.01 Pa per root joule of the air let go */
+    var Fm = pl.Meff * pl.vmax / (0.05 * pl.T) + 0.05 * pl.M * GRAV + 50, Vc = Fm / 6e5 * Math.max(pl.S, 0.01), Ap = 0.01 / 3 * Math.sqrt(6e5 * Vc);
+    var air = unitNoise(ns, rnd, 12000, 2000), tV = pl.tEnd + 0.12;
+    for (i = 0; i < ns; i++) {
+      t = i / FS; v = mechVel(pl, t); w = v / pl.vmax;
+      var on = t >= pl.t0 && t <= pl.tEnd ? 0.3 + 0.7 * w + (t > pl.tEnd - 0.1 * pl.T ? 0.6 : 0) : 0;
+      var vent = t >= tV ? Math.exp(-(t - tV) / 0.22) * Math.min(1, (t - tV) / 0.004) : 0;
+      drive[i] = Ap * air[i] * (0.4 * on + 3 * vent);
+    }
+    addStrike(drive, pl.t0 - 0.01, 'steel', 0.003, 6, rnd, 0, 1);
+  }
+  /* ---- path ---- */
+  var M2 = Math.sqrt(pl.M);
+  if (pl.type === 'slide' || pl.type === 'rotate') {
+    var rum = unitNoise(ns, rnd, 0, 0), lpS = 0, wheel = 0, dWheel = pl.type === 'slide' ? 0.06 : 0.02, zr = pl.type === 'rotate' ? Math.round(60 + 140 * Math.min(1, pl.Rr)) : 0, gearPh = 0;
+    for (i = 0; i < ns; i++) {
+      t = i / FS; v = mechVel(pl, t); w = v / pl.vmax;
+      lpS = rum[i] + (lpS - rum[i]) * Math.exp(-TAU * (150 + 600 * w) / FS);
+      path[i] += 0.03 * M2 * v * lpS;
+      /* wheels with a flat spot knock once a turn; a turret's ring gear clicks once a tooth */
+      wheel += v / (Math.PI * dWheel) / FS;
+      if (wheel >= 1) { wheel -= 1; if (pl.wear > 0.05) addN(path, t, 0.0004, 0.01 * pl.wear * M2 * v); }
+      if (zr) { gearPh += zr * v / pl.Rr / TAU / FS; if (gearPh >= 1) { gearPh -= 1; addN(path, t, 0.002, 0.003 * M2 * w); } }
+    }
+  } else if (pl.creak > 0) {
+    /* stick-slip at the hinge pin: each slip excites three creak resonances; a worn hinge slips unevenly */
+    var cf = [450 * Math.sqrt(pl.sc), 1100 * Math.sqrt(pl.sc), 2300 * Math.sqrt(pl.sc)], cz = [0, 0, 0, 0, 0, 0], cr = [], cc = [], slip = 0, Ac = 0.02 * M2 * (pl.wear - 0.15) / 0.85;
+    var cg = [];
+    for (k = 0; k < 3; k++) { cr.push(Math.exp(-Math.PI * cf[k] / (25 * FS))); cc.push(2 * cr[k] * Math.cos(TAU * Math.min(cf[k], 18000) / FS)); cg.push(Math.sin(TAU * Math.min(cf[k], 18000) / FS)); }
+    for (i = 0; i < ns; i++) {
+      t = i / FS; v = mechVel(pl, t);
+      var x = 0;
+      slip += v / pl.L * 0.006 / 15e-6 / FS;
+      if (slip >= 1) { slip -= 1 + pl.wear * 0.1 * (rnd() - 0.5); x = Ac * (0.8 + 0.4 * rnd()); }
+      var y3 = 0;
+      for (k = 0; k < 3; k++) { var yk = cc[k] * cz[2 * k] - cr[k] * cr[k] * cz[2 * k + 1] + x * cg[k]; cz[2 * k + 1] = cz[2 * k]; cz[2 * k] = yk; y3 += yk / (k + 1); }
+      path[i] = y3;
+    }
+  }
+  /* ---- body: the panel's lowest modes shaken by drive and path, and a loose cover that rattles ---- */
+  var mt = spec === 'steel' ? MATERIALS.steel : spec === 'wood' ? MATERIALS.wood : spec, bz = [0, 0, 0, 0, 0, 0, 0, 0];
+  /* input gains 2(1 - r) sin w give each mode a peak gain of one, whatever its pitch */
+  var bf = [], br = [], bc = [], bg = [];
+  for (k = 0; k < 4; k++) { bf.push(Math.min(pl.f0 * mt.ratios[k], 15000)); br.push(Math.exp(-Math.PI * bf[k] / (20 * FS))); bc.push(2 * br[k] * Math.cos(TAU * bf[k] / FS)); bg.push(2 * (1 - br[k]) * Math.sin(TAU * bf[k] / FS)); }
+  for (i = 0; i < ns; i++) {
+    var xin = drive[i] + path[i], yb = 0;
+    for (k = 0; k < 4; k++) { var ybk = bc[k] * bz[2 * k] - br[k] * br[k] * bz[2 * k + 1] + xin * bg[k]; bz[2 * k + 1] = bz[2 * k]; bz[2 * k] = ybk; yb += ybk; }
+    body[i] = yb * 0.5;
+  }
+  if (pl.wear > 0.3) {
+    var rate = 30 * (pl.wear - 0.3) / 0.7;
+    for (i = 0; i < ns; i += 48) {
+      t = i / FS; w = mechVel(pl, t) / pl.vmax;
+      var c1 = rnd(), c2 = rnd();
+      if (c1 < rate * w * 0.001) dampedSine(body, t, 2000 + 2000 * c2, 8, 0.004 * M2);
+    }
+  }
+  /* ---- ends ---- */
+  /* a latch near 80 dB at 1 m, a light switch near 70 */
+  var Elatch = 0.001 * Math.sqrt(1 + pl.M / 50);
+  if (pl.type === 'switch') {
+    addStrike(ends, pl.t0, spec, 0.0002 * Math.sqrt(pl.M / 0.02), pl.sc * 4, rnd, 0, 1);
+    addStrike(ends, pl.tEnd, spec, 0.001 * Math.sqrt(pl.M / 0.02), pl.sc * 4, rnd, 0, 1);
+  } else {
+    if (!pl.close && pl.latch !== 'none') addStrike(ends, pl.t0 - 0.05, 'steel', Elatch * 0.5, 6, rnd, 0, 1);
+    if (!pl.close && pl.latch === 'bolt') { boltInto(ends, pl.t0 - 0.45, pl, rnd); }
+    addStrike(ends, pl.tEnd, spec, Math.max(pl.Eend * STOP_EFF * pl.stop.e, 1e-6), pl.sc, rnd, pl.stop.lp, 1);
+    if (pl.close && pl.stop.lp === 1200) {
+      /* the seal squeezes the air out of the gap */
+      noiseBurst(ends, pl.tEnd + 0.002, 0.03, 60, 500, 0.02 * pl.L * pl.L * pl.vEnd, rnd, 0.004);
+    }
+    if (pl.close && pl.latch === 'latch') addStrike(ends, pl.tEnd + 0.015, 'steel', Elatch, 6, rnd, 0, 1);
+    if (pl.close && pl.latch === 'bolt') boltInto(ends, pl.tEnd + 0.3, pl, rnd);
+  }
+  var bufs = [drive, path, body, ends], gs = [o.g1, o.g2, o.g3, o.g4];
+  for (k = 0; k < 4; k++) {
+    if (!(gs[k] > 0)) continue;
+    var b = bufs[k];
+    for (i = 0; i < ns; i++) b[i] /= r;
+    postLayer(b, r, o.ground);
+    layers.push({ m: b, t: tA, pan: o.pan, g: gs[k] });
+  }
+  ev.push({ k: 'launch', t: tA + pl.t0, label: lab ? (pl.type === 'switch' ? 'press' : pl.drive === 'manual' ? 'moves' : 'drive') : '' });
+  ev.push({ k: 'impact', t: tA + pl.tEnd, label: lab ? (pl.type === 'switch' ? 'snap' : 'stop') : '' });
+}
+/* a motor-driven lock bolt: a short whir, then the bolt seats */
+function boltInto(buf, t, pl, rnd) {
+  var n = Math.round(0.18 * FS), n0 = Math.round(t * FS), ph = 0, i;
+  for (i = 0; i < n && n0 + i < buf.length; i++) {
+    var x = i / n, f = 900 * (0.4 + 0.6 * Math.sin(Math.PI * x));
+    ph += f / FS;
+    if (n0 + i >= 0) buf[n0 + i] += 0.02 * fsin(ph) * Math.sin(Math.PI * x);
+  }
+  addStrike(buf, t + 0.19, 'steel', 0.004 * Math.sqrt(1 + pl.M / 100), 3, rnd, 0, 1);
+}
+
+/* ---------- heat ----------
+   Heating and cooling: a part held at its joints strains by alpha dT. Each joint sticks until the strain passes its
+   friction, then slips and rings a piece of the part, so slips come as fast as the temperature changes: a cooling
+   engine ticks quickly at first and more and more slowly as it nears the room (Newton's law). A large thin panel can
+   snap through as it heats (oil-canning). Wood slips with a short creak instead of a ping.
+   Melting: acid eats through with a fizz of fine hydrogen bubbles and a hiss, the part groans as its section thins and
+   then gives way into the acid; lava sizzles, chars and swallows it; a cutting torch roars, throws sparks and molten
+   drops, and the cut piece falls. */
+var THERM_ALPHA = { steel: 1.2e-5, aluminium: 2.3e-5, wood: 5e-6, plastic: 8e-5 };
+/* each joint slips two or three times over the change, at random thresholds; a slip in steel that has cooled by 400 K
+   gives up about 0.3 mJ, less for a smaller change */
+var SLIP_E = 3e-4, SLIP_N = 2.5;
+function heatSpec(mat) { var s = (MECH_MATS[mat] || MECH_MATS.steel).spec; return s === 'steel' ? MATERIALS.steel : s === 'wood' ? MATERIALS.wood : s; }
+/* a short stick-slip creak: n slips at 'rate' per second through two resonances */
+function creakInto(buf, t, n, rate, f1, amp, rnd) {
+  var n0 = Math.round(t * FS), len = Math.round((n / rate + 0.05) * FS), fs = [f1, 2.4 * f1], z = [0, 0, 0, 0], rr = [], cc = [], gg = [], k, i, ph = 0, x;
+  for (k = 0; k < 2; k++) { var f = Math.min(fs[k], 15000); rr.push(Math.exp(-Math.PI * f / (20 * FS))); cc.push(2 * rr[k] * Math.cos(TAU * f / FS)); gg.push(Math.sin(TAU * f / FS)); }
+  for (i = 0; i < len && n0 + i < buf.length; i++) {
+    x = 0;
+    if (i < len - 0.05 * FS) { ph += rate / FS; if (ph >= 1) { ph -= 1 + 0.1 * (rnd() - 0.5); x = amp * (0.7 + 0.6 * rnd()); } }
+    var y = 0;
+    for (k = 0; k < 2; k++) { var v = cc[k] * z[2 * k] - rr[k] * rr[k] * z[2 * k + 1] + x * gg[k]; z[2 * k + 1] = z[2 * k]; z[2 * k] = v; y += v / (1 + k); }
+    if (n0 + i >= 0) buf[n0 + i] += y;
+  }
+}
+function planHeat(q, grnd) {
+  var mode = q.thMode, mm = MECH_MATS[q.thMat] || MECH_MATS.steel, M = Math.max(q.thMass, 0.01), L = clamp(Math.sqrt(M / (mm.rho * mm.h)), 0.03, 6), Tw = clamp(q.thTime, 0.5, 12);
+  var pl = { mode: mode, mat: q.thMat, spec: heatSpec(q.thMat), M: M, L: L, sc: clamp(0.6 / L, 0.15, 12), r: Math.max(0.3, q.thDist), tw: Tw, slips: [], bangs: [], s: clamp(q.thStrength, 0.05, 1) };
+  if (mode === 'heat' || mode === 'cool') {
+    /* the temperature eases by e^-t/tau with tau a third of the window; joints with random friction slip in turn */
+    var tau = Tw / 3, nj = clamp(Math.round(q.thJoints), 1, 200), thr = [], acc = [], k, i, dT = q.thDT, th0 = dT / SLIP_N;
+    for (k = 0; k < nj; k++) { var u1 = grnd(), u2 = grnd(); thr.push(th0 * Math.exp(0.5 * (u1 + u2 - 1))); acc.push(thr[k] * grnd()); }
+    var last = mode === 'heat' ? 0 : dT, tot = 0, snap = mode === 'heat' && q.thMat !== 'wood' && L > 0.6 ? dT * 0.45 : -1;
+    for (i = 1; i <= Tw * 1000; i++) {
+      var t = i / 1000, T = mode === 'heat' ? dT * (1 - Math.exp(-t / tau)) : dT * Math.exp(-t / tau), step = Math.abs(T - last);
+      last = T; tot += step;
+      for (k = 0; k < nj; k++) {
+        acc[k] += step * (0.6 + 0.8 * ((k * 0.618) % 1));
+        if (acc[k] >= thr[k]) {
+          acc[k] -= thr[k] * (0.6 + 0.4 * grnd());
+          var sz = grnd(), pn = grnd();
+          pl.slips.push({ t: t, E: SLIP_E * dT / 400 * (thr[k] / th0) * (thr[k] / th0), f: thr[k] / th0, sc: pl.sc * (1.2 + 3 * sz), pan: (pn * 2 - 1) * 0.7 });
+        }
+      }
+      if (snap > 0 && tot >= snap) { pl.bangs.push({ t: t, E: 0.005 * M * (dT / 100) }); snap = tot + dT * 0.4; }
+    }
+    pl.dur = Tw + 0.6; pl.tMain = pl.slips.length ? pl.slips[0].t : 0; pl.label = mode === 'heat' ? 'first slip' : 'first tick';
+    pl.tau = tau; pl.dT = dT;
+  } else {
+    pl.tf = Tw; pl.tMain = Tw; pl.label = mode === 'torch' ? 'piece drops' : 'gives way';
+    pl.dur = Tw + (mode === 'acid' ? 1.8 : mode === 'lava' ? 1.6 : 1.3);
+  }
+  return pl;
+}
+function heatLayers(pl, p, o, rnd, layers, ev, lab) {
+  var ns = Math.ceil(pl.dur * FS), r = pl.r, tA = o.t0 + r / C, g = [], k, i, t, gb, M2 = Math.sqrt(pl.M), s = pl.s;
+  for (k = 0; k < 4; k++) g.push(new Float32Array(ns));
+  var sides = [new Float32Array(ns), new Float32Array(ns), new Float32Array(ns), new Float32Array(ns)];
+  if (pl.mode === 'heat' || pl.mode === 'cool') {
+    pl.slips.forEach(function (sl) {
+      if (pl.mat === 'wood') creakInto(g[1], sl.t, 3 + Math.floor(12 * rnd()), 180 + 500 * rnd(), 300 * sl.sc, 0.0003 * M2 * sl.f, rnd);
+      else {
+        /* small bolted parts: a short tink */
+        var h = modalHit(pl.spec, sl.E, sl.sc, rnd, { maxModes: 4, t60Scale: 0.06, noGrains: true }), n0 = Math.round(sl.t * FS);
+        for (i = 0; i < h.length && n0 + i < ns; i++) { g[0][n0 + i] += h[i]; sides[0][n0 + i] += h[i] * sl.pan; }
+      }
+    });
+    pl.bangs.forEach(function (b) { addStrike(g[2], b.t, pl.spec, b.E, pl.sc * 0.8, rnd, 0, 1); });
+  } else {
+    var tf = pl.tf, acid = LIQUIDS.acid, lava = LIQUIDS.lava, evs = [], mids = [g[0], g[1], g[2], g[3]];
+    if (pl.mode === 'acid') {
+      /* the reaction speeds up as the surface roughens, then the fallen piece keeps fizzing in the pool */
+      var hiss = unitNoise(ns, rnd, 9000, 3000), rate = 1500 * s * Math.sqrt(pl.M), nb = Math.min(Math.round(rate * pl.dur), LQ_CAP * Math.round(pl.dur)), wb = Math.sqrt(rate * pl.dur / Math.max(1, nb));
+      for (i = 0; i < nb; i++) {
+        var tb = rnd() * pl.dur, keep = rnd(), ab = rnd(), pb = (rnd() * 2 - 1) * 0.5, rr = acidRate(tb, tf);
+        /* hydrogen bubbles ring as they leave the metal and burst at the top; set against the hiss */
+        if (keep < rr / 1.6) { evs.push(evBurst(0, tb, 0.0002 + 0.0003 * ab, acid, wb * 30, pb)); if (ab < 0.25) evs.push(evRing(0, tb, 0.0004 + 0.0024 * ab, 0.01, 0.03 * wb, 0.6, 0.1, pb, acid)); }
+      }
+      for (i = 0; i < ns; i++) g[3][i] += 0.004 * s * M2 * hiss[i] * acidRate(i / FS, tf);
+      gb = groanBuf(pl.mat === 'wood' ? 'creak' : 'groan', pl.spec, pl.sc, tf * 0.75, rnd);
+      toPeak(gb, 0.03 * M2);
+      addAt(g[1], gb, tf * 0.25);
+      addStrike(g[2], tf, pl.spec, 0.002 * pl.M, pl.sc * 1.5, rnd, 0, 1);
+      /* the piece drops 30 cm into the pool */
+      var tl = tf + 0.25;
+      evs.push(evClick(2, tl, 0.004, 0.05 * M2, 0));
+      evs.push(evNoise(2, tl + 0.001, 0.04, 800, 7000, 0.03 * M2, 0));
+      for (i = 0; i < 6; i++) { var dt = rnd(), da = rnd(), dp = rnd(); evs.push(evRing(2, tl + 0.05 + 0.3 * dt, 0.001 + 0.002 * da, 0.002, 0.05, 0.8, 0.1, (dp * 2 - 1) * 0.5, acid)); }
+    } else if (pl.mode === 'lava') {
+      /* moisture flashes to steam at once; wood and plastic char and crackle; gas bubbles up round it; it sinks */
+      var steam = unitNoise(ns, rnd, 10000, 2000), burns = pl.mat === 'wood' || pl.mat === 'plastic';
+      for (i = 0; i < ns; i++) { t = i / FS; g[3][i] += 0.08 * M2 * s * steam[i] * Math.exp(-t / (burns ? 1.2 : 0.5)) * Math.min(1, t / 0.01); }
+      var nc = Math.round((burns ? 60 : 15) * tf * s);
+      for (i = 0; i < nc; i++) {
+        var tc = 0.2 + rnd() * (tf - 0.2), ac = rnd(), pc = (rnd() * 2 - 1) * 0.5;
+        if (burns) evs.push(evClick(0, tc, 0.0003 + 0.001 * ac, 0.15 * M2 * Math.pow(ac, 2), pc));
+        else evs.push(evTone(0, tc, 1500 * pl.sc * (1 + 3 * ac), 0.02, 0.02 * M2 * ac, 0, pc));
+      }
+      var nq = Math.round(200 * s);
+      for (i = 0; i < nq; i++) { var tq = rnd() * 1.2, aq = rnd(); evs.push(evCollapse(0, tq, 0.0005 + 0.001 * aq, 0.01 * Math.exp(-tq / 0.4), (rnd() * 2 - 1) * 0.3)); }
+      var nl = Math.round(3 * tf * s + 2);
+      for (i = 0; i < nl; i++) { var tg = 0.3 + rnd() * tf, ag = rnd(), pg = (rnd() * 2 - 1) * 0.6; evs.push(evDome(2, tg, 0.01 + 0.03 * ag, lava, 0.1, pg)); evs.push(evBurst(2, tg, 0.01 + 0.03 * ag, lava, 0.1, pg)); }
+      evs.push(evDome(2, tf, 0.06 * Math.cbrt(pl.M / 5), lava, 0.2, 0));
+      evs.push(evBurst(2, tf, 0.06 * Math.cbrt(pl.M / 5), lava, 0.2, 0));
+      gb = groanBuf(pl.mat === 'wood' ? 'creak' : pl.mat === 'plastic' ? 'tick' : 'groan', pl.spec, pl.sc, tf * 0.8, rnd);
+      toPeak(gb, 0.02 * M2);
+      addAt(g[1], gb, tf * 0.2);
+    } else {
+      /* torch: a jet of burning gas, roar under it, sparks while it cuts, drops of molten steel hitting the floor */
+      var Pt = 5 + 25 * s, roarHi = jetNoise(ns, 2500, rnd, false), roarLo = jetNoise(ns, 300, rnd, false), sparks = crackleNoise(ns, 900, rnd, false);
+      var on = 0.05, off = tf + 0.35;
+      for (i = 0; i < ns; i++) {
+        t = i / FS;
+        var e = t < on ? 0 : t < off ? Math.min(1, (t - on) / 0.04) : Math.max(0, 1 - (t - off) / 0.05), cut = t > 0.4 && t < tf ? Math.min(1, (t - 0.4) / 0.2) : 0;
+        g[3][i] += 0.012 * Math.sqrt(Pt) * e * (roarHi[i] + 0.7 * roarLo[i]);
+        g[0][i] += 0.01 * Math.sqrt(Pt) * cut * sparks[i];
+      }
+      evs.push(evClick(3, on, 0.004, 0.15, 0));
+      evs.push(evClick(3, off, 0.003, 0.08, 0));
+      for (t = 0.6; t < tf; t += 0.08 + 0.15 * rnd()) {
+        var pd = (rnd() * 2 - 1) * 0.4, drop = t + Math.sqrt(2 * 0.8 / GRAV);
+        evs.push(evClick(2, drop, 0.0006, 0.01, pd));
+        evs.push(evNoise(2, drop + 0.001, 0.06, 2500, 10000, 0.006, pd));
+      }
+      var tl2 = tf + Math.sqrt(2 * 0.5 / GRAV);
+      addStrike(g[2], tl2, pl.spec, 0.5 * pl.M * GRAV * 0.5 * STOP_EFF, pl.sc, rnd, 0, 1);
+      addStrike(g[2], tl2 + 0.12, pl.spec, 0.1 * pl.M * GRAV * 0.5 * STOP_EFF, pl.sc * 1.1, rnd, 0, 1);
+    }
+    liquidSynth(evs, mids, sides, rnd, false);
+  }
+  var gs = [o.g1, o.g2, o.g3, o.g4], pn = o.pan * 0.7;
+  for (k = 0; k < 4; k++) {
+    if (!(gs[k] > 0)) continue;
+    var L = new Float32Array(ns), R = new Float32Array(ns);
+    for (i = 0; i < ns; i++) { L[i] = (g[k][i] * (1 + pn) + sides[k][i]) / r; R[i] = (g[k][i] * (1 - pn) - sides[k][i]) / r; }
+    postLayer(L, r, o.ground); postLayer(R, r, o.ground);
+    layers.push({ L: L, R: R, t: tA, g: gs[k] });
+  }
+  ev.push({ k: 'impact', t: tA + pl.tMain, label: lab ? pl.label : '' });
+}
+/* how fast acid works, against the time it takes to eat through */
+function acidRate(t, tf) { return t < tf ? smoothstep(t / 0.4) * (1 + 0.6 * t / tf) : 0.7 * Math.exp(-(t - tf) / 1.2); }
+
+/* ---------- footsteps ----------
+   A step is a heel strike, the surface answering, the roll onto the toe with a scuff, and whatever the walker carries.
+   Cadence follows dynamic similarity: a leg of length l steps at about 1.44 sqrt(v / l) per second, so a person
+   walking at 1.4 m/s steps 1.8 times a second and a giant more slowly. The heel lands with a few percent of the leg's
+   momentum (STEP_EFF of its energy reaches the floor's modes), softened by the sole: the longer the contact, the
+   lower the strike. Hard floors ring (boards also creak, grates rattle), loose ones crunch grain by grain, water
+   splashes and mud lets go with a suck. A robot leg whines through each swing, at 0.003 Pa per root watt of the
+   tenth of m g v that walking takes, as a gearmotor does. */
+var STEP_EFF = 0.003;
+var FEET = { bare: { lp: 700, e: 0.6, toe: 0.4 }, shoe: { lp: 1100, e: 0.8, toe: 0.5 }, boot: { lp: 3500, e: 1, toe: 0.5 }, claw: { lp: 7000, e: 0.7, toe: 0.2 },
+  metal: { lp: 0, e: 1.2, toe: 0.5 }, robot: { lp: 0, e: 1.3, toe: 0.4 } };
+var GROUNDS = {
+  concrete: { hit: 'concrete', sc: 1, thud: 0.4 }, wood: { hit: 'wood', sc: 0.6, thud: 1, creak: 1 }, metal: { hit: 'steel', sc: 1.6, thud: 0.6, rattle: 1 },
+  gravel: { hit: 'dirt', sc: 1, thud: 0.6, grains: { n: 40, dur: 0.14, f: 1800, w: 0.0004, a: 0.25 } },
+  dirt: { hit: 'dirt', sc: 1, thud: 1, grains: { n: 6, dur: 0.1, f: 600, w: 0.002, a: 0.05 } },
+  grass: { hit: 'dirt', sc: 1.3, thud: 0.5, rustle: 1 }, snow: { hit: 'dirt', sc: 1.5, thud: 0.3, grains: { n: 90, dur: 0.17, f: 3000, w: 0.0003, a: 0.14 } },
+  sand: { hit: 'dirt', sc: 0.8, thud: 0.6, shush: 1 }, water: { hit: 'dirt', sc: 1, thud: 0.3, splash: 1 }, mud: { hit: 'dirt', sc: 0.8, thud: 0.8, suck: 1 }
+};
+function planFeet(q, grnd) {
+  var M = Math.max(q.ftMass, 0.5), leg = 0.9 * Math.cbrt(M / 75), legs = q.ftLegs === 4 || q.ftLegs === '4' ? 4 : 2, gait = q.ftGait;
+  var v = (gait === 'run' ? 4 : gait === 'sneak' ? 0.6 : 1.4) * Math.sqrt(leg / 0.9), f = 1.44 * Math.sqrt(v / leg), force = gait === 'run' ? 2.5 : gait === 'sneak' ? 1.02 : 1.2;
+  /* footfalls inside a stride; a four-legged run gallops in pairs */
+  var pat = legs === 2 ? [0, 0.5] : gait === 'run' ? [0, 0.12, 0.45, 0.57] : [0, 0.25, 0.5, 0.75], n = clamp(Math.round(q.ftSteps), 1, 32), steps = [], k;
+  var stride = (legs === 2 ? 2 : 1) / f;
+  for (k = 0; k < n; k++) {
+    var j = grnd(), a = grnd(), s = Math.floor(k / pat.length), b = pat[k % pat.length];
+    steps.push({ t: 0.05 + (s + b) * stride + (j - 0.5) * 0.04 / f, side: k % 2 ? 1 : -1, load: force * (0.9 + 0.2 * a) });
+  }
+  var foot = FEET[q.ftFoot] || FEET.shoe, gr = GROUNDS[q.ftSurface] || GROUNDS.concrete, vh = gait === 'run' ? 1.4 : gait === 'sneak' ? 0.25 : 0.6;
+  var Eh = 0.5 * 0.08 * M * vh * vh;
+  return { M: M, leg: leg, legs: legs, v: v, f: f, steps: steps, foot: foot, footName: q.ftFoot, gr: gr, surf: q.ftSurface, gait: gait, Eh: Eh,
+    roll: gait === 'run' ? 0.03 : gait === 'sneak' ? 0.16 : 0.09, r: Math.max(0.3, q.ftDist), gear: clamp(q.ftGear, 0, 1),
+    dur: steps[n - 1].t + (q.ftSurface === 'water' || q.ftSurface === 'mud' ? 1.1 : 0.7), tMain: steps[0].t };
+}
+function feetLayers(pl, p, o, rnd, layers, ev, lab) {
+  var ns = Math.ceil(pl.dur * FS), r = pl.r, tA = o.t0 + r / C, g = [], sd = [], k, i, M2 = Math.sqrt(pl.M), gr = pl.gr, ft = pl.foot;
+  for (k = 0; k < 4; k++) { g.push(new Float32Array(ns)); sd.push(new Float32Array(ns)); }
+  var evs = [], mud = LIQUIDS.mud, water = LIQUIDS.water;
+  function put(k2, buf, t, pan) { var n0 = Math.round(t * FS); for (var j = 0; j < buf.length && n0 + j < ns; j++) if (n0 + j >= 0) { g[k2][n0 + j] += buf[j]; sd[k2][n0 + j] += buf[j] * pan; } }
+  pl.steps.forEach(function (st, si) {
+    var t = st.t, pan = 0.15 * st.side, E = pl.Eh * st.load * STEP_EFF * ft.e, h, sc = gr.sc * clamp(Math.pow(75 / pl.M, 0.15), 0.3, 3);
+    /* heel: the floor struck through the sole, and the body's weight landing as a low thud */
+    h = modalHit(gr.hit, E, sc, rnd, { noGrains: true });
+    if (ft.lp) { onePoleLP(h, ft.lp); onePoleLP(h, ft.lp); }
+    put(0, h, t, pan);
+    var nt = Math.round(0.035 * FS), th = new Float32Array(nt), At = 0.0012 * pl.M * st.load * gr.thud * (pl.gait === 'sneak' ? 0.3 : 1);
+    for (i = 0; i < nt; i++) th[i] = At * Math.sin(Math.PI * i / nt) * Math.sin(Math.PI * i / nt) * Math.sin(TAU * 55 * i / FS);
+    put(0, th, t, pan);
+    /* the surface */
+    if (gr.creak) { var cr = rnd(); if (cr < 0.6) creakInto(g[1], t + 0.03 + 0.05 * rnd(), 4 + Math.floor(10 * rnd()), 150 + 350 * rnd(), 180 + 250 * rnd(), 0.004 * M2 * st.load, rnd); }
+    if (gr.rattle) { var hr = modalHit('steel', E * 0.3, sc * 2.5, rnd, { maxModes: 4, t60Scale: 0.15, noGrains: true }); put(1, hr, t + 0.012 + 0.015 * rnd(), pan); }
+    if (gr.grains) {
+      /* grains break or knock while the weight comes on, most at its steepest */
+      var G = gr.grains, ng = Math.round(G.n * Math.sqrt(st.load) * Math.cbrt(pl.M / 75));
+      for (i = 0; i < ng; i++) { var u = rnd(), fa = rnd(), ga = rnd(), tg = t + G.dur * Math.sqrt(u); evs.push(evClick(1, tg, G.w * (0.5 + fa), G.a * M2 / 8.7 * (0.3 + ga) * (1 - 0.6 * u), pan + 0.1 * (fa - 0.5))); }
+    }
+    if (gr.rustle) evs.push(evNoise(1, t + 0.005, 0.07, 2500, 9000, 0.06 * M2 / 8.7 * st.load, pan));
+    if (gr.shush) evs.push(evNoise(1, t + 0.01, 0.12, 200, 2200, 0.075 * M2 / 8.7 * st.load, pan));
+    if (gr.splash) {
+      evs.push(evClick(1, t, 0.003, 0.08 * M2 / 8.7 * st.load, pan));
+      evs.push(evNoise(1, t + 0.002, 0.05, 900, 8000, 0.04 * M2 / 8.7 * st.load, pan));
+      for (i = 0; i < 6; i++) { var dt = rnd(), da = rnd(), dp = rnd(); evs.push(evClick(1, t + 0.08 + 0.25 * dt, 0.0015, 0.004, pan + (dp - 0.5) * 0.6)); if (da < 0.5) evs.push(evRing(1, t + 0.085 + 0.25 * dt, 0.0008 + 0.002 * da, 0.002, 0.05, 0.8, 0.1, pan + (dp - 0.5) * 0.6, water)); }
+    }
+    if (gr.suck) {
+      evs.push(evClick(1, t, 0.005, 0.06 * M2 / 8.7 * st.load, pan));
+      /* the foot pulls free: the mud seals round it and lets air in with a gloop */
+      var ta = t + pl.roll + 0.12;
+      evs.push(evDome(1, ta, 0.012 + 0.01 * rnd(), mud, 0.3, pan)); evs.push(evBurst(1, ta + 0.005, 0.015, mud, 0.3, pan));
+    }
+    /* roll onto the toe and push off: a lighter strike and the sole scuffing; rubber on a smooth floor may squeak */
+    h = modalHit(gr.hit, E * ft.toe * 0.4, sc * 1.3, rnd, { noGrains: true, maxModes: 4 });
+    if (ft.lp) { onePoleLP(h, ft.lp * 1.3); onePoleLP(h, ft.lp * 1.3); }
+    put(2, h, t + pl.roll, pan);
+    evs.push(evNoise(2, t + pl.roll + 0.01, 0.03, 1500, 7000, 0.006 * M2 / 8.7 * (pl.gait === 'run' ? 2 : 1), pan));
+    var sq = rnd();
+    if (pl.footName === 'shoe' && (pl.surf === 'wood' || pl.surf === 'concrete') && sq < (pl.gait === 'run' ? 0.35 : 0.08)) {
+      var fsq = 1200 + 1300 * rnd(), nq = Math.round(0.05 * FS), q0 = Math.round((t + pl.roll + 0.02) * FS), phq = 0;
+      for (i = 0; i < nq && q0 + i < ns; i++) { phq += fsq * (1 + 0.03 * Math.sin(TAU * 35 * i / FS)) / FS; var vq = 0.01 * M2 / 8.7 * fsin(phq) * Math.sin(Math.PI * i / nq); g[2][q0 + i] += vq; sd[2][q0 + i] += vq * pan; }
+    }
+    /* what the walker carries jingles; a robot leg's servo whines through the swing before the step */
+    if (pl.gear > 0) for (i = 0; i < 4; i++) { var tj = t + 0.01 + 0.08 * rnd(), fj = rnd(); var hj = modalHit('steel', 2e-5 * pl.gear * M2 / 8.7, 6 + 6 * fj, rnd, { maxModes: 3, t60Scale: 0.1, noGrains: true }); put(3, hj, tj, pan + (fj - 0.5) * 0.4); }
+    if (pl.footName === 'robot') {
+      var sw = 0.5 / pl.f * (pl.legs === 2 ? 1 : 0.5), n0 = Math.round((t - sw) * FS), nw = Math.round(sw * FS), ph1 = 0, ph2 = 0, Aw = 0.003 * Math.sqrt(0.1 * pl.M * GRAV * pl.v), fr = 9000 / 60 * Math.pow(75 / pl.M, 0.2);
+      for (i = 0; i < nw; i++) {
+        if (n0 + i < 0 || n0 + i >= ns) continue;
+        var bell = Math.sin(Math.PI * i / nw); ph1 += 12 * fr * bell / FS; ph2 += 13 * fr * bell / FS;
+        var vw = Aw * bell * (fsin(ph1) + 1.3 * fsin(ph2));
+        g[3][n0 + i] += vw; sd[3][n0 + i] += vw * pan;
+      }
+    }
+  });
+  liquidSynth(evs, g, sd, rnd, false);
+  var gs = [o.g1, o.g2, o.g3, o.g4], pn = o.pan * 0.7;
+  for (k = 0; k < 4; k++) {
+    if (!(gs[k] > 0)) continue;
+    var L = new Float32Array(ns), R = new Float32Array(ns);
+    for (i = 0; i < ns; i++) { L[i] = (g[k][i] * (1 + pn) + sd[k][i]) / r; R[i] = (g[k][i] * (1 - pn) - sd[k][i]) / r; }
+    postLayer(L, r, o.ground); postLayer(R, r, o.ground);
+    layers.push({ L: L, R: R, t: tA, g: gs[k] });
+  }
+  pl.steps.forEach(function (st, si) { ev.push({ k: 'impact', t: tA + st.t, label: lab && si === 0 ? 'step' : '' }); });
+}
+
+/* ---------- voices ----------
+   Source and filter. The folds pulse at f0 (a Rosenberg flow pulse; its closing phase shortens with effort, so a
+   hard call is brighter); the tract, a tube about 17 cm long in a 70 kg mammal and scaling as the cube root of mass,
+   rings at its formants, odd multiples of c / 4L, so a larger animal has lower and closer formants (formant
+   dispersion is how animals judge size); pitch falls with size too. Hard calls show the nonlinear phenomena of real
+   roars and screams: period doubling (a subharmonic at f0/2), a growl from the false folds near 30 Hz, and breaks.
+   Breath is turbulence at the glottis through the same tract. A reptile mostly hisses; a robot buzzes on quantised
+   pitches through a speaker in a metal can. */
+var CALLS = {
+  /* dur s, then f0 and jaw (formant scale) contours as [t 0..1, value] points, effort, rough, breath */
+  idle:   { dur: 0.45, f0: [[0, 1], [1, 0.85]], jaw: [[0, 0.9], [1, 0.9]], eff: 0.3, rough: 0.15, breath: 0.35, onset: 0.04 },
+  alert:  { dur: 0.2, f0: [[0, 1.35], [0.3, 1.25], [1, 1]], jaw: [[0, 1.05], [0.4, 1.2], [1, 1]], eff: 0.9, rough: 0.3, breath: 0.2, onset: 0.008 },
+  attack: { dur: 1.5, f0: [[0, 0.9], [0.35, 1.2], [1, 0.8]], jaw: [[0, 0.9], [0.3, 1.25], [1, 1]], eff: 1, rough: 0.85, breath: 0.45, onset: 0.06 },
+  pain:   { dur: 0.45, f0: [[0, 1.8], [0.25, 2.4], [1, 1.2]], jaw: [[0, 1.1], [1, 1]], eff: 0.8, rough: 0.1, breath: 0.25, onset: 0.01 },
+  death:  { dur: 1.9, f0: [[0, 1], [1, 0.6]], jaw: [[0, 1.05], [1, 0.85]], eff: 0.5, rough: 0.6, breath: 0.6, onset: 0.05 }
+};
+function contour(pts, x) { for (var k = 1; k < pts.length; k++) if (x <= pts[k][0]) return pts[k - 1][1] + (pts[k][1] - pts[k - 1][1]) * (x - pts[k - 1][0]) / (pts[k][0] - pts[k - 1][0]); return pts[pts.length - 1][1]; }
+function planVoice(q, grnd) {
+  var M = Math.max(q.crMass, 0.05), call = CALLS[q.crCall] || CALLS.idle, type = q.crType, L = 0.17 * Math.cbrt(M / 70) * q.crTract;
+  var f0 = clamp(130 * Math.pow(M / 70, -0.3) * q.crPitch, 15, 1500), dur = call.dur * Math.pow(M / 70, 0.12) * q.crLength;
+  var fm = [];
+  for (var k = 0; k < 5; k++) fm.push((2 * k + 1) * C / (4 * L));
+  return { M: M, call: call, callName: q.crCall, type: type, L: L, f0: f0, dF: C / (2 * L), fm: fm, dur: dur, tot: dur + 0.6, r: Math.max(0.3, q.crDist),
+    eff: call.eff * q.crEffort, rough: clamp(call.rough * q.crRough * (type === 'robot' ? 0.5 : 1), 0, 1.5), breath: call.breath * (type === 'reptile' ? (q.crCall === 'alert' ? 4.5 : 1.5) : 1),
+    /* a reptile hisses when wary and bellows when it attacks */
+    voiced: type === 'reptile' ? (q.crCall === 'alert' ? 0.15 : 0.7) : 1,
+    level: 1.5 * Math.pow(M / 70, 0.45), j0: grnd() };
+}
+/* the tract: five formant resonators, retuned every 64 samples to the jaw contour; bandwidths widen with pitch */
+function tractFilter(src, pl, wide) {
+  var n = src.length, out = new Float32Array(n), z = new Float64Array(10), c1 = [0, 0, 0, 0, 0], c2 = [0, 0, 0, 0, 0], gn = [0, 0, 0, 0, 0], i, k, b;
+  for (b = 0; b < n; b += 64) {
+    var x = Math.min(1, b / FS / pl.dur), jaw = contour(pl.call.jaw, x);
+    for (k = 0; k < 5; k++) {
+      /* the jaw raises the first formant most; robots keep a fixed can */
+      var f = Math.min(pl.fm[k] * (k === 0 ? jaw : 1 + (jaw - 1) * 0.4), 0.45 * FS), bw = (50 + 0.06 * f) * wide, R = Math.exp(-Math.PI * bw / FS);
+      c1[k] = 2 * R * Math.cos(TAU * f / FS); c2[k] = R * R; gn[k] = 2 * (1 - R) * Math.sin(TAU * f / FS) / (1 + k * 0.6);
+    }
+    for (i = b; i < Math.min(n, b + 64); i++) {
+      var y = 0;
+      for (k = 0; k < 5; k++) { var v = c1[k] * z[2 * k] - c2[k] * z[2 * k + 1] + gn[k] * src[i]; z[2 * k + 1] = z[2 * k]; z[2 * k] = v; y += v; }
+      out[i] = y;
+    }
+  }
+  return out;
+}
+function voiceLayers(pl, p, o, rnd, layers, ev, lab) {
+  var ns = Math.ceil(pl.tot * FS), nd = Math.ceil(pl.dur * FS), r = pl.r, tA = o.t0 + r / C, i, k;
+  var src = new Float32Array(ns), rough = new Float32Array(ns), br = new Float32Array(ns), body = new Float32Array(ns);
+  var ph = 0, per = 0, amp = 1, prevG = 0, jit = 0.01 + 0.04 * pl.rough, gph = rnd(), robot = pl.type === 'robot', hiss = pl.type === 'reptile';
+  var Tc = 0.2 - 0.12 * clamp(pl.eff, 0, 1), To = 0.4, gr = 22 + 14 * rnd();
+  for (i = 0; i < nd; i++) {
+    var x = i / nd, t = i / FS, env = Math.min(1, t / pl.call.onset) * Math.min(1, (nd - i) / (0.08 * FS));
+    if (pl.callName === 'death') env *= 1 - 0.7 * x;
+    var f = pl.f0 * contour(pl.call.f0, x) * (1 + 0.08 * (pl.eff - 0.5));
+    /* a robot steps from semitone to semitone */
+    if (robot) f = pl.f0 * Math.pow(2, Math.round(12 * Math.log(f / pl.f0) / Math.LN2) / 12);
+    ph += f / FS * (1 + jit * 0.2 * (rnd() - 0.5));
+    if (ph >= 1) { ph -= 1; per++; var u = rnd(); amp = 1 + 0.1 * pl.rough * (u - 0.5); }
+    /* Rosenberg flow and its derivative, the glottal source */
+    var g = ph < To ? 0.5 * (1 - Math.cos(Math.PI * ph / To)) : ph < To + Tc ? Math.cos(Math.PI / 2 * (ph - To) / Tc) : 0;
+    if (robot) g = ph < 0.5 ? 2 * ph : 2 - 2 * ph;
+    var d = (g - prevG) * amp * env; prevG = g;
+    d *= pl.voiced;
+    src[i] = d;
+    /* nonlinear: alternate periods louder and softer (f0/2), and the false-fold growl; a robot is ring-modulated */
+    var mod = robot ? Math.cos(TAU * (90 + 60 * pl.j0) * t) - 1 : pl.rough * ((per % 2 ? 0.45 : -0.45) + 0.6 * Math.sin(TAU * gr * t + 2 * Math.sin(TAU * 3.1 * t)));
+    rough[i] = d * mod;
+    /* breath: turbulence pulsing with the glottal opening */
+    var nz = rnd() * 2 - 1;
+    br[i] = nz * pl.breath * env * (0.3 + 0.7 * g) * 0.15;
+  }
+  /* a closing breath after a dying call */
+  if (pl.callName === 'death') for (i = nd; i < Math.min(ns, nd + Math.round(0.5 * FS)); i++) { var y = (i - nd) / (0.5 * FS); br[i] += (rnd() * 2 - 1) * 0.04 * Math.sin(Math.PI * y); }
+  var wide = robot ? 0.6 : hiss ? 1.6 : 1 + 0.5 * Math.min(1, pl.M / 1000);
+  var vo = tractFilter(src, pl, wide), ro = tractFilter(rough, pl, wide), bo = tractFilter(br, pl, wide);
+  /* the body: a chest cavity under a big animal's voice, or the metal can round a robot's speaker (a short comb) */
+  if (robot) { var D = Math.round(0.0016 * FS); for (i = D; i < ns; i++) body[i] = 0.6 * (vo[i - D] + ro[i - D]); }
+  else {
+    var fc = clamp(90 * Math.cbrt(70 / pl.M), 20, 400), R2 = Math.exp(-Math.PI * fc / (4 * FS)), cc = 2 * R2 * Math.cos(TAU * fc / FS), y1 = 0, y2 = 0;
+    for (i = 0; i < ns; i++) { var yy = cc * y1 - R2 * R2 * y2 + (src[i] + rough[i]); y2 = y1; y1 = yy; body[i] = yy; }
+    /* the chest is set to a quarter of the voice, not measured */
+    scale(body, 0.25 * peakOf(vo) / (peakOf(body) || 1));
+  }
+  /* scale the whole voice to its level at 1 m from the loudest of the four */
+  var pk = Math.max(peakOf(vo), peakOf(bo), 1e-9), Lv = pl.level * pl.eff * (hiss ? 0.6 : 1) / pk, bufs = [vo, ro, bo, body], gs = [o.g1, o.g2, o.g3, o.g4];
+  for (k = 0; k < 4; k++) {
+    if (!(gs[k] > 0)) continue;
+    var b = bufs[k];
+    for (i = 0; i < ns; i++) b[i] *= Lv / r;
+    postLayer(b, r, o.ground);
+    layers.push({ m: b, t: tA, pan: o.pan, g: gs[k] });
+  }
+  ev.push({ k: 'launch', t: tA, label: lab ? pl.callName : '' });
+}
+
+/* ---------- handling ----------
+   Things picked up, dropped, put away and used. A dropped object bounces with restitution e: each bounce from e^2
+   of the height before, sooner by e. A coin then rolls on its rim like Euler's disk, its contact going round faster
+   and faster toward a finite-time stop (the rate grows about as (t_end - t)^-1/3). Paper and cloth crumple in clicks
+   whose energies follow a power law, as measured for paper (Houle and Sethna, 1996). A bottle's cork pops at the
+   bottle's Helmholtz frequency, and pouring from it glugs as air bubbles back in. A blade scrapes along its sheath and
+   rings as it clears. */
+var HANDS = {
+  coins: { mat: 'steel', m: 0.007, n: 5, e: 0.55, sc: 8 }, keys: { mat: 'steel', m: 0.012, n: 5, e: 0.3, sc: 6 },
+  potion: { mat: 'glass', m: 0.35, n: 1, e: 0.35, sc: 1.6, bottle: true }, blade: { mat: 'steel', m: 1.2, n: 1, e: 0.25, sc: 1.4, blade: true },
+  gem: { mat: 'glass', m: 0.01, n: 1, e: 0.5, sc: 7 }, armour: { mat: 'steel', m: 2.5, n: 3, e: 0.2, sc: 1.1 },
+  cloth: { soft: 0.3, m: 0.4, n: 1, e: 0.05, sc: 1 }, leather: { soft: 0.6, m: 0.8, n: 1, e: 0.08, sc: 1 }, paper: { soft: 1, m: 0.05, n: 1, e: 0.1, sc: 1 }
+};
+var HAND_GROUNDS = { wood: 'wood', stone: 'concrete', metal: 'steel', bag: null };
+/* crumpling: clicks with energies from a power law P(E) ~ E^-1.3, drawn by inverse sampling between e0 and 1000 e0 */
+function crumple(evs, g, t0, dur, rate, amp, hp, pan, rnd) {
+  var n = Math.round(rate * dur), i, u, E;
+  for (i = 0; i < n; i++) {
+    var tt = t0 + dur * rnd(); u = rnd();
+    E = Math.pow(1 - u * (1 - Math.pow(1000, -0.3)), -1 / 0.3);
+    evs.push(evClick(g, tt, 0.00015 + 0.0006 / Math.sqrt(E), amp * Math.sqrt(E / 1000), pan + 0.2 * (rnd() - 0.5)));
+  }
+  evs.push(evNoise(g, t0, dur * 0.5, hp, 12000, amp * 0.15, pan));
+}
+function planHand(q, grnd) {
+  var ob = HANDS[q.hdObject] || HANDS.coins, h = Math.max(q.hdHeight, 0.01), act = q.hdAction, bounces = [], k, t = 0;
+  if (act === 'drop') {
+    /* free fall, then bounces until a hop lasts under 5 ms */
+    var v = Math.sqrt(2 * GRAV * h), e = ob.e * (q.hdSurface === 'bag' ? 0.3 : q.hdSurface === 'wood' ? 0.85 : 1);
+    t = 0.05;
+    for (k = 0; k < 12; k++) {
+      var j = grnd();
+      bounces.push({ t: t, E: 0.5 * ob.m * v * v, pan: (j - 0.5) * 0.2 });
+      v *= e; var hop = 2 * v / GRAV;
+      if (hop < 0.005) break;
+      t += hop;
+    }
+  }
+  var spin = act === 'drop' && q.hdObject === 'coins' && q.hdSurface !== 'bag' ? 0.9 + 0.5 * grnd() : 0;
+  var dur = act === 'drop' ? t + spin + 0.9 : act === 'use' ? (ob.bottle ? 2.2 : ob.blade ? 1.6 : 1.4) : 1.1;
+  /* what sounds when, for the diagram */
+  var marks = act === 'drop' ? [] : act === 'pickup' ? [[0.08, 'lifted']] : act === 'equip' ? [[0.08, 'lifted'], [0.45, 'stowed'], [ob.blade ? 0.72 : 0.78, ob.blade ? 'guard' : 'clasp']] :
+    ob.bottle ? [[0.1, 'cork pops'], [0.5, 'glugs']] : ob.blade ? [[0.1, 'scrapes'], [0.56, 'clears, rings']] : ob.n > 1 ? [[0.1, 'one by one']] : ob.soft ? [[0.1, 'crumples']] : [[0.1, 'clink'], [0.32, 'clink']];
+  return { ob: ob, name: q.hdObject, act: act, h: h, surf: q.hdSurface, bounces: bounces, spin: spin, tSpin: t, dur: dur, r: Math.max(0.2, q.hdDist), n: ob.n, marks: marks,
+    tMain: bounces.length ? bounces[0].t : 0.1, label: act === 'drop' ? 'lands' : act };
+}
+function handLayers(pl, p, o, rnd, layers, ev, lab) {
+  var ns = Math.ceil(pl.dur * FS), r = pl.r, tA = o.t0 + r / C, g = [], sd = [], k, i, ob = pl.ob, evs = [], gspec = HAND_GROUNDS[pl.surf];
+  for (k = 0; k < 4; k++) { g.push(new Float32Array(ns)); sd.push(new Float32Array(ns)); }
+  function hit(k2, mat, E, sc, t, pan, opt) { var b = modalHit(mat, Math.max(E, 1e-9), sc, rnd, opt || { noGrains: true }), n0 = Math.round(t * FS); for (var j = 0; j < b.length && n0 + j < ns; j++) if (n0 + j >= 0) { g[k2][n0 + j] += b[j]; sd[k2][n0 + j] += b[j] * pan; } }
+  /* a handful of small hard things knocking together while they move */
+  function jingle(t, dur, count, E) { for (var j = 0; j < count; j++) { var tj = t + dur * rnd(), s2 = rnd(); hit(1, ob.mat, E * (0.3 + rnd()), ob.sc * (0.8 + 0.5 * s2), tj, (s2 - 0.5) * 0.5, { maxModes: 4, t60Scale: 0.25, noGrains: true }); } }
+  /* 1/100 of the impact energy reaches the modes, as for the mechanism's stops */
+  var EFF = STOP_EFF;
+  if (pl.act === 'drop') {
+    pl.bounces.forEach(function (b, bi) {
+      var E = b.E * EFF;
+      if (ob.soft) { evs.push(evNoise(0, b.t, 0.04, 80, 900, 0.3 * Math.sqrt(E), b.pan)); crumple(evs, 2, b.t, 0.12, 120 * ob.soft, 0.4 * Math.sqrt(E), 1500, b.pan, rnd); }
+      else {
+        for (var c = 0; c < pl.n; c++) hit(0, ob.mat, E / pl.n, ob.sc * (1 + 0.08 * c), b.t + 0.004 * c * rnd(), b.pan + 0.1 * c, { noGrains: true });
+        if (pl.n > 1 && bi === 0) jingle(b.t, 0.15, 3 * pl.n, E / pl.n * 0.2);
+      }
+      /* a soft thing lands over a long contact: a dull thud, not the floor's ring */
+      if (gspec && !ob.soft) hit(3, gspec, E * 0.5, 1, b.t, b.pan, { noGrains: true });
+      else evs.push(evNoise(3, b.t, 0.05, 100, 1500, 0.4 * Math.sqrt(E), b.pan));
+    });
+    if (pl.spin) {
+      /* rolling on the rim, the contact circles faster toward the stop, then the coin slaps flat */
+      var t0 = pl.tSpin, T = pl.spin, tt = 0, E0 = pl.bounces[0].E * EFF * 0.02;
+      while (tt < T * 0.995) {
+        var rate = 18 * Math.pow(1 - tt / T, -1 / 3);
+        hit(1, ob.mat, E0 * (1 - 0.7 * tt / T), ob.sc, t0 + tt, 0.05, { maxModes: 3, t60Scale: 0.1, noGrains: true });
+        tt += 1 / rate;
+      }
+      hit(0, ob.mat, E0 * 4, ob.sc, t0 + T, 0.05, { noGrains: true });
+      if (gspec) hit(3, gspec, E0 * 2, 1.5, t0 + T, 0.05, { noGrains: true });
+    }
+  } else if (pl.act === 'pickup' || pl.act === 'equip') {
+    /* off the surface with a scrape; into a pouch, a belt or a sheath */
+    var E1 = ob.m * GRAV * 0.05 * EFF;
+    evs.push(evNoise(2, 0.08, 0.05, 1200, 7000, 0.02 * Math.sqrt(ob.m), 0));
+    if (!ob.soft) { if (pl.n > 1) jingle(0.1, 0.35, 4 * pl.n, E1 / pl.n); else hit(0, ob.mat, E1, ob.sc, 0.1, 0, { noGrains: true, maxModes: 4 }); }
+    else crumple(evs, 2, 0.1, 0.35, 160 * ob.soft, 0.02 * Math.sqrt(ob.m), 1200, 0, rnd);
+    if (pl.act === 'equip') {
+      crumple(evs, 2, 0.45, 0.3, 90, 0.015, 900, 0.1, rnd);
+      if (ob.blade) { evs.push(evNoise(2, 0.5, 0.18, 2500, 9000, 0.05, 0)); hit(0, 'steel', E1 * 0.5, 4, 0.72, 0, { maxModes: 4, t60Scale: 0.2, noGrains: true }); }
+      else hit(1, 'steel', 0.002 * EFF * 10, 6, 0.78, 0.1, { maxModes: 3, t60Scale: 0.1, noGrains: true });
+    }
+  } else {
+    /* use */
+    if (ob.bottle) {
+      /* the cork pops at the bottle's Helmholtz pitch: neck 1 cm across, 5 cm long, 0.3 l; then three glugs and a pour */
+      var A = Math.PI * 0.01 * 0.01, fH = C / TAU * Math.sqrt(A / (0.0003 * (0.05 + 1.7 * 0.01)));
+      evs.push(evTone(0, 0.1, fH, 0.012, 0.4, 0.25, 0));
+      evs.push(evNoise(2, 0.1, 0.01, 300, 4000, 0.1, 0));
+      for (k = 0; k < 7; k++) { var tg = 0.5 + 0.17 * k + 0.03 * rnd(), fill = 0.8 - 0.1 * k; evs.push(evRing(1, tg, 0.006 + 0.002 * rnd(), 0.05, 0.08, 0.4, 0.03, 0, LIQUIDS.water)); evs.push(evTone(0, tg, fH * Math.sqrt(1 / (1 - fill * 0.9)), 0.02, 0.05, 0, 0)); }
+      for (k = 0; k < 120; k++) { var tp = 0.5 + 1.2 * rnd(); evs.push(evRing(2, tp, 0.0005 + 0.002 * rnd(), 0.02, 0.03, 0.5, 0.08, 0.1, LIQUIDS.water)); }
+    } else if (ob.blade) {
+      /* drawn: steel scraping on the sheath mouth, then free and ringing */
+      var sn = unitNoise(Math.round(0.45 * FS), rnd, 9000, 2500), n0 = Math.round(0.1 * FS);
+      for (i = 0; i < sn.length && n0 + i < ns; i++) { var x = i / sn.length; g[2][n0 + i] += 0.08 * sn[i] * Math.sin(Math.PI * Math.min(1, x * 1.2)) * (0.6 + 0.4 * Math.sin(TAU * 23 * i / FS)); }
+      hit(0, 'steel', 0.4 * EFF, ob.sc, 0.56, 0.1, { noGrains: true, t60Scale: 1.2 });
+    } else if (pl.n > 1) {
+      /* counted out one by one, or shaken */
+      for (k = 0; k < pl.n * 2; k++) hit(0, ob.mat, ob.m * GRAV * 0.03 * EFF, ob.sc * (0.9 + 0.2 * rnd()), 0.1 + 0.13 * k + 0.02 * rnd(), (rnd() - 0.5) * 0.3, { noGrains: true, maxModes: 5 });
+      jingle(0.1, 0.13 * pl.n * 2, pl.n * 3, ob.m * GRAV * 0.01 * EFF);
+    } else if (ob.soft) crumple(evs, 2, 0.1, 0.9, 260 * ob.soft, 0.03 * Math.sqrt(ob.m + 0.1), 1500, 0, rnd);
+    else { hit(0, ob.mat, ob.m * GRAV * 0.05 * EFF, ob.sc, 0.1, -0.2, { noGrains: true }); hit(0, ob.mat, ob.m * GRAV * 0.04 * EFF, ob.sc * 1.03, 0.32, 0.2, { noGrains: true }); }
+  }
+  liquidSynth(evs, g, sd, rnd, false);
+  var gs = [o.g1, o.g2, o.g3, o.g4], pn = o.pan * 0.7;
+  for (k = 0; k < 4; k++) {
+    if (!(gs[k] > 0)) continue;
+    var L = new Float32Array(ns), R = new Float32Array(ns);
+    for (i = 0; i < ns; i++) { L[i] = (g[k][i] * (1 + pn) + sd[k][i]) / r; R[i] = (g[k][i] * (1 - pn) - sd[k][i]) / r; }
+    postLayer(L, r, o.ground); postLayer(R, r, o.ground);
+    layers.push({ L: L, R: R, t: tA, g: gs[k] });
+  }
+  ev.push({ k: 'impact', t: tA + pl.tMain, label: lab ? pl.label : '' });
+}
+
+/* ---------- fire ----------
+   A flame D metres across puffs at about 1.5 / sqrt(D) Hz (Cetegen and Ahmed's pool-fire law): a torch flutters, a
+   blaze heaves. Its roar is turbulent combustion noise, broadband, peaking lower for bigger flames, carrying a tiny
+   share of the heat release (FIRE_ETA of Q; wood gives about 600 kW per square metre of fire). Wood crackles as
+   pockets of gas and steam burst, with energies in a power law (crackling noise); wet wood hisses and pops more.
+   Embers settle and tick. A cloud of fuel that ignites is a monopole: burnt gas swelling sevenfold within the burn
+   time gives the whump, and the fire then roars and dies back. */
+var FIRE_ETA = 2e-9, FIRES = {
+  campfire: { q: 6e5, crack: 1, hiss: 1, embers: 1, flutter: 0.15, jet: 0 }, torch: { q: 6e5, crack: 0.4, hiss: 0.3, embers: 0, flutter: 0.6, jet: 0 },
+  blaze: { q: 1e6, crack: 0.6, hiss: 0.6, embers: 1.5, flutter: 0.25, jet: 0 }, burner: { q: 2e6, crack: 0, hiss: 0, embers: 0, flutter: 0.05, jet: 1 },
+  ignite: { q: 1e6, crack: 0.5, hiss: 0.3, embers: 0.5, flutter: 0.2, jet: 0 }
+};
+function planFire(q, grnd) {
+  var f = FIRES[q.fiMode] || FIRES.campfire, D = clamp(q.fiSize, 0.02, 30), Q = f.q * Math.PI * D * D / 4, fp = 1.5 / Math.sqrt(D);
+  var loop = q.fiMode !== 'ignite', k = Math.max(1, Math.round(fp * LOOP_S));
+  return { mode: q.fiMode, f: f, D: D, Q: Q, burst: null, fp: loop ? k / LOOP_S : fp, kp: k, fc: clamp(250 / Math.sqrt(D), 60, 2500), prms: Math.sqrt(RHO * C * FIRE_ETA * Q / (4 * Math.PI)),
+    wet: clamp(q.fiMoist, 0, 1), wind: clamp(q.fiWind, 0, 1), r: Math.max(0.3, q.fiDist), loop: loop, dur: loop ? LOOP_S : 2.6, tb: D / (2 * 4), ph: grnd(), tMain: 0.05 };
+}
+/* crackle, ember and hiss events for a stretch of fire; periodic stretches wrap */
+function fireEvents(pl, rnd, len, t0, env) {
+  var evs = [], f = pl.f, rate = 25 * Math.sqrt(pl.Q / 1.7e5) * (0.4 + pl.wet) * f.crack, n = Math.round(rate * len), i;
+  for (i = 0; i < n; i++) {
+    var t = t0 + rnd() * len, u = rnd(), pan = (rnd() * 2 - 1) * 0.5, E = Math.pow(1 - u * (1 - Math.pow(1000, -0.5)), -2), a = 0.5 * Math.sqrt(E / 1000) * env(t), fs = rnd();
+    evs.push(evClick(1, t, 0.0001 + 0.0004 * fs, a, pan));
+    if (E > 100) evs.push(evTone(1, t, 900 + 2500 * fs, 0.004, 0.5 * a, 0, pan));
+  }
+  var ne = Math.round(3 * f.embers * len * Math.sqrt(pl.D));
+  for (i = 0; i < ne; i++) { var te = t0 + rnd() * len, ue = rnd(), pe = (rnd() * 2 - 1) * 0.4; evs.push(ue < 0.7 ? evTone(3, te, 3000 + 4000 * rnd(), 0.003, 0.02 * env(te), 0, pe) : evNoise(3, te, 0.03, 80, 900, 0.05 * Math.sqrt(pl.D) * env(te), pe)); }
+  return evs;
+}
+function fireBeds(pl, rnd, ns, periodic, env, bufs) {
+  var f = pl.f, roar = jetNoise(ns, pl.fc, rnd, periodic), hiss = jetNoise(ns, f.jet ? 3500 : 6000, rnd, periodic), i;
+  var w1 = rnd(), w2 = rnd(), kf = Math.max(1, Math.round((5 + 6 * pl.wind) * LOOP_S)), loopN = periodic ? ns : LOOP_S * FS;
+  for (i = 0; i < ns; i++) {
+    var t = i / FS, x = i / loopN;
+    /* puffing at fp, and the wind fluttering the flame faster; both close round the loop */
+    var m = 1 + 0.45 * Math.sin(TAU * (pl.kp * x + pl.ph)) + (f.flutter + 0.5 * pl.wind) * 0.5 * (Math.sin(TAU * (kf * x + w1)) + 0.6 * Math.sin(TAU * (Math.round(kf * 1.7) * x + w2)));
+    var e = env(t), b = pl.burst ? pl.burst(t) : 1;
+    bufs.m[0][i] += pl.prms * roar[i] * Math.max(0.1, m) * e * b;
+    bufs.m[2][i] += pl.prms * hiss[i] * (f.jet ? 0.8 : 0.35 * pl.wet * f.hiss) * e;
+  }
+}
+function fireSignal(pl, p, o, rnd, ns) {
+  var bf = lqBuffers(ns), gs = [o.g1, o.g2, o.g3, o.g4], mid = new Float32Array(ns), side = new Float32Array(ns), k, i, one = function () { return 1; };
+  liquidSynth(fireEvents(pl, rnd, LOOP_S, 0, one), bf.m, bf.s, rnd, true);
+  fireBeds(pl, rnd, ns, true, one, bf);
+  for (k = 0; k < 4; k++) for (i = 0; i < ns; i++) { mid[i] += bf.m[k][i] * gs[k]; side[i] += bf.s[k][i] * gs[k]; }
+  return { mid: mid, side: side };
+}
+function fireLayers(pl, p, o, rnd, layers, ev, lab) {
+  var ns = Math.ceil(pl.dur * FS), r = pl.r, tA = o.t0 + r / C, bf = lqBuffers(ns), gs = [o.g1, o.g2, o.g3, o.g4], k, i, tb = Math.max(pl.tb, 0.03), t0 = 0.05;
+  /* the fire after ignition: up within the burn time, then dying back */
+  var env = function (t) { return t < t0 ? 0 : t < t0 + tb ? smoothstep((t - t0) / tb) : Math.exp(-(t - t0 - tb) / 0.8); };
+  /* burning the cloud releases about 3.5 MJ per cubic metre within 2 tb; the roar follows that rate, so it bursts */
+  var Vc = Math.PI / 6 * pl.D * pl.D * pl.D, Qb = 3.5e6 * Vc / (2 * tb), kb = Math.sqrt(Qb / pl.Q) - 1;
+  pl.burst = function (t) { var u = (t - t0) / (2 * tb); return u > 0 && u < 1 ? 1 + kb * Math.sin(Math.PI * u) * Math.sin(Math.PI * u) / Math.max(env(t), 0.05) : 1; };
+  liquidSynth(fireEvents(pl, rnd, pl.dur - 0.3, t0, env), bf.m, bf.s, rnd, false);
+  fireBeds(pl, rnd, ns, false, env, bf);
+  /* the whump: the burnt gas swells to (sigma - 1) = 6 times the cloud over T = 2 tb; with the burnt share
+     s(u) = u - sin(2 pi u) / 2 pi the swelling starts and ends smoothly, V'' = 6 V 2 pi sin(2 pi u) / T^2, p = rho V'' / 4 pi */
+  var V = 6 * Math.PI / 6 * pl.D * pl.D * pl.D, T = 2 * tb, n0 = Math.round(t0 * FS), nb = Math.round(T * FS), wh = new Float32Array(ns);
+  for (i = 0; i < nb && n0 + i < ns; i++) wh[n0 + i] = RHO / (4 * Math.PI) * V * TAU * Math.sin(TAU * i / nb) / (T * T);
+  /* most of a large cloud's swell is below hearing; keep what is above 25 Hz */
+  onePoleHP(wh, 25); onePoleHP(wh, 25);
+  for (i = 0; i < ns; i++) bf.m[3][i] += wh[i];
+  for (k = 0; k < 4; k++) {
+    if (!(gs[k] > 0)) continue;
+    var L = new Float32Array(ns), R = new Float32Array(ns), pn = o.pan * 0.7;
+    for (i = 0; i < ns; i++) { L[i] = (bf.m[k][i] * (1 + pn) + bf.s[k][i]) / r; R[i] = (bf.m[k][i] * (1 - pn) - bf.s[k][i]) / r; }
+    postLayer(L, r, o.ground); postLayer(R, r, o.ground);
+    layers.push({ L: L, R: R, t: tA, g: gs[k] });
+  }
+  ev.push({ k: 'launch', t: tA + t0, label: lab ? 'ignites' : '' });
+}
+
 /* ---------- recordings and impulse responses ----------
    Recordings and impulse responses come in from outside as assets: 48 kHz stereo Float32Arrays, set with setAsset()
    (the page decodes the files; the worker gets a copy). Three synthetic examples stand in until a file is loaded. */
@@ -2087,7 +3289,8 @@ function getHits(id, sens) { return readAsset('hits', id, (+sens).toFixed(2), fu
 var STRENGTH = {
   explosion: { keys: [['exW', 1]] }, implosion: { keys: [['imR0', 1 / 3]] }, destruction: { keys: [['dsMass', 1]] },
   discharge: { keys: [['dcEnergy', 1]] }, blaster: { keys: [['tgEnergy', 1], ['lnEnergy', 1], ['bvChannel', 1], ['bpEnergy', 1]] },
-  field: { keys: [['ffHitE', 1]], gain: true }
+  field: { keys: [['ffHitE', 1]], gain: true }, liquid: { keys: [['lqHeight', 1]] },
+  mechanism: { keys: [], gain: true }, heat: { keys: [], gain: true }, footsteps: { keys: [], gain: true }, voice: { keys: [], gain: true }, handling: { keys: [], gain: true }, fire: { keys: [['fiSize', 0.5]] }
 };
 var MAX_TRIGGERS = 32;
 
@@ -2333,7 +3536,10 @@ function roomIR(p) {
 }
 
 /* ---------- seamless loops: hover, static burn, field hum ---------- */
-function isLoop(p) { return (p.kind === 'rocket' && p.rkMode === 'static') || (p.kind === 'rotor' && p.rtMode === 'hover') || (p.kind === 'field' && p.ffMode === 'hum'); }
+function isLoop(p) {
+  return (p.kind === 'rocket' && p.rkMode === 'static') || (p.kind === 'rotor' && p.rtMode === 'hover') || (p.kind === 'field' && p.ffMode === 'hum') ||
+    (p.kind === 'liquid' && (p.lqMode === 'stream' || p.lqMode === 'rain' || p.lqMode === 'bubble')) || (p.kind === 'fire' && p.fiMode !== 'ignite');
+}
 /* The four layer groups (the Layer levels sliders). For a stem, every other group that is on gets a vanishing gain
    instead of zero: the code then takes exactly the same branches and random draws as the full mix, so the stems add
    up to the mix sample for sample. Every gain enters the mix linearly, which is what makes this hold. */
@@ -2349,6 +3555,8 @@ function renderLoop(p, seed, only, ext) {
   var o = sceneGains(p, only);
   if (pl.kind === 'rotor') { sig = rotorSignal(pl.rt, p, o, rnd, Np, true); r = pl.rt.r; }
   else if (pl.kind === 'field') { sig = fieldSignal(pl.ff, p, o, rnd, Np, true); r = pl.ff.r; }
+  else if (pl.kind === 'liquid') { sig = liquidSignal(pl.lq, p, o, rnd, Np); r = pl.lq.r; }
+  else if (pl.kind === 'fire') { sig = fireSignal(pl.fi, p, o, rnd, Np); r = pl.fi.r; }
   else { sig = rocketStatic(pl, p, o, rnd, Np); r = pl.r; }
   var L = new Float32Array(Np), R = new Float32Array(Np);
   for (i = 0; i < Np; i++) { L[i] = (sig.mid[i] + sig.side[i]) / r; R[i] = (sig.mid[i] - sig.side[i]) / r; }
@@ -2383,7 +3591,7 @@ function planRep(p, seed, k, s) {
     if (kind === 'explosion') q.exDist = p.exDist * a; else if (kind === 'destruction') q.dsDist = p.dsDist * a;
     else if (kind === 'implosion') q.imDist = p.imDist * a; else if (kind === 'discharge') q.dcDist = p.dcDist * a;
     else if (kind === 'blaster') { q.miss = p.miss * a; q.bpStiff = p.bpStiff * (1 + j * 0.3 * (grnd() - 0.5)); q.bvSpeed = p.bvSpeed * (1 + j * 0.1 * (grnd() - 0.5)); }
-    else if (kind === 'field') q.ffDist = p.ffDist * a; else if (kind === 'recording') { q.miss = p.miss * a; q.rcDist = p.rcDist * a; } else q.miss = p.miss * a;
+    else if (kind === 'field') q.ffDist = p.ffDist * a; else if (kind === 'liquid') q.lqDist = p.lqDist * a; else if (kind === 'mechanism') q.mcDist = p.mcDist * a; else if (kind === 'heat') q.thDist = p.thDist * a; else if (kind === 'footsteps') q.ftDist = p.ftDist * a; else if (kind === 'voice') q.crDist = p.crDist * a; else if (kind === 'handling') q.hdDist = p.hdDist * a; else if (kind === 'fire') q.fiDist = p.fiDist * a; else if (kind === 'recording') { q.miss = p.miss * a; q.rcDist = p.rcDist * a; } else q.miss = p.miss * a;
     if (kind !== 'projectile') pan = j * 1.4 * (grnd() - 0.5);
   }
   if (kind === 'explosion') out = { ex: planExplosion(q.exW, q.exDist, Math.round(q.exFrags), Math.round(q.exDebris), grnd) };
@@ -2394,6 +3602,13 @@ function planRep(p, seed, k, s) {
   else if (kind === 'discharge') out = { dc: planDischarge(q, grnd) };
   else if (kind === 'blaster') out = { wp: planWeapon(q, grnd) };
   else if (kind === 'field') out = { ff: planField(q, grnd) };
+  else if (kind === 'liquid') out = { lq: planLiquid(q, grnd) };
+  else if (kind === 'mechanism') out = { mc: planMech(q, grnd) };
+  else if (kind === 'heat') out = { th: planHeat(q, grnd) };
+  else if (kind === 'footsteps') out = { ft: planFeet(q, grnd) };
+  else if (kind === 'voice') out = { cr: planVoice(q, grnd) };
+  else if (kind === 'handling') out = { hd: planHand(q, grnd) };
+  else if (kind === 'fire') out = { fi: planFire(q, grnd) };
   else if (kind === 'recording') out = { rc: planRecording(q) };
   else {
     out = analyzeProj(q); out.pay = null;
@@ -2447,6 +3662,13 @@ function mixScene(p, seed, only) {
     else if (pl.kind === 'discharge') dischargeLayers(pl.dc, q, o, rnd, layers, ev, lab);
     else if (pl.kind === 'blaster') weaponLayers(pl.wp, q, o, rnd, layers, ev, lab);
     else if (pl.kind === 'field') fieldLayers(pl.ff, q, o, rnd, layers, ev, lab);
+    else if (pl.kind === 'liquid') liquidLayers(pl.lq, q, o, rnd, layers, ev, lab);
+    else if (pl.kind === 'mechanism') mechLayers(pl.mc, q, o, rnd, layers, ev, lab);
+    else if (pl.kind === 'heat') heatLayers(pl.th, q, o, rnd, layers, ev, lab);
+    else if (pl.kind === 'footsteps') feetLayers(pl.ft, q, o, rnd, layers, ev, lab);
+    else if (pl.kind === 'voice') voiceLayers(pl.cr, q, o, rnd, layers, ev, lab);
+    else if (pl.kind === 'handling') handLayers(pl.hd, q, o, rnd, layers, ev, lab);
+    else if (pl.kind === 'fire') fireLayers(pl.fi, q, o, rnd, layers, ev, lab);
     else if (pl.kind === 'recording') recordingLayers(pl.rc, q, o, rnd, layers, ev, lab);
     else projLayers(pl, q, o, rnd, layers, ev, lab);
     if (!trig) tOff += (p.seqInterval || 0.1) * (1 + (p.seqJitter || 0) * (trnd() - 0.5));
@@ -2493,14 +3715,15 @@ function stretch(x, s) {
   return y;
 }
 function padTo(x, front, back) { var y = new Float32Array(front + x.length + back); y.set(x, front); return y; }
-function findOnsets(L, R) {
-  var N = L.length, pk = peakOf(L, R), fast = 0, slow = 0, last = -1e9, out = [];
+/* onsets from sample 'from' on; the samples before it only warm the detector */
+function findOnsets(L, R, from) {
+  var N = L.length, pk = peakOf(L, R), fast = 0, slow = 0, last = -1e9, out = [], n0 = from || 0;
   var aF = Math.exp(-1 / (0.012 * FS)), aSa = Math.exp(-1 / (0.03 * FS)), aSr = Math.exp(-1 / (0.25 * FS)), win = Math.round(0.02 * FS);
   for (var n = 0; n < N; n++) {
     var x = Math.max(Math.abs(L[n]), Math.abs(R[n]));
     fast = x > fast ? x : x + (fast - x) * aF;
     slow = x > slow ? x + (slow - x) * aSa : x + (slow - x) * aSr;
-    if (fast > 0.2 * pk && fast > 2.5 * slow && n - last > 0.14 * FS) {
+    if (n >= n0 && fast > 0.2 * pk && fast > 2.5 * slow && n - last > 0.14 * FS) {
       var lv = 0; for (var j = n; j < n + win && j < N; j++) lv = Math.max(lv, Math.abs(L[j]), Math.abs(R[j]));
       out.push({ n: n, level: lv }); last = n;
     }
@@ -2559,7 +3782,13 @@ function actionize(raw, a) {
   var maxN = 24 * FS;
   if (!loop && L.length > maxN) { L = L.slice(0, maxN); R = R.slice(0, maxN); }
   if (a.tail > 0 && !loop) { var extra = Math.min(maxN + 4 * FS - L.length, Math.round((1 + a.tail * 3) * FS)); L = padTo(L, 0, extra); R = padTo(R, 0, extra); }
-  var N = L.length, on = findOnsets(L, R);
+  var N = L.length, on = [];
+  if (loop) {
+    /* a loop's onsets come from the kept period, heard after one period of warm-up, and repeat in every period,
+       so a sub drop near the end wraps round the seam */
+    var Pl = Math.round(raw.L.length * slow);
+    findOnsets(L.subarray(0, 2 * Pl), R.subarray(0, 2 * Pl), Pl).forEach(function (o) { for (var k = 0; k < 3; k++) on.push({ n: o.n - Pl + k * Pl, level: o.level }); });
+  } else on = findOnsets(L, R);
   /* level references come from the kept period of a loop, not from its warm-up */
   function norm(target) {
     var a0 = 0, b0 = L.length, pk = 0, q, v;
@@ -3013,6 +4242,15 @@ var DEFAULTS = { kind: 'projectile',
   irAsset: 'ex:stair', irWet: -6,
   ffMode: 'hum', ffBase: 62, ffType: 'membrane', ffBeat: 1.5, ffShimmer: 0.5, ffCorona: 0.4, ffHitE: 2000, ffGlide: 0.6, ffDist: 3,
   ffB: 1, ffDens: 1e19, ffBeta: 0.3, ffAngle: 30, ffSaw: 0.4, ffSawT: 1.33, ffChorus: 0.4, ffSurface: 0.4, ffSoliton: 0.4,
+  lqMode: 'drop', lqMedium: 'water', lqDrop: 0.0023, lqHeight: 0.07, lqDepth: 0.2, lqMass: 0.2, lqFlow: 0.08, lqVessel: 0.12, lqFill: 0.9,
+  lqTemp: 650, lqThick: 0.002, lqRate: 300, lqSize: 1, lqHeat: 1, lqRain: 8, lqDist: 1.5,
+  mcType: 'slide', mcDrive: 'hydraulic', mcAction: 'close', mcMass: 300, mcMat: 'steel', mcStroke: 1.6, mcAngle: 90, mcTime: 1.8, mcStop: 'rubber', mcLatch: 'bolt',
+  mcWear: 0.1, mcRpm: 3000, mcDist: 3,
+  thMode: 'cool', thMat: 'steel', thMass: 8, thDT: 400, thTime: 8, thJoints: 6, thStrength: 0.6, thDist: 1.5,
+  ftMass: 75, ftLegs: '2', ftFoot: 'boot', ftSurface: 'concrete', ftGait: 'walk', ftSteps: 6, ftGear: 0, ftDist: 2,
+  crType: 'beast', crCall: 'attack', crMass: 190, crPitch: 1, crTract: 1, crEffort: 1, crRough: 1, crLength: 1, crDist: 5,
+  hdObject: 'coins', hdAction: 'drop', hdHeight: 0.3, hdSurface: 'wood', hdDist: 0.8,
+  fiMode: 'campfire', fiSize: 0.6, fiMoist: 0.3, fiWind: 0.2, fiDist: 2,
   seqCount: 1, seqInterval: 0.12, seqJitter: 0.2, seqFrom: 'interval', seqAsset: 'ex:door', seqSens: 0.5, seqDyn: 0.7, seqGuide: -40,
   dsKnock: 'ex:knock', dsLike: 'glass', dsDebris: 'model', grAsset: 'ex:gravel',
   env: 'field', ground: 0.5, trimCrack: 0, trimLaunch: 0, trimWake: 0, trimImpact: 0 };
@@ -3108,7 +4346,104 @@ var PRESETS = [
   { id: 'tinroof', name: 'Rain on a tin roof', p: { kind: 'recording', rcAsset: 'ex:rain', rcBody: 'steel', rcThick: 0.6, rcSize: 3, rcDist: 3, env: 'indoor', trimCrack: -14 } },
   { id: 'lakeice', name: 'Rain on lake ice', p: { kind: 'recording', rcAsset: 'ex:rain', rcBody: 'ice', rcThick: 40, rcSize: 40, rcDist: 6, env: 'valley', trimCrack: -18 } },
   { id: 'laservoice', name: 'Voice through a dispersive line', p: { kind: 'recording', rcAsset: 'ex:voice', rcBody: 'line', rcLength: 25, rcDist: 2, env: 'indoor', trimCrack: -40 } },
-  { id: 'springvoice', name: 'Voice in a spring', p: { kind: 'recording', rcAsset: 'ex:voice', rcBody: 'spring', rcLength: 0.6, rcDist: 2, env: 'none', trimCrack: -10 } }
+  { id: 'springvoice', name: 'Voice in a spring', p: { kind: 'recording', rcAsset: 'ex:voice', rcBody: 'spring', rcLength: 0.6, rcDist: 2, env: 'none', trimCrack: -10 } },
+
+  { id: 'drip', name: 'Drip', p: { kind: 'liquid', lqMode: 'drop', env: 'room' } },
+  { id: 'cavedrip', name: 'Cave drip', p: { kind: 'liquid', lqMode: 'drop', lqDrop: 0.0026, lqHeight: 0.06, lqDepth: 0.5, lqDist: 4, env: 'cave' } },
+  { id: 'wetfloor', name: 'Drip on a wet floor', p: { kind: 'liquid', lqMode: 'drop', lqDrop: 0.0025, lqHeight: 1.5, lqDepth: 0.001, lqDist: 1.2, env: 'room' } },
+  { id: 'pondstone', name: 'Stone into a pond', p: { kind: 'liquid', lqMode: 'splash', lqMass: 0.25, lqHeight: 1.5, lqDepth: 1, lqDist: 3, env: 'forest' } },
+  { id: 'bodywater', name: 'Body into water', p: { kind: 'liquid', lqMode: 'splash', lqMass: 80, lqHeight: 1.5, lqDepth: 3, lqDist: 6, env: 'field' } },
+  { id: 'mudstep', name: 'Boot into mud', p: { kind: 'liquid', lqMode: 'splash', lqMedium: 'mud', lqMass: 2, lqHeight: 0.25, lqDepth: 0.05, lqDist: 1.5, env: 'field' } },
+  { id: 'pourglass', name: 'Pouring a glass', p: { kind: 'liquid', lqMode: 'pour', lqHeight: 0.15, lqDist: 0.8, env: 'room' } },
+  { id: 'bucket', name: 'Filling a bucket', p: { kind: 'liquid', lqMode: 'pour', lqFlow: 0.25, lqHeight: 0.6, lqVessel: 0.3, lqFill: 0.6, lqDist: 1.5, env: 'room' } },
+  { id: 'quench', name: 'Blade quench', p: { kind: 'liquid', lqMode: 'quench', lqMass: 0.1, lqThick: 0.0015, lqTemp: 600, lqDist: 1.2, env: 'room' } },
+  { id: 'brook', name: 'Brook, loop', p: { kind: 'liquid', lqMode: 'stream', lqRate: 300, lqDist: 3, env: 'forest' } },
+  { id: 'pondrain', name: 'Rain on a pond, loop', p: { kind: 'liquid', lqMode: 'rain', lqRain: 8, lqDist: 2, env: 'forest' } },
+  { id: 'drizzle', name: 'Drizzle on water, loop', p: { kind: 'liquid', lqMode: 'rain', lqRain: 1, lqDist: 1.5, env: 'forest' } },
+  { id: 'kettle', name: 'Kettle singing, loop', p: { kind: 'liquid', lqMode: 'bubble', lqRate: 120, lqHeat: 0.6, lqDist: 1, env: 'room' } },
+  { id: 'boil', name: 'Rolling boil, loop', p: { kind: 'liquid', lqMode: 'bubble', lqRate: 120, lqHeat: 1, lqDist: 1, env: 'room' } },
+  { id: 'mudpot', name: 'Mud pot, loop', p: { kind: 'liquid', lqMode: 'bubble', lqMedium: 'mud', lqRate: 6, lqDist: 3, env: 'field' } },
+  { id: 'lavapool', name: 'Lava pool, loop', p: { kind: 'liquid', lqMode: 'bubble', lqMedium: 'lava', lqRate: 2, lqDist: 6, env: 'cave' } },
+  { id: 'acidvat', name: 'Acid vat, loop', p: { kind: 'liquid', lqMode: 'bubble', lqMedium: 'acid', lqRate: 2500, lqDist: 1.5, env: 'room' } },
+
+  { id: 'hydroclose', name: 'Hydraulic door, closing', p: { kind: 'mechanism', env: 'indoor' } },
+  { id: 'hydroopen', name: 'Hydraulic door, opening', p: { kind: 'mechanism', mcAction: 'open', env: 'indoor' } },
+  { id: 'airdoor', name: 'Pneumatic door', p: { kind: 'mechanism', mcDrive: 'pneumatic', mcAction: 'open', mcMass: 60, mcMat: 'aluminium', mcStroke: 1.2, mcTime: 0.6, mcLatch: 'none', env: 'indoor' } },
+  { id: 'blastdoor', name: 'Blast door', p: { kind: 'mechanism', mcDrive: 'electric', mcMass: 2500, mcStroke: 2.5, mcTime: 6, mcStop: 'damped', mcRpm: 1500, mcWear: 0.3, mcDist: 5, env: 'indoor' } },
+  { id: 'shutter', name: 'Roller shutter', p: { kind: 'mechanism', mcDrive: 'electric', mcAction: 'open', mcMass: 80, mcStroke: 2.5, mcTime: 4, mcStop: 'hard', mcLatch: 'none', mcRpm: 1400, mcWear: 0.7, env: 'urban' } },
+  { id: 'creakdoor', name: 'Creaking door', p: { kind: 'mechanism', mcType: 'hinge', mcDrive: 'manual', mcAction: 'open', mcMass: 25, mcMat: 'wood', mcTime: 2.2, mcStop: 'hard', mcLatch: 'latch', mcWear: 0.8, mcDist: 2, env: 'room' } },
+  { id: 'doorslam', name: 'Door slam', p: { kind: 'mechanism', mcType: 'hinge', mcDrive: 'manual', mcMass: 30, mcMat: 'wood', mcAngle: 70, mcTime: 0.45, mcStop: 'hard', mcLatch: 'latch', mcWear: 0.1, mcDist: 2, env: 'room' } },
+  { id: 'locker', name: 'Locker door', p: { kind: 'mechanism', mcType: 'hinge', mcDrive: 'manual', mcMass: 6, mcTime: 0.35, mcStop: 'hard', mcLatch: 'latch', mcWear: 0.4, mcDist: 1.5, env: 'room' } },
+  { id: 'crateopen', name: 'Crate lid, opening', p: { kind: 'mechanism', mcType: 'hinge', mcDrive: 'manual', mcAction: 'open', mcMass: 4, mcMat: 'wood', mcAngle: 100, mcTime: 0.9, mcStop: 'hard', mcLatch: 'none', mcWear: 0.5, mcDist: 1.2, env: 'room' } },
+  { id: 'crateshut', name: 'Crate lid, dropped shut', p: { kind: 'mechanism', mcType: 'hinge', mcDrive: 'manual', mcMass: 4, mcMat: 'wood', mcAngle: 100, mcTime: 0.35, mcStop: 'hard', mcLatch: 'none', mcDist: 1.2, env: 'room' } },
+  { id: 'turret', name: 'Turret traverse', p: { kind: 'mechanism', mcType: 'rotate', mcDrive: 'electric', mcAction: 'open', mcMass: 400, mcTime: 2.5, mcStop: 'damped', mcLatch: 'none', mcWear: 0.2, mcDist: 4, env: 'field' } },
+  { id: 'servo', name: 'Robot servo', p: { kind: 'mechanism', mcType: 'rotate', mcDrive: 'electric', mcAction: 'open', mcMass: 0.5, mcMat: 'plastic', mcAngle: 60, mcTime: 0.35, mcStop: 'hard', mcLatch: 'none', mcWear: 0.05, mcRpm: 12000, mcDist: 1, env: 'room' } },
+  { id: 'switch', name: 'Switch', p: { kind: 'mechanism', mcType: 'switch', mcDrive: 'manual', mcMass: 0.02, mcMat: 'plastic', mcTime: 0.012, mcLatch: 'none', mcDist: 0.6, env: 'room' } },
+  { id: 'lever', name: 'Heavy lever', p: { kind: 'mechanism', mcType: 'switch', mcDrive: 'manual', mcMass: 1.5, mcTime: 0.08, mcLatch: 'none', mcWear: 0.3, mcDist: 1, env: 'indoor' } },
+
+  { id: 'engcool', name: 'Engine cooling, ticks', p: { kind: 'heat', thTime: 10, thJoints: 6, env: 'room' } },
+  { id: 'exhaust', name: 'Exhaust pipe ticking', p: { kind: 'heat', thMass: 3, thDT: 500, thTime: 6, thJoints: 5, thDist: 1, env: 'urban' } },
+  { id: 'oven', name: 'Oven heating up', p: { kind: 'heat', thMode: 'heat', thMass: 6, thDT: 200, thTime: 6, thJoints: 5, env: 'room' } },
+  { id: 'roofsun', name: 'Tin roof in the sun', p: { kind: 'heat', thMode: 'heat', thMass: 40, thDT: 40, thTime: 10, thJoints: 8, thDist: 4, env: 'field' } },
+  { id: 'housecool', name: 'House settling at night', p: { kind: 'heat', thMat: 'wood', thMass: 200, thDT: 12, thTime: 12, thJoints: 4, thDist: 3, env: 'room' } },
+  { id: 'acidsteel', name: 'Acid eats through steel', p: { kind: 'heat', thMode: 'acid', thMass: 3, thTime: 4, env: 'room' } },
+  { id: 'acidcrate', name: 'Acid on a wooden crate', p: { kind: 'heat', thMode: 'acid', thMat: 'wood', thMass: 5, thTime: 3, env: 'room' } },
+  { id: 'lavacrate', name: 'Crate into lava', p: { kind: 'heat', thMode: 'lava', thMat: 'wood', thMass: 6, thTime: 3, thDist: 3, env: 'cave' } },
+  { id: 'lavasteel', name: 'Steel into lava', p: { kind: 'heat', thMode: 'lava', thMass: 10, thTime: 4, thDist: 3, env: 'cave' } },
+  { id: 'torchcut', name: 'Cutting torch', p: { kind: 'heat', thMode: 'torch', thMass: 4, thTime: 3, env: 'indoor' } },
+
+  { id: 'boots', name: 'Boots on concrete', p: { kind: 'footsteps', env: 'indoor' } },
+  { id: 'sneak', name: 'Sneaking on boards', p: { kind: 'footsteps', ftFoot: 'shoe', ftSurface: 'wood', ftGait: 'sneak', ftSteps: 4, env: 'room' } },
+  { id: 'runboards', name: 'Running on boards', p: { kind: 'footsteps', ftSurface: 'wood', ftGait: 'run', ftSteps: 8, env: 'room' } },
+  { id: 'grate', name: 'Boots on a metal grate', p: { kind: 'footsteps', ftSurface: 'metal', env: 'indoor' } },
+  { id: 'gravel', name: 'Walking on gravel', p: { kind: 'footsteps', ftSurface: 'gravel', env: 'field' } },
+  { id: 'snow', name: 'Walking in snow', p: { kind: 'footsteps', ftSurface: 'snow', env: 'forest' } },
+  { id: 'sand', name: 'Walking on sand', p: { kind: 'footsteps', ftFoot: 'shoe', ftSurface: 'sand', env: 'field' } },
+  { id: 'grass', name: 'Walking through grass', p: { kind: 'footsteps', ftFoot: 'shoe', ftSurface: 'grass', env: 'forest' } },
+  { id: 'puddles', name: 'Running through puddles', p: { kind: 'footsteps', ftSurface: 'water', ftGait: 'run', env: 'urban' } },
+  { id: 'mudwade', name: 'Wading through mud', p: { kind: 'footsteps', ftSurface: 'mud', ftSteps: 4, env: 'field' } },
+  { id: 'armour', name: 'Armoured soldier', p: { kind: 'footsteps', ftMass: 110, ftGear: 0.8, env: 'indoor' } },
+  { id: 'mech', name: 'Mech walker', p: { kind: 'footsteps', ftFoot: 'robot', ftMass: 6000, ftSteps: 4, ftDist: 15, env: 'field' } },
+  { id: 'robodog', name: 'Robot dog', p: { kind: 'footsteps', ftFoot: 'robot', ftLegs: '4', ftMass: 30, ftSteps: 8, env: 'room' } },
+  { id: 'clawtiles', name: 'Claws on a hard floor', p: { kind: 'footsteps', ftFoot: 'claw', ftLegs: '4', ftMass: 25, ftSteps: 8, env: 'room' } },
+  { id: 'beast', name: 'Large beast, running', p: { kind: 'footsteps', ftFoot: 'bare', ftLegs: '4', ftMass: 400, ftSurface: 'dirt', ftGait: 'run', ftSteps: 8, ftDist: 8, env: 'field' } },
+
+  { id: 'roar', name: 'Big cat roar', p: { kind: 'voice', crDist: 10, env: 'field' } },
+  { id: 'bark', name: 'Dog barking', p: { kind: 'voice', crCall: 'alert', crMass: 30, seqCount: 3, seqInterval: 0.4, env: 'urban' } },
+  { id: 'growl', name: 'Wolf growl', p: { kind: 'voice', crCall: 'idle', crMass: 45, crEffort: 0.8, crRough: 3, crLength: 4, crDist: 3, env: 'forest' } },
+  { id: 'grunt', name: 'Grunt', p: { kind: 'voice', crCall: 'idle', crMass: 90, crDist: 2, env: 'room' } },
+  { id: 'hurt', name: 'Small creature hurt', p: { kind: 'voice', crCall: 'pain', crMass: 3, crDist: 2, env: 'forest' } },
+  { id: 'dying', name: 'Beast dying', p: { kind: 'voice', crCall: 'death', crMass: 300, crDist: 4, env: 'field' } },
+  { id: 'giant', name: 'Giant monster roar', p: { kind: 'voice', crMass: 8000, crDist: 30, env: 'valley' } },
+  { id: 'hiss', name: 'Reptile hiss', p: { kind: 'voice', crType: 'reptile', crCall: 'alert', crMass: 80, crLength: 4, crDist: 2, env: 'forest' } },
+  { id: 'dragon', name: 'Dragon roar', p: { kind: 'voice', crType: 'reptile', crMass: 5000, crDist: 20, env: 'valley' } },
+  { id: 'robotalert', name: 'Robot alert', p: { kind: 'voice', crType: 'robot', crCall: 'alert', crMass: 50, seqCount: 3, seqInterval: 0.25, crDist: 2, env: 'indoor' } },
+  { id: 'robottaunt', name: 'Robot taunt', p: { kind: 'voice', crType: 'robot', crMass: 200, crDist: 3, env: 'indoor' } },
+  { id: 'robotdown', name: 'Robot shutting down', p: { kind: 'voice', crType: 'robot', crCall: 'death', crMass: 100, crDist: 2, env: 'indoor' } },
+
+  { id: 'coindrop', name: 'Coins dropped on a table', p: { kind: 'handling', env: 'room' } },
+  { id: 'coinpick', name: 'Picking up coins', p: { kind: 'handling', hdAction: 'pickup', env: 'room' } },
+  { id: 'coincount', name: 'Counting coins', p: { kind: 'handling', hdAction: 'use', env: 'room' } },
+  { id: 'keys', name: 'Keys', p: { kind: 'handling', hdObject: 'keys', hdAction: 'use', env: 'room' } },
+  { id: 'potion', name: 'Uncorking a potion', p: { kind: 'handling', hdObject: 'potion', hdAction: 'use', env: 'room' } },
+  { id: 'potiondrop', name: 'Potion dropped', p: { kind: 'handling', hdObject: 'potion', hdHeight: 0.8, hdSurface: 'stone', env: 'room' } },
+  { id: 'draw', name: 'Drawing a sword', p: { kind: 'handling', hdObject: 'blade', hdAction: 'use', env: 'room' } },
+  { id: 'sheathe', name: 'Sheathing a sword', p: { kind: 'handling', hdObject: 'blade', hdAction: 'equip', env: 'room' } },
+  { id: 'sworddrop', name: 'Sword dropped on stone', p: { kind: 'handling', hdObject: 'blade', hdHeight: 1, hdSurface: 'stone', hdDist: 1.5, env: 'indoor' } },
+  { id: 'gem', name: 'Gem picked up', p: { kind: 'handling', hdObject: 'gem', hdAction: 'pickup', env: 'room' } },
+  { id: 'armouron', name: 'Putting on armour', p: { kind: 'handling', hdObject: 'armour', hdAction: 'equip', hdDist: 1, env: 'room' } },
+  { id: 'armourdrop', name: 'Armour dropped', p: { kind: 'handling', hdObject: 'armour', hdHeight: 0.6, hdSurface: 'stone', hdDist: 1.5, env: 'indoor' } },
+  { id: 'intobag', name: 'Into the bag', p: { kind: 'handling', hdObject: 'leather', hdAction: 'equip', env: 'room' } },
+  { id: 'scroll', name: 'Unrolling a scroll', p: { kind: 'handling', hdObject: 'paper', hdAction: 'use', env: 'room' } },
+  { id: 'clothes', name: 'Clothes dropped', p: { kind: 'handling', hdObject: 'cloth', hdHeight: 1, env: 'room' } },
+
+  { id: 'campfire', name: 'Campfire, loop', p: { kind: 'fire', env: 'forest' } },
+  { id: 'wetfire', name: 'Wet wood fire, loop', p: { kind: 'fire', fiMoist: 1, env: 'forest' } },
+  { id: 'walltorch', name: 'Wall torch, loop', p: { kind: 'fire', fiMode: 'torch', fiSize: 0.08, fiWind: 0.3, fiDist: 1, env: 'cave' } },
+  { id: 'blaze', name: 'Burning building, loop', p: { kind: 'fire', fiMode: 'blaze', fiSize: 8, fiDist: 15, env: 'urban' } },
+  { id: 'furnace', name: 'Gas furnace, loop', p: { kind: 'fire', fiMode: 'burner', fiSize: 0.15, fiWind: 0, fiDist: 1.5, env: 'indoor' } },
+  { id: 'ignite', name: 'Brazier ignites', p: { kind: 'fire', fiMode: 'ignite', fiSize: 0.5, fiDist: 3, env: 'indoor' } },
+  { id: 'fireball', name: 'Fuel cloud ignites', p: { kind: 'fire', fiMode: 'ignite', fiSize: 3, fiDist: 15, env: 'field' } }
 ];
 var ACTION_DEFAULTS = { slowmo: 1, punch: 0, weight: 0, drive: 0, bite: 0, tail: 0, swell: 0, width: 0, loud: 0 };
 var ACTION_PRESETS = [
@@ -3133,6 +4468,6 @@ function merge(base, over) { var o = {}, k; for (k in base) o[k] = base[k]; for 
 root.BFX = { qrCode: qrCode, qrSvg: qrSvg, packPlan: packPlan, unpackPlan: unpackPlan, setAsset: setAsset, getAsset: getAsset, removeAsset: removeAsset, xmpText: xmpText, ixmlText: ixmlText, keywordPaths: keywordPaths, getIR: getIR, detectHits: detectHits, getHits: getHits, measureModes: measureModes, getModes: getModes,
   getGrains: getGrains, features: features, distance: distance, matchScore: matchScore, posToVal: posToVal, monoOf: monoOf, BAND_HZ: BAND_HZ, MAX_TRIGGERS: MAX_TRIGGERS, FIT_TRIES: FIT_TRIES, triggered: triggered, prepareIR: prepareIR, fftConvolve: fftConvolve, bodyIR: bodyIR, roomIR: roomIR,
   EXAMPLES: EXAMPLES, REC_MAX_S: REC_MAX_S, IR_MAX_S: IR_MAX_S, renderStems: renderStems, zipFiles: zipFiles, encodeWavFloat: encodeWavFloat, PLATES: PLATES, FF_RATIOS: FF_RATIOS, isLoop: isLoop, LOOP_S: LOOP_S, FRAG_BOOST_DB: FRAG_BOOST_DB, DEBRIS_BOOST_DB: DEBRIS_BOOST_DB, job: job, FS: FS, C: C, TRAJ_HZ: TRAJ_HZ, analyze: analyze, analyzeProj: analyzeProj, posAt: posAt, DS: DS, renderRaw: renderRaw, actionize: actionize, fft: fft,
-  encodeWav: encodeWav, zipStore: zipStore, peakOf: peakOf, ENVS: ENVS, MATERIALS: MATERIALS, DEFAULTS: DEFAULTS, PRESETS: PRESETS,
+  encodeWav: encodeWav, zipStore: zipStore, peakOf: peakOf, ENVS: ENVS, MATERIALS: MATERIALS, LIQUIDS: LIQUIDS, QUENCH: QUENCH, MECH_MATS: MECH_MATS, GROUNDS: GROUNDS, FEET: FEET, CALLS: CALLS, HANDS: HANDS, _crumple: crumple, FIRES: FIRES, DEFAULTS: DEFAULTS, PRESETS: PRESETS,
   ACTION_DEFAULTS: ACTION_DEFAULTS, ACTION_PRESETS: ACTION_PRESETS, merge: merge, _wake: wakeLayer, _modal: modalHit, rng: rng };
 })(typeof self !== 'undefined' ? self : globalThis);

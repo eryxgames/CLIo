@@ -359,7 +359,7 @@ class CEngineTests(unittest.TestCase):
 
     def test_it_renders_without_node(self):
         a = audio(sets={"b": {"pistol": SHOT, "rail": {"ballistic": "railgun", "p": {"D": 30}, "length": 0.8},
-                              "rotor": {"ballistic": "quadpass", "length": 0.5}}}, sounds={"rotor": CHIP}, env=self.env())
+                              "rec": {"ballistic": "carpass", "length": 0.5}}}, sounds={"rec": CHIP}, env=self.env())
         a.set_sound_set("b")
         self.assertTrue(a.sfx("pistol"))
         path = a.backend.log[-1][1]
@@ -370,7 +370,7 @@ class CEngineTests(unittest.TestCase):
         self.assertAlmostEqual(peak, 0.5 * a.sfx_volume, delta=0.01)
         self.assertTrue(a.sfx("rail"))
         self.assertEqual(a.ballistic.rendered_c, 2)
-        a.sfx("rotor")                                            # a kind the C engine has not yet: the game's own
+        a.sfx("rec")                                  # a kind the C engine cannot render (a recording): the game's own
         self.assertFalse(os.path.basename(a.backend.log[-1][1]).startswith("ballistic-"))
         status = " ".join(a.status())
         self.assertIn("C engine", status)
@@ -422,7 +422,8 @@ class CEngineTests(unittest.TestCase):
         self.assertEqual(CLIB.call({"preset": "pistol", "action": "loudest", "out": where})["error"],
                          'Ballistic has no action preset called "loudest"')
         self.assertTrue(CLIB.supports({"preset": "railgun", "p": {"D": 3}}))
-        self.assertFalse(CLIB.supports({"preset": "quadpass"}))
+        self.assertTrue(CLIB.supports({"preset": "quadpass"}))
+        self.assertFalse(CLIB.supports({"preset": "carpass"}))
         self.assertFalse(CLIB.supports({"preset": "knockfire"}))  # needs a recording
 
 

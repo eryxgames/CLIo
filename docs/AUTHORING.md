@@ -649,7 +649,8 @@ sweeps the hiss. Songs that use none of this sound exactly as they did.
 Sound effects are played by name (`{"sfx": "unlock"}`). Built in: `select back error save
 step door airlock locked unlock pickup drop open use craft read computer power teleport
 secret coin quest quest_done levelup heal trap alarm encounter hit crit miss hurt guard
-focus special flee enemy_down win lose explosion`. Add or replace them in `sounds.json`:
+focus special flee enemy_down win lose explosion`. A level also plays `footstep` at every step, which is
+silent unless the game or its sound set defines it. Add or replace them in `sounds.json`:
 
 ```json
 "zap": {"wave": "saw", "freq": [900, 120], "dur": 0.2, "vol": 0.4},

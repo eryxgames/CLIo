@@ -1,12 +1,13 @@
 # Ballistic's sound engine in CLIo
 
-Sound effects modelled from physics: shots, ricochets, blasts, impacts, arcs, energy fields. They come from
+Sound effects modelled from physics: shots, ricochets, blasts, impacts, arcs, energy fields, and the sounds of a game's
+world: liquids, doors and machines, heat, fire, footsteps, creature and robot voices, things picked up and dropped. They come from
 [Ballistic Foley Lab](https://github.com/eigensoundlab/ballistic), by the same author and under the same licence
 (Apache-2.0).
 
 | File | What it is |
 | --- | --- |
-| `engine.js` | A copy of Ballistic's `src/engine.js`, unchanged: version 0.1.0, commit `45a3f91` (2026-11-16) |
+| `engine.js` | A copy of Ballistic's `src/engine.js`, unchanged: version 0.1.0, commit `3603078` (2026-11-19) |
 | `render.cjs` | Runs the engine in Node.js: a request per line in, an answer per line out, a WAV per take |
 | `__init__.py` | The Python side: which takes are ready, which to play next, rendering in the background, baking |
 

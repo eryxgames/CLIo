@@ -46,7 +46,7 @@ BAKED = "baked.json"
 BAKED_FORMAT = "clio-ballistic-baked"
 RENDER_TIMEOUT = 30.0           # seconds one take may take before Node is thought stuck
 MAX_CRASHES = 3                 # Node is started again after it stops on its own, this many times
-ENGINE_COMMIT = "45a3f91"       # the Ballistic commit engine.js is a copy of; the C engine must follow the same
+ENGINE_COMMIT = "3603078"       # the Ballistic commit engine.js is a copy of; the C engine must follow the same
 
 _known = None
 _engine_id = None

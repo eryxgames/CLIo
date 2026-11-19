@@ -701,6 +701,7 @@ class Level:
             return False
         ox, oy = p.x, p.y
         p.x, p.y = nx, ny
+        self.sfx("footstep")                    # silent unless the game or its sound set has a footstep
         self.anim([FX(cam=(ox + (nx - ox) * ease(i / 4.0), oy + (ny - oy) * ease(i / 4.0))) for i in range(1, 5)],
                   0.03)
         self.update_seen()

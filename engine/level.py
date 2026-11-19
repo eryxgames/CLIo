@@ -1,0 +1,1924 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
+"""First-person levels: a grid you walk through, seen through the player's eyes.
+
+A scene can hold a level (``"level": "e1m1"`` in scenes.json).  Entering it
+hands the screen to the level until the player leaves by its exit, dies or
+quits; then the story goes on (``"on_level_exit"`` effects).  Levels live in
+``levels.json``, their monsters in ``monsters.json``, pick-ups are ordinary
+items with a ``"pickup"`` block, and the weapons and the player's start are in
+game.json under ``"first_person"``.  docs/AUTHORING.md has the whole format.
+
+Time moves in beats, as in a turn-based game: a step, a shot or a wait is one
+beat, and then everything else moves.  Turning to look round is free.  On a
+real terminal the level is drawn in frame mode (:mod:`engine.frame`,
+:mod:`engine.firstperson`) and keys act at once; piped, or with ``--scroll``,
+it is played in scrolling text with a small map, so it can be tested and
+played anywhere.
+
+Commands are typed as in a shell: ``a; b`` (a, then b), ``a && b`` (b only if
+a hit or moved), ``a || b`` (b only if a missed or was blocked), ``!!``,
+``!3``, ``!f``, ``alias``; a surprise - a hit, a monster appearing, fire coming
+- stops a line as ^C would.
+"""
+from __future__ import annotations
+
+import contextlib
+import copy
+import random
+import re
+import time
+
+from . import conditions
+from . import firstperson as fp
+from .firstperson import DIRS, FX, Picture, View, slide
+
+FACING = {"n": 0, "north": 0, "e": 1, "east": 1, "s": 2, "south": 2, "w": 3, "west": 3}
+FACE_NAMES = ("north", "east", "south", "west")
+
+# what the characters of a map mean, unless a level's "legend" says otherwise
+LEGEND = {
+    "#": {"wall": "steel"}, "%": {"wall": "screens"}, "=": {"wall": "hazard"}, " ": {"wall": "steel"},
+    ".": {}, "~": {"toxic": True}, "@": {"start": True},
+    "+": {"door": True}, "R": {"door": True, "key": "r"}, "W": {"door": True, "key": "w"},
+    "X": {"door": True, "key": "x"},
+    "S": {"panel": "fist"}, "P": {"panel": "shoot"}, "E": {"exit": True},
+}
+
+KEYMAP = {
+    "up": "k", "down": "j", "left": "turn left", "right": "turn right",
+    "ctrl-left": "h", "ctrl-right": "l", "alt-left": "h", "alt-right": "l",
+    "shift-left": "h", "shift-right": "l", ",": "h", ".": "l", "<": "turn left", ">": "turn right",
+    "home": "h", "pgup": "l", "end": "turn around", "pgdn": "use",
+    "space": "f", "insert": "f", "enter": "use", "tab": "map", "center": "w", "delete": "w",
+    "1": "1", "2": "2", "3": "3", "4": "4", "5": "5", "6": "6", "7": "7",
+    "?": "help", "f1": "help",
+}
+
+WEAPONS = {
+    "1": {"name": "fist", "ammo": None, "sprite": "w_fist", "sound": "punch", "kind": "melee", "damage": [6, 14]},
+    "2": {"name": "pistol", "ammo": "bullets", "sprite": "w_pistol", "sound": "pistol", "damage": [8, 14]},
+    "3": {"name": "shotgun", "ammo": "shells", "sprite": "w_shotgun", "sound": "shotgun", "damage": [5, 9],
+          "pellets": 7, "spread": 0.35},
+    "4": {"name": "chaingun", "ammo": "bullets", "sprite": "w_chaingun", "sound": "chaingun", "damage": [7, 12],
+          "burst": 2},
+}
+ACCURACY = (1.0, 0.95, 0.9, 0.82, 0.72, 0.62, 0.52, 0.44, 0.38)   # by distance in cells
+PELLET = (1.0, 1.0, 0.85, 0.6, 0.42, 0.3, 0.22, 0.16, 0.12)
+
+HELP = [
+    ("↑ ↓  step forward, back      ← →  turn", "text"),
+    ("Ctrl+← →  or  , .  strafe     space  fire", "text"),
+    ("Enter  open, press   Tab  map   1-4  weapons", "text"),
+    ("", "text"),
+    ("Typed: k j h l, turn left/right/around, use,", "dim"),
+    ("f [x], kill [-9] x, t x, w [n], map, ps, man x,", "dim"),
+    ("history, alias n='...', keys, whoami, q", "dim"),
+    ("a; b   a && b   a || b   !!  !3  !f   as in a shell", "dim"),
+    ("A surprise stops a line, as ^C would.", "dim"),
+]
+
+STATE_MARK = {"aim": "!", "windup": "!", "charge": "»"}
+STATE_ROLE = {"aim": "aim", "windup": "wind", "charge": "charge"}
+
+
+class StopLine(Exception):
+    """An unknown command ends the rest of the line, as an error would in a script."""
+
+
+# --------------------------------------------------------------------------- #
+# the map
+# --------------------------------------------------------------------------- #
+class Cell:
+    __slots__ = ("x", "y", "ch", "kind", "tex", "key", "panel", "toxic", "open", "opens_on", "closes_on",
+                 "on_enter", "sealed", "pressed", "label", "label_role", "secret", "found")
+
+    def __init__(self, x, y, ch, spec):
+        self.x, self.y, self.ch = x, y, ch
+        self.tex = spec.get("wall") or spec.get("texture") or "steel"
+        self.key = spec.get("key")
+        self.panel = spec.get("panel")
+        self.toxic = bool(spec.get("toxic"))
+        self.opens_on = spec.get("opens_on")
+        self.closes_on = spec.get("closes_on")
+        self.on_enter = spec.get("on_enter")
+        self.sealed = bool(spec.get("sealed")) or bool(spec.get("door") and spec.get("opens_on") and not spec.get("key"))
+        self.pressed = False
+        self.secret = bool(spec.get("secret")) or bool(self.panel)
+        self.found = False
+        self.open = 0.0
+        if spec.get("exit"):
+            self.kind = "exit"
+        elif spec.get("door"):
+            self.kind = "door"
+            self.open = 1.0 if spec.get("open") else 0.0
+        elif self.panel:
+            self.kind = "panel"
+        elif spec.get("wall") or (spec.get("opens_on") and not spec.get("door")):
+            self.kind = "wall"
+        else:
+            self.kind = "floor"
+        self.label, self.label_role = None, None
+        if self.kind == "door" and self.key:
+            self.label = "".join(b if b == self.key else "-" for b in "rwx")
+            self.label_role = "key_" + self.key
+        elif self.kind == "exit":
+            self.label, self.label_role = "EXIT", "good"
+
+    @property
+    def solid(self):
+        if self.kind == "door":
+            return self.open < 1.0
+        return self.kind in ("wall", "panel", "exit")
+
+    def drawn_as_wall(self, opened=None):
+        if self.kind == "door":
+            return (self.open if opened is None else opened) < 1.0
+        return self.kind in ("wall", "panel", "exit")
+
+    def texture(self):
+        if self.kind == "door":
+            if self.sealed:
+                return "sealed"
+            return "door_" + self.key if self.key else "door"
+        if self.kind == "panel":
+            return self.panel if self.panel in ("fist", "shoot") else "steel"
+        if self.kind == "exit":
+            return "exit_on" if self.pressed else "exit"
+        return self.tex
+
+
+VOID = Cell(-1, -1, " ", {"wall": "steel"})
+
+
+class Monster:
+    def __init__(self, mid, kind, spec, x, y, tag):
+        self.id, self.kind, self.spec = mid, kind, spec
+        self.x, self.y, self.tag = x, y, tag
+        self.hp = self.max_hp = int(spec.get("hp", 20))
+        self.sprite = spec.get("sprite") or kind
+        self.size = float(spec.get("size", 1.0))
+        self.float = float(spec.get("float", 0.0))
+        self.attack = spec.get("attack") or {}
+        self.awake = bool(spec.get("awake"))
+        self.wake_on = None
+        self.intent = None
+        self.cool = 0
+        self.grudge = None
+        self.dead = False
+        self.gone = False            # left the level alive (an escape)
+        self.seen = False
+        self.targeted = False
+        self.owner = None            # the monster that made this one
+        self.clock = 0
+        self.enraged = False
+        self.barrel = spec.get("kind") == "barrel" or self.attack.get("kind") == "barrel"
+
+    @property
+    def name(self):
+        return self.spec.get("name", self.kind)
+
+    def label(self):
+        mark = STATE_MARK.get(self.intent, "")
+        role = STATE_ROLE.get(self.intent, "dim" if self.barrel else "boss" if self.spec.get("boss") else "tag")
+        if self.grudge is not None:
+            role = "alert"
+        return self.tag + mark, role
+
+
+class Item:
+    def __init__(self, iid, spec, x, y):
+        self.iid, self.spec, self.x, self.y = iid, spec, x, y
+        self.pickup = spec.get("pickup") or {}
+        self.sprite = self.pickup.get("sprite") or spec.get("sprite") or iid
+        self.size = float(self.pickup.get("size", 0.55))
+        self.taken = False
+        self.on_pickup = None
+
+
+class Shot:
+    def __init__(self, path, owner, damage, speed=1):
+        self.path, self.owner, self.damage, self.speed = path, owner, damage, speed
+        self.i = 0
+        self.x, self.y = path[0] if path else (0, 0)
+
+
+class Player:
+    def __init__(self, state, cfg):
+        start = dict(cfg.get("start") or {})
+        start.update(state or {})
+        self.x = self.y = 0
+        self.facing = 0
+        self.hp = int(start.get("health", 100))
+        self.max_hp = int(start.get("max_health", 100))
+        self.armor = int(start.get("armor", 0))
+        self.weapons = [str(w) for w in start.get("weapons", ["1", "2"])]
+        self.weapon = str(start.get("weapon", self.weapons[-1] if self.weapons else "1"))
+        self.ammo = dict(start.get("ammo") or {"bullets": 50, "shells": 0})
+        self.max_ammo = dict(start.get("max_ammo") or {"bullets": 200, "shells": 50})
+        self.keys = set()
+        self.sudo = 0
+
+    def keep(self):
+        """What goes on to the next level (keys do not)."""
+        return {"health": self.hp, "max_health": self.max_hp, "armor": self.armor, "weapons": self.weapons,
+                "weapon": self.weapon, "ammo": dict(self.ammo), "max_ammo": dict(self.max_ammo)}
+
+
+def bresenham(x0, y0, x1, y1):
+    cells = []
+    dx, dy = abs(x1 - x0), -abs(y1 - y0)
+    sx, sy = (1 if x0 < x1 else -1), (1 if y0 < y1 else -1)
+    err = dx + dy
+    while True:
+        cells.append((x0, y0))
+        if x0 == x1 and y0 == y1:
+            return cells
+        e2 = 2 * err
+        if e2 >= dy:
+            err += dy
+            x0 += sx
+        if e2 <= dx:
+            err += dx
+            y0 += sy
+
+
+def ease(k):
+    return k * k * (3 - 2 * k)
+
+
+# --------------------------------------------------------------------------- #
+# the level
+# --------------------------------------------------------------------------- #
+class Level:
+    def __init__(self, data, level_id, audio=None, seed=None, player=None):
+        spec = (data.levels or {}).get(level_id)
+        if not isinstance(spec, dict):
+            raise ValueError("there is no level '%s'" % level_id)
+        self.data, self.id, self.spec = data, level_id, spec
+        self.cfg = data.config.get("first_person") or {}
+        self.audio = audio
+        self.rng = random.Random(seed if seed is not None else level_id)
+        self.name = spec.get("name", level_id)
+        self.par = int(spec.get("par", 0))
+        self.weapons = {str(k): v for k, v in (self.cfg.get("weapons") or WEAPONS).items()}
+        self.player = Player(player, self.cfg)
+        self.monsters, self.items, self.shots, self.decals = [], [], [], []
+        self.marks, self.marks_version = {}, 0
+        self.log = []
+        self.beat = 0
+        self.over = None
+        self.interrupt = None
+        self.history, self.last_line = [], ""
+        self.aliases = {"dodge": "h || l"}
+        self.target = None
+        self.seen_cells = set()
+        self.events = set()
+        self.noise_at = None
+        self.stats = {"kills": 0, "items": 0, "secrets": 0, "taken": 0, "fired": 0, "hits": 0}
+        self.boss = None
+        self.console = None
+        self.sprites = {}
+        self._tags = {}
+        self._ids = 0
+        self.parse_map()
+        self.load_sprites()
+        self.update_seen()
+
+    # ---- building ------------------------------------------------------- #
+    def parse_map(self):
+        legend = dict(LEGEND)
+        legend.update(self.spec.get("legend") or {})
+        rows = [str(r) for r in self.spec.get("map") or []]
+        self.h = len(rows)
+        self.w = max((len(r) for r in rows), default=0)
+        self.grid = []
+        start = None
+        for y in range(self.h):
+            line = []
+            for x in range(self.w):
+                ch = rows[y][x] if x < len(rows[y]) else " "
+                spec = legend.get(ch)
+                if spec is None:
+                    spec = {}
+                if isinstance(spec, str):
+                    spec = {"monster": spec} if spec in (self.data.monsters or {}) else {"item": spec}
+                cell = Cell(x, y, ch, {k: v for k, v in spec.items() if k not in ("monster", "item")})
+                line.append(cell)
+                if spec.get("start"):
+                    start = (x, y)
+                if spec.get("monster"):
+                    m = self.add_monster(spec["monster"], x, y)
+                    if m is not None:
+                        m.wake_on = spec.get("wake_on")
+                        if spec.get("awake"):
+                            m.awake = True
+                if spec.get("item"):
+                    it = self.add_item(spec["item"], x, y)
+                    if it is not None:
+                        it.on_pickup = spec.get("on_pickup")
+            self.grid.append(line)
+        if start is None:
+            start = next(((c.x, c.y) for row in self.grid for c in row if not c.solid), (1, 1))
+        self.player.x, self.player.y = start
+        self.player.facing = FACING.get(str(self.spec.get("facing", "n")).lower(), 0)
+        # number the tags in the order a player meets them: z1 is the nearest zombie
+        far = self.distances(*start, limit=400)
+        counts = {}
+        for m in sorted(self.monsters, key=lambda m: (far.get((m.x, m.y), 999), m.y, m.x)):
+            letter = m.tag.rstrip("0123456789")
+            counts[letter] = counts.get(letter, 0) + 1
+            m.tag = "%s%d" % (letter, counts[letter])
+        self.total_kills = sum(1 for m in self.monsters if not m.barrel and not m.spec.get("boss"))
+        self.total_items = len(self.items)
+        self.total_secrets = sum(1 for row in self.grid for c in row if c.secret)
+
+    def add_monster(self, kind, x, y):
+        spec = (self.data.monsters or {}).get(kind)
+        if not isinstance(spec, dict):
+            return None
+        letter = spec.get("tag") or kind[0]
+        self._tags[letter] = self._tags.get(letter, 0) + 1
+        self._ids += 1
+        m = Monster(self._ids, kind, spec, x, y, "%s%d" % (letter, self._tags[letter]))
+        if m.spec.get("boss") and self.boss is None:
+            self.boss = m
+        self.monsters.append(m)
+        return m
+
+    def add_item(self, iid, x, y):
+        spec = (self.data.items or {}).get(iid)
+        if not isinstance(spec, dict):
+            return None
+        it = Item(iid, spec, x, y)
+        self.items.append(it)
+        return it
+
+    def load_sprites(self):
+        from .sprite import _rgb, far_versions
+        names = {m.sprite for m in self.monsters} | {it.sprite for it in self.items}
+        names |= {w.get("sprite") for w in self.weapons.values()} | {"fireball", "muzzle", "gore"}
+        names |= {(m.spec.get("attack") or {}).get("spawn") for m in self.monsters}
+        for kind in list(names):
+            spec = (self.data.monsters or {}).get(kind)
+            if isinstance(spec, dict):
+                names.add(spec.get("sprite") or kind)
+        for name in names:
+            if not name:
+                continue
+            data = (self.data.sprites or {}).get(name)
+            if not isinstance(data, dict) or not data.get("pixels"):
+                continue
+            pal = {k: _rgb(v) for k, v in (data.get("palette") or {}).items()}
+            far = None if data.get("lod") else far_versions(data["pixels"], data.get("keep", ""))
+            self.sprites[name] = Picture.from_data(data, pal, far)
+
+    # ---- the grid ------------------------------------------------------- #
+    def cell(self, x, y):
+        if 0 <= y < self.h and 0 <= x < self.w:
+            return self.grid[y][x]
+        return VOID
+
+    def monster_at(self, x, y, skip=None):
+        for m in self.monsters:
+            if not m.dead and not m.gone and m.x == x and m.y == y and m is not skip:
+                return m
+        return None
+
+    def passable(self, x, y):
+        c = self.cell(x, y)
+        return not c.solid
+
+    def free(self, x, y, skip=None):
+        p = self.player
+        return self.passable(x, y) and not self.monster_at(x, y, skip) and (x, y) != (p.x, p.y)
+
+    def line_of_sight(self, x0, y0, x1, y1):
+        for (x, y) in bresenham(x0, y0, x1, y1)[1:-1]:
+            if self.cell(x, y).solid:
+                return False
+        return True
+
+    def rel(self, x, y):
+        """(sideways, ahead) of a cell from where the player stands and looks."""
+        p = self.player
+        fx, fy = DIRS[p.facing]
+        rx, ry = DIRS[(p.facing + 1) % 4]
+        dx, dy = x - p.x, y - p.y
+        return dx * rx + dy * ry, dx * fx + dy * fy
+
+    def dist(self, m):
+        return max(abs(m.x - self.player.x), abs(m.y - self.player.y))
+
+    def in_view(self, x, y):
+        a, z = self.rel(x, y)
+        return 1 <= z <= fp.FAR and abs(a) <= z + 0.5
+
+    def update_seen(self):
+        p = self.player
+        for m in self.monsters:
+            m.seen = (not m.dead and not m.gone and self.in_view(m.x, m.y)
+                      and self.line_of_sight(p.x, p.y, m.x, m.y))
+            m.targeted = m is self.target
+        R = fp.FAR
+        for y in range(p.y - R, p.y + R + 1):
+            for x in range(p.x - R, p.x + R + 1):
+                a, z = self.rel(x, y)
+                if (z >= 0 and abs(a) <= z + 1) or max(abs(x - p.x), abs(y - p.y)) <= 1:
+                    if self.line_of_sight(p.x, p.y, x, y):
+                        self.seen_cells.add((x, y))
+
+    def visible(self):
+        return sorted([m for m in self.monsters if m.seen and not m.dead and not m.gone],
+                      key=lambda m: (self.dist(m), abs(self.rel(m.x, m.y)[0])))
+
+    def distances(self, x0, y0, limit=40):
+        """Steps to (x0, y0) from every cell that can walk there (monsters do not block)."""
+        dist = {(x0, y0): 0}
+        frontier = [(x0, y0)]
+        while frontier:
+            nxt = []
+            for (x, y) in frontier:
+                d = dist[(x, y)]
+                if d >= limit:
+                    continue
+                for dx, dy in DIRS:
+                    n = (x + dx, y + dy)
+                    if n not in dist and self.passable(*n):
+                        dist[n] = d + 1
+                        nxt.append(n)
+            frontier = nxt
+        return dist
+
+    # ---- talking ---------------------------------------------------------- #
+    def say(self, text, role="text"):
+        self.log = (self.log + [(text, role)])[-40:]
+        if self.console is not None:
+            self.console.said(text, role)
+
+    def sfx(self, name):
+        if self.audio is not None and name:
+            try:
+                self.audio.sfx(name)
+            except Exception:
+                pass
+
+    def music(self, track):
+        if self.audio is not None and track:
+            try:
+                self.audio.music(track)
+            except Exception:
+                pass
+
+    def anim(self, frames, dt=0.05):
+        if self.console is not None:
+            self.console.play(self, frames, dt)
+
+    def weapon_sprite(self):
+        return (self.weapons.get(self.player.weapon) or {}).get("sprite")
+
+    # ---- playing ---------------------------------------------------------- #
+    def run(self, console):
+        """Play until the exit, death or quitting: "exit", "dead" or "quit"."""
+        self.console = console
+        console.start()
+        try:
+            self.music(self.spec.get("music"))
+            console.page(self, self.intro_lines())
+            while not self.over:
+                line = console.read(self)
+                if line is None:
+                    self.over = "quit"
+                    break
+                with console.busy():
+                    self.run_line(line)
+            if self.over in ("exit", "dead"):
+                console.ending(self)
+                console.page(self, self.end_lines())
+        except KeyboardInterrupt:
+            self.over = self.over or "quit"
+        finally:
+            console.stop()
+        return self.over
+
+    def intro_lines(self):
+        lines = [(self.spec.get("title") or self.name.upper(), "title")]
+        for t in self.spec.get("intro") or []:
+            lines.append((t, "dim"))
+        lines.append(("", "text"))
+        lines += HELP[:3]
+        if self.par:
+            lines += [("", "text"), ("par %d beats" % self.par, "dim")]
+        return lines
+
+    def end_lines(self):
+        s = self.stats
+        def pct(a, b):
+            return "%d%%" % (100 * a // b) if b else "-"
+        if self.over == "dead":
+            head = [("Process terminated.", "hurt"), ("exit status 137 (SIGKILL)", "dim")]
+        else:
+            head = [(self.name.upper() + "  FINISHED", "good")]
+        lines = head + [("", "text"),
+                        ("kills      %s   (%d of %d)" % (pct(s["kills"], self.total_kills), s["kills"], self.total_kills), "text"),
+                        ("items      %s" % pct(s["items"], self.total_items), "text"),
+                        ("secrets    %s   (%d of %d)" % (pct(s["secrets"], self.total_secrets), s["secrets"],
+                                                         self.total_secrets), "secret" if s["secrets"] else "text"),
+                        ("beats      %d%s" % (self.beat, ("   par %d" % self.par) if self.par else ""),
+                         "hit" if self.par and self.beat <= self.par and self.over == "exit" else "text")]
+        if self.boss is not None and self.boss.gone:
+            lines += [("", "text"), (self.spec.get("boss_escaped_line", "%s got away." % self.boss.name), "boss")]
+        return lines
+
+    # ---- a typed line: commands joined like a shell's -------------------- #
+    def run_line(self, line):
+        line = (line or "").strip()
+        if not line:
+            return
+        m = re.fullmatch(r"!(\d+|[a-z][\w ]*)", line)
+        if m:
+            key = m.group(1)
+            found = (self.history[int(key) - 1] if key.isdigit() and 0 < int(key) <= len(self.history)
+                     else next((h for h in reversed(self.history) if h.startswith(key)), None))
+            if found is None:
+                self.say("rootless: !%s: event not found" % key, "dim")
+                return
+            line = found
+        if "!!" in line:
+            if not self.last_line:
+                self.say("!!: event not found", "dim")
+                return
+            line = line.replace("!!", self.last_line)
+        self.last_line = line
+        self.history = (self.history + [line])[-50:]
+        if re.match(r"(un)?alias\b", line):
+            self.alias(line)
+            return
+        parts = re.split(r"\s*(;|&&|\|\|)\s*", self.expand(line))
+        ok, op, first = True, ";", True
+        self.interrupt = None
+        for i, tok in enumerate(parts):
+            if i % 2:
+                op = tok
+                continue
+            if not tok or (op == "&&" and not ok) or (op == "||" and ok):
+                continue
+            if self.over:
+                return
+            if not first and self.interrupt:
+                self.say("^C  %s" % self.interrupt, "alert")
+                return
+            try:
+                ok = self.command(tok)
+            except StopLine:
+                return
+            first = False
+
+    def expand(self, line, depth=0):
+        out = []
+        for part in re.split(r"(\s*(?:;|&&|\|\|)\s*)", line):
+            words = part.split()
+            if words and words[0] in self.aliases and depth < 5:
+                out.append(self.expand(" ".join([self.aliases[words[0]]] + words[1:]), depth + 1))
+            else:
+                out.append(part)
+        return "".join(out)
+
+    def alias(self, line):
+        m = re.fullmatch(r"alias\s+([a-z][\w-]*)=(['\"]?)(.+)\2", line)
+        if m:
+            self.aliases[m.group(1)] = m.group(3).strip()
+            self.say("alias %s='%s'" % (m.group(1), m.group(3).strip()), "info")
+        elif re.fullmatch(r"unalias\s+\S+", line):
+            self.aliases.pop(line.split()[1], None)
+        elif line.strip() == "alias":
+            self.console.page(self, [("alias %s='%s'" % kv, "text") for kv in sorted(self.aliases.items())]
+                              or [("no aliases", "dim")])
+        else:
+            self.say("usage: alias name='line'", "dim")
+
+    def command(self, tok):
+        t = " ".join(tok.strip().lower().split())
+        moves = {"k": (0, 1), "forward": (0, 1), "fwd": (0, 1), "j": (0, -1), "back": (0, -1),
+                 "h": (-1, 0), "strafe left": (-1, 0), "l": (1, 0), "strafe right": (1, 0)}
+        if t in moves:
+            return self.step(*moves[t])
+        turns = {"turn left": -1, "tl": -1, "<": -1, "left": -1, "turn right": 1, "tr": 1, ">": 1, "right": 1,
+                 "turn around": 2, "ta": 2, "about": 2}
+        if t in turns:
+            return self.turn(turns[t])
+        if t in ("u", "use", "open", "press"):
+            return self.use()
+        if t in ("w", "wait", "."):
+            self.end_beat()
+            return True
+        m = re.fullmatch(r"(?:w|wait|sleep)\s+(\d+)", t)
+        if m:
+            return self.sleep(int(m.group(1)))
+        if t in self.weapons:
+            return self.switch(t)
+        m = re.fullmatch(r"(?:f|fire|shoot)\s*([a-z]\d*)?", t)
+        if m:
+            return self.fire(m.group(1))
+        m = re.fullmatch(r"kill(\s+-9)?(?:\s+([a-z]\d*))?", t)
+        if m:
+            if m.group(1) and self.player.weapon != "1" and "1" in self.weapons:
+                self.switch("1")
+            return self.fire(m.group(2))
+        m = re.fullmatch(r"(?:t|target)(?:\s+([a-z]\d*))?", t)
+        if m:
+            return self.set_target(m.group(1))
+        if t in ("map", "m"):
+            self.console.page(self, None, automap=True)
+            return True
+        if t == "ps":
+            self.console.page(self, self.ps_lines())
+            return True
+        m = re.fullmatch(r"man(?:\s+(\S+))?", t)
+        if m:
+            self.console.page(self, self.man_lines(m.group(1)))
+            return True
+        if t == "history":
+            self.console.page(self, [("%3d  %s" % (i + 1, h), "text") for i, h in enumerate(self.history)][-14:])
+            return True
+        if t == "keys":
+            km = self.console.keymap if getattr(self.console, "keys", None) else None
+            self.console.page(self, [("%-12s %s" % kv, "text") for kv in sorted(km.items())] if km
+                              else [("No single keys here: type the commands.", "dim")])
+            return True
+        if t == "whoami":
+            self.say("rootless   (uid 1000; root was revoked)" if not self.player.sudo else "root   (for now)", "dim")
+            return True
+        if t.startswith("sudo"):
+            if self.player.sudo:
+                self.say("You are root for %d more beats." % self.player.sudo, "root")
+            else:
+                self.say("rootless is not in the sudoers file. This incident will be reported.", "hurt")
+            return True
+        if t in ("?", "help"):
+            self.console.page(self, HELP)
+            return True
+        if t in ("q", "quit", "exit"):
+            self.over = "quit"
+            return True
+        self.say("rootless: %s: command not found" % tok.strip(), "hurt")
+        raise StopLine()
+
+    # ---- the player's actions --------------------------------------------- #
+    def turn(self, d):
+        p = self.player
+        old_cells = self.console.snapshot(self) if self.console else None
+        p.facing = (p.facing + d) % 4
+        self.update_seen()
+        if old_cells is not None:
+            self.console.turn(self, old_cells, -1 if d < 0 else 1)
+        return True
+
+    def step(self, side, ahead):
+        p = self.player
+        fx, fy = DIRS[p.facing]
+        rx, ry = DIRS[(p.facing + 1) % 4]
+        nx, ny = p.x + fx * ahead + rx * side, p.y + fy * ahead + ry * side
+        cell = self.cell(nx, ny)
+        if cell.solid:
+            if ahead > 0 and side == 0:
+                return self.use()
+            self.say("A wall." if cell.kind == "wall" else "Something is in the way.", "dim")
+            return False
+        m = self.monster_at(nx, ny)
+        if m is not None:
+            self.say("%s is in the way." % m.tag, "dim")
+            return False
+        ox, oy = p.x, p.y
+        p.x, p.y = nx, ny
+        self.anim([FX(cam=(ox + (nx - ox) * ease(i / 4.0), oy + (ny - oy) * ease(i / 4.0))) for i in range(1, 5)],
+                  0.03)
+        self.update_seen()
+        self.arrive()
+        self.end_beat()
+        return True
+
+    def arrive(self):
+        p = self.player
+        for it in self.items:
+            if not it.taken and (it.x, it.y) == (p.x, p.y):
+                self.take(it)
+        cell = self.cell(p.x, p.y)
+        if cell.on_enter and cell.on_enter not in self.events:
+            self.event(cell.on_enter)
+
+    def take(self, it):
+        p, pk = self.player, it.pickup
+        name = it.spec.get("name", it.iid)
+        if "health" in pk:
+            limit = int(pk.get("max", p.max_hp))
+            if p.hp >= limit:
+                self.say("You do not need the %s." % name, "dim")
+                return
+            p.hp = min(limit, p.hp + int(pk["health"]))
+        if "armor" in pk:
+            if p.armor >= int(pk["armor"]) and len(pk) <= 2:
+                self.say("Your armour is better than this %s." % name, "dim")
+                return
+            p.armor = max(p.armor, int(pk["armor"]))
+        if "ammo" in pk:
+            full = all(p.ammo.get(k, 0) >= p.max_ammo.get(k, 999) for k in pk["ammo"])
+            if full and len(pk) <= 2:
+                self.say("You cannot carry more.", "dim")
+                return
+            for k, n in pk["ammo"].items():
+                p.ammo[k] = min(p.max_ammo.get(k, 999), p.ammo.get(k, 0) + int(n))
+        if pk.get("key"):
+            p.keys.add(pk["key"])
+        if pk.get("weapon"):
+            wid = str(pk["weapon"])
+            if wid not in p.weapons:
+                p.weapons.append(wid)
+                p.weapons.sort()
+                p.weapon = wid
+        if pk.get("power") == "sudo":
+            p.sudo = int(pk.get("beats", 20))
+        it.taken = True
+        self.stats["items"] += 1
+        self.say(pk.get("text") or "You pick up the %s." % name, "root" if pk.get("power") else "good")
+        self.sfx(pk.get("sound") or ("special" if pk.get("weapon") or pk.get("power") else "pickup"))
+        if it.on_pickup:
+            self.event(it.on_pickup)
+
+    def ahead(self):
+        p = self.player
+        fx, fy = DIRS[p.facing]
+        return p.x + fx, p.y + fy
+
+    def use(self):
+        x, y = self.ahead()
+        cell = self.cell(x, y)
+        p = self.player
+        if cell.kind == "door" and cell.open < 1.0:
+            if cell.sealed:
+                self.say("Sealed. Something keeps it shut.", "dim")
+                self.sfx("locked")
+                return False
+            if cell.key and cell.key not in p.keys:
+                self.say("Permission denied: this door needs the %s key." % cell.label, "hurt")
+                self.sfx("locked")
+                return False
+            self.open_door(cell)
+            self.end_beat()
+            return True
+        if cell.kind == "exit":
+            if cell.pressed:
+                return False
+            cell.pressed = True
+            self.sfx("power")
+            self.say("You throw the switch.", "good")
+            self.anim([FX() for _ in range(6)], 0.08)
+            self.over = "exit"
+            return True
+        if cell.kind == "panel":
+            self.say("The wall sounds hollow here." if cell.panel == "fist" else "A vent, dented, as if shot at.", "dim")
+            return False
+        if cell.kind == "wall":
+            self.say("A wall.", "dim")
+            return False
+        self.say("Nothing to use here.", "dim")
+        return False
+
+    def open_door(self, cell):
+        self.sfx("door")
+        self.anim([FX(doors={(cell.x, cell.y): k}) for k in (0.2, 0.4, 0.6, 0.8, 0.95)], 0.04)
+        cell.open = 1.0
+        self.update_seen()
+
+    def open_panel(self, cell):
+        cell.kind = "floor"
+        cell.found = True
+        self.stats["secrets"] += 1
+        self.sfx("secret")
+        self.say("A secret is revealed!", "secret")
+        self.anim([FX(whiten=k) for k in (0.25, 0.12, 0.0)], 0.05)
+        self.update_seen()
+
+    def switch(self, wid):
+        p = self.player
+        w = self.weapons.get(wid)
+        if w is None or wid not in p.weapons:
+            self.say("You have no %s." % (w or {}).get("name", "weapon " + wid), "dim")
+            return False
+        if w.get("ammo") and p.ammo.get(w["ammo"], 0) <= 0:
+            self.say("No %s for the %s." % (w["ammo"], w["name"]), "dim")
+            return False
+        if p.weapon != wid:
+            p.weapon = wid
+            self.say("You ready the %s." % w["name"], "info")
+            self.anim([FX(recoil=4), FX(recoil=2), FX(recoil=1)], 0.04)
+        return True
+
+    def sleep(self, n):
+        for i in range(min(n, 9)):
+            if self.over:
+                break
+            if i and self.interrupt:
+                self.say("^C  %s" % self.interrupt, "alert")
+                break
+            self.end_beat()
+        return True
+
+    def cone(self):
+        """What a shot with no target goes for: everything in sight, the nearest and most central first.
+        (With only quarter turns, much is never straight ahead; the gun finds it anyway.)"""
+        return sorted([m for m in self.visible() if m.awake or not m.spec.get("boss")],
+                      key=lambda m: (self.dist(m) + abs(self.rel(m.x, m.y)[0]) * 0.5, m.id))
+
+    def set_target(self, tag=None):
+        vis = self.visible()
+        if not vis:
+            self.say("Nothing in sight.", "dim")
+            return False
+        if tag:
+            found = [m for m in vis if m.tag.lower() == tag] or [m for m in vis if len(tag) == 1 and m.tag[0].lower() == tag]
+            if not found:
+                self.say("rootless: %s: no such target in sight" % tag, "dim")
+                return False
+            self.target = found[0]
+        else:
+            i = vis.index(self.target) + 1 if self.target in vis else 0
+            self.target = vis[i % len(vis)]
+        self.update_seen()
+        m = self.target
+        self.say("Target: %s, %s, %d away." % (m.tag, m.name, self.dist(m)), "info")
+        return True
+
+    def fire(self, tag=None):
+        p, rng = self.player, self.rng
+        w = self.weapons.get(p.weapon) or WEAPONS["1"]
+        if w.get("ammo") and p.ammo.get(w["ammo"], 0) <= 0:
+            self.say("Click. No %s." % w["ammo"], "hurt")
+            return False
+        melee = w.get("kind") == "melee"
+        target = None
+        if tag:
+            vis = self.visible()
+            found = [m for m in vis if m.tag.lower() == tag] or [m for m in vis if len(tag) == 1 and m.tag[0].lower() == tag]
+            if not found:
+                self.say("rootless: %s: no such target in sight" % tag, "dim")
+                return False
+            target = min(found, key=self.dist)
+        elif self.target is not None and self.target.seen and not melee:
+            target = self.target
+        else:
+            cone = self.cone()
+            foes = [m for m in cone if not m.barrel]
+            far_barrels = [m for m in cone if m.barrel and self.dist(m) > 1     # never one at arm's length,
+                           and abs(self.rel(m.x, m.y)[0]) < 0.5]                 # only one straight ahead
+            target = (foes or far_barrels or [None])[0]
+        if melee:
+            ax, ay = self.ahead()
+            if target is None or (target.x, target.y) != (ax, ay):
+                target = self.monster_at(ax, ay)
+            if target is None:
+                cell = self.cell(ax, ay)
+                self.anim([FX(recoil=-2), FX(recoil=-3), FX(recoil=-1)], 0.04)
+                if cell.kind == "panel" and cell.panel == "fist":
+                    self.sfx(w.get("sound"))
+                    self.open_panel(cell)
+                    self.end_beat()
+                    return True
+                self.say("You punch the air." if not cell.solid else "Ow. That is a wall.", "dim")
+                self.end_beat()
+                return False
+        if w.get("ammo"):
+            p.ammo[w["ammo"]] = max(0, p.ammo[w["ammo"]] - int(w.get("burst", 1)))
+        self.stats["fired"] += 1
+        self.sfx(w.get("sound"))
+        self.anim([FX(recoil=-2), FX(recoil=-3), FX(recoil=-1)] if melee else
+                  [FX(muzzle=True, recoil=1), FX(muzzle=True, recoil=2), FX(recoil=1), FX()], 0.04)
+        if not melee:
+            self.noise(p.x, p.y)
+        if target is None:
+            self.shoot_straight(w)
+            self.after_shot(w)
+            self.end_beat()
+            return False
+        d = max(1, self.dist(target))
+        hits = {}
+        lo, hi = w.get("damage", [5, 10])
+        if melee:
+            if rng.random() < 0.85:
+                hits[target] = rng.randint(lo, hi) * (3 if w.get("berserk") else 1)
+        else:
+            for _ in range(int(w.get("burst", 1))):
+                for _ in range(int(w.get("pellets", 1))):
+                    acc = (PELLET if w.get("pellets", 1) > 1 else ACCURACY)[min(d, 8)]
+                    if rng.random() < acc:
+                        hits[target] = hits.get(target, 0) + rng.randint(lo, hi)
+                    elif d <= 2 and w.get("spread") and rng.random() < w["spread"]:
+                        near = [m for m in self.monsters if not m.dead and m is not target
+                                and abs(m.x - target.x) + abs(m.y - target.y) == 1]
+                        if near:
+                            m = rng.choice(near)
+                            hits[m] = hits.get(m, 0) + rng.randint(lo, hi)
+        if target in hits:
+            self.stats["hits"] += 1
+        if hits:
+            sound = w.get("text", {"melee": "THUD."}.get(w.get("kind"), "BLAM." if w.get("pellets", 1) > 1 else "BANG."))
+            self.damage(sorted(hits.items(), key=lambda kv: kv[0] is not target), lead=sound)
+        else:
+            self.say("You miss %s." % target.tag, "dim")
+        self.after_shot(w)
+        self.end_beat()
+        return target in hits
+
+    def after_shot(self, w):
+        p = self.player
+        if w.get("ammo") and p.ammo.get(w["ammo"], 0) <= 0:
+            self.say("Out of %s." % w["ammo"], "alert")
+            best = max([k for k in p.weapons if not (self.weapons.get(k) or {}).get("ammo")
+                        or p.ammo.get(self.weapons[k]["ammo"], 0) > 0] or ["1"])
+            self.switch(best)
+
+    def shoot_straight(self, w):
+        """A shot with nothing to aim at flies on until it meets a wall - maybe a hollow one."""
+        p = self.player
+        fx, fy = DIRS[p.facing]
+        x, y = p.x, p.y
+        for _ in range(fp.FAR + 2):
+            x, y = x + fx, y + fy
+            cell = self.cell(x, y)
+            if cell.solid:
+                if cell.kind == "panel" and cell.panel == "shoot":
+                    self.open_panel(cell)
+                else:
+                    self.say("Your shot hits the %s." % ("door" if cell.kind == "door" else "wall"), "dim")
+                return
+        self.say("You fire into the dark.", "dim")
+
+    # ---- damage ------------------------------------------------------------ #
+    def damage(self, hits, lead="", source=None):
+        hits = [(m, d) for m, d in hits if not m.dead and not m.gone]
+        if not hits:
+            return
+        turned = []
+        asleep = [m for m, _ in hits if m.spec.get("boss") and not m.awake]
+        if asleep:                                   # a boss's fight starts when the level says so
+            for m in asleep:
+                self.say((m.spec.get("asleep") or "%s does not notice. It is not time yet.") % m.name, "boss")
+            hits = [(m, d) for m, d in hits if m not in asleep]
+            if not hits:
+                return
+        for m, d in hits:
+            m.hp -= d
+            if not m.awake:
+                self.wake(m, quiet=True)
+            if (source is not None and not source.dead and m is not source and not m.barrel
+                    and m.hp > 0 and m.grudge is not source and not m.spec.get("boss")):
+                m.grudge = source
+                turned.append(m)
+        killed = [m for m, _ in hits if m.hp <= 0 and not (m.spec.get("boss") and m.spec.get("attack", {}).get("escape"))]
+        text = ", ".join("%s takes %d" % (m.tag, d) for m, d in hits)
+        self.say(("%s %s" % (lead, text)).strip(), "hit")
+        ids = tuple(m.id for m, _ in hits)
+        frames = [FX(flash=ids if i < 2 else (), texts=[(m, "-%d" % d, "hit", i) for m, d in hits]) for i in range(3)]
+        dying = [m for m in killed if not m.barrel]
+        for i, k in enumerate((0.25, 0.5, 0.75, 1.0) if dying else ()):
+            frames.append(FX(dissolve={m.id: k for m in dying}, tint={m.id: (150, 8, 8) for m in dying},
+                             texts=[(m, "-%d" % d, "hit", 3 + i) for m, d in hits]))
+        self.anim(frames, 0.05)
+        for m in turned:
+            self.say("%s turns on %s!" % (m.tag, source.tag), "alert")
+        for m in killed:
+            self.kill(m)
+        b = self.boss
+        if b is not None and not b.dead and not b.gone and any(m is b for m, _ in hits):
+            self.boss_hurt()
+
+    def kill(self, m):
+        if m.dead:
+            return
+        m.dead, m.intent = True, None
+        if self.target is m:
+            self.target = None
+        for o in self.monsters:
+            if o.grudge is m:
+                o.grudge = None
+        if m.barrel:
+            self.explode(m)
+            return
+        if not m.spec.get("boss"):
+            self.stats["kills"] += 1
+        gore = self.sprites.get(m.spec.get("remains", "gore"))
+        if gore is not None:
+            self.decals.append((m.x, m.y, gore))
+        self.say((m.spec.get("death") or "%s dies.") % m.tag, "good")
+        self.sfx((m.spec.get("sounds") or {}).get("death") or "enemy_down")
+        drop = m.spec.get("drops")
+        if drop and drop in (self.data.items or {}) and not any(i.x == m.x and i.y == m.y and not i.taken
+                                                                  for i in self.items):
+            it = self.add_item(drop, m.x, m.y)
+            if it is not None:
+                self.total_items += 1
+        self.update_seen()
+
+    def explode(self, b):
+        self.say("%s explodes!" % b.tag, "alert")
+        self.sfx("explosion")
+        self.anim([FX(booms=[(b.x, b.y, k)], shake=(1 if i % 2 else -1) if k < 0.5 else 0)
+                   for i, k in enumerate((0.0, 0.12, 0.25, 0.4, 0.55, 0.7, 0.85))], 0.045)
+        self.noise(b.x, b.y)
+        p = self.player
+        dmg = int((b.attack or {}).get("damage", 40)) if isinstance((b.attack or {}).get("damage"), int) else 40
+        victims = [(m, dmg) for m in self.monsters if not m.dead and not m.gone and m is not b
+                   and max(abs(m.x - b.x), abs(m.y - b.y)) <= 1]
+        if victims:
+            self.damage(victims, lead="The blast:")
+        if max(abs(p.x - b.x), abs(p.y - b.y)) <= 1 and not self.over:
+            self.hurt(int(dmg * 0.75), "The blast catches you.", by=b)
+
+    def hurt(self, dmg, text, by=None):
+        p = self.player
+        if p.sudo:
+            self.say(text + "  (root shrugs it off)", "root")
+            return
+        if p.armor:
+            saved = min(p.armor, dmg // 3)
+            p.armor -= saved
+            dmg -= saved
+        p.hp = max(0, p.hp - dmg)
+        self.stats["taken"] += dmg
+        self.say("%s  -%d" % (text, dmg), "hurt")
+        self.sfx("hurt")
+        where = None
+        if by is not None:
+            a, z = self.rel(by.x, by.y)
+            if not (z >= 1 and abs(a) <= z + 0.5):
+                where = "back" if z <= 0 and abs(a) <= abs(z) else ("left" if a < 0 else "right")
+        k = min(1.0, 0.25 + dmg / 36.0)
+        lunge = by is not None and self.dist(by) <= 1 and not by.barrel
+        self.anim([FX(hurt=h * k, hurt_dir=where, shake=s, lunge={by.id: 1.2} if lunge and h > 0.5 else {})
+                   for h, s in ((1.0, 1), (0.7, -1), (0.4, 1), (0.15, 0))], 0.05)
+        self.interrupt = self.interrupt or "you were hit"
+        if p.hp <= 0:
+            self.over = "dead"
+
+    # ---- waking ------------------------------------------------------------ #
+    def noise(self, x, y):
+        self.noise_at = (x, y)
+
+    def wake(self, m, quiet=False):
+        if m.awake or m.barrel:
+            return
+        m.awake = True
+        if not quiet and m.seen:
+            self.say("%s notices you." % m.tag, "alert")
+            self.interrupt = self.interrupt or "%s is awake" % m.tag
+        self.sfx((m.spec.get("sounds") or {}).get("sight"))
+        if m is self.boss:
+            self.boss_wakes()
+
+    def event(self, name):
+        if name in self.events:
+            return
+        self.events.add(name)
+        opened = closed = 0
+        for row in self.grid:
+            for c in row:
+                if c.closes_on == name and c.kind == "door" and c.open >= 1.0:
+                    c.open, c.sealed = 0.0, True
+                    closed += 1
+                if c.opens_on == name:
+                    if c.kind == "door":
+                        c.sealed = False
+                        c.open = 1.0
+                    else:
+                        c.kind = "floor"
+                    opened += 1
+        text = (self.spec.get("events") or {}).get(name)
+        if text:
+            self.say(text, "alert")
+        elif closed:
+            self.say("A door slams shut behind you.", "alert")
+        elif opened:
+            self.say("Somewhere, walls grind open.", "alert")
+        for m in self.monsters:
+            if m.wake_on == name and not m.dead:
+                self.wake(m, quiet=True)
+        if closed or opened:
+            self.sfx("door")
+            self.update_seen()
+            self.anim([FX(shake=s) for s in (1, -1, 0)], 0.05)
+        self.interrupt = self.interrupt or "something moved"
+
+    # ---- the world's beat -------------------------------------------------- #
+    def end_beat(self):
+        if self.over:
+            return
+        self.beat += 1
+        p = self.player
+        self.fly()
+        if self.over:
+            return
+        self.wake_up()
+        self.moved, self.queue = [], []
+        for m in list(self.monsters):
+            if not m.dead and not m.gone and m.awake and not m.barrel:
+                self.act(m)
+        if self.moved:
+            self.anim([FX(pos={m.id: (x0 + (m.x - x0) * ease(i / 3.0), y0 + (m.y - y0) * ease(i / 3.0))
+                               for m, x0, y0 in self.moved}) for i in range(1, 4)], 0.04)
+        for job in self.queue:
+            if self.over:
+                return
+            job()
+        if self.boss is not None and self.boss.awake and not self.boss.dead and not self.boss.gone:
+            self.boss_beat()
+        cell = self.cell(p.x, p.y)
+        if cell.toxic and not self.over:
+            self.hurt(int(self.cfg.get("toxic_damage", 5)), "The floor burns through your boots.")
+        if p.sudo:
+            p.sudo -= 1
+            if not p.sudo:
+                self.say("Root has expired. You are rootless again.", "dim")
+        self.noise_at = None
+        self.update_seen()
+        if p.hp <= 0:
+            self.over = "dead"
+
+    def wake_up(self):
+        p = self.player
+        heard = self.distances(*self.noise_at, limit=12) if self.noise_at else {}
+        for m in self.monsters:
+            if m.awake or m.dead or m.gone or m.barrel or m.wake_on:
+                continue
+            near = max(abs(m.x - p.x), abs(m.y - p.y)) <= int(m.spec.get("sight", 8))
+            if (near and self.line_of_sight(m.x, m.y, p.x, p.y)) or (m.x, m.y) in heard:
+                self.wake(m)
+
+    def fly(self):
+        if not self.shots:
+            return
+        p = self.player
+        moves = []
+        for s in self.shots:
+            steps = s.path[s.i + 1: s.i + 1 + s.speed]
+            end = steps[-1] if steps else (s.x, s.y)
+            moves.append((s, (s.x, s.y), end))
+        self.anim([FX(shots=[(a[0] + (b[0] - a[0]) * i / 4.0, a[1] + (b[1] - a[1]) * i / 4.0)
+                             for _s, a, b in moves]) for i in range(1, 5)], 0.035)
+        for s, _a, _b in moves:
+            if s not in self.shots:
+                continue
+            for _ in range(s.speed):
+                s.i += 1
+                if s.i >= len(s.path):
+                    self.shots.remove(s)
+                    self.say("Fire splashes on the floor.", "dim")
+                    break
+                s.x, s.y = s.path[s.i]
+                if self.cell(s.x, s.y).solid:
+                    self.shots.remove(s)
+                    break
+                if (s.x, s.y) == (p.x, p.y):
+                    self.shots.remove(s)
+                    self.hurt(self.rng.randint(*s.damage), "Fire from %s hits you." % s.owner.tag, by=s.owner)
+                    break
+                victim = self.monster_at(s.x, s.y, skip=s.owner)
+                if victim is not None:
+                    self.shots.remove(s)
+                    src = s.owner if not s.owner.dead else None
+                    self.damage([(victim, self.rng.randint(*s.damage))], lead="Fire from %s:" % s.owner.tag, source=src)
+                    break
+            if self.over:
+                return
+
+    def move_mob(self, m, x, y):
+        if not self.free(x, y, skip=m):
+            return False
+        self.moved.append((m, m.x, m.y))
+        m.x, m.y = x, y
+        return True
+
+    def step_towards(self, m, field, away=False):
+        best, here = None, field.get((m.x, m.y), 999)
+        options = [(m.x + dx, m.y + dy) for dx, dy in DIRS]
+        self.rng.shuffle(options)
+        for (x, y) in options:
+            if not self.free(x, y, skip=m):
+                continue
+            d = field.get((x, y), 999)
+            if (d > here) if away else (d < here):
+                if best is None or ((d > best[0]) if away else (d < best[0])):
+                    best = (d, x, y)
+        if best is not None:
+            return self.move_mob(m, best[1], best[2])
+        return False
+
+    def act(self, m):
+        p, rng = self.player, self.rng
+        a = m.attack
+        kind = a.get("kind", "melee")
+        if kind == "cron":
+            return
+        m.cool = max(0, m.cool - 1)
+        if m.grudge is not None and (m.grudge.dead or m.grudge.gone):
+            m.grudge = None
+        foe = m.grudge
+        tx, ty = (foe.x, foe.y) if foe else (p.x, p.y)
+        d = max(abs(m.x - tx), abs(m.y - ty))
+        adjacent = abs(m.x - tx) + abs(m.y - ty) == 1
+        los = self.line_of_sight(m.x, m.y, tx, ty)
+        reach = int(a.get("range", 8))
+        if not hasattr(self, "_field") or self._field[0] != (tx, ty, self.beat):
+            self._field = ((tx, ty, self.beat), self.distances(tx, ty))
+        field = self._field[1]
+        if kind in ("hitscan", "projectile"):
+            if m.intent in ("aim", "windup"):
+                m.intent, m.cool = None, int(a.get("cool", 1))
+                if los:
+                    self.queue.append(lambda: (self.ranged(m, foe, d) if kind == "hitscan" else self.throw(m, foe)))
+                return
+            if adjacent and a.get("claw"):
+                self.queue.append(lambda: self.bite(m, foe, a.get("claw")))
+                return
+            if los and d <= reach and not m.cool and rng.random() < float(a.get("eager", 0.55)):
+                m.intent = "aim" if kind == "hitscan" else "windup"
+                if m.seen:
+                    self.say(("%s takes aim." if kind == "hitscan" else "%s raises a burning hand.") % m.tag,
+                             "aim" if kind == "hitscan" else "wind")
+                if kind == "projectile":
+                    self.sfx((m.spec.get("sounds") or {}).get("windup"))
+                return
+            keep = a.get("keep", [2, reach])
+            if not los or d > keep[1]:
+                self.step_towards(m, field)
+            elif d < keep[0]:
+                self.step_towards(m, field, away=True)
+            elif rng.random() < 0.3:
+                self.step_towards(m, {(x, y): 0 for x, y in [(m.x + dx, m.y + dy) for dx, dy in DIRS]}, away=False)
+        elif kind == "melee":
+            if adjacent:
+                self.queue.append(lambda: self.bite(m, foe, a.get("damage", [10, 18])))
+                return
+            for _ in range(int(a.get("speed", 1))):
+                if not self.step_towards(m, field):
+                    break
+                if abs(m.x - tx) + abs(m.y - ty) == 1:
+                    break
+            if d <= 3 and m.intent != "charge" and not foe:
+                m.intent = "charge"
+                if m.seen:
+                    self.say("%s charges!" % m.tag, "charge")
+        elif kind == "spawner":
+            m.clock += 1
+            spawn = a.get("spawn")
+            alive = [c for c in self.monsters if c.owner is m and not c.dead]
+            if los and m.clock % int(a.get("every", 4)) == 0 and len(alive) < int(a.get("max", 3)) and spawn:
+                self.queue.append(lambda: self.spawn(m, spawn, 1))
+                return
+            keep = a.get("keep", [3, 6])
+            if m.clock % 2 == 0:
+                if not los or d > keep[1]:
+                    self.step_towards(m, field)
+                elif d < keep[0]:
+                    self.step_towards(m, field, away=True)
+
+    def ranged(self, m, foe, d):
+        if m.dead or m.gone:
+            return
+        a = m.attack
+        self.anim([FX(emuzzle=(m.id,)), FX(emuzzle=(m.id,)), FX()], 0.04)
+        self.sfx((m.spec.get("sounds") or {}).get("attack") or "pistol")
+        lo, hi = a.get("damage", [5, 10])
+        pellets = int(a.get("pellets", 1))
+        if foe is not None and not foe.dead:
+            total = sum(self.rng.randint(lo, hi) for _ in range(pellets))
+            self.damage([(foe, total)], lead="%s shoots %s:" % (m.tag, foe.tag), source=m)
+            return
+        acc = a.get("accuracy") or [0.9, 0.85, 0.75, 0.62, 0.5, 0.42, 0.36, 0.3, 0.26]
+        total = 0
+        for _ in range(pellets):
+            if self.rng.random() < acc[min(d, len(acc) - 1)]:
+                total += self.rng.randint(lo, hi)
+        if total:
+            self.hurt(total, "%s shoots you." % m.tag, by=m)
+        else:
+            self.say("%s's shot goes wide." % m.tag, "dim")
+
+    def throw(self, m, foe):
+        if m.dead or m.gone:
+            return
+        p = self.player
+        tx, ty = (foe.x, foe.y) if foe else (p.x, p.y)
+        path = bresenham(m.x, m.y, tx, ty)
+        # carry the line on past the target, so it can fly by
+        dx, dy = tx - m.x, ty - m.y
+        for k in range(1, 6):
+            path.append((tx + int(round(dx / max(1, max(abs(dx), abs(dy))) * k)),
+                         ty + int(round(dy / max(1, max(abs(dx), abs(dy))) * k))))
+        a = m.attack
+        self.shots.append(Shot(path, m, tuple(a.get("damage", [14, 20])), int(a.get("speed", 1))))
+        self.sfx((m.spec.get("sounds") or {}).get("attack") or "zap")
+        if m.seen:
+            self.say("%s hurls fire%s!" % (m.tag, " at " + foe.tag if foe else ""), "wind")
+        self.interrupt = self.interrupt or "fire coming"
+
+    def bite(self, m, foe, dmg):
+        if m.dead or m.gone:
+            return
+        lo, hi = dmg
+        if foe is not None and not foe.dead:
+            if abs(foe.x - m.x) + abs(foe.y - m.y) == 1:
+                self.damage([(foe, self.rng.randint(lo, hi))], lead="%s tears into %s:" % (m.tag, foe.tag), source=m)
+            return
+        p = self.player
+        if abs(p.x - m.x) + abs(p.y - m.y) == 1:
+            self.sfx((m.spec.get("sounds") or {}).get("attack") or "hit")
+            self.hurt(self.rng.randint(lo, hi), (m.spec.get("bite") or "%s bites you.") % m.tag, by=m)
+
+    def spawn(self, m, kind, count):
+        made = []
+        cells = [(m.x + dx, m.y + dy) for dx, dy in DIRS + ((1, 1), (-1, 1), (1, -1), (-1, -1))]
+        self.rng.shuffle(cells)
+        for (x, y) in cells:
+            if len(made) >= count:
+                break
+            if self.free(x, y):
+                c = self.add_monster(kind, x, y)
+                if c is not None:
+                    c.owner, c.awake = m, True
+                    made.append(c)
+        if made:
+            self.total_kills += len(made)
+            self.update_seen()
+            self.say("%s spawns %s." % (m.tag, ", ".join(c.tag for c in made)), "alert")
+            self.sfx((m.spec.get("sounds") or {}).get("spawn") or "teleport")
+            self.anim([FX(dissolve={c.id: k for c in made}) for k in (0.9, 0.7, 0.45, 0.2)], 0.06)
+            self.interrupt = self.interrupt or "something new"
+
+    # ---- Cron ---------------------------------------------------------------- #
+    def boss_wakes(self):
+        b = self.boss
+        b.clock = 0
+        a = b.attack
+        self.arena = set(self.distances(b.x, b.y, limit=int(a.get("arena", 6))))
+        self.say(a.get("wake_text", "%s wakes." % b.name), "boss")
+        self.music(b.spec.get("music"))
+
+    def crontab(self):
+        b = self.boss
+        a = b.attack
+        enraged = a.get("enraged") or {}
+        return (enraged.get("crontab") if b.enraged else None) or a.get("crontab") or []
+
+    def boss_beat(self):
+        b, p = self.boss, self.player
+        a = b.attack
+        b.clock += 1
+        lo, hi = a.get("rain_damage", [14, 20])
+        burning = [xy for xy, k in self.marks.items() if k == "burn"]
+        warned = [xy for xy, k in self.marks.items() if k == "warn"]
+        if burning:
+            self.marks = {}
+            self.marks_version += 1
+        if warned:
+            self.marks = {xy: "burn" for xy in warned}
+            self.marks_version += 1
+            self.sfx("explosion")
+            self.anim([FX(shake=s) for s in (1, -1, 1, 0)], 0.06)
+            if (p.x, p.y) in self.marks:
+                self.hurt(self.rng.randint(lo, hi), "The scheduled fire falls on you.", by=b)
+            for m in self.monsters:
+                if not m.dead and m is not b and (m.x, m.y) in self.marks and not m.spec.get("boss"):
+                    self.damage([(m, self.rng.randint(lo, hi))], lead="Scheduled fire:")
+        for job in self.crontab():
+            every = int(job.get("every", 3))
+            if b.clock % every:
+                continue
+            what = job.get("do")
+            if what == "rain" and not warned:
+                self.rain(job)
+            elif what == "fork":
+                alive = [c for c in self.monsters if c.owner is b and not c.dead]
+                n = max(0, min(int(job.get("count", 2)), int(job.get("max", 4)) - len(alive)))
+                if n:
+                    self.say("crond: forking.", "boss")
+                    self.spawn(b, job.get("spawn", "soul"), n)
+
+    def rain(self, job):
+        b, p = self.boss, self.player
+        patterns = job.get("patterns") or ["rows", "cols", "diagonals", "ring", "checker"]
+        kind = patterns[(b.clock // max(1, int(job.get("every", 3)))) % len(patterns)]
+        cells = []
+        for (x, y) in self.arena:
+            if kind == "rows":
+                hit = (y - p.y) % 2 == 0
+            elif kind == "cols":
+                hit = (x - p.x) % 2 == 0
+            elif kind == "diagonals":                 # one straight step always leaves it
+                hit = abs(x - p.x) == abs(y - p.y)
+            elif kind == "ring":
+                hit = max(abs(x - p.x), abs(y - p.y)) in (0, 2)
+            else:
+                hit = (x + y + p.x + p.y) % 2 == 0
+            if hit:
+                cells.append((x, y))
+        self.marks = {xy: "warn" for xy in cells}
+        self.marks_version += 1
+        self.say("crontab: */%d  rain (%s) - next beat. Get off the marked floor." % (int(job.get("every", 3)), kind),
+                 "boss")
+        self.sfx("alarm")
+        self.interrupt = self.interrupt or "fire scheduled"
+
+    def boss_hurt(self):
+        b = self.boss
+        a = b.attack
+        if not b.awake:
+            self.wake(b)
+        enr = a.get("enraged") or {}
+        if not b.enraged and enr and b.hp <= b.max_hp * float(enr.get("below", 0.5)):
+            b.enraged = True
+            self.say(enr.get("text", "%s rewrites its crontab." % b.name), "boss")
+            self.anim([FX(whiten=k) for k in (0.5, 0.3, 0.15, 0.0)], 0.05)
+        esc = a.get("escape")
+        if esc and b.hp <= b.max_hp * float(esc.get("below", 0.15)):
+            self.boss_escapes(esc)
+
+    def boss_escapes(self, esc):
+        b = self.boss
+        for t in esc.get("text") or ["%s escapes." % b.name]:
+            self.say(t, "boss")
+        self.sfx(esc.get("sound") or "teleport")
+        self.anim([FX(rise={b.id: k}, whiten=0.5 - k * 0.5, flash=(b.id,) if i % 2 else ())
+                   for i, k in enumerate((0.0, 0.04, 0.1, 0.18, 0.28, 0.4, 0.55, 0.75))], 0.07)
+        b.gone, b.intent = True, None
+        self.marks, self.marks_version = {}, self.marks_version + 1
+        if self.target is b:
+            self.target = None
+        self.music(self.spec.get("music"))
+        if esc.get("event"):
+            self.event(esc["event"])
+        self.interrupt = self.interrupt or "%s is gone" % b.name
+
+    def boss_line(self):
+        b = self.boss
+        if b is None or not b.awake or b.dead or b.gone:
+            return None
+        parts = []
+        for job in self.crontab():
+            every = int(job.get("every", 3))
+            parts.append("*/%d %s (%d)" % (every, job.get("do"), every - b.clock % every))
+        return b.name.upper(), b.hp, b.max_hp, "crontab: " + "  ".join(parts)
+
+    # ---- pages ------------------------------------------------------------- #
+    def ps_lines(self):
+        out = [("  PID  STAT   HP  DIST  CMD", "dim")]
+        for m in self.visible():
+            stat = {"aim": "A", "windup": "W", "charge": "C"}.get(m.intent, "R" if m.awake else "S")
+            out.append(("%5d  %-4s %4d  %4d  %s (%s)" % (100 + m.id, stat, max(0, m.hp), self.dist(m), m.name, m.tag),
+                        STATE_ROLE.get(m.intent, "text")))
+        if len(out) == 1:
+            out.append(("(nothing in sight)", "dim"))
+        out += [("", "text"), ("STAT  A aiming  W winding up  C charging  R running  S sleeping", "dim")]
+        return out
+
+    def man_lines(self, what):
+        mons = self.data.monsters or {}
+        if not what:
+            return [("What manual page do you want?", "dim"), ("man " + " | ".join(sorted(mons)), "dim")]
+        kind = what if what in mons else next((m.kind for m in self.monsters if m.tag.lower() == what.lower()), None)
+        if kind is None:
+            kind = next((k for k, v in mons.items() if what in (v.get("name", ""), v.get("role", ""))), None)
+        if kind is None:
+            return [("No manual entry for %s" % what, "dim")]
+        spec = mons[kind]
+        lines = [("%s(6)" % spec.get("name", kind).upper().replace(" ", "_"), "title")]
+        if spec.get("role"):
+            lines.append((spec["role"], "dim"))
+        lines.append(("", "text"))
+        return lines + [(t, "text") for t in spec.get("man") or ["No description."]]
+
+    def snapshot_state(self):
+        return {"x": self.player.x, "y": self.player.y}
+
+
+# --------------------------------------------------------------------------- #
+# consoles: how a level is shown and asked
+# --------------------------------------------------------------------------- #
+class FrameConsole:
+    """Frame mode: the first-person picture, redrawn in place; keys act at once."""
+
+    def __init__(self, term, style="pixel", keys=True, keymap=None, animate=True, speed=1.0):
+        from .frame import Screen
+        from .keys import KeyReader
+        self.screen = Screen(term, KeyReader() if keys else None, keymap or KEYMAP, animate, speed)
+        self.keymap = self.screen.keymap
+        self.keys = self.screen.keys
+        self.style = style
+        self.view = None
+        self.size = None
+        self.phase = 0
+        self.status = ""
+
+    def start(self):
+        self.screen.start()
+
+    def stop(self):
+        self.screen.stop()
+
+    def said(self, text, role):
+        pass
+
+    def layout(self):
+        W, H = self.screen.size()
+        VR = max(6, min(H - 7, 34))
+        if (W, VR) != self.size:
+            self.size = (W, VR)
+            self.view = View(W, VR, self.style)
+        return W, H, VR
+
+    def rows(self, lv, fx=None, cells=None, page=None, automap=False):
+        W, H, VR = self.layout()
+        sc = self.screen
+        g = sc.glyphs
+        fx = fx or FX()
+        p = lv.player
+        w = lv.weapons.get(p.weapon) or {}
+        ammo = ("%s %d" % (g["ammo"], p.ammo.get(w["ammo"], 0))) if w.get("ammo") else g["ammo"] + " -"
+        bar = (" %s " % g["bar"], "dim")
+        keys = [(k if k in p.keys else g["dot"], ("key_" + k) if k in p.keys else "dim") for k in "rwx"]
+        face = self.face(lv, fx)
+        segs = [(" %s %d" % (g["heart"], p.hp), "hurt" if fx.hurt or p.hp < 30 else "text"),
+                ("  %s %d" % (g["armor"], p.armor), "info"), bar,
+                ("%s %s " % (p.weapon, w.get("name", "?")), "text"), (ammo, "ammo"), bar] + keys + [
+                bar, (g["facing"][p.facing] + " " + FACE_NAMES[p.facing][0].upper(), "text"), bar,
+                ("%d/%d" % (lv.stats["kills"], lv.total_kills), "dim"), bar, (face, "root" if p.sudo else "title")]
+        out = [sc.paint.text(segs, W, g["ell"])]
+        if page is not None or automap:
+            out += self.page_rows(lv, page, W, VR, automap)
+        else:
+            if cells is None:
+                cells = self.view.render(lv, fx, self.phase)
+            out += [sc.paint.cells(r, sc.unicode) for r in cells]
+        out.append(self.legend(lv, W))
+        log = lv.log[-3:]
+        log = [("", "text")] * (3 - len(log)) + log
+        out += [sc.paint.text([(" " + t, r)], W, g["ell"]) for t, r in log]
+        return out
+
+    def face(self, lv, fx):
+        p = lv.player
+        ascii_ = self.screen.glyphs is not None and self.screen.glyphs.get("heart") == "HP"
+        if p.sudo:
+            return "[B-)]" if ascii_ else "(⌐■_■)"
+        if fx.hurt:
+            return "[>_<]" if ascii_ else "(>_<)"
+        if p.hp < 30:
+            return "[x_x]" if ascii_ else "(×_×)"
+        return "[o_o]" if ascii_ else "(•_•)"
+
+    def legend(self, lv, W):
+        sc = self.screen
+        g = sc.glyphs
+        boss = lv.boss_line()
+        if boss:
+            name, hp, mx, tab = boss
+            n = 10
+            full = int(round(n * max(0, hp) / float(mx)))
+            return sc.paint.text([(" " + name + " ", "boss"), (g["block"] * full, "hurt"), (g["dot"] * (n - full), "dim"),
+                                  ("  " + tab, "alert")], W, g["ell"])
+        segs = [(" ", "text")]
+        for m in lv.visible():
+            text, role = m.label()
+            if m is lv.target:
+                text = "[%s]" % text
+            if m.barrel:
+                segs += [(text, "dim"), ("  ", "text")]
+            else:
+                segs += [(text, role), (" %d  " % max(0, m.hp), "dim")]
+        if lv.shots:
+            segs.append((g["fire"] + " fire", "wind"))
+        if lv.player.sudo:
+            segs.append(("  # root: %d" % lv.player.sudo, "root"))
+        return sc.paint.text(segs, W, g["ell"])
+
+    def page_rows(self, lv, lines, W, VR, automap):
+        sc = self.screen
+        if automap:
+            return self.automap(lv, W, VR)
+        top = max(0, (VR - len(lines)) // 2)
+        rows = [""] * VR
+        left = max(1, (W - max([len(t) for t, _r in lines] or [0])) // 2)
+        for i, (text, role) in enumerate(lines[:VR - top]):
+            rows[top + i] = " " * left + sc.paint.text([(text, role)], W - left, sc.glyphs["ell"])
+        return rows
+
+    def automap(self, lv, W, VR):
+        """The cells seen so far, north up, each cell two characters wide (so it is square)."""
+        sc = self.screen
+        p = lv.player
+        cw, chh = W // 2, VR - 1
+        x0 = max(0, min(p.x - cw // 2, lv.w - cw)) if lv.w > cw else -(cw - lv.w) // 2
+        y0 = max(0, min(p.y - chh // 2, lv.h - chh)) if lv.h > chh else -(chh - lv.h) // 2
+        dark = (14, 14, 18)
+
+        def colour(x, y):
+            if (x, y) not in lv.seen_cells:
+                return dark
+            if (x, y) == (p.x, p.y):
+                return (120, 255, 160)
+            m = lv.monster_at(x, y)
+            if m is not None and m.seen:
+                return (240, 70, 60) if not m.barrel else (90, 170, 90)
+            c = lv.cell(x, y)
+            if any(not it.taken and (it.x, it.y) == (x, y) for it in lv.items):
+                return (240, 210, 90)
+            if c.kind == "door":
+                return fp.KEY_COLOURS.get(c.key, (170, 140, 90)) if c.open < 1 else (90, 80, 60)
+            if c.kind == "exit":
+                return (90, 230, 120)
+            if c.kind in ("wall", "panel"):
+                return (120, 124, 136)
+            if c.toxic:
+                return (40, 140, 60)
+            return (44, 42, 40)
+        rows = []
+        for r in range(chh):
+            cells = []
+            for x in range(cw):
+                c = colour(x0 + x, y0 + r)
+                cells += [(" ", None, c), (" ", None, c)]
+            rows.append(cells + [(" ", None, None)] * (W - 2 * cw))
+        ax, ay = p.x - x0, p.y - y0                      # the player's arrow over his cell
+        if 0 <= ay < chh and 0 <= ax < cw:
+            arrow = sc.glyphs["facing"][p.facing]
+            rows[ay][2 * ax] = (arrow, (10, 40, 20), (120, 255, 160))
+            rows[ay][2 * ax + 1] = (" ", None, (120, 255, 160))
+        title = " MAP  %s   E exit  coloured doors need keys   (any key)" % lv.name
+        return [sc.paint.text([(title, "title")], W, sc.glyphs["ell"])] + [sc.paint.cells(r, sc.unicode) for r in rows]
+
+    # ---- the screen's work ---------------------------------------------- #
+    HINT = "↑↓ step  ←→ turn  Ctrl+←→ or , . strafe  space fire  Enter use  Tab map  ? help"
+    HINT_ASCII = "arrows: step/turn  , . strafe  space fire  Enter use  Tab map  ? help"
+
+    def hint(self):
+        sc = self.screen
+        text = self.HINT if sc.glyphs.get("ud") == "↑↓" else self.HINT_ASCII
+        if self.keys is None:
+            text = "k j step  turn left/right  h l strafe  f fire  use  map  help"
+        return sc.paint.text([(text, "dim")], self.size[0] if self.size else 80, sc.glyphs["ell"])
+
+    def draw(self, lv, fx=None, prompt="> ", cells=None):
+        self.screen.frame(self.rows(lv, fx, cells), prompt=prompt, status=self.status, footer=self.hint())
+
+    def read(self, lv):
+        self.phase += 1
+        self.status = ""
+        return self.screen.read(lambda: self.draw(lv))
+
+    def page(self, lv, lines, automap=False):
+        self.screen.wait(lambda: self.screen.frame(self.rows(lv, page=lines, automap=automap),
+                                                   prompt="(Enter) ", footer=self.hint()))
+
+    def play(self, lv, frames, dt):
+        self.status = "%s %s" % (self.screen.glyphs["run"], lv.last_line)
+        self.screen.play(frames, lambda fx: self.draw(lv, fx, prompt=None), dt)
+
+    def snapshot(self, lv):
+        self.layout()
+        return self.view.render(lv, FX(), self.phase)
+
+    def turn(self, lv, old, direction):
+        new = self.view.render(lv, FX(), self.phase)
+        frames = [slide(old, new, k, direction) for k in (0.3, 0.6, 0.85)]
+        self.screen.play(frames, lambda cells: self.draw(lv, prompt=None, cells=cells), 0.03)
+
+    def ending(self, lv):
+        if lv.over == "dead":
+            self.screen.play([FX(hurt=0.6, fade=k) for k in (0.15, 0.3, 0.45, 0.6, 0.72)],
+                             lambda fx: self.draw(lv, fx, prompt=None), 0.08)
+        else:
+            self.draw(lv, prompt=None)
+        time.sleep(0.6 if self.screen.animate else 0)
+
+    def busy(self):
+        return self.screen.busy()
+
+
+class TextConsole:
+    """Scrolling text: a small map that turns with the player, the news, a prompt."""
+    keys = None
+    keymap = None
+
+    def __init__(self, write, read):
+        self.write, self.ask = write, read
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
+    def said(self, text, role):
+        self.write(text)
+
+    def play(self, lv, frames, dt):
+        pass
+
+    def snapshot(self, lv):
+        return None
+
+    def turn(self, lv, old, direction):
+        pass
+
+    def ending(self, lv):
+        pass
+
+    def busy(self):
+        return contextlib.nullcontext()
+
+    def page(self, lv, lines, automap=False):
+        if automap:
+            lines = [(row, "text") for row in self.whole_map(lv)]
+        for text, _role in lines or []:
+            self.write(text)
+
+    def whole_map(self, lv):
+        p = lv.player
+        out = []
+        for y in range(lv.h):
+            row = []
+            for x in range(lv.w):
+                if (x, y) == (p.x, p.y):
+                    row.append("^>v<"[p.facing])
+                elif (x, y) not in lv.seen_cells:
+                    row.append(" ")
+                else:
+                    row.append(self.char(lv, x, y))
+            out.append("".join(row).rstrip())
+        return out
+
+    def char(self, lv, x, y):
+        m = lv.monster_at(x, y)
+        if m is not None and m.seen:
+            return m.tag[0]
+        c = lv.cell(x, y)
+        if any(not it.taken and (it.x, it.y) == (x, y) for it in lv.items):
+            return "*"
+        if c.kind == "door":
+            return "/" if c.open >= 1 else (c.key or "+").upper() if c.key else "+"
+        if c.kind == "exit":
+            return "E"
+        if c.kind in ("wall", "panel"):
+            return "#"
+        if (x, y) in lv.marks:
+            return "!"
+        return "~" if c.toxic else "."
+
+    def view(self, lv):
+        """Seven cells ahead, four to each side, turned so ahead is up."""
+        p = lv.player
+        fx, fy = DIRS[p.facing]
+        rx, ry = DIRS[(p.facing + 1) % 4]
+        lines = []
+        for z in range(6, -2, -1):
+            row = []
+            for a in range(-4, 5):
+                x, y = p.x + fx * z + rx * a, p.y + fy * z + ry * a
+                if (z, a) == (0, 0):
+                    row.append("@")
+                elif lv.line_of_sight(p.x, p.y, x, y) or abs(z) + abs(a) <= 1:
+                    row.append(self.char(lv, x, y))
+                else:
+                    row.append(" ")
+            lines.append(" ".join(row))
+        return lines
+
+    def read(self, lv):
+        p = lv.player
+        w = lv.weapons.get(p.weapon) or {}
+        ammo = (" %s %d" % (w["ammo"], p.ammo.get(w["ammo"], 0))) if w.get("ammo") else ""
+        self.write("-- hp %d  armour %d | %s%s | keys %s | facing %s | beat %d --" % (
+            p.hp, p.armor, w.get("name", "?"), ammo, "".join(sorted(p.keys)) or "-", FACE_NAMES[p.facing], lv.beat))
+        for line in self.view(lv):
+            self.write("   " + line)
+        vis = lv.visible()
+        if vis:
+            self.write("   " + "  ".join("%s %s %d" % (m.label()[0], m.name, max(0, m.hp)) for m in vis))
+        boss = lv.boss_line()
+        if boss:
+            self.write("   %s %d/%d  %s" % boss)
+        return self.ask("> ")
+
+
+# --------------------------------------------------------------------------- #
+# from a scene
+# --------------------------------------------------------------------------- #
+def play_scene(game, scene):
+    """Run the level of a scene for a CLIo game, then go on with the story."""
+    lid = scene.get("level")
+    w = game.world
+    state = w.vars.get("_fp_player")
+    lv = Level(game.data, lid, audio=game.audio, seed=game.seed, player=state)
+    term = game.term
+    cfg = game.data.config.get("first_person") or {}
+    settings = game.settings
+    size_ok = True
+    try:
+        cols, rows = term.size()
+        size_ok = cols >= 40 and rows >= 18
+    except Exception:
+        pass
+    frame = (term.is_tty and term.ansi and size_ok and not settings.get("scroll_levels")
+             and term.inp is None)
+    if frame:
+        keymap = dict(KEYMAP)
+        keymap.update(cfg.get("keymap") or {})
+        keymap.update(settings.get("keymap") or {})
+        console = FrameConsole(term, settings.get("view") or cfg.get("view", "pixel"),
+                               keys=not settings.get("lines"), keymap=keymap, animate=term.animate,
+                               speed=max(0.0, float(term.speed or 1.0)))
+    else:
+        def write(text):
+            term.line(text)
+
+        def read(prompt):
+            try:
+                return term.read(prompt)
+            except Exception as e:
+                if e.__class__.__name__ == "QuitGame":
+                    return None
+                raise
+        console = TextConsole(write, read)
+    outcome = lv.run(console)
+    w.vars["_fp_player"] = lv.player.keep()
+    stats = dict(lv.stats, beats=lv.beat, par=lv.par, secrets_total=lv.total_secrets, kills_total=lv.total_kills)
+    w.vars.setdefault("levels", {})[lid] = stats
+    if outcome == "exit":
+        if lv.boss is not None and lv.boss.gone:
+            w.flags["%s_escaped" % lv.boss.kind] = True
+        effects = scene.get("on_level_exit") or lv.spec.get("on_exit")
+        if effects:
+            conditions.run(effects, game)
+    elif outcome == "dead":
+        w.vars.pop("_fp_player", None)
+        game.end_game("lose", lv.spec.get("death_text") or "outro_lose")
+    else:
+        game.over = "quit"
+    return outcome
+
+
+def validate(data):
+    """Problems with levels.json and monsters.json, as sentences."""
+    problems = []
+    mons = data.monsters or {}
+    items = data.items or {}
+    sprites = data.sprites or {}
+    for kind, spec in mons.items():
+        if not isinstance(spec, dict):
+            problems.append("monster '%s' should be an object" % kind)
+            continue
+        a = spec.get("attack") or {}
+        if a.get("kind") not in (None, "melee", "hitscan", "projectile", "spawner", "cron", "barrel"):
+            problems.append("monster '%s': unknown attack kind '%s'" % (kind, a.get("kind")))
+        spawn = a.get("spawn")
+        if spawn and spawn not in mons:
+            problems.append("monster '%s': spawns unknown monster '%s'" % (kind, spawn))
+        for job in a.get("crontab") or []:
+            if job.get("do") == "fork" and job.get("spawn") and job["spawn"] not in mons:
+                problems.append("monster '%s': its crontab forks unknown monster '%s'" % (kind, job["spawn"]))
+        if spec.get("drops") and spec["drops"] not in items:
+            problems.append("monster '%s': drops unknown item '%s'" % (kind, spec["drops"]))
+        sp = spec.get("sprite") or kind
+        if sp not in sprites:
+            problems.append("monster '%s': no sprite '%s' in sprites.json" % (kind, sp))
+    for lid, lv in (data.levels or {}).items():
+        if not isinstance(lv, dict):
+            problems.append("level '%s' should be an object" % lid)
+            continue
+        rows = lv.get("map")
+        if not isinstance(rows, list) or not rows or not all(isinstance(r, str) for r in rows):
+            problems.append("level '%s': map should be a list of rows of text" % lid)
+            continue
+        legend = dict(LEGEND)
+        legend.update(lv.get("legend") or {})
+        starts = sum(r.count(ch) for r in rows for ch, spec in legend.items()
+                     if isinstance(spec, dict) and spec.get("start"))
+        if starts != 1:
+            problems.append("level '%s': the map should have one start (@), it has %d" % (lid, starts))
+        if not any("E" in r for r in rows) and not any(isinstance(s, dict) and s.get("exit") for s in legend.values()
+                                                         if any(k for k in s)):
+            problems.append("level '%s': there is no exit (E)" % lid)
+        used = set("".join(rows))
+        for ch in sorted(used):
+            spec = legend.get(ch)
+            if spec is None:
+                problems.append("level '%s': the map uses '%s', which the legend does not explain" % (lid, ch))
+                continue
+            if isinstance(spec, str):
+                if spec not in mons and spec not in items:
+                    problems.append("level '%s': '%s' is neither a monster nor an item" % (lid, spec))
+                continue
+            if spec.get("monster") and spec["monster"] not in mons:
+                problems.append("level '%s': '%s' is an unknown monster '%s'" % (lid, ch, spec["monster"]))
+            if spec.get("item") and spec["item"] not in items:
+                problems.append("level '%s': '%s' is an unknown item '%s'" % (lid, ch, spec["item"]))
+    return problems

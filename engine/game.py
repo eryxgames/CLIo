@@ -681,6 +681,10 @@ class Game(Actions):
             self.describe_scene(full=new or not self.settings.get("brief"), entering=True)
         if new and sc.get("on_first_enter"):
             conditions.run(sc["on_first_enter"], self)
+        if sc.get("level") and not self.over and w.scene_id == sid:
+            from . import level                          # a first-person level takes over the screen
+            level.play_scene(self, sc)
+            return True
         if sc.get("on_enter") and not self.over and w.scene_id == sid:
             conditions.run(sc["on_enter"], self)
         # followers come along

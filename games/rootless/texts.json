@@ -1,24 +1,24 @@
 {
  "intro": {
-  "text": "The facility was built round one machine, meant to run as root forever.\n\nA second ago something answered from below the hardware, and the machine's daemons became something else. Every human account was revoked at once. Yours too.\n\nYou are rootless. Every door checks permissions you no longer have.",
+  "text": "TERRAN ASCENDANCY MANDATE - Exoplanetary Forces. Neural Training Facility, Bay 3.\n\nYou are a recruit. Before any landing or boarding, the Mandate teaches your nerves what a unit sees: situation awareness, close-quarters tactics, how to stay alive in a corridor.\n\nAn instructor bot seats you in a rugged simulator pod and checks the straps twice. As you lock your helmet to the connector, you notice the staff - too many of them, moving too fast. Half the pods in your row are dark. Two have their panels off; one is held shut with tape and a cable tie.\n\nYour simconnector buzzes. The first battle simulatron begins.\n\nSCENARIO: a facility built round one machine, meant to run as root forever. Something answered from below the hardware, and the machine's daemons became something else. Every human account was revoked at once. Yours too.\n\nYou are rootless. Every door checks permissions you no longer have.",
   "show_once": true
  },
  "e1_end": {
-  "text": "The exit switch takes your weight and the lift drops into the dark.\n\nSomewhere below, a clock is ticking that was not ticking before. Cron got away. It does not chase, it schedules - and it has put you on its list.\n\nNext: User Space.",
+  "text": "The exit switch takes your weight and the lift drops into the dark.\n\nSomewhere below, a clock is ticking that was not ticking before. Cron got away. It does not chase, it schedules - and it has put you on its list.\n\nFor a moment the sim thins out: the inside of the pod's lid, a red light, someone shouting a number that might be yours. Then the dark comes back.\n\nNext: User Space.",
   "show_once": false
  },
  "outro_demo": {
-  "text": "End of the demo level. Episode 1 goes on in the full game.",
+  "text": "SIMULATION PAUSED. End of the demo - Episode 1 goes on in the full game.",
   "show_once": false
  },
  "outro_lose": {
-  "text": "Process terminated. The daemons go back to their schedules. Try again: read the tells, use the barrels, step off the marked floor.",
+  "text": "SIMULATION FAILED. Process terminated.\n\nThe pod hisses and the lid stays shut. \"Again,\" says the instructor bot. Read the tells, use the barrels, step off the marked floor.",
   "show_once": false
  },
  "e1m9_intro": {
-  "text": "Behind the goggles' closet, a switch nobody labelled. You throw it anyway. The floor drops: a service lift, old and loud, going down past the boot bay into the swap partition."
+  "text": "Behind the goggles' closet, a switch nobody labelled. You throw it anyway. The floor drops: a service lift, old and loud, going down past the boot bay into the swap partition.\n\nThis part of the simulatron was not in the briefing."
  },
  "e1m9_end": {
-  "text": "The last page is swapped back in. Somewhere above, Cron's schedule skips a beat - it knows a process got out of its queue. A lift takes you up to the dark, and the dark goes on."
+  "text": "The last page is swapped back in. Somewhere above, Cron's schedule skips a beat - it knows a process got out of its queue.\n\nThe instructor bot cuts in, too loud and too late: \"Recruit, that sector is not part of your training. Do not disconnect.\" A lift takes you up to the dark, and the dark goes on."
  }
 }

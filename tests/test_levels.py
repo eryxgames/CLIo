@@ -630,8 +630,123 @@ class NewEnemyTests(unittest.TestCase):
             self.assertTrue(spec["man"] and spec["death"])
             for snd in (spec.get("sounds") or {}).values():
                 self.assertIn(snd, data.sounds, "%s: %s" % (kind, snd))
-        self.assertIn("marine", data.sprites)
+        self.assertIn("recruit", data.sprites)
+        self.assertNotIn("marine", data.sprites)
+        for kind in ("shred", "kswapd", "kworker", "crawler", "spinlock"):   # drawn small, like the others
+            self.assertLessEqual(len(data.sprites[kind]["pixels"]), 21)
         self.assertEqual(validate(data), [])
+
+
+class AnimationTests(unittest.TestCase):
+    def test_walk_frames_from_a_standing_sprite(self):
+        from engine.sprite import walk_frames
+        zombie = GameData(ROOTLESS).sprites["zombie"]["pixels"]
+        a, b = walk_frames(zombie)
+        self.assertEqual((len(a), len(a[0])), (len(zombie), len(zombie[0])))
+        self.assertEqual(a[-1], "........kkk.")                # the left foot is up...
+        self.assertEqual(b[-1], "..kkk.......")                # ...then the right
+        self.assertEqual(a[:10], zombie[:10])                  # the body stays as it was
+        self.assertEqual(walk_frames(GameData(ROOTLESS).sprites["barrel"]["pixels"]), [])   # no feet, no walk
+        self.assertEqual(walk_frames(["..xx..", ".xxxx.", "xxxxxx", ".xxxx.", "..xx..", "..xx.."]), [])
+
+    def test_a_level_loads_steps_attacks_and_muzzles(self):
+        lv = Level(GameData(ROOTLESS), "e1m9", seed=1)
+        shred = lv.sprites["shred"]
+        self.assertEqual(len(shred.walk), 2)
+        self.assertIsNotNone(shred.attack)
+        self.assertTrue(shred.walk[0].lods)                    # far versions of the steps too
+        self.assertAlmostEqual(shred.muzzle[0], 15.5 / 16)
+        self.assertEqual(lv.sprites["barrel"].walk, [])
+        self.assertIsNone(lv.sprites["crawler"].attack)
+        lv = room_with(["#########", "#@.....r#", "#########"], {"r": "crawler"})
+        r = lv.monsters[0]
+        r.awake = True
+        lv.end_beat()
+        self.assertEqual((r.x, r.stride), (5, 2))              # two steps a beat, counted: which foot to show
+
+    def test_the_picture_shows_steps_and_aim(self):
+        lv = room_with(["#######",
+                        "#.....#",
+                        "#..@..#",
+                        "#..f..#",
+                        "#######"], {"f": "shred"})
+        lv.player.facing = 2
+        f = next(m for m in lv.monsters if m.kind == "shred")
+        f.seen = True
+        view = View(60, 17, "pixel")
+        still = view.render(lv, FX(), 0)
+        step = view.render(lv, FX(pos={f.id: (f.x, f.y)}), 0)
+        self.assertNotEqual(still, step)
+        f.intent = "windup"
+        aim = view.render(lv, FX(), 0)
+        self.assertNotEqual(still, aim)
+
+
+class MeleeWeaponTests(unittest.TestCase):
+    def armed(self, rows, legend=None, weapons=("1", "2", "shovel", "chainsaw")):
+        lv = room_with(rows, legend)
+        lv.player.weapons = list(weapons)
+        return lv
+
+    def test_key_1_goes_round_the_melee_weapons(self):
+        lv = self.armed(["#####", "#@..#", "#####"])
+        said = []
+        for _ in range(4):
+            lv.run_line("1")
+            said.append(lv.player.weapon)
+        self.assertEqual(said, ["chainsaw", "shovel", "1", "chainsaw"])
+        lv.run_line("2")
+        lv.run_line("shovel")                                 # by name, typed
+        self.assertEqual(lv.player.weapon, "shovel")
+        self.assertEqual(lv.slot_of("shovel"), "1")
+        self.assertEqual(lv.beat, 0)                           # choosing takes no time
+
+    def test_the_shovel_shoves(self):
+        lv = self.armed(["#######", "#@z...#", "#######"])
+        lv.weapons["shovel"] = dict(lv.weapons["shovel"], accuracy=1.0)
+        z = next(m for m in lv.monsters if m.kind == "zombie")
+        z.hp, z.awake = 200, True
+        lv.player.facing, lv.player.weapon = 1, "shovel"
+        lv.run_line("f")
+        self.assertLess(z.hp, 200)
+        self.assertIn("CLANG", told(lv))
+        self.assertIn("thrown back", told(lv))
+
+    def test_the_chainsaw_staggers(self):
+        lv = self.armed(["######", "#@z..#", "######"])
+        z = next(m for m in lv.monsters if m.kind == "zombie")
+        z.hp, z.awake = 200, True
+        lv.player.facing, lv.player.weapon = 1, "chainsaw"
+        hp = lv.player.hp
+        for _ in range(4):
+            lv.run_line("f")
+        self.assertEqual(lv.player.hp, hp)                     # it never got its aim back
+        self.assertLess(z.hp, 200 - 4 * 9 + 1)                 # every bite lands
+        self.assertEqual((z.x, z.y), (2, 1))                   # and it stayed put
+
+    def test_out_of_ammo_goes_to_the_best_melee_weapon(self):
+        lv = self.armed(["#####", "#@..#", "#####"], weapons=("1", "2", "shovel"))
+        lv.player.weapon, lv.player.ammo["bullets"] = "2", 1
+        lv.run_line("f")
+        self.assertEqual(lv.player.weapon, "shovel")
+
+    def test_picking_up_the_shovel_in_e1m1(self):
+        lv = level()
+        put(lv, 14, 28, 3)
+        lv.run_line("k")
+        self.assertEqual(((lv.player.x, lv.player.y), lv.player.weapon), ((13, 28), "shovel"))
+        self.assertIn("shovel", lv.player.weapons)
+        rows = Level(GameData(ROOTLESS), "e1m9").spec["map"]
+        self.assertEqual(rows[1][4], "n")                      # the chainsaw: E1M9's closet
+
+    def test_problems_with_keys_and_frames(self):
+        data = with_level({"map": ["#####", "#@.E#", "#####"]},
+                          weapons={"axe": {"name": "axe", "kind": "melee"}, "saw": {"name": "saw", "key": "1"}})
+        data.sprites = dict(data.sprites, odd={"pixels": ["aa", "aa"], "palette": {"a": "#fff"}, "walk": [["a"]]})
+        said = " | ".join(validate(data))
+        self.assertIn("weapon 'axe': key should be one of 1-9", said)
+        self.assertNotIn("weapon 'saw'", said)
+        self.assertIn("sprite 'odd': its walk and attack frames should be 2 x 2", said)
 
 
 class SecretLevelTests(unittest.TestCase):
@@ -719,6 +834,8 @@ class EndScreenTests(unittest.TestCase):
         self.assertIn("next run in", strip_ansi(ending.tick_line(spec, 1.2, Painter(3), 80)))
         self.assertLessEqual(len(ending.picture(Game.data, "cron", 10)), 10)    # shrunk to fit
         self.assertEqual(len(ending.picture(Game.data, "cron", 16)), 15)         # at its own size
+        self.assertEqual(Game.cfg["end_screen"]["picture"], "recruit")             # the hero, not his enemies
+        self.assertEqual(len(ending.picture(Game.data, "recruit", 14)), 14)
 
     def test_piped_the_usual_ending(self):
         from engine.game import Game
@@ -793,6 +910,7 @@ class ChecksAndGameTests(unittest.TestCase):
         out = term.out.getvalue()
         self.assertIn("BOOT SECTOR", out)
         self.assertIn("ZOMBIE_PROCESS(6)", out)
+        self.assertIn("simulator pod", out)                     # the frame: a recruit's first battle simulation
         self.assertIn("facing east", out)
 
     def test_played_with_keys_in_a_redrawn_screen(self):

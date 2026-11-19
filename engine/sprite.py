@@ -271,6 +271,40 @@ def far_versions(pixels, keep="", smallest=4):
     return out
 
 
+def walk_frames(pixels, legs=0.28):
+    """Two steps of a walk made from a standing sprite: the feet on one side lifted a pixel,
+    then the other side's. Nothing (``[]``) when the bottom row has no two feet apart -
+    a blob, a floater or a barrel does not walk."""
+    w = max((len(r) for r in pixels), default=0)
+    rows = [list(r.ljust(w, ".")) for r in pixels]
+    h = len(rows)
+    if h < 6:
+        return []
+    feet = [x for x, ch in enumerate(rows[-1]) if ch != "."]
+    groups = []
+    for x in feet:
+        if groups and x == groups[-1][-1] + 1:
+            groups[-1].append(x)
+        else:
+            groups.append([x])
+    if len(groups) < 2:
+        return []
+    mid = (groups[0][-1] + groups[-1][0]) / 2.0
+    top = max(1, h - max(2, int(round(h * legs))))
+    out = []
+    for left in (True, False):
+        f = [r[:] for r in rows]
+        for x in range(w):
+            if (x < mid) != left:
+                continue
+            for y in range(top, h):
+                if rows[y][x] != "." or y - 1 >= top:
+                    f[y - 1][x] = rows[y][x]
+            f[h - 1][x] = "."
+        out.append(["".join(r) for r in f])
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # Monsters from a body plan
 # --------------------------------------------------------------------------- #

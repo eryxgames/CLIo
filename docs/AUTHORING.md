@@ -1308,6 +1308,19 @@ The player's start is in game.json:
 }
 ```
 
+A weapon is picked by its key: its id when that is a digit, or `"key"`. One key can hold
+several weapons - Rootless puts the fist, the shovel and the chainsaw on 1: pressed, it takes
+the best of them in hand (the last in weapons.json), pressed again the next. Typing a
+weapon's id (`shovel`) takes it too. A melee weapon can have `"accuracy"` (the chance a
+blow lands, 0.85 if not said), `"shove": true` (a blow throws the target a cell back, as
+the shotgun does at point blank) and `"stagger": 1` (a monster it bites loses that many
+beats: no aim, no step - not a boss); `"ready_sound"` plays when it is taken in hand.
+
+```json
+"shovel":   {"name": "shovel", "key": "1", "kind": "melee", "damage": [10, 20], "accuracy": 0.9, "shove": true, ...},
+"chainsaw": {"name": "chainsaw", "key": "1", "kind": "melee", "damage": [9, 16], "accuracy": 1.0, "stagger": 1, ...}
+```
+
 A shot goes for what is in sight, nearest and most central first; a barrel only when it is
 straight ahead and not at arm's length. `pellets` spread to monsters next to the target
 (`spread`); `burst` fires (and spends) that many rounds a beat. `view` is how the level is
@@ -1319,7 +1332,7 @@ drawn: `pixel` (half blocks), `dots` or `dots-fill` (braille); `--view` override
 enough for a level:
 
 ```json
-"end_screen": {"heading": "EPISODE 1: KNEE-DEEP IN THE SHELL", "picture": ["marine", "cron"],
+"end_screen": {"heading": "EPISODE 1: KNEE-DEEP IN THE SHELL", "picture": "recruit",
                "next": "Next: User Space", "credits": ["RØØTLESS - a game by ..."],
                "tick": "*/3 * * * *  cron  rain --on rootless"}
 ```
@@ -1354,6 +1367,15 @@ losing them as plain scaling would. To draw them yourself, put them in the sprit
 `"lod": [{"pixels": [...]}, ...]`: the level uses the smallest that is not much smaller
 than what it needs.
 
+A monster that walks shows its steps while it moves: the engine makes two from its
+standing picture, the feet on one side lifted a pixel, then the other side's (when the
+bottom row has two feet apart; floaters, barrels and spawners do not walk). To draw
+them yourself, give the sprite `"walk": [[...rows...], [...rows...]]`; `"walk": []` keeps
+it still. `"attack": [...rows...]` is shown while it takes aim, levels its nozzle, spins up
+or fires - a flash at the barrel, a raised arm. `"muzzle": [x, y]` is the pixel its shots
+leave from, where the flash is drawn (the right edge if not said). Steps and the attack
+picture are as big as the sprite, and get far versions of their own.
+
 ### Tiles
 
 The walls, floors and ceilings of levels are drawn with tiles: small pictures in the
@@ -1386,7 +1408,7 @@ with Enter.
 | Space | `f`, `f z1`, `kill z1` | fire (at z1); `kill -9 x` punches |
 | Enter | `use` | open, press what is ahead |
 | Tab | `map` | the map of what has been seen |
-| 1-7 | `1`-`7` | weapons |
+| 1-7 | `1`-`7`, `shovel` | weapons (a key pressed again: the next weapon on it) |
 | numpad 5 or Delete | `w`, `w 3` | wait a beat (or three) |
 | | `t z1` | keep aiming at z1 |
 | | `ps`, `man orphan`, `history`, `keys`, `whoami`, `help` | |

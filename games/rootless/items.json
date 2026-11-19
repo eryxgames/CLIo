@@ -142,5 +142,26 @@
    "sound": "unlock",
    "text": "You have write permission: the -w- key."
   }
+ },
+ "shovel": {
+  "name": "shovel",
+  "description": "A trenching tool, standard issue for boarding troops. The edge is sharpened.",
+  "pickup": {
+   "weapon": "shovel",
+   "sprite": "shovel",
+   "size": 0.5,
+   "text": "A shovel: standard issue, the edge sharpened. It shares key 1 with your fists - press 1 again for the next."
+  }
+ },
+ "chainsaw": {
+  "name": "chainsaw",
+  "description": "A cutting saw from a damage-control locker. Whatever it bites stops what it was doing.",
+  "pickup": {
+   "weapon": "chainsaw",
+   "sprite": "chainsaw",
+   "size": 0.55,
+   "sound": "chainsaw_up",
+   "text": "A chainsaw from a damage-control locker. It starts first pull. (Key 1; again for the next.)"
+  }
  }
 }

@@ -59,6 +59,9 @@ class Picture:
         self.rows = rows
         self.h, self.w = len(rows), max((len(r) for r in rows), default=0)
         self.lods = sorted(lods, key=lambda p: p.h)
+        self.walk = []                # a monster's steps, shown while it moves
+        self.attack = None            # shown while it takes aim and fires
+        self.muzzle = None            # where its shots leave it, as fractions of its width and height
 
     def pick(self, height):
         """The drawing to scale to ``height`` pixels: the smallest that is not much smaller."""
@@ -841,6 +844,12 @@ class View:
                     if 0 <= xx < self.PW:
                         px[yy][xx] = shade(px[yy][xx], 0.6)
         fog = 0.5 + 0.5 * min(1.0, t * 1.6)
+        muzzle = pic.muzzle
+        if m is not None and not m.dead:              # the frame for what it is doing
+            if pic.attack is not None and (m.intent in ("aim", "windup", "spin") or m.id in fx.emuzzle):
+                pp = pic.attack.pick(target_h)
+            elif pic.walk and m.id in fx.pos and not m.float:
+                pp = pic.walk[getattr(m, "stride", 0) % len(pic.walk)].pick(target_h)
         if m is None:
             self.blit(px, pp.rows, x0, y0, s, lambda c, i, j: shade(c, fog), z)
             return
@@ -860,13 +869,14 @@ class View:
         self.blit(px, pp.rows, x0, y0, s, fn, z)
         if m.intent == "windup" and not m.dead:                   # fire gathering in its hand
             fs = s * 0.8
-            gx, gy = x0 + sw * 0.85, y0 - 2 * fs
+            gx, gy = (x0 + sw * muzzle[0], y0 + sh * muzzle[1]) if muzzle else (x0 + sw * 0.85, y0 - 2 * fs)
             self.glow(px, gx, gy, 6 * fs + 1, (255, 140, 40), 0.55)
             if self.fireball is not None:
                 fb = self.fireball
                 self.blit(px, fb.rows, int(round(gx - fb.w * fs / 2)), int(round(gy - fb.h * fs / 2)), fs)
         if m.id in fx.emuzzle:
-            self.glow(px, x0 + sw * 0.95, y0 + sh * 0.45, max(2.5 * self.sx, 4 * s), (255, 230, 120), 0.95)
+            mx, my = muzzle or (0.95, 0.45)
+            self.glow(px, x0 + sw * mx, y0 + sh * my, max(2.5 * self.sx, 4 * s), (255, 230, 120), 0.95)
         if labels is not None and not m.dead and m.seen:
             text, role = m.label()
             row = max(0, y0 // self.sy - 1)

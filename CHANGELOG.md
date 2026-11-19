@@ -68,6 +68,12 @@ game, RØØTLESS, shows them.
   (a chance to sidestep a shot seen coming) and `burst_fire` (a death that burns).
 - **A secret exit**: `{"exit": "secret"}` runs the scene's `on_secret_exit` instead of
   `on_level_exit`.
+- **Monsters that walk and aim**: while a monster moves it shows its steps - made by the
+  engine from its standing picture, or drawn (`"walk"`); while it takes aim and fires,
+  its `"attack"` picture; its shots flash at its `"muzzle"`.
+- **Melee weapons**: one key can hold several weapons (`"key"`; pressed again, the next
+  on it; a weapon can also be typed by its id). Melee options `accuracy`, `shove` (throws
+  the target back) and `stagger` (a bitten monster loses its turn); `ready_sound`.
 - **An end screen** (`"end_screen"` in game.json): a won game of levels ends on a screen
   of its own - banner, pictures side by side, the totals counting up, the ending, what
   comes next, credits and a crontab line still ticking.
@@ -94,15 +100,17 @@ game, RØØTLESS, shows them.
   of the whole game (the flag `cron_escaped`); the exit is a lift down. A secret exit in
   the goggles' closet leads to E1M9 *Swap Partition*: a belt hall running into acid, an
   oil depot guarded by flamethrowers, a coolant room of slick floor with a crate puzzle,
-  and a minigun holding the exit. Five new enemies drawn from pictures - shred
-  (flamethrower), kworker (dodging gunner), kswapd (heavy gunner), crawler (fast, three red
-  eyes), spinlock (minigun) - and a marine beside Cron on the end screen. Two riffs, sounds
-  (chip and Ballistic), 35 sprites, a tile.
+  and a minigun holding the exit. Five new enemies - shred (flamethrower), kworker
+  (dodging gunner), kswapd (heavy gunner), crawler (fast, three red eyes), spinlock
+  (minigun) - drawn in the game's own style, and the recruit, the game's hero, on the end
+  screen. A shovel (E1M1) and a chainsaw (E1M9's closet) share key 1 with the fist. The
+  story is framed: a recruit of the Terran Ascendancy Mandate in a simulator pod, his
+  first battle simulation. Two riffs, sounds (chip and Ballistic), 39 sprites, a tile.
 - `--view STYLE`, `--lines` (every command typed, no single keys), `--scroll`.
   `--check` also counts levels and monsters, and checks their maps and references.
 - `engine/levelbot.py`: a simple player that walks a level by its `"bot"` goals - if it can
   finish, a person can (`python tests/levelbot.py`, and in the editor). It plans slides,
-  keeps off fire, steps out of a flamethrower's line and ducks a spun-up minigun. 63 more
+  keeps off fire, steps out of a flamethrower's line and ducks a spun-up minigun. 72 more
   tests.
 - **Sound sets** (`sounds.NAME.json`): other sets of sound effects over a game's own, chosen
   with `--sounds NAME`, `CLIO_SOUNDS`, `"sound_set"` in game.json, or `sound set NAME` while

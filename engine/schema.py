@@ -242,7 +242,12 @@ KINDS = [
         F("sound", label="Sound of a shot"), F("text", label="A shot in words (BANG.)"),
         R("pellets", "number", "Pellets a shot (a shotgun: 7)"),
         R("spread", "number", "How far the pellets spread to monsters beside (0 to 1)"),
-        R("burst", "number", "Rounds fired a beat (a chaingun: 2)")]},
+        R("burst", "number", "Rounds fired a beat (a chaingun: 2)"),
+        R("key", "text", "The key that picks it, 1-9 (one key can hold several: pressed again, the next)"),
+        R("accuracy", "number", "Melee: the chance a blow lands (0 to 1; 0.85 if not said)"),
+        R("shove", "bool", "Melee: a blow throws the target a cell back"),
+        R("stagger", "number", "Melee: beats a bitten monster loses (no aim, no step)"),
+        R("ready_sound", "text", "Sound when it is taken in hand")]},
     {"key": "monsters", "file": "monsters", "label": "Monsters", "one": "monster", "shape": "map", "title": "name",
      "fields": [
         F("name"), F("role"), F("tag", label="Tag letter (z: z1, z2...)"), F("sprite", "sprite", "Sprite"),

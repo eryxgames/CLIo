@@ -71,7 +71,7 @@ PELLET = (1.0, 1.0, 0.85, 0.6, 0.42, 0.3, 0.22, 0.16, 0.12)
 HELP = [
     ("↑ ↓  step forward, back      ← →  turn", "text"),
     ("Ctrl+← →  or  , .  strafe     space  fire", "text"),
-    ("Enter  open, press   Tab  map   1-4  weapons", "text"),
+    ("Enter  open, press   Tab  map   1-7  weapons", "text"),
     ("", "text"),
     ("Typed: k j h l, turn left/right/around, use,", "dim"),
     ("f [x], kill [-9] x, t x, w [n], map, ps, man x,", "dim"),
@@ -182,6 +182,8 @@ class Monster:
         self.hp = self.max_hp = int(spec.get("hp", 20))
         self.spin = 0                                   # beats spent spinning up (a gun that must spin first)
         self.spun = False
+        self.stride = 0                                 # steps taken: which foot its walk shows
+        self.stun = 0                                   # beats it loses (a chainsaw bites)
         self.sprite = spec.get("sprite") or kind
         self.size = float(spec.get("size", 1.0))
         self.float = float(spec.get("float", 0.0))
@@ -398,7 +400,7 @@ class Level:
         return it
 
     def load_sprites(self):
-        from .sprite import _rgb, far_versions
+        from .sprite import _rgb, far_versions, walk_frames
         names = {m.sprite for m in self.monsters} | {it.sprite for it in self.items}
         names |= {w.get("sprite") for w in self.weapons.values()} | {"fireball", "muzzle", "gore"}
         names |= {(m.spec.get("attack") or {}).get("spawn") for m in self.monsters}
@@ -406,6 +408,12 @@ class Level:
             spec = (self.data.monsters or {}).get(kind)
             if isinstance(spec, dict):
                 names.add(spec.get("sprite") or kind)
+        movers = set()                                  # the pictures of monsters that walk
+        for kind in {m.kind for m in self.monsters} | {(m.spec.get("attack") or {}).get("spawn") for m in self.monsters}:
+            spec = (self.data.monsters or {}).get(kind)
+            if isinstance(spec, dict) and not spec.get("float") \
+                    and (spec.get("attack") or {}).get("kind") not in ("barrel", "spawner", "cron"):
+                movers.add(spec.get("sprite") or kind)
         for name in names:
             if not name:
                 continue
@@ -413,8 +421,17 @@ class Level:
             if not isinstance(data, dict) or not data.get("pixels"):
                 continue
             pal = {k: _rgb(v) for k, v in (data.get("palette") or {}).items()}
-            far = None if data.get("lod") else far_versions(data["pixels"], data.get("keep", ""))
-            self.sprites[name] = Picture.from_data(data, pal, far)
+            keep = data.get("keep", "")
+            far = None if data.get("lod") else far_versions(data["pixels"], keep)
+            pic = self.sprites[name] = Picture.from_data(data, pal, far)
+            if name in movers:                          # its steps: drawn, or made from its standing picture
+                walk = data["walk"] if isinstance(data.get("walk"), list) else walk_frames(data["pixels"])
+                pic.walk = [Picture.from_data({"pixels": f}, pal, far_versions(f, keep)) for f in walk if f]
+                if data.get("attack"):
+                    pic.attack = Picture.from_data({"pixels": data["attack"]}, pal, far_versions(data["attack"], keep))
+            mz = data.get("muzzle")
+            if isinstance(mz, (list, tuple)) and len(mz) == 2 and pic.w and pic.h:
+                pic.muzzle = ((mz[0] + 0.5) / pic.w, (mz[1] + 0.5) / pic.h)
 
     def load_tiles(self):
         """The game's own tiles (tiles.json) over the engine's, and the level's floor and ceiling."""
@@ -693,6 +710,8 @@ class Level:
         m = re.fullmatch(r"(?:w|wait|sleep)\s+(\d+)", t)
         if m:
             return self.sleep(int(m.group(1)))
+        if len(t) == 1 and t.isdigit() and any(self.slot_of(k) == t for k in self.weapons):
+            return self.choose_slot(t)
         if t in self.weapons:
             return self.switch(t)
         m = re.fullmatch(r"(?:f|fire|shoot)\s*([a-z]\d*)?", t)
@@ -1122,6 +1141,27 @@ class Level:
         self.anim([FX(whiten=k) for k in (0.25, 0.12, 0.0)], 0.05)
         self.update_seen()
 
+    def slot_of(self, wid):
+        """The key a weapon is on: its "key", or its id when that is a digit."""
+        w = self.weapons.get(wid) or {}
+        return str(w.get("key") or wid)
+
+    def choose_slot(self, key):
+        """A weapon key: the best weapon on it, or the next one when one of them is in hand already."""
+        p = self.player
+        order = list(self.weapons)
+        mine = [k for k in order if self.slot_of(k) == key and k in p.weapons]
+        if len(mine) <= 1:
+            return self.switch(mine[0] if mine else key)
+        mine.reverse()                                  # the last in weapons.json first: the best
+        if p.weapon in mine:
+            mine = mine[mine.index(p.weapon) + 1:] + mine[:mine.index(p.weapon)]
+        for k in mine:
+            w = self.weapons[k]
+            if not w.get("ammo") or p.ammo.get(w["ammo"], 0) > 0:
+                return self.switch(k)
+        return self.switch(mine[0])
+
     def switch(self, wid):
         p = self.player
         w = self.weapons.get(wid)
@@ -1134,6 +1174,8 @@ class Level:
         if p.weapon != wid:
             p.weapon = wid
             self.say("You ready the %s." % w["name"], "info")
+            if w.get("ready_sound"):
+                self.sfx(w["ready_sound"])
             self.anim([FX(recoil=4), FX(recoil=2), FX(recoil=1)], 0.04)
         return True
 
@@ -1207,7 +1249,10 @@ class Level:
                     self.open_panel(cell)
                     self.end_beat()
                     return True
-                self.say("You punch the air." if not cell.solid else "Ow. That is a wall.", "dim")
+                if w.get("name", "fist") == "fist":
+                    self.say("You punch the air." if not cell.solid else "Ow. That is a wall.", "dim")
+                else:
+                    self.say(("The %s cuts the air." if not cell.solid else "The %s bites the wall. Sparks.") % w["name"], "dim")
                 self.end_beat()
                 return False
         if w.get("ammo"):
@@ -1228,7 +1273,7 @@ class Level:
         hits = {}
         lo, hi = w.get("damage", [5, 10])
         if melee:
-            if rng.random() < 0.85:
+            if rng.random() < float(w.get("accuracy", 0.85)):
                 hits[target] = rng.randint(lo, hi) * (3 if w.get("berserk") else 1)
         else:
             for _ in range(int(w.get("burst", 1))):
@@ -1263,8 +1308,13 @@ class Level:
         if hits:
             sound = w.get("text", {"melee": "THUD."}.get(w.get("kind"), "BLAM." if w.get("pellets", 1) > 1 else "BANG."))
             self.damage(sorted(hits.items(), key=lambda kv: kv[0] is not target), lead=sound)
-            if (int(w.get("pellets", 1)) > 1 and d == 1 and target in hits and not target.dead and not target.barrel
-                    and not target.spec.get("boss")):                    # point blank: the shotgun shoves
+            if (melee and w.get("stagger") and target in hits and not target.dead and not target.barrel
+                    and not target.spec.get("boss")):                    # it reels: no aim, no step
+                target.stun = max(target.stun, int(w["stagger"]))
+                target.intent = None
+            if ((int(w.get("pellets", 1)) > 1 or (melee and w.get("shove"))) and d == 1 and target in hits
+                    and not target.dead and not target.barrel
+                    and not target.spec.get("boss")):                    # point blank: the shotgun (or a shovel) shoves
                 fx_, fy_ = DIRS[p.facing]
                 if self.free(target.x + fx_, target.y + fy_, skip=target):
                     ox, oy = target.x, target.y
@@ -1281,8 +1331,11 @@ class Level:
         p = self.player
         if w.get("ammo") and p.ammo.get(w["ammo"], 0) <= 0:
             self.say("Out of %s." % w["ammo"], "alert")
-            best = max([k for k in p.weapons if not (self.weapons.get(k) or {}).get("ammo")
-                        or p.ammo.get(self.weapons[k]["ammo"], 0) > 0] or ["1"])
+            order = list(self.weapons)
+            ready = [k for k in p.weapons if k in self.weapons and (not self.weapons[k].get("ammo")
+                                                                     or p.ammo.get(self.weapons[k]["ammo"], 0) > 0)]
+            best = max(ready or ["1"], key=lambda k: (bool((self.weapons.get(k) or {}).get("ammo")),
+                                                      order.index(k) if k in order else -1))
             self.switch(best)
 
     def shoot_straight(self, w):
@@ -1743,6 +1796,7 @@ class Level:
             return False
         self.moved.append((m, m.x, m.y))
         m.x, m.y = x, y
+        m.stride += 1
         return True
 
     def step_towards(self, m, field, away=False):
@@ -1767,6 +1821,11 @@ class Level:
         if kind == "cron":
             return
         m.cool = max(0, m.cool - 1)
+        if m.stun:                                      # still reeling: no aim, no step
+            m.stun -= 1
+            m.intent = None
+            m.spin, m.spun = 0, False
+            return
         if m.grudge is not None and (m.grudge.dead or m.grudge.gone):
             m.grudge = None
         foe = m.grudge
@@ -2202,7 +2261,7 @@ class FrameConsole:
         face = self.face(lv, fx)
         segs = [(" %s %d" % (g["heart"], p.hp), "hurt" if fx.hurt or p.hp < 30 else "text"),
                 ("  %s %d" % (g["armor"], p.armor), "dim" if not p.armor else "key_x" if p.armor > 100 else "good"), bar,
-                ("%s %s " % (p.weapon, w.get("name", "?")), "text"), (ammo, "ammo"), bar] + keys + [
+                ("%s %s " % (lv.slot_of(p.weapon), w.get("name", "?")), "text"), (ammo, "ammo"), bar] + keys + [
                 bar, (g["facing"][p.facing] + " " + FACE_NAMES[p.facing][0].upper(), "text"), bar,
                 ("%d/%d" % (lv.stats["kills"], lv.total_kills), "dim"), bar, (face, "root" if p.sudo else "title")]
         out = [sc.paint.text(segs, W, g["ell"])]
@@ -2602,6 +2661,16 @@ def validate(data):
             problems.append("weapon '%s': damage should be [least, most]" % wid)
         if w.get("sprite") and w["sprite"] not in sprites:
             problems.append("weapon '%s': no sprite '%s' in sprites.json" % (wid, w["sprite"]))
+        key = str(w.get("key") or wid)
+        if not (len(key) == 1 and key in "123456789"):
+            problems.append("weapon '%s': key should be one of 1-9 (the key that picks it)" % wid)
+    for name, sp in sprites.items():                 # a monster's steps and its attack: drawn as big as it is
+        if not isinstance(sp, dict) or not isinstance(sp.get("pixels"), list):
+            continue
+        size = (len(sp["pixels"]), max((len(r) for r in sp["pixels"]), default=0))
+        frames = list(sp.get("walk") or []) + ([sp["attack"]] if sp.get("attack") else [])
+        if any(not isinstance(f, list) or (len(f), max((len(r) for r in f), default=0)) != size for f in frames):
+            problems.append("sprite '%s': its walk and attack frames should be %d x %d, as it is" % (name, size[1], size[0]))
     for lid, lv in (data.levels or {}).items():
         if not isinstance(lv, dict):
             problems.append("level '%s' should be an object" % lid)

@@ -501,5 +501,60 @@
   ],
   "dur": 0.6,
   "vol": 0.3
+ },
+ "shovel": [
+  {
+   "wave": "noise",
+   "noise_rate": 1800,
+   "freq": 0,
+   "dur": 0.12,
+   "vol": 0.3,
+   "decay": 0.1,
+   "sustain": 0.2
+  },
+  {
+   "wave": "square",
+   "freq": [
+    620,
+    540
+   ],
+   "dur": 0.2,
+   "vol": 0.1
+  }
+ ],
+ "chainsaw": [
+  {
+   "wave": "saw",
+   "freq": [
+    120,
+    150
+   ],
+   "dur": 0.45,
+   "vol": 0.22,
+   "vibrato": [
+    28,
+    0.09
+   ]
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 3000,
+   "freq": 0,
+   "dur": 0.45,
+   "vol": 0.12
+  }
+ ],
+ "chainsaw_up": {
+  "wave": "saw",
+  "freq": [
+   60,
+   140
+  ],
+  "dur": 0.6,
+  "vol": 0.22,
+  "vibrato": [
+   22,
+   0.08
+  ]
  }
 }

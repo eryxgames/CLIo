@@ -277,6 +277,67 @@ def display_test(term, logo_name=None):
     return 0
 
 
+def compact_json(obj, indent=0):
+    """JSON as a person reads it, with long lists of numbers kept on one line each (a vertex, a frame)."""
+    import json
+    pad = " " * (indent + 1)
+    if isinstance(obj, dict):
+        if not obj:
+            return "{}"
+        inner = (",\n").join("%s%s: %s" % (pad, json.dumps(k, ensure_ascii=False), compact_json(v, indent + 1))
+                              for k, v in obj.items())
+        return "{\n%s\n%s}" % (inner, " " * indent)
+    if isinstance(obj, list) and obj and all(isinstance(x, list) for x in obj):
+        inner = (",\n").join(pad + compact_json(x, indent + 1) for x in obj)
+        return "[\n%s\n%s]" % (inner, " " * indent)
+    return json.dumps(obj, ensure_ascii=False, separators=(", ", ": ") if not isinstance(obj, list) else (",", ":"))
+
+
+def import_model(game_dir, path, name=None, scale=0.4):
+    """``--import-model``: a glTF file into the game's models.json (a model of that name keeps how it was set
+    to move - bob, turning, smooth, spin, scale - and takes the rest from the file)."""
+    import json
+    from collections import OrderedDict
+    from engine import gltf, model
+    try:
+        spec, notes = gltf.to_model(path, scale=scale)
+    except (OSError, gltf.GltfError, KeyError, IndexError, struct_error()) as e:
+        print("Cannot read %s: %s" % (path, e))
+        return 2
+    name = name or "".join(c if c.isalnum() or c in "-_" else "_" for c in
+                           os.path.splitext(os.path.basename(path))[0].lower())
+    target = os.path.join(game_dir, "models.json")
+    table = OrderedDict()
+    if os.path.isfile(target):
+        with open(target, encoding="utf-8") as f:
+            table = json.load(f, object_pairs_hook=OrderedDict)
+    old = table.get(name) or {}
+    new = OrderedDict((k, v) for k, v in old.items() if k in ("bob", "turning", "smooth", "spin", "scale"))
+    new.update(spec)
+    new.pop("notes", None)
+    table[name] = new
+    wrong = model.problems({name: new})
+    if wrong:
+        print("The model does not come out right:\n  " + "\n  ".join(wrong))
+        return 2
+    with open(target + ".tmp", "w", encoding="utf-8") as f:
+        f.write(compact_json(table) + "\n")
+    os.replace(target + ".tmp", target)
+    m = model.Model(name, new)
+    clips = ", ".join("%s (%d)" % (k, len(v)) for k, v in (new.get("frames") or {}).items()) or "none"
+    print("Model '%s' in %s: %d triangles, %d materials, %.2f cells high; animations: %s."
+          % (name, target, len(m.faces), len(m.materials), m.height, clips))
+    for n in notes:
+        print("  note: " + n)
+    print('A monster or a vehicle uses it with "model": "%s" in monsters.json; an item in its "pickup".' % name)
+    return 0
+
+
+def struct_error():
+    import struct
+    return struct.error
+
+
 def write_sheet(game_dir, what, scale, out=None):
     """``--sheet``: the game's pictures on one PNG, and its atlas beside it."""
     import json
@@ -388,6 +449,11 @@ def main(argv=None):
     ap.add_argument("--sheet", choices=("monsters", "sprites", "tiles"),
                     help="write a sheet of the game's pictures as PNG, with an atlas (JSON) of where each one is, and exit")
     ap.add_argument("--scale", type=int, default=4, help="with --sheet: how many times as big the pictures are (4)")
+    ap.add_argument("--import-model", metavar="FILE",
+                    help="bring a glTF model (.glb or .gltf, e.g. from Blender) into the game's models.json and exit")
+    ap.add_argument("--model-name", metavar="NAME", help="with --import-model: its name (default: the file's)")
+    ap.add_argument("--model-scale", type=float, default=0.4,
+                    help="with --import-model: cells per metre (0.4: a 2.5 m room is a cell high)")
     ap.add_argument("--import-sheet", metavar="FILE",
                     help="take an edited sheet (FILE.png, with FILE.json beside it) back into the game and exit")
     ap.add_argument("--version", action="version",
@@ -439,6 +505,8 @@ def main(argv=None):
         return write_sheet(game_dir, args.sheet, args.scale, args.export)
     if args.import_sheet:
         return read_sheet(game_dir, args.import_sheet)
+    if args.import_model:
+        return import_model(game_dir, args.import_model, args.model_name, args.model_scale)
     if args.bake_sounds:
         try:
             return bake_sounds(game_dir, args.bake_sounds)
@@ -453,7 +521,8 @@ def main(argv=None):
                   % (data.title, len(data.scenes), len(data.items), len(data.characters),
                      len(data.dialogues), len(data.quests),
                      (", %d levels, %d monsters, %d weapons, %d tiles" % (len(data.levels), len(data.monsters), len(data.weapons),
-                                                                         len(data.tiles))) if data.levels else ""))
+                                                                         len(data.tiles))) if data.levels else "")
+                     + (", %d models" % len(data.models) if getattr(data, "models", None) else ""))
             for p in problems:
                 print("  ! " + p)
             print("OK" if not problems else "%d problem(s)" % len(problems))

@@ -1385,6 +1385,60 @@ work - for a slow machine or a very wide window) or `"auto"` (the default: low o
 very big picture); `--detail` overrides it. Walls are drawn 10 cells ahead; monsters, items
 and shots count within 7.
 
+### 3D models
+
+Beside sprites, a level can draw low-poly 3D models: a monster, a vehicle or an item with
+`"model": "NAME"` (an item in its `"pickup"`) is drawn from `models.json` instead of its
+sprite, lit, turned the way it faces (where it went, or at the player when it aims), and
+labelled as a sprite is. Model space: x to the right, y forward, z up; one unit is a cell
+(and the room's height); the origin is on the floor under its middle.
+
+```json
+"drone_scout": {
+  "materials": {"hull": {"color": "#6b717c", "metal": 0.8, "rough": 0.35},
+                "paint": {"color": "#e07a1f", "metal": 0, "rough": 0.5},
+                "eye": {"color": "#ff3020", "glow": 3}},
+  "bob": [0.04, 2],
+  "parts": [
+    {"shape": "sphere", "size": [0.5, 0.5, 0.34], "at": [0, 0, 0.55], "material": "hull", "detail": 1},
+    {"shape": "cylinder", "axis": "y", "size": [0.15, 0.42, 0.15], "at": [-0.36, 0, 0.52], "material": "paint",
+     "group": "pods"},
+    {"shape": "box", "size": [0.1, 0.07, 0.07], "at": [0, 0.25, 0.56], "material": "eye"}],
+  "spin": {"pods": {"axis": "y", "speed": 90}}
+}
+```
+
+- **Parts**: `shape` is `box`, `wedge` (a box whose top slopes down to its front: a nose,
+  a ramp, a canopy), `cylinder`, `cone`, `sphere` (`detail` 0-3) or `ring` (a torus;
+  `thick` is the tube against the ring, `tube` its sides); `sides` for round ones, `axis`
+  (`x`, `y` or `z`) for the way a round one lies. `size` is the part's box, `at` its middle,
+  `turn` `[yaw, pitch, roll]` in degrees; `color` paints one part over its material.
+- **Materials** are glTF's physically based kind: `color` (as picked on a screen), `metal`
+  (0 paint and plastic, 1 bare metal), `rough` (0 a mirror, 1 chalk), `glow` (light of its
+  own, 0-4). A triangle is lit as a whole - the low-poly look - or, with `"smooth": true`,
+  at its corners and blended across (round things). The light comes with the player, from
+  his left and above, so the side he sees is lit and its far side falls into shadow; metal
+  shows that light's side of the room, and the level's fog dims it as it does sprites.
+- **Moving**: `"bob": [height, beats]` floats it up and down; `"turning"` turns the whole
+  model so many degrees a beat (a pickup); `"spin"` turns a `group` of parts about its own
+  middle (rotors, turbines, a radar dish). Imported animations play as **frames**: `idle`,
+  `walk` (while it moves), `attack` (while it aims and fires); `fps` is frames a beat.
+- **Destroyed**, a model breaks into its triangles, which fly out from its middle, turn,
+  fall to the floor and are gone; it leaves no gore unless its monster names `remains`.
+- **From Blender**: export glTF 2.0 (`.glb`, or `.gltf` with its `.bin`), then
+  `python clio.py GAME --import-model drone.glb` (`--model-name`, `--model-scale`: cells
+  per metre, 0.4 by default - a 2.5 m room is a cell high). It brings in the meshes of
+  the scene with their objects' placing; the materials' base colour, metallic, roughness
+  and emission; a base colour texture (PNG) or vertex colours as a colour per triangle;
+  and every action - object and armature (skinned) animation alike - as frames, named as
+  the actions are. Shape keys (morph targets) and JPEG textures are not taken; it says so.
+  Keys you added by hand to a model of that name (`bob`, `turning`, `smooth`, `spin`)
+  stay. Keep models low: a few hundred triangles each - every one is lit and filled in
+  Python, about 1 ms for a 200-triangle model.
+
+`--check` checks the shapes, sizes, materials and mesh of every model, and that what names
+a model has one.
+
 ### Saving in a level
 
 `save [name]` (F5) saves in a level and `load [name]` (F9) loads; `saves` lists them. A save

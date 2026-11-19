@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import math
 
+from . import model as model_mod
 from .frame import mix, shade, lum
 
 DECAY = 0.64                 # apparent size falls to 64% with each cell of distance
@@ -319,6 +320,7 @@ class FX:
         self.style = None        # draw this frame in another style (a teleport's dots)
         self.face = None         # the way the picture looks, in place of the player's (a teleport)
         self.missiles = ()       # things flying: (x, y, height, sprite name, glow colour or None) - a rocket, a grenade
+        self.tick = 0.0          # how far into the beat the animation is (0..1): spinning parts turn by it
         self.__dict__.update(kw)
 
 
@@ -403,6 +405,18 @@ def _flames():
 
 
 FLAMES = _flames()
+
+
+def _normal(p0, p1, p2):
+    """A world triangle's outward normal (the model-to-world turn is a mirror, so the cross is turned round)."""
+    ux, uy, uz = p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]
+    vx, vy, vz = p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]
+    return _unit3((-(uy * vz - uz * vy), -(uz * vx - ux * vz), -(ux * vy - uy * vx)))
+
+
+def _unit3(v):
+    n = math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]) or 1.0
+    return v[0] / n, v[1] / n, v[2] / n
 
 
 def _drawn(rows, palette):
@@ -777,6 +791,7 @@ class View:
         f = fx.face if fx.face is not None else p.facing
         fx_, fy_ = DIRS[f]
         rx, ry = DIRS[(f + 1) % 4]
+        cam = (cx, cy, fx_, fy_, rx, ry)
         px = self.backdrop(lv, cx, cy, f, phase)
         self.cover = {}
         self.fireball = lv.sprites.get("fireball")
@@ -817,7 +832,8 @@ class View:
                 continue
             a, z = rel(it.x, it.y)
             if -0.3 < z <= SIGHT:
-                items.append((z, 2, 0, "item", (a, it)))
+                items.append((z, 2, 0, "itemmodel" if it.model and it.model in getattr(lv, "models", {}) else "item",
+                              (a, it)))
         for (x, y) in getattr(lv, "crate_cells", lambda: ())():
             cx_, cy_ = fx.crates.get((x, y), (x, y))
             a, z = rel(cx_, cy_)
@@ -842,7 +858,10 @@ class View:
             mx, my = fx.pos.get(m.id, (m.x, m.y))
             a, z = rel(mx, my)
             if -0.4 < z <= SIGHT + 0.5:
-                items.append((z, 3, 0, "mob", (a, m)))
+                if m.model and m.model in getattr(lv, "models", {}):
+                    items.append((z, 3, 0, "model", (a, m, mx, my)))
+                else:
+                    items.append((z, 3, 0, "mob", (a, m)))
         shots = fx.shots if fx.shots is not None else [(s.x, s.y) for s in lv.shots]
         for sx_, sy_ in shots:
             a, z = rel(sx_, sy_)
@@ -910,6 +929,15 @@ class View:
                 s2 = pic.h * s / pp.h
                 self.blit(px, pp.rows, int(round(self.X(a, z) - pp.w * s2 / 2)), int(round(base - pp.h * s2)), s2,
                           lambda c, i, j: shade(c, fog))
+            elif kind == "model":
+                a, m, mx, my = obj
+                self.draw_monster_model(px, lv, m, a, z, mx, my, fx, labels, cam, phase)
+            elif kind == "itemmodel":
+                a, it = obj
+                mdl = lv.models[it.model]
+                t = phase + fx.tick
+                self.draw_model(px, mdl, it.x, it.y, math.radians(mdl.turning * t), "idle", t, cam,
+                                lift=fx.lift_items.get(it, 0.0) * 0.3)
             elif kind == "item":
                 a, it = obj
                 self.draw_thing(px, lv.sprites.get(it.sprite), a, z, it.size, None, fx, labels=None,
@@ -984,6 +1012,132 @@ class View:
             px = [([black] * s + row[:-s]) if s > 0 else (row[-s:] + [black] * -s) for row in px]
         over = self.place_labels(labels, overlays)
         return self.halves(px, over) if self.style == "pixel" else self.braille(px, over)
+
+    # ---- 3D models (engine/model.py) ---------------------------------------- #
+    LIGHT = (-0.2, -0.72, 0.66)         # from the viewer's left and above (a little behind): back, left, up
+    EYE = 0.52                          # the eye's height: the horizon's (the room is 1 high)
+
+    def project(self, cam, x, y, h):
+        """A point of the world (cells; h up from the floor) on the picture: (x, y, depth), or None behind."""
+        cx, cy, fx_, fy_, rx, ry = cam
+        dx, dy = x - cx, y - cy
+        a, z = dx * rx + dy * ry, dx * fx_ + dy * fy_
+        if z < 0.12:
+            return None
+        t = DECAY ** z
+        return self.half + a * self.LW * t, self.yh + self.FS * t - h * (self.FS + self.CH) * t, z
+
+    def draw_model(self, px, mdl, wx, wy, heading, clip, t, cam, lift=0.0, size=1.0, gone=0.0, seed=0,
+                   flash=False, tint=None):
+        """A model standing at (wx, wy) facing ``heading`` (radians: 0 east, pi/2 south), posed for
+        ``clip`` at time ``t``; ``gone`` (0..1): blown apart that far. Returns its top and middle on the
+        picture (y, x), or None if none of it showed."""
+        verts = mdl.pose(clip, t)
+        if size != 1.0:
+            verts = [(x * size, y * size, z * size) for x, y, z in verts]
+        fxw, fyw = math.cos(heading), math.sin(heading)
+        rxw, ryw = -fyw, fxw
+        world = [(wx + x * rxw + y * fxw, wy + x * ryw + y * fyw, z + lift) for x, y, z in verts]
+        if gone > 0:
+            tris = model_mod.shards(mdl, world, gone, seed)
+            cull = False
+        else:
+            tris = [((world[f[0]], world[f[1]], world[f[2]]), f) for f in mdl.faces]
+            cull = True
+        W, H = self.PW, self.PH
+        zbuf = {}
+        lb, ll, lu = self.LIGHT                           # the light comes with the viewer: what he sees is lit
+        light = _unit3((cam[2] * lb + cam[4] * ll, cam[3] * lb + cam[5] * ll, lu))
+        ex, ey = cam[0], cam[1]
+        smooth = mdl.smooth and gone <= 0
+        normals = {}
+        if smooth:                                        # a corner's normal: its triangles' together
+            for (p0, p1, p2), f in tris:
+                n = _normal(p0, p1, p2)
+                for i in f[:3]:
+                    s = normals.setdefault(i, [0.0, 0.0, 0.0])
+                    s[0] += n[0]
+                    s[1] += n[1]
+                    s[2] += n[2]
+        top, xs, shown = self.PH, [], False
+        for (p0, p1, p2), f in tris:
+            pts = [self.project(cam, p[0], p[1], p[2]) for p in (p0, p1, p2)]
+            if None in pts:
+                continue
+            area = (pts[1][0] - pts[0][0]) * (pts[2][1] - pts[0][1]) - (pts[1][1] - pts[0][1]) * (pts[2][0] - pts[0][0])
+            if cull and area <= 0:                        # turned away (the model's x-y-z to the world's is a mirror)
+                continue
+            mat = mdl.materials[f[3]]
+            rgb = f[4] or mat.rgb
+            depth = (pts[0][2] + pts[1][2] + pts[2][2]) / 3
+            fog = (0.5 + 0.5 * min(1.0, DECAY ** depth * 1.6)) if not mat.glow else 1.0    # as sprites
+            if smooth:
+                cols = []
+                for i, p in zip(f[:3], (p0, p1, p2)):
+                    n = _unit3(normals[i])
+                    v = _unit3((ex - p[0], ey - p[1], self.EYE - p[2]))
+                    c = model_mod.pbr(mat, rgb, (n[0], n[1], n[2]), light, v)
+                    cols.append([c[0] * fog, c[1] * fog, c[2] * fog])
+            else:
+                n = _normal(p0, p1, p2)
+                if not cull and n[0] * (ex - p0[0]) + n[1] * (ey - p0[1]) + n[2] * (self.EYE - p0[2]) < 0:
+                    n = (-n[0], -n[1], -n[2])             # a shard's back: lit as its front
+                mx_ = (p0[0] + p1[0] + p2[0]) / 3
+                my_ = (p0[1] + p1[1] + p2[1]) / 3
+                mz_ = (p0[2] + p1[2] + p2[2]) / 3
+                v = _unit3((ex - mx_, ey - my_, self.EYE - mz_))
+                c = model_mod.pbr(mat, rgb, n, light, v)
+                cols = (int(c[0] * fog), int(c[1] * fog), int(c[2] * fog))
+                if flash:
+                    cols = (255, 255, 255)
+                elif tint:
+                    cols = mix(cols, tint, 0.6)
+            model_mod.raster(px, zbuf, W, H, pts, cols)
+            shown = True
+            top = min(top, pts[0][1], pts[1][1], pts[2][1])
+            xs += [pts[0][0], pts[1][0], pts[2][0]]
+        if not shown:
+            return None
+        return top, (min(xs) + max(xs)) / 2
+
+    def shadow(self, px, x, base, w):
+        for yy in range(int(base) - self.sy // 2, int(base) + 1):
+            if 0 <= yy < self.PH:
+                for xx in range(int(x - w * 0.4), int(x + w * 0.4) + 1):
+                    if 0 <= xx < self.PW:
+                        px[yy][xx] = shade(px[yy][xx], 0.6)
+
+    def draw_monster_model(self, px, lv, m, a, z, mx, my, fx, labels, cam, phase):
+        mdl = lv.models[m.model]
+        t = phase + fx.tick
+        if m.intent in ("aim", "windup", "spin", "charge") or m.id in fx.emuzzle or m.heading is None:
+            heading = math.atan2(cam[1] - my, cam[0] - mx)            # at the player
+        elif m.id in fx.pos and (m.x, m.y) != (mx, my):
+            heading = math.atan2(m.y - my, m.x - mx)                  # the way it is going
+        else:
+            heading = m.heading
+        if m.dead and m.id not in fx.dissolve:
+            return
+        clip = ("attack" if m.intent in ("aim", "windup", "spin") or m.id in fx.emuzzle else
+                "walk" if m.id in fx.pos else "idle")
+        lift = m.float * 0.6 + (fx.rise.get(m.id, 0.0) if fx.rise else 0.0)
+        if not m.float:
+            tz = DECAY ** z
+            self.shadow(px, self.X(a, z), self.yh + self.FS * tz, mdl.radius * 2 * m.size * self.LW * tz)
+        else:
+            tz = DECAY ** z
+            self.shadow(px, self.X(a, z), self.yh + self.FS * tz, mdl.radius * 1.4 * m.size * self.LW * tz)
+        got = self.draw_model(px, mdl, mx, my, heading, clip, t, cam, lift=lift, size=m.size,
+                              gone=fx.dissolve.get(m.id, 0.0) if m.dead or m.id in fx.dissolve else 0.0, seed=m.id,
+                              flash=m.id in fx.flash, tint=fx.tint.get(m.id))
+        if got and labels is not None and not m.dead and m.seen:
+            top, x = got
+            text, role = m.label()
+            row = max(0, int(top) // self.sy - 1)
+            labels.append((row, int(round(x / self.sx - len(text) / 2)), text, role, z, m.targeted))
+            for mm, txt, r, rise in fx.texts:
+                if mm is m:
+                    labels.append((max(0, row - 1 - rise // 2), int(round(x / self.sx - len(txt) / 2)), txt, r, z, False))
 
     def draw_thing(self, px, pic, a, z, size, m, fx, labels, lift=0.0):
         if pic is None:

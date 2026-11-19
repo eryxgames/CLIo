@@ -87,7 +87,8 @@ class GameData:
                     "texts": "texts.json", "dialogues": "dialogues.json", "quests": "quests.json",
                     "triggers": "triggers.json", "music": "music.json", "sounds": "sounds.json",
                     "sprites": "sprites.json", "dungeon": "dungeon.json", "levels": "levels.json",
-                    "monsters": "monsters.json", "tiles": "tiles.json", "weapons": "weapons.json"}
+                    "monsters": "monsters.json", "tiles": "tiles.json", "weapons": "weapons.json",
+                    "models": "models.json"}
 
         def load(key, required=False):
             name = files.get(key, defaults[key])
@@ -116,6 +117,7 @@ class GameData:
         self.monsters = load("monsters") or {}
         self.tiles = load("tiles") or {}               # walls, floors and ceilings of levels, over the engine's
         self.weapons = load("weapons") or {}           # weapons in levels, over game.json's first_person ones
+        self.models = load("models") or {}             # low-poly 3D models for levels (engine/model.py)
         self.art_dir = os.path.join(self.dir, cfg.get("art_dir", "art"))
 
         self.theme = cfg.get("style") or cfg.get("style_config") or "default"

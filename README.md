@@ -83,6 +83,7 @@ python clio.py [game] [options]
   --no-sound      run silently
   --sounds SET    another set of sound effects (rootless: ballistic, which needs Node.js or baked takes)
   --get-ballistic install Ballistic's C engine for this machine in your data folder (renders without Node.js)
+  --import-model F  bring a glTF model (.glb/.gltf, e.g. from Blender) into a game's models.json
   --no-color      plain text
   --ascii         no box-drawing or block characters
   --glyphs MODE   full, safe (frames stay, symbols become plain) or ascii
@@ -196,13 +197,14 @@ engine/
   banner.py          text in graphic styles   fx.py       art animation
   automap.py         auto-map                 maze.py     dungeon generator
   audio/             synth, composer, sound effects, playback backends
-    ballistic/       Ballistic Foley Lab's sound engine, run in Node.js
+    ballistic/       Ballistic Foley Lab's sound engine (Node.js, or its C engine: --get-ballistic)
   data.py            loading and normalising game files
   world.py           game state, save/load
   parser.py          command parser           actions.py  the verbs
   conditions.py      conditions and effects   quests.py   dialogue.py   combat.py
   game.py            the turn loop
   level.py           first-person levels      firstperson.py  the view
+  model.py           3D models in levels      gltf.py     glTF from Blender
   frame.py  keys.py  the redrawn screen and single keys
 games/               derelict/  depths/  rootless/
 templates/starter/   a tiny complete game to copy (Apache-2.0)
@@ -220,7 +222,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 306 tests, under a minute
+python -m unittest discover -s tests     # 322 tests, under a minute
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 python tests/levelbot.py 10              # an automatic player walks Rootless's E1M1 ten times

@@ -174,6 +174,17 @@ game, RØØTLESS, shows them.
   has a claw for a weapon, shoves heavy **containers** (`{"crate": "heavy"}`) that the
   player alone cannot move, wades through acid, fits through no door, and bursts when it is
   wrecked. The picture shows its cage and claws. The level bot can `board` and get `out`.
+- **3D models in levels** (`models.json`, `engine/model.py`): a monster, vehicle or item with
+  `"model"` is drawn as a low-poly model instead of a sprite - made of parts (box, wedge,
+  cylinder, cone, sphere, ring: placed, sized, turned) or a mesh, with glTF's physically
+  based materials (colour, metal, rough, glow) lit by a Cook-Torrance light, flat or smooth,
+  in the level's fog, with a depth buffer; it faces where it went or whom it aims at, bobs,
+  turns, spins groups of parts, plays imported frames (`idle`, `walk`, `attack`), and when
+  destroyed breaks into shards that fly, fall and fade. About 1 ms for 200 triangles.
+- **`--import-model FILE`**: glTF 2.0 (`.glb`, `.gltf`) from Blender into `models.json` -
+  meshes with their placing, PBR materials, PNG textures and vertex colours as colours per
+  triangle, object and skinned animations as frames (`--model-name`, `--model-scale`).
+  `--check` checks models and what names them.
 - **`python clio.py --get-ballistic`**: installs Ballistic's C engine for this machine - the release CLIo
   follows (0.5.0: Linux x64/arm64, macOS, Windows x64/arm64, Android), checked against the SHA-256 CLIo keeps,
   only the library with its LICENSE and NOTICE, in the user's data folder (`~/.local/share/clio/ballistic/`,

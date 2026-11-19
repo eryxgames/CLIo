@@ -201,6 +201,8 @@ class Monster:
         self.stride = 0                                 # steps taken: which foot its walk shows
         self.stun = 0                                   # beats it loses (a chainsaw bites)
         self.sprite = spec.get("sprite") or kind
+        self.model = spec.get("model")                  # a 3D model in models.json, drawn instead of the sprite
+        self.heading = None                             # where it faces (radians; None: at the player)
         self.size = float(spec.get("size", 1.0))
         self.float = float(spec.get("float", 0.0))
         self.attack = spec.get("attack") or {}
@@ -236,6 +238,7 @@ class Item:
         self.iid, self.spec, self.x, self.y = iid, spec, x, y
         self.pickup = spec.get("pickup") or {}
         self.sprite = self.pickup.get("sprite") or spec.get("sprite") or iid
+        self.model = self.pickup.get("model")
         self.size = float(self.pickup.get("size", 0.55))
         self.taken = False
         self.on_pickup = None
@@ -366,6 +369,7 @@ class Level:
         self._tags = {}
         self._ids = 0
         self.parse_map()
+        self.load_models()
         self.load_sprites()
         self.load_tiles()
         self.plates(quiet=True)
@@ -446,6 +450,23 @@ class Level:
         it = Item(iid, spec, x, y)
         self.items.append(it)
         return it
+
+    def load_models(self):
+        """The 3D models the level's monsters and items use, built once for the game's data."""
+        from . import model as model_mod
+        table = getattr(self.data, "models", None) or {}
+        built = getattr(self.data, "_built_models", None)
+        if built is None or built[0] is not table:
+            built = (table, {})
+            try:
+                self.data._built_models = built
+            except AttributeError:
+                pass
+        want = {m.model for m in self.monsters if m.model} | {it.model for it in self.items if it.model}
+        for name in want:
+            if name in table and name not in built[1]:
+                built[1].update(model_mod.load({name: table[name]}))
+        self.models = {n: built[1][n] for n in want if n in built[1]}
 
     def load_sprites(self):
         from .sprite import _rgb, far_versions, walk_frames
@@ -617,6 +638,10 @@ class Level:
 
     def anim(self, frames, dt=0.05):
         if self.console is not None:
+            n = len(frames)
+            for i, fx in enumerate(frames):                # the clock spinning parts turn by, within the beat
+                if not fx.tick:
+                    fx.tick = (i + 1) / float(n)
             self.console.play(self, frames, dt)
 
     def weapon_sprite(self):
@@ -1727,15 +1752,22 @@ class Level:
         ids = tuple(m.id for m, _ in hits)
         frames = [FX(flash=ids if i < 2 else (), texts=[(m, "-%d" % d, "hit", i) for m, d in hits]) for i in range(3)]
         dying = [m for m in killed if not m.barrel]
+        built = [m for m in dying if m.model and m.model in self.models]   # 3D models break into shards instead
+        burst = [m for m in burst if m not in built]
         gibs = Bits(self.vrng)
         for m in burst:                                      # overkill, or a blast: it comes apart
             pic = self.sprites.get(m.sprite)
             cols = [c for row in (pic.rows if pic else []) for c in row if c is not None][::3] or [(150, 20, 20)]
             gibs.burst(m.x, m.y, 0.6 * m.size, cols + [(150, 10, 10), (110, 0, 0)], n=22, speed=1.8, up=2.0, size=1.2)
         flying = gibs.frames(4, 0.05) if burst else [()] * 4
-        for i, k in enumerate((0.25, 0.5, 0.75, 1.0) if dying else ()):
-            frames.append(FX(dissolve={m.id: (1.0 if m in burst else k) for m in dying}, tint={m.id: (150, 8, 8) for m in dying},
-                             texts=[(m, "-%d" % d, "hit", 3 + i) for m, d in hits], parts=flying[i]))
+        steps = 8 if built else 4
+        for i in range(steps if dying else 0):
+            k = (i + 1) / float(steps)
+            frames.append(FX(dissolve={m.id: (k if m in built else 1.0 if m in burst else min(1.0, k * steps / 4.0))
+                                       for m in dying},
+                             tint={m.id: (150, 8, 8) for m in dying if m not in built},
+                             texts=[(m, "-%d" % d, "hit", 3 + i) for m, d in hits],
+                             parts=flying[i] if i < len(flying) else ()))
         self.anim(frames, 0.05)
         for m in turned:
             self.say("%s turns on %s!" % (m.tag, source.tag), "alert")
@@ -1759,7 +1791,7 @@ class Level:
             return
         if not m.spec.get("boss"):
             self.stats["kills"] += 1
-        gore = self.sprites.get(m.spec.get("remains", "gore"))
+        gore = self.sprites.get(m.spec.get("remains", None if m.model in self.models else "gore"))
         if gore is not None:
             self.decals.append((m.x, m.y, gore))
         if m.spec.get("burst_fire"):                   # its tanks burst: fire all round
@@ -2119,6 +2151,9 @@ class Level:
         for m in list(self.monsters):
             if not m.dead and not m.gone and m.awake and not m.barrel:
                 self.act(m)
+        for m, x0, y0 in self.moved:                    # it faces the way it went
+            if (m.x, m.y) != (x0, y0):
+                m.heading = math.atan2(m.y - y0, m.x - x0)
         if self.moved:
             self.anim([FX(pos={m.id: (x0 + (m.x - x0) * ease(i / 3.0), y0 + (m.y - y0) * ease(i / 3.0))
                                for m, x0, y0 in self.moved}) for i in range(1, 4)], 0.04)
@@ -3296,8 +3331,18 @@ def validate(data):
         if spec.get("drops") and spec["drops"] not in items:
             problems.append("monster '%s': drops unknown item '%s'" % (kind, spec["drops"]))
         sp = spec.get("sprite") or kind
-        if sp not in sprites:
+        models = getattr(data, "models", None) or {}
+        if spec.get("model") and spec["model"] not in models:
+            problems.append("monster '%s': no model '%s' in models.json" % (kind, spec["model"]))
+        elif sp not in sprites and not spec.get("model"):
             problems.append("monster '%s': no sprite '%s' in sprites.json" % (kind, sp))
+    from . import model as model_mod
+    models = getattr(data, "models", None) or {}
+    problems += model_mod.problems(models)
+    for iid, it in items.items():
+        pk = (it or {}).get("pickup") if isinstance(it, dict) else None
+        if isinstance(pk, dict) and pk.get("model") and pk["model"] not in models:
+            problems.append("item '%s': no model '%s' in models.json" % (iid, pk["model"]))
     from .firstperson import TEXTURES
     tiles = getattr(data, "tiles", None) or {}
     for name, t in tiles.items():

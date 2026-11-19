@@ -20,6 +20,7 @@ to have the engine look for broken references.
 - [The map](#the-map)
 - [Sound and music](#sound-and-music)
 - [Generated dungeons](#generated-dungeons)
+- [First-person levels](#first-person-levels)
 - [Coming from CLIo 1](#coming-from-clio-1)
 
 ## A complete tiny game
@@ -988,6 +989,206 @@ anything called `..._text` always; otherwise a string with a space in it, unless
 is known to hold something else. Songs, sounds and sprites are left out. A choice written
 as a key - `{"Ask about the ship": "..."}` - has its answer in the table but not the
 question, since a key cannot be changed without changing what refers to it.
+
+## First-person levels
+
+A scene can hold a level: a grid the player walks through, seen through his eyes and
+redrawn in place (frame mode), with monsters that move and shoot a beat at a time.
+`games/rootless` is a complete example.
+
+```json
+{"id": "boot_sector", "name": "Boot Sector", "level": "e1m1",
+ "on_level_exit": [{"story": "e1_end"}, {"win": "outro_demo"}]}
+```
+
+Entering the scene hands the screen to the level. When the player throws the exit switch,
+`on_level_exit` runs (any effects: `goto` the next level's scene, a story text, `win`);
+when he dies the game is lost (`death_text` names the text); quitting leaves the game as
+quitting always does. Health, armour, weapons and ammunition go on to the next level; keys
+do not. Each level's numbers (kills, items, secrets, beats) are kept in the variable
+`levels`.
+
+**Time** moves in beats: a step, a shot, opening a door or `w` (wait) is one beat, and
+then every monster moves. Turning to look round is free. On a real terminal the level is
+drawn as a picture and keys act at once; piped, with `--scroll`, or on a screen smaller
+than 40 x 18 it is played in scrolling text with a small map that turns with the player,
+so it can be tested and played anywhere.
+
+### levels.json
+
+```json
+"e1m1": {
+  "name": "Boot Sector", "title": "E1M1   BOOT SECTOR",
+  "intro": ["Episode 1: Knee-Deep in the Shell."],
+  "par": 140, "music": "boot_sector", "facing": "n",
+  "map": ["#####E#####",
+          "#...C.....#",
+          "##X#####1##",
+          "#..k..@..D#",
+          "###########"],
+  "legend": {"X": {"door": true, "key": "x", "closes_on": "arena", "opens_on": "boss_escaped"},
+             "1": {"wall": "steel", "opens_on": "keyroom"},
+             "k": {"item": "key_x", "on_pickup": "keyroom"},
+             "D": {"monster": "daemon", "wake_on": "keyroom"},
+             "C": {"monster": "cron", "wake_on": "arena"}, "m": "medkit"},
+  "events": {"keyroom": "The walls grind open."}
+}
+```
+
+The map is rows of characters, north at the top. Without a legend entry a character means:
+
+| Character | Meaning |
+| --- | --- |
+| `#` `%` `=` | wall: steel panels, terminal screens, hazard stripes (a space is a wall too) |
+| `.` | floor; `~` toxic floor (hurts every beat, `toxic_damage` in `first_person`) |
+| `@` | where the player starts (`facing`: n, e, s or w) |
+| `+` | a door: walk into it (or press Enter, `use`) to open it |
+| `R` `W` `X` | a door that needs the r, w or x key (drawn red, yellow or blue, marked `r--` `-w-` `--x`) |
+| `S` | a hollow wall: a secret that opens to a punch (the fist, weapon 1) |
+| `P` | a dented vent: a secret that opens to a gunshot with nothing else to aim at |
+| `E` | the exit switch, on a wall |
+
+A legend entry is either the id of a monster or an item (`"m": "medkit"`), or an object:
+`{"monster": id}` or `{"item": id}` on a floor cell; `{"wall": texture}`; `{"door": true,
+"key": "x"}`; `{"toxic": true}`; `{"panel": "fist"}` or `{"panel": "shoot"}`;
+`{"exit": true}`. Textures are `steel`, `screens`, `screens2`, `hazard`.
+
+**Events** tie a level together. They have names you choose; a cell with
+`"on_enter": name` sets one off when the player steps on it, an item with
+`"on_pickup": name` when he takes it. Then every cell with `"opens_on": name` opens (a
+wall becomes floor; a door opens), every open door with `"closes_on": name` slams shut and
+stays sealed, and every monster with `"wake_on": name` wakes. A door with `opens_on` and no
+key is sealed until then. `events` gives the line shown when one happens. A boss's escape
+sets off its own event (see below). Monster closets, traps and doors that open when a
+fight is won are all made this way.
+
+Monsters are named on the map in the order a player meets them: the nearest zombie is `z1`.
+
+### monsters.json
+
+```json
+"zombie": {"name": "zombie process", "role": "hitscan grunt", "tag": "z", "sprite": "zombie",
+           "hp": 20, "size": 1.0, "sight": 8, "drops": "clip",
+           "attack": {"kind": "hitscan", "damage": [4, 9], "range": 8, "keep": [2, 6], "eager": 0.5},
+           "sounds": {"sight": "zombie_sight", "attack": "pistol", "death": "zombie_death"},
+           "death": "%s is reaped.", "man": ["What man zombie shows, line by line."]}
+```
+
+A monster sleeps until it sees the player (`sight` cells, default 8, with nothing in
+between), hears a shot (gunfire carries 12 cells through open space), is hurt, or its
+`wake_on` event comes. `size` is 1 for a person; `float` lifts it off the floor (0..1).
+`awake: true` starts it awake.
+
+| `attack.kind` | What it does |
+| --- | --- |
+| `hitscan` | takes aim for a beat (a red `!`), then fires: `damage`, `pellets`, `accuracy` by distance; it keeps to `keep` = [nearest, farthest] cells |
+| `projectile` | raises a burning hand (an orange `!`), then throws fire at where the player stood; it flies `speed` cells a beat, so a step aside dodges it; `claw` when close |
+| `melee` | comes `speed` cells a beat and bites when next to the player |
+| `spawner` | every `every` beats makes a `spawn` (a monster id), up to `max` at a time |
+| `barrel` | does nothing until hit; then bursts for `damage` on everything next to it |
+| `cron` | a boss that works to a schedule (see below) |
+
+Fire that hits a monster turns it on the thrower: monsters fight each other.
+
+**A boss** has `"boss": true` and ignores the player's shots until its fight starts (its
+`wake_on` event). The `cron` kind follows a crontab:
+
+```json
+"attack": {"kind": "cron", "arena": 7, "rain_damage": [14, 20],
+           "crontab": [{"every": 3, "do": "rain"},
+                       {"every": 5, "do": "fork", "spawn": "soul", "count": 2, "max": 3}],
+           "enraged": {"below": 0.5, "text": "...", "crontab": [{"every": 2, "do": "rain"}]},
+           "escape": {"below": 0.15, "event": "boss_escaped", "text": ["...", "..."]}}
+```
+
+`rain` marks part of the floor of the arena (the cells within `arena` steps of the boss) a
+beat ahead and burns it the next: rows, columns, diagonals, rings or a checkerboard,
+always laid so that one step gets the player off it. `fork` makes monsters. The next jobs
+and their countdowns are shown under the picture. Below `enraged.below` of its health the
+boss switches to the faster crontab; below `escape.below` it does not die but escapes:
+it says its lines, leaves, and sets off `event`. Its own `music` plays while it fights.
+When the level is left after a boss escaped, the flag `<monster id>_escaped` is set
+(`cron_escaped`), so a later level or ending can bring it back.
+
+### Pick-ups, weapons and the player
+
+Anything lying in a level is an ordinary item (items.json) with a `pickup` block, taken by
+walking onto it:
+
+```json
+"medkit":  {"name": "medkit", "pickup": {"health": 25, "sprite": "medkit", "text": "..."}},
+"shells":  {"name": "shells", "pickup": {"ammo": {"shells": 4}, "sprite": "shells", "size": 0.45}},
+"key_x":   {"name": "x key", "pickup": {"key": "x", "sprite": "key_x", "sound": "unlock"}},
+"shotgun": {"name": "shotgun", "pickup": {"weapon": 3, "ammo": {"shells": 8}, "sprite": "shotgun"}},
+"sudo_orb": {"name": "sudo", "pickup": {"power": "sudo", "beats": 15, "sprite": "sudo_orb"}}
+```
+
+`health` (up to `max`, default the player's maximum; not taken at full health), `armor`
+(armour soaks a third of every hurt), `ammo`, `key`, `weapon`, `power: "sudo"` (nothing
+hurts the player for `beats`; the picture inverts). `size` is the picture's size on the
+floor (0.55 if not said).
+
+The weapons and the player's start are in game.json:
+
+```json
+"first_person": {
+  "view": "pixel",
+  "start": {"health": 100, "weapons": ["1", "2"], "weapon": "2",
+            "ammo": {"bullets": 50, "shells": 0}, "max_ammo": {"bullets": 200, "shells": 50}},
+  "weapons": {
+    "1": {"name": "fist", "kind": "melee", "damage": [6, 14], "sprite": "w_fist", "sound": "punch"},
+    "2": {"name": "pistol", "ammo": "bullets", "damage": [8, 14], "sprite": "w_pistol", "sound": "pistol"},
+    "3": {"name": "shotgun", "ammo": "shells", "damage": [5, 9], "pellets": 7, "spread": 0.35, ...},
+    "4": {"name": "chaingun", "ammo": "bullets", "damage": [7, 12], "burst": 2, ...}},
+  "keymap": {"q": "turn left"}
+}
+```
+
+A shot goes for what is in sight, nearest and most central first; a barrel only when it is
+straight ahead and not at arm's length. `pellets` spread to monsters next to the target
+(`spread`); `burst` fires (and spends) that many rounds a beat. `view` is how the level is
+drawn: `pixel` (half blocks), `dots` or `dots-fill` (braille); `--view` overrides it.
+
+### Sprites for a level
+
+Monsters, pick-ups and the gun in the player's hands (`w_...`) are pixel sprites
+(sprites.json). A level also uses `fireball`, `muzzle` (the flash) and `gore` (what is left
+where a monster died) if the game has them. Far away a sprite is drawn small; the engine
+makes smaller drawings for that when the level starts, keeping the pixels that matter -
+the letters in `"keep"` (say `"eE"` for the eyes), then the rarest colours - instead of
+losing them as plain scaling would. To draw them yourself, put them in the sprite as
+`"lod": [{"pixels": [...]}, ...]`: the level uses the smallest that is not much smaller
+than what it needs.
+
+### Playing it
+
+Keys act at once while nothing is typed; anything else starts a typed command, finished
+with Enter.
+
+| Keys | Command | |
+| --- | --- | --- |
+| ↑ ↓ | `k` `j` | step forward, back |
+| ← → (and `<` `>`) | `turn left`, `turn right`, `turn around` | turn (free) |
+| Ctrl+← →, Alt+← →, `,` `.` | `h` `l` | strafe left, right |
+| Space | `f`, `f z1`, `kill z1` | fire (at z1); `kill -9 x` punches |
+| Enter | `use` | open, press what is ahead |
+| Tab | `map` | the map of what has been seen |
+| 1-7 | `1`-`7` | weapons |
+| numpad 5 or Delete | `w`, `w 3` | wait a beat (or three) |
+| | `t z1` | keep aiming at z1 |
+| | `ps`, `man orphan`, `history`, `keys`, `whoami`, `help` | |
+
+The numpad works with NumLock off: 8 2 step, 4 6 turn, 7 9 strafe, 0 fires, 1 turns round.
+Lines are joined as in a shell: `a; b`, `a && b` (b only if a hit or moved), `a || b`
+(b only if a missed or was blocked); `!!` repeats the last line, `!3` the third, `!f` the
+last that began with f; `alias dodge='h || l'` names a line. Anything new - a hit, a
+monster waking, fire coming - stops the rest of a line, as Ctrl-C would. `--lines` turns
+the single keys off; `"keymap"` in `first_person` (key name -> command line) changes them.
+The window can be resized at any time; the picture is drawn again at once.
+
+`python tests/levelbot.py 10 rootless e1m1` lets a simple player walk a level ten times
+(it follows the level's `"bot"` list of goals: item ids or map characters). If it can
+finish, a person can.
 
 ## Coming from CLIo 1
 

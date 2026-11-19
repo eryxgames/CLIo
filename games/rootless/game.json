@@ -1,0 +1,104 @@
+{
+ "id": "rootless",
+ "title": "RØØTLESS",
+ "subtitle": "Episode 1: Knee-Deep in the Shell",
+ "description": "First-person action in the terminal. Root was revoked; the daemons came. A demo level.",
+ "author": "Daniel Sandner",
+ "version": "0.1",
+ "order": 3,
+ "style": "default",
+ "initial_scene": "boot_sector",
+ "intro": "intro",
+ "title_banner": {
+  "text": "RØØTLESS",
+  "style": "shadow",
+  "palette": "fire"
+ },
+ "show_title": false,
+ "title_music": {
+  "generate": {
+   "mood": "dark",
+   "seed": 13,
+   "sound": "rich"
+  }
+ },
+ "music_sound": "rich",
+ "player_stats": {
+  "health": 100,
+  "max_health": 100
+ },
+ "first_person": {
+  "view": "pixel",
+  "toxic_damage": 5,
+  "start": {
+   "health": 100,
+   "armor": 0,
+   "weapons": [
+    "1",
+    "2"
+   ],
+   "weapon": "2",
+   "ammo": {
+    "bullets": 50,
+    "shells": 0
+   },
+   "max_ammo": {
+    "bullets": 200,
+    "shells": 50
+   }
+  },
+  "weapons": {
+   "1": {
+    "name": "fist",
+    "kind": "melee",
+    "damage": [
+     6,
+     14
+    ],
+    "sprite": "w_fist",
+    "sound": "punch",
+    "text": "THUD."
+   },
+   "2": {
+    "name": "pistol",
+    "ammo": "bullets",
+    "damage": [
+     8,
+     14
+    ],
+    "sprite": "w_pistol",
+    "sound": "pistol",
+    "text": "BANG."
+   },
+   "3": {
+    "name": "shotgun",
+    "ammo": "shells",
+    "damage": [
+     5,
+     9
+    ],
+    "pellets": 7,
+    "spread": 0.35,
+    "sprite": "w_shotgun",
+    "sound": "shotgun",
+    "text": "BLAM."
+   },
+   "4": {
+    "name": "chaingun",
+    "ammo": "bullets",
+    "damage": [
+     7,
+     12
+    ],
+    "burst": 2,
+    "sprite": "w_chaingun",
+    "sound": "chaingun",
+    "text": "BRRRT."
+   }
+  }
+ },
+ "help": "Arrows step and turn, Ctrl+arrows or , . strafe, space fires, Enter opens, Tab shows the map.",
+ "about": "A demo of CLIo's first-person levels: frame mode, keys that act at once, a crontab boss.",
+ "website": "eryxian.com",
+ "license": "All rights reserved - see LICENSE.md in this game's folder"
+}

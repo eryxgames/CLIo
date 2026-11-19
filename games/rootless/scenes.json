@@ -1,0 +1,17 @@
+[
+ {
+  "id": "boot_sector",
+  "name": "Boot Sector",
+  "area": "Episode 1",
+  "description": "The boot bay of the facility. Lights on, nobody home.",
+  "level": "e1m1",
+  "on_level_exit": [
+   {
+    "story": "e1_end"
+   },
+   {
+    "win": "outro_demo"
+   }
+  ]
+ }
+]

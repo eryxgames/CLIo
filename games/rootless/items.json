@@ -1,0 +1,102 @@
+{
+ "medkit": {
+  "name": "medkit",
+  "description": "A white box with a red cross.",
+  "pickup": {
+   "health": 25,
+   "sprite": "medkit",
+   "text": "You patch yourself up with a medkit. (+25)"
+  }
+ },
+ "stimpack": {
+  "name": "stimpack",
+  "description": "A small blue vial.",
+  "pickup": {
+   "health": 10,
+   "sprite": "stimpack",
+   "size": 0.4,
+   "text": "A stimpack. (+10)"
+  }
+ },
+ "armor": {
+  "name": "armour vest",
+  "description": "Green, heavy, still warm.",
+  "pickup": {
+   "armor": 100,
+   "sprite": "armor",
+   "text": "You put on the armour vest. (100)"
+  }
+ },
+ "clip": {
+  "name": "clip",
+  "description": "Ten rounds.",
+  "pickup": {
+   "ammo": {
+    "bullets": 10
+   },
+   "sprite": "clip",
+   "size": 0.4,
+   "text": "A clip. (+10 bullets)"
+  }
+ },
+ "shells": {
+  "name": "shells",
+  "description": "Four shotgun shells.",
+  "pickup": {
+   "ammo": {
+    "shells": 4
+   },
+   "sprite": "shells",
+   "size": 0.45,
+   "text": "Four shells."
+  }
+ },
+ "key_x": {
+  "name": "x key",
+  "description": "Execute permission, on a blue card.",
+  "pickup": {
+   "key": "x",
+   "sprite": "key_x",
+   "size": 0.45,
+   "sound": "unlock",
+   "text": "You have execute permission: the --x key."
+  }
+ },
+ "shotgun": {
+  "name": "shotgun",
+  "description": "Pump action. Reassuring.",
+  "pickup": {
+   "weapon": 3,
+   "ammo": {
+    "shells": 8
+   },
+   "sprite": "shotgun",
+   "size": 0.8,
+   "text": "You got the shotgun! (3)"
+  }
+ },
+ "chaingun": {
+  "name": "chaingun",
+  "description": "Many barrels, one opinion.",
+  "pickup": {
+   "weapon": 4,
+   "ammo": {
+    "bullets": 20
+   },
+   "sprite": "chaingun",
+   "size": 0.8,
+   "text": "You got the chaingun! (4)"
+  }
+ },
+ "sudo_orb": {
+  "name": "sudo",
+  "description": "A glowing sphere with a # in it.",
+  "pickup": {
+   "power": "sudo",
+   "beats": 15,
+   "sprite": "sudo_orb",
+   "size": 0.55,
+   "text": "sudo -s. You are root for 15 beats: nothing can hurt you."
+  }
+ }
+}

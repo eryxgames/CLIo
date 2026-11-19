@@ -1,0 +1,722 @@
+{
+ "zombie": {
+  "pixels": [
+   "....SSSS....",
+   "...SssssS...",
+   "...sEssEs...",
+   "...SssssS...",
+   "....SbbS....",
+   ".....SS.....",
+   "..CccccccC..",
+   ".Ccccbcccccg",
+   ".CccbbccCggg",
+   ".Cc.ccccgg..",
+   ".ss.cCccs...",
+   "....cccc....",
+   "....pPPp....",
+   "....pp.pp...",
+   "...pp...pp..",
+   "...pP...Pp..",
+   "...pp...pp..",
+   "..kkk...kkk."
+  ],
+  "palette": {
+   "S": "#56604e",
+   "s": "#8a9a7c",
+   "E": "#ff3b2f",
+   "b": "#8a1a1a",
+   "C": "#7c7c74",
+   "c": "#b4b4a8",
+   "g": "#3a3c42",
+   "p": "#4a4e62",
+   "P": "#363a4c",
+   "k": "#2c2824"
+  },
+  "keep": "Eb",
+  "lod": [
+   {
+    "pixels": [
+     "..SS..",
+     ".SEES.",
+     "..bb..",
+     ".cbccg",
+     "Ccbcgg",
+     "..cc..",
+     "..pp..",
+     ".pP.p.",
+     ".kk.k."
+    ]
+   },
+   {
+    "pixels": [
+     ".EE.",
+     ".bb.",
+     "Cbcg",
+     ".cc.",
+     ".pp.",
+     ".p.."
+    ]
+   },
+   {
+    "pixels": [
+     ".E.",
+     ".b.",
+     ".b.",
+     ".p.",
+     "..k"
+    ]
+   }
+  ]
+ },
+ "sudo": {
+  "pixels": [
+   "....SSSS......",
+   "...SssssS.....",
+   "...sEssEs.....",
+   "...SsmmsS.....",
+   "....SSSS......",
+   "..CccccccC....",
+   ".CccRcccccwwgg",
+   ".CccccccCwgggg",
+   ".Cc.cccc.s....",
+   ".ss.cCcc......",
+   "....cccc......",
+   "....pPPp......",
+   "....pp.pp.....",
+   "...pp...pp....",
+   "...pP...Pp....",
+   "...pp...pp....",
+   "..kkk...kkk..."
+  ],
+  "palette": {
+   "S": "#4a5446",
+   "s": "#7e8e70",
+   "E": "#ff2020",
+   "m": "#2a0a0a",
+   "C": "#24242c",
+   "c": "#3c3c48",
+   "R": "#c02828",
+   "w": "#6e4828",
+   "g": "#46484f",
+   "p": "#2e2e38",
+   "P": "#1e1e26",
+   "k": "#1a1816"
+  },
+  "keep": "ER",
+  "lod": [
+   {
+    "pixels": [
+     "..SS...",
+     ".SEES..",
+     ".CSSC..",
+     "CcRcwwg",
+     "Cscc...",
+     "..PP...",
+     "..p.p..",
+     ".pP.p..",
+     ".kk.kk."
+    ]
+   },
+   {
+    "pixels": [
+     ".EE..",
+     ".SS..",
+     "CRcwg",
+     ".cc..",
+     ".p...",
+     ".k.k."
+    ]
+   },
+   {
+    "pixels": [
+     ".E..",
+     "CRwg",
+     ".c..",
+     "....",
+     "k.k."
+    ]
+   }
+  ]
+ },
+ "orphan": {
+  "pixels": [
+   "..s......s..",
+   "..sNNNNNNs..",
+   "...NnnnnN...",
+   "...nEnnEn...",
+   "...NnmmnN...",
+   "....NnnN....",
+   ".sNNnnnnNNs.",
+   "NNn.nnnn.nNN",
+   "Nn..nNNn..nN",
+   "s...nnnn...s",
+   "....nNNn....",
+   "....nn.nn...",
+   "...Nn...nN..",
+   "...Nn...nN..",
+   "..ss.....ss."
+  ],
+  "palette": {
+   "s": "#d8cbb0",
+   "N": "#5a3820",
+   "n": "#8a5a34",
+   "E": "#ff9a1f",
+   "m": "#3a0808"
+  },
+  "keep": "Em",
+  "lod": [
+   {
+    "pixels": [
+     ".sNNs.",
+     ".NEEN.",
+     "..mm..",
+     "NNnnNN",
+     "s.nn.s",
+     "..nn..",
+     ".Nn.N.",
+     ".s..ss"
+    ]
+   },
+   {
+    "pixels": [
+     ".NN.",
+     ".mm.",
+     "NnnN",
+     ".nn.",
+     ".N.."
+    ]
+   }
+  ]
+ },
+ "daemon": {
+  "pixels": [
+   "..h..........h..",
+   ".hh..RRRRRR..hh.",
+   ".hRRRrrrrrrRRRh.",
+   "..RrrErrrrErrR..",
+   ".RrrrrrrrrrrrrR.",
+   "RrrtmtmtmtmtmrrR",
+   "RrrmmmmmmmmmmrrR",
+   "RrrmtmtmtmtmtrrR",
+   ".RrrrrrrrrrrrrR.",
+   "RRrrRrrrrrrRrrRR",
+   "Rrr.RrrrrrrR.rrR",
+   "kk..RRrrrrRR..kk",
+   "....Rrr..rrR....",
+   "...RRr....rRR...",
+   "...kkk....kkk..."
+  ],
+  "palette": {
+   "h": "#d8cbb0",
+   "R": "#8c3a42",
+   "r": "#c86a6e",
+   "E": "#ffd23f",
+   "t": "#efe6cf",
+   "m": "#3a0a10",
+   "k": "#d8cbb0"
+  },
+  "keep": "Etm",
+  "lod": [
+   {
+    "pixels": [
+     ".h.RR.h.",
+     ".RErrER.",
+     "RtmmmmmR",
+     "RmmmmmmR",
+     "RrrrrrrR",
+     "k.RrrR.k",
+     "..R..R..",
+     ".kk..kk."
+    ]
+   },
+   {
+    "pixels": [
+     "h.RRh.",
+     "Rtmtm.",
+     "RmmmmR",
+     "kRrRrR",
+     ".k.k.."
+    ]
+   }
+  ]
+ },
+ "spawner": {
+  "pixels": [
+   ".........oo.........",
+   "......ooobbooo......",
+   ".....obbbbbbbbo.....",
+   "....obbbbbbbbbbo....",
+   "...obbbbbbbbbbbbo...",
+   "...obbbbEEEEbbbbo...",
+   "..obbbbBEeeEBbbbbo..",
+   "..obbBBBEEEEBBBbbo..",
+   "..obbBBBBEEBBBBbbo..",
+   "...obBBBBBBBBBBbo...",
+   "...obBmtmmmmtmBbo...",
+   "....oBBBBBBBBBBo....",
+   "....oobBBBBBBboo....",
+   "...oBoBbBbbBbBoBo...",
+   "...oBoBoBooBoBoBo...",
+   "....ooBoo..ooBoo....",
+   ".....oBo....oBo.....",
+   "......o......o......",
+   "...................."
+  ],
+  "palette": {
+   "B": "#466428",
+   "E": "#ece6d6",
+   "b": "#78a046",
+   "e": "#ff3b2f",
+   "m": "#34080c",
+   "o": "#16141a",
+   "t": "#eee6cf"
+  },
+  "keep": "eEmt",
+  "lod": [
+   {
+    "pixels": [
+     "...oooo...",
+     "..obbbbo..",
+     ".obbEEbbo.",
+     ".obBEEBbo.",
+     ".oBBEEBBo.",
+     "..BmmmmB..",
+     "..oBBBBo..",
+     "..oooooo..",
+     "...o..o...",
+     ".........."
+    ]
+   },
+   {
+    "pixels": [
+     "..obo..",
+     ".bEEbo.",
+     ".bEEBb.",
+     ".ommmo.",
+     ".oBBoo.",
+     "..o.o..",
+     "......."
+    ]
+   },
+   {
+    "pixels": [
+     ".bbb.",
+     ".bEb.",
+     ".mmm.",
+     ".oBo.",
+     "....."
+    ]
+   }
+  ],
+  "generated": "monster('fork', 'floater', 20)"
+ },
+ "soul": {
+  "pixels": [
+   "..f.ff.f..",
+   ".fFfFFfFf.",
+   ".fwwwwwwf.",
+   "fwwewwewwf",
+   "fwkekkekwf",
+   ".wwwwwwww.",
+   ".wwk..kww.",
+   "..wwwwww..",
+   "...w.w.w.."
+  ],
+  "palette": {
+   "f": "#ff7a1a",
+   "F": "#ffd25a",
+   "w": "#e2ddc8",
+   "e": "#ff3b2f",
+   "k": "#2a1010"
+  },
+  "keep": "e",
+  "lod": [
+   {
+    "pixels": [
+     ".fFf.",
+     "fewef",
+     "fekef",
+     ".kwk.",
+     ".www."
+    ]
+   }
+  ]
+ },
+ "cron": {
+  "pixels": [
+   "........................",
+   "............RR..........",
+   ".......RR..rrR...R......",
+   ".......Rrrrrrrrr.RR.....",
+   "......rrrfftfffrrrR.....",
+   "...RRrrftfftffftfrr.....",
+   "..RRrrfftfffffhtffrr....",
+   "....rfffffffffhffffrRR..",
+   "...rrttffffffhhffttrrR..",
+   "...rfffffffEEhffffffr...",
+   ".RRrffffhhEEEEffffffr...",
+   ".RrrfffffEEppEEfffffrr..",
+   "..rrttfffEEppEEfffttrrR.",
+   "...rffffffEEEEffffffrRR.",
+   "...rfffffffEEfffffffr...",
+   "..Rrrttffffffffffttrr...",
+   "..RRrffffffffffffffr....",
+   "....rrfftfffffftffrrRR..",
+   ".....rrftffftfftfrrRR...",
+   ".....Rrrrffftffrrr......",
+   ".....RR.rrrrrrrrR.......",
+   "......R.c.Rrr..cR.......",
+   "........c.RR...c........",
+   "........c......c........",
+   "........c......c........",
+   "........c......c........",
+   "........c......c........",
+   ".......bbb....bbb.......",
+   ".......bbb....bbb.......",
+   "........b......b........"
+  ],
+  "palette": {
+   "f": "#e6dcc0",
+   "r": "#be9640",
+   "R": "#7c5c22",
+   "t": "#3a2e24",
+   "h": "#2a2020",
+   "E": "#d82a2a",
+   "p": "#120808",
+   "c": "#8a8e98",
+   "b": "#c8ccd6"
+  },
+  "keep": "Ep",
+  "lod": [
+   {
+    "pixels": [
+     "......R.....",
+     "...RrrrrR...",
+     "..RrttftrR..",
+     ".RrffffhfrR.",
+     ".rtffEEhftr.",
+     "RrffEEEEffr.",
+     ".rtfEEEEftrR",
+     ".rtffEEfftr.",
+     ".RrffffffrR.",
+     "..RrtfttrR..",
+     "...RrrrrR...",
+     "....cR.c....",
+     "....c..c....",
+     "....b..b....",
+     "....b..b...."
+    ]
+   },
+   {
+    "pixels": [
+     "........",
+     "..rtfr..",
+     ".rffhfr.",
+     ".ffEEff.",
+     ".tfEEft.",
+     ".rffffr.",
+     "..rftr..",
+     "........",
+     "........",
+     "..b..b.."
+    ]
+   },
+   {
+    "pixels": [
+     "...r..",
+     ".rtfr.",
+     "rfEEf.",
+     ".tEEtr",
+     ".rftr.",
+     "..rr..",
+     "......",
+     "......"
+    ]
+   }
+  ]
+ },
+ "barrel": {
+  "pixels": [
+   "..gggg..",
+   ".rgGGgr.",
+   "rrrrrrrr",
+   "bBbbbbBb",
+   "bBbbbBBb",
+   "rrrrrrrr",
+   "bBbbbbBb",
+   "bBbbbbBb",
+   "bBbbbbBb",
+   "rrrrrrrr"
+  ],
+  "palette": {
+   "g": "#8cff5a",
+   "G": "#e0ffb0",
+   "r": "#7a827a",
+   "b": "#4e7a4e",
+   "B": "#2e4a2e"
+  }
+ },
+ "fireball": {
+  "pixels": [
+   "..ff..",
+   ".fFFf.",
+   "fFwwFf",
+   "fFwwFf",
+   ".fFFf.",
+   "..ff.."
+  ],
+  "palette": {
+   "f": "#ff6a1a",
+   "F": "#ffb03a",
+   "w": "#fff6c0"
+  }
+ },
+ "gore": {
+  "pixels": [
+   "...rr.R...",
+   ".rRrrRrr..",
+   "rrRRrrRrr."
+  ],
+  "palette": {
+   "r": "#5a0e0e",
+   "R": "#8a1a1a"
+  }
+ },
+ "muzzle": {
+  "pixels": [
+   "..yYy..",
+   ".yYWYy.",
+   "yYWWWYy",
+   ".yYWYy.",
+   "..y.y.."
+  ],
+  "palette": {
+   "y": "#ffb03a",
+   "Y": "#ffe070",
+   "W": "#ffffff"
+  }
+ },
+ "w_fist": {
+  "pixels": [
+   "...ssssss...",
+   "..sSsSsSss..",
+   "..ssssssss..",
+   "..sssssss...",
+   "...sssss....",
+   "..sssssss...",
+   ".sssssssss..",
+   "sssssssssss."
+  ],
+  "palette": {
+   "s": "#c89678",
+   "S": "#9a6e58"
+  }
+ },
+ "w_pistol": {
+  "pixels": [
+   "....kk....",
+   "....kk....",
+   "....KK....",
+   "...kKKk...",
+   "...kkkk...",
+   "..sskkss..",
+   ".ssskkss..",
+   "ssssssss..",
+   "sssssssss."
+  ],
+  "palette": {
+   "s": "#c89678",
+   "S": "#9a6e58",
+   "k": "#46484f",
+   "K": "#7a7e8a"
+  }
+ },
+ "w_shotgun": {
+  "pixels": [
+   "......kk......",
+   "......kk......",
+   "......KK......",
+   "......KK......",
+   ".....kKKk.....",
+   ".....kKKk.....",
+   "....wkKKkw....",
+   "...swwwwwws...",
+   "..ssswwwwsss..",
+   ".sssssswssssss",
+   "ssssssssssssss"
+  ],
+  "palette": {
+   "s": "#c89678",
+   "S": "#9a6e58",
+   "k": "#46484f",
+   "K": "#7a7e8a",
+   "w": "#6e4828"
+  }
+ },
+ "w_chaingun": {
+  "pixels": [
+   ".....kKkKk....",
+   ".....kKkKk....",
+   ".....kKkKk....",
+   ".....KkKkK....",
+   "....kkkkkkk...",
+   "....kgggggk...",
+   "...skkkkkkks..",
+   "..sssskkksss..",
+   ".ssssssssssss.",
+   "sssssssssssss.",
+   "ssssssssssssss"
+  ],
+  "palette": {
+   "s": "#c89678",
+   "S": "#9a6e58",
+   "k": "#3a3c44",
+   "K": "#8a8e9a",
+   "g": "#c89a30"
+  }
+ },
+ "medkit": {
+  "pixels": [
+   ".wwwwwwww.",
+   "wwwwrrwwww",
+   "wwwwrrwwww",
+   "wwrrrrrrww",
+   "wwrrrrrrww",
+   "wwwwrrwwww",
+   "wwwwrrwwww",
+   "gggggggggg"
+  ],
+  "palette": {
+   "w": "#e6e6e0",
+   "r": "#d22828",
+   "g": "#96968f"
+  }
+ },
+ "stimpack": {
+  "pixels": [
+   "..kk..",
+   "..ww..",
+   ".wbbw.",
+   ".wbbw.",
+   ".wbbw.",
+   ".wbbw.",
+   ".wwww.",
+   "..ww.."
+  ],
+  "palette": {
+   "k": "#46484f",
+   "w": "#dcdcd6",
+   "b": "#5ac8ff"
+  }
+ },
+ "armor": {
+  "pixels": [
+   "..GG....GG..",
+   ".GgG....GgG.",
+   ".GggGGGGggG.",
+   ".GggggggggG.",
+   ".GgggYYgggG.",
+   ".GggggggggG.",
+   ".GggggggggG.",
+   "..GggggggG..",
+   "...GGGGGG..."
+  ],
+  "palette": {
+   "g": "#46aa46",
+   "G": "#286e28",
+   "Y": "#e6dc78"
+  }
+ },
+ "clip": {
+  "pixels": [
+   ".yyyyyy.",
+   ".yYYYYy.",
+   ".yyyyyy.",
+   ".kkkkkk."
+  ],
+  "palette": {
+   "y": "#b48c32",
+   "Y": "#e6c35a",
+   "k": "#46484f"
+  }
+ },
+ "shells": {
+  "pixels": [
+   ".rr.rr.rr.",
+   ".RR.RR.RR.",
+   ".rr.rr.rr.",
+   ".rr.rr.rr.",
+   ".YY.YY.YY."
+  ],
+  "palette": {
+   "r": "#b4281e",
+   "R": "#e65a46",
+   "Y": "#d2aa3c"
+  }
+ },
+ "key_x": {
+  "pixels": [
+   ".bbbbbb.",
+   ".bBBBBb.",
+   ".bBwwBb.",
+   ".bBBBBb.",
+   ".bbbbbb.",
+   ".bkbkbb.",
+   ".bbbbbb."
+  ],
+  "palette": {
+   "b": "#3c64d2",
+   "B": "#6e96ff",
+   "w": "#ffffff",
+   "k": "#1e2850"
+  }
+ },
+ "shotgun": {
+  "pixels": [
+   "................",
+   "kkkkkkkkkkkwww..",
+   "KKKKKKKKKKwwwwww",
+   "...........wwwww"
+  ],
+  "palette": {
+   "k": "#46484f",
+   "K": "#7a7e8a",
+   "w": "#6e4828"
+  }
+ },
+ "chaingun": {
+  "pixels": [
+   "kKkKkKkKkKggg...",
+   "KkKkKkKkKkgggwww",
+   "kKkKkKkKkKgggwww",
+   "..........ggg..."
+  ],
+  "palette": {
+   "k": "#3a3c44",
+   "K": "#8a8e9a",
+   "g": "#c89a30",
+   "w": "#46484f"
+  }
+ },
+ "sudo_orb": {
+  "pixels": [
+   "....ooo....",
+   "..oobbboo..",
+   ".obwwbbbbo.",
+   ".owwkbkbbo.",
+   "obwkkkkkbbo",
+   "obbbkbkbbbo",
+   "obbkkkkkbbo",
+   ".obbkbkbbo.",
+   ".obbbbbbbo.",
+   "..oobbboo..",
+   "....ooo...."
+  ],
+  "palette": {
+   "o": "#3cb4ff",
+   "b": "#b4f0ff",
+   "w": "#ffffff",
+   "k": "#1a3c78"
+  }
+ }
+}

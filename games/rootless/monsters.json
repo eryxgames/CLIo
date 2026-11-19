@@ -1,0 +1,301 @@
+{
+ "zombie": {
+  "name": "zombie process",
+  "role": "hitscan grunt",
+  "tag": "z",
+  "sprite": "zombie",
+  "hp": 20,
+  "attack": {
+   "kind": "hitscan",
+   "damage": [
+    4,
+    9
+   ],
+   "range": 8,
+   "keep": [
+    2,
+    6
+   ],
+   "eager": 0.5
+  },
+  "drops": "clip",
+  "sounds": {
+   "sight": "zombie_sight",
+   "attack": "pistol",
+   "death": "zombie_death"
+  },
+  "death": "%s is reaped.",
+  "man": [
+   "Died, but was never reaped. Still holds its rifle and its PID.",
+   "",
+   "Hitscan: when it takes aim (red !) its next shot cannot be dodged.",
+   "Kill it first, or put a wall between you. It misses more at range."
+  ]
+ },
+ "sudo": {
+  "name": "sudo zombie",
+  "role": "shotgun grunt",
+  "tag": "g",
+  "sprite": "sudo",
+  "hp": 30,
+  "attack": {
+   "kind": "hitscan",
+   "damage": [
+    3,
+    6
+   ],
+   "pellets": 3,
+   "range": 6,
+   "keep": [
+    1,
+    4
+   ],
+   "eager": 0.5,
+   "accuracy": [
+    0.95,
+    0.9,
+    0.8,
+    0.62,
+    0.45,
+    0.32,
+    0.22
+   ]
+  },
+  "drops": "shells",
+  "sounds": {
+   "sight": "zombie_sight",
+   "attack": "shotgun",
+   "death": "zombie_death"
+  },
+  "death": "%s is reaped. Its privileges go with it.",
+  "man": [
+   "A zombie that once had sudo. It still believes it does.",
+   "",
+   "Three pellets at once; deadly up close, poor at a distance.",
+   "Keep your distance, or get to it before it takes aim."
+  ]
+ },
+ "orphan": {
+  "name": "orphan",
+  "role": "fire thrower",
+  "tag": "o",
+  "sprite": "orphan",
+  "hp": 30,
+  "attack": {
+   "kind": "projectile",
+   "damage": [
+    12,
+    18
+   ],
+   "speed": 1,
+   "range": 7,
+   "keep": [
+    2,
+    5
+   ],
+   "claw": [
+    6,
+    10
+   ],
+   "eager": 0.45
+  },
+  "sounds": {
+   "sight": "orphan_sight",
+   "windup": "orphan_windup",
+   "attack": "fire_throw",
+   "death": "orphan_death"
+  },
+  "death": "%s burns out.",
+  "man": [
+   "Lost its parent process. Found something else instead.",
+   "",
+   "Raises a burning hand (orange !), then throws fire at where you stand.",
+   "The fire flies a cell a beat: step out of its way.",
+   "It burns whatever it meets first - and that one will not forgive."
+  ]
+ },
+ "daemon": {
+  "name": "daemon",
+  "role": "melee charger",
+  "tag": "d",
+  "sprite": "daemon",
+  "size": 1.25,
+  "hp": 60,
+  "attack": {
+   "kind": "melee",
+   "damage": [
+    10,
+    18
+   ],
+   "speed": 1
+  },
+  "sight": 9,
+  "sounds": {
+   "sight": "daemon_sight",
+   "attack": "daemon_bite",
+   "death": "daemon_death"
+  },
+  "death": "%s goes down howling.",
+  "bite": "%s bites you.",
+  "man": [
+   "Ran in the background until it smelt you.",
+   "",
+   "Melee charger: a cell a beat, then teeth.",
+   "Shotgun it up close, or back off and let something else hit it."
+  ]
+ },
+ "spawner": {
+  "name": "spawner",
+  "role": "spawner",
+  "tag": "n",
+  "sprite": "spawner",
+  "size": 1.15,
+  "float": 0.25,
+  "hp": 60,
+  "attack": {
+   "kind": "spawner",
+   "spawn": "soul",
+   "every": 4,
+   "max": 3,
+   "keep": [
+    3,
+    6
+   ]
+  },
+  "sounds": {
+   "sight": "spawner_sight",
+   "spawn": "soul",
+   "death": "orphan_death"
+  },
+  "death": "%s bursts. Its children are orphans now.",
+  "man": [
+   "fork(), fork(), fork(). It never waits for its children.",
+   "",
+   "Every few beats it spawns a lost+found soul, up to three at a time.",
+   "Kill it first; the souls are only its noise."
+  ]
+ },
+ "soul": {
+  "name": "lost+found soul",
+  "role": "kamikaze",
+  "tag": "l",
+  "sprite": "soul",
+  "size": 0.7,
+  "float": 0.35,
+  "hp": 10,
+  "awake": true,
+  "attack": {
+   "kind": "melee",
+   "damage": [
+    5,
+    9
+   ],
+   "speed": 2
+  },
+  "sounds": {
+   "attack": "soul",
+   "death": "soul_death"
+  },
+  "death": "%s is recovered.",
+  "man": [
+   "Fragments nobody claimed, burning with resentment.",
+   "",
+   "Flies two cells a beat and bites. Ten health: one good hit."
+  ]
+ },
+ "barrel": {
+  "name": "barrel",
+  "tag": "b",
+  "sprite": "barrel",
+  "hp": 1,
+  "kind": "barrel",
+  "attack": {
+   "kind": "barrel",
+   "damage": 40
+  },
+  "man": [
+   "Pressurised coolant, gone bad.",
+   "",
+   "Bursts for 40 at everything next to it - you too, within one cell."
+  ]
+ },
+ "cron": {
+  "name": "Cron",
+  "role": "the scheduler",
+  "tag": "C",
+  "sprite": "cron",
+  "size": 1.7,
+  "float": 0.12,
+  "hp": 260,
+  "boss": true,
+  "music": {
+   "generate": {
+    "mood": "battle",
+    "seed": 66,
+    "sound": "rich",
+    "bars": 16
+   }
+  },
+  "sounds": {
+   "sight": "cron_wake",
+   "death": "teleport"
+  },
+  "attack": {
+   "kind": "cron",
+   "arena": 7,
+   "rain_damage": [
+    14,
+    20
+   ],
+   "wake_text": "Cron opens its eye. Its hands begin to turn. crontab -l:",
+   "crontab": [
+    {
+     "every": 3,
+     "do": "rain"
+    },
+    {
+     "every": 5,
+     "do": "fork",
+     "spawn": "soul",
+     "count": 2,
+     "max": 3
+    }
+   ],
+   "enraged": {
+    "below": 0.5,
+    "text": "Cron rewrites its crontab: */2. It is in a hurry now.",
+    "crontab": [
+     {
+      "every": 2,
+      "do": "rain"
+     },
+     {
+      "every": 4,
+      "do": "fork",
+      "spawn": "soul",
+      "count": 2,
+      "max": 4
+     }
+    ]
+   },
+   "escape": {
+    "below": 0.15,
+    "event": "boss_escaped",
+    "sound": "teleport",
+    "text": [
+     "Cron's hands spin backwards. Its face cracks.",
+     "crond: job rescheduled for the end of time.",
+     "Cron is gone."
+    ]
+   }
+  },
+  "man": [
+   "CRON(8) - the daemon that keeps time. It was here before root, and it means to outlast it.",
+   "",
+   "It does not chase. It schedules: every few beats fire falls on a pattern of",
+   "the floor - marked a beat ahead. Read the crontab, step off the marked floor.",
+   "It forks lost+found souls to keep you busy. Hurt it enough and it rewrites",
+   "its own schedule. Nobody has ever seen it die."
+  ]
+ }
+}

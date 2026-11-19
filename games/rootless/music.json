@@ -1,0 +1,66 @@
+{
+ "boot_sector": {
+  "title": "Boot Sector",
+  "tempo": 138,
+  "steps_per_beat": 4,
+  "instruments": {
+   "gtr": {
+    "wave": "saw",
+    "drive": 0.7,
+    "lowpass": 0.45,
+    "attack": 0.002,
+    "decay": 0.08,
+    "sustain": 0.55,
+    "release": 0.04,
+    "gate": 0.72,
+    "volume": 0.26
+   },
+   "bass": {
+    "wave": "triangle",
+    "volume": 0.5,
+    "gate": 0.8
+   },
+   "lead": {
+    "wave": "square",
+    "duty": 0.25,
+    "attack": 0.01,
+    "decay": 0.12,
+    "sustain": 0.7,
+    "release": 0.1,
+    "vibrato": [
+     5,
+     0.012
+    ],
+    "volume": 0.18,
+    "echo": [
+     0.22,
+     0.25
+    ]
+   },
+   "kit": {
+    "wave": "drums",
+    "volume": 0.7
+   }
+  },
+  "patterns": {
+   "A": {
+    "gtr": "[e2 b2]:2 [e2 b2] [e2 b2] [e2 b2]:2 [e2 b2] [e2 b2] [g2 d3]:2 [g2 d3] [g2 d3] [a#2 f3]:2 [a2 e3]:2 | [e2 b2]:2 [e2 b2] [e2 b2] [e2 b2]:2 [e2 b2] [e2 b2] [c3 g3]:2 [b2 f#3]:2 [a#2 f3]:2 [a2 e3]:2",
+    "bass": "e1:2 e1 e1 e1:2 e1 e1 g1:4 a#1:2 a1:2 | e1:2 e1 e1 e1:2 e1 e1 c2:2 b1:2 a#1:2 a1:2",
+    "kit": "k . h . s . h k k . h . s . h h | k . h . s . h k k k h . s . s s"
+   },
+   "B": {
+    "gtr": "[e2 b2]:2 [e2 b2]:2 [e2 b2] [e2 b2] [e2 b2]:2 [c3 g3]:4 [d3 a3]:4 | [e2 b2]:2 [e2 b2]:2 [e2 b2] [e2 b2] [e2 b2]:2 [a#2 f3]:4 [b2 f#3]:4",
+    "bass": "e1:4 e1:4 c2:4 d2:4 | e1:4 e1:4 a#1:4 b1:4",
+    "lead": "e4:4 g4:2 a4:2 a#4:4 a4:2 g4:2 | e4:6 d4:2 e4:8",
+    "kit": "k . h k s . h . k . h k s . h . | k . h k s . h . k k s . s s s s"
+   }
+  },
+  "sequence": [
+   "A",
+   "A",
+   "B",
+   "A",
+   "B"
+  ]
+ }
+}

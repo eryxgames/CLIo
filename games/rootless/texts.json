@@ -1,0 +1,18 @@
+{
+ "intro": {
+  "text": "The facility was built round one machine, meant to run as root forever.\n\nA second ago something answered from below the hardware, and the machine's daemons became something else. Every human account was revoked at once. Yours too.\n\nYou are rootless. Every door checks permissions you no longer have.",
+  "show_once": true
+ },
+ "e1_end": {
+  "text": "The exit switch takes your weight and the lift drops into the dark.\n\nSomewhere below, a clock is ticking that was not ticking before. Cron got away. It does not chase, it schedules - and it has put you on its list.\n\nNext: User Space.",
+  "show_once": false
+ },
+ "outro_demo": {
+  "text": "End of the demo level. Episode 1 goes on in the full game.",
+  "show_once": false
+ },
+ "outro_lose": {
+  "text": "Process terminated. The daemons go back to their schedules. Try again: read the tells, use the barrels, step off the marked floor.",
+  "show_once": false
+ }
+}

@@ -1,0 +1,121 @@
+{
+ "e1m1": {
+  "name": "Boot Sector",
+  "title": "E1M1   BOOT SECTOR",
+  "intro": [
+   "Episode 1: Knee-Deep in the Shell.",
+   "Find the x key. Beyond the x door, something keeps time."
+  ],
+  "par": 140,
+  "music": "boot_sector",
+  "facing": "n",
+  "map": [
+   "###############E#################",
+   "#############.....###############",
+   "#############.....###############",
+   "###########%#%#B#%#%#############",
+   "##########...........############",
+   "##########...........############",
+   "##########.....C.....############",
+   "#######u.S..#.....#..############",
+   "##########...........############",
+   "##########...........############",
+   "##########.....T.....############",
+   "###############X#################",
+   "##############=m=################",
+   "##############=g=############D###",
+   "##########%%%%%+%%%%%########1###",
+   "##########.........b.######.h.n.#",
+   "######c..#.z...o...z.######.....#",
+   "######.N.P...........+.~~~....k.#",
+   "######c..#.....G.....######.....#",
+   "##########.b.s.......######.m...#",
+   "##########..........h########1###",
+   "###############+#############O###",
+   "##############=.=################",
+   "##############=.=################",
+   "###############+#################",
+   "############....zb.##############",
+   "############.......Sa############",
+   "############.h...c.##############",
+   "############...@...##############",
+   "#################################"
+  ],
+  "legend": {
+   "B": {
+    "door": true,
+    "opens_on": "boss_escaped"
+   },
+   "X": {
+    "door": true,
+    "key": "x",
+    "closes_on": "arena",
+    "opens_on": "boss_escaped"
+   },
+   "T": {
+    "on_enter": "arena"
+   },
+   "1": {
+    "wall": "steel",
+    "opens_on": "keyroom"
+   },
+   "z": {
+    "monster": "zombie"
+   },
+   "g": {
+    "monster": "sudo"
+   },
+   "o": {
+    "monster": "orphan"
+   },
+   "n": {
+    "monster": "spawner"
+   },
+   "b": {
+    "monster": "barrel"
+   },
+   "C": {
+    "monster": "cron",
+    "wake_on": "arena"
+   },
+   "D": {
+    "monster": "daemon",
+    "wake_on": "keyroom"
+   },
+   "O": {
+    "monster": "orphan",
+    "wake_on": "keyroom"
+   },
+   "m": "medkit",
+   "h": "stimpack",
+   "a": "armor",
+   "c": "clip",
+   "s": "shells",
+   "G": "shotgun",
+   "N": "chaingun",
+   "u": "sudo_orb",
+   "k": {
+    "item": "key_x",
+    "on_pickup": "keyroom"
+   }
+  },
+  "events": {
+   "keyroom": "The key room's walls grind open. They were waiting for you to touch it.",
+   "arena": "The x door slams shut and locks behind you.",
+   "boss_escaped": "Far away, the sealed door unlocks."
+  },
+  "boss_escaped_line": "Cron escaped. He will be waiting at the end of time.",
+  "death_text": "outro_lose",
+  "bot": [
+   "shells",
+   "shotgun",
+   "c",
+   "N",
+   "key_x",
+   "m",
+   "T",
+   "C",
+   "E"
+  ]
+ }
+}

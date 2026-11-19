@@ -2,6 +2,61 @@
 
 Notable changes to CLIo. Versions follow [semantic versioning](https://semver.org).
 
+## Unreleased
+
+First-person levels: a scene can hold a map that the player walks through, seen through
+his eyes and redrawn in place, with monsters that move a beat at a time. A third demo
+game, RØØTLESS, shows them.
+
+### Added
+
+- **First-person levels** (`levels.json`, a scene's `"level"`). A map of characters with a
+  legend: walls in four textures, doors, doors that need the r, w or x key, toxic floor,
+  secrets that open to a punch or a shot, an exit switch. **Events** tie a level together:
+  stepping on a cell or taking an item opens walls and doors, slams doors shut and wakes
+  monsters (closets, traps, sealed arenas). `on_level_exit` in the scene says what follows.
+  Health, armour, weapons and ammunition go on to the next level; each level's kills,
+  items, secrets and beats are kept in the variable `levels`.
+- **Monsters for levels** (`monsters.json`): `hitscan` (takes aim a beat, then fires),
+  `projectile` (fire that flies and can be side-stepped), `melee`, `spawner`, `barrel`,
+  and `cron`, a boss that works to a crontab - fire raining on patterns of the floor,
+  marked a beat ahead, and monsters forked - that turns faster when hurt and can escape
+  instead of dying (`escape`, which sets off an event). Monsters wake on sight, on
+  gunfire they hear, when hurt or on an event, and fight each other when one hurts another.
+- **Pick-ups and weapons**: items with a `pickup` block (health, armour, ammunition, keys,
+  weapons, `sudo` - nothing hurts for a while), and `first_person` in game.json for the
+  weapons (fist, pistol, shotgun with pellets, chaingun with bursts) and the player's start.
+- **The picture**: walls in perspective with textures, a floor and ceiling that stay put
+  as the player moves, sprites drawn smaller with distance and hidden behind walls, the
+  gun in the player's hands, muzzle flashes, fire, blood, hits that shake the picture,
+  an automap (Tab). Three styles: `pixel` (half blocks), `dots` and `dots-fill` (braille).
+- **Frame mode** (`engine/frame.py`, `engine/keys.py`): on a real terminal a level has its
+  own screen, redrawn in place, with the prompt on the last lines. Keys act at once while
+  nothing is typed: arrow keys step and turn, Ctrl/Alt/Shift+arrows or `,` `.` strafe,
+  Space fires, Enter uses, Tab shows the map, 1-7 choose a weapon, the numpad works with
+  NumLock off; `"keymap"` changes them. Anything else is typed as a command. The picture is
+  drawn again as soon as the window changes size, on Windows as on Linux and macOS.
+  Piped, with `--scroll` or on a screen under 40 x 18 a level is played in scrolling text.
+- **Commands joined as in a shell**: `a; b`, `a && b`, `a || b`, `!!`, `!3`, `alias`; a
+  surprise stops the rest of a line. `ps`, `man`, `kill -9`, `history`, `whoami`.
+- **Far versions of sprites** (`lod`, `keep`): far away a sprite is drawn from a smaller
+  drawing that keeps the pixels that matter (the letters in `keep`, then the rarest
+  colours). The engine makes them when a level starts; a sprite can have its own.
+- **Monsters grown on a body plan**: `sprite.monster(seed, body, size)` - biped, beast,
+  floater, crawler, brute - with eyes kept in the far versions.
+- **RØØTLESS** (`games/rootless`), the third demo game: E1M1 *Boot Sector*, a first-person
+  level with zombie processes, orphans, daemons, a spawner, barrels, three secrets, a
+  locked arena and Cron, who rains fire on a schedule and escapes to be the final boss of
+  the whole game (the flag `cron_escaped`). Its own riff, sounds and 24 sprites.
+- `--view STYLE`, `--lines` (every command typed, no single keys), `--scroll`.
+  `--check` also counts levels and monsters, and checks their maps and references.
+- `tests/levelbot.py`: a simple player that walks a level by its `"bot"` goals - if it can
+  finish, a person can. 28 more tests.
+
+### Changed
+
+- The banner font has `Ø`, `ø`, `Æ`, `æ`; in plain ASCII they become `0`, `o`, `AE`, `ae`.
+
 ## 2.2.2 - 2026-11-18
 
 Music with more colours: instruments that can be overdriven, detuned, filtered and put in

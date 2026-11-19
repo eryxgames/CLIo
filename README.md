@@ -17,6 +17,7 @@ python clio.py            # pick a game
 python clio.py derelict   # sci-fi adventure
 python clio.py depths     # dungeon crawler
 python clio.py depths --mode rogue    # ...with one life and no bottom
+python clio.py rootless   # first-person shooter in a terminal
 ```
 
 ## The demo games
@@ -25,6 +26,7 @@ python clio.py depths --mode rogue    # ...with one life and no bottom
 | --- | --- |
 | **Derelict** (`games/derelict`) | A complete short adventure aboard an abandoned cargo hauler. Puzzles, dialogue trees, quests, a wandering NPC, one tactical fight that can also be talked around, and three endings. |
 | **The Hollow** (`games/depths`) | A dungeon crawler that is different on every run: three generated floors, three character classes, tactical combat against single monsters and packs, loot, shrines, a peddler, generated monster sprites and generated music. `--seed 7` replays the same dungeon. **Rogue mode** gives you one life and a dungeon that keeps going down, with a table of the best runs. |
+| **RØØTLESS** (`games/rootless`) | A first-person shooter drawn in the terminal, a beat at a time: E1M1 *Boot Sector*, the first level of a game in the making. Walk with the arrow keys, strafe, fire with Space; zombie processes, orphans, daemons, a spawner, barrels, keys and locked doors, a monster closet, secrets to punch and shoot, and Cron, who rains fire on a schedule. Typed commands work too, joined as in a shell (`f z1 && w || h`). `--view dots` draws it in braille. |
 | **Sandbox** (`game_files`) | The original CLIo 1 test bed, loaded unchanged by the new engine. |
 
 ## Features
@@ -53,8 +55,12 @@ python clio.py depths --mode rogue    # ...with one life and no bottom
 - [x] Auto-map
 - [x] Generative maze, monster packs, endless dungeons that scale with depth
 - [x] Game modes (for example story and rogue), permadeath, scores and a records table
+- [x] First-person levels: a map drawn in perspective and redrawn in place (frame mode),
+      textured walls, sprites that shrink with distance and keep their eyes, monsters that
+      aim, throw fire, charge, spawn and fight each other, keys, doors, secrets, events,
+      a boss on a schedule, an automap; arrow keys or typed commands, any window size
 - [x] Save / load of the *whole* world, named slots
-- [x] Two demo games, a starter template, over a hundred automated tests
+- [x] Three demo games, a starter template, over a hundred and eighty automated tests
 - [x] Game editor in the browser: `python clio.py mygame --edit`, or
       [on the web](https://eryxgames.github.io/CLIo/) with nothing installed - forms for
       everything a game is made of, the map, conversations as graphs, all text as a
@@ -80,6 +86,9 @@ python clio.py [game] [options]
   --width N       force the layout width
   --seed N        reproducible random numbers (same seed, same dungeon)
   --mode NAME     game mode, for games that have several (depths: story, rogue)
+  --view STYLE    how first-person levels are drawn: pixel, dots, dots-fill
+  --lines         in a level, every command is typed and ended with Enter (no single keys)
+  --scroll        play levels in scrolling text instead of a redrawn picture
   --check         validate a game's data files and exit
   --looks         list the logos, banner styles, palettes and animations
   --logo NAME     the logo the launcher shows (or CLIO_LOGO=NAME); --effect NAME animates it
@@ -181,7 +190,9 @@ engine/
   parser.py          command parser           actions.py  the verbs
   conditions.py      conditions and effects   quests.py   dialogue.py   combat.py
   game.py            the turn loop
-games/               derelict/  depths/
+  level.py           first-person levels      firstperson.py  the view
+  frame.py  keys.py  the redrawn screen and single keys
+games/               derelict/  depths/  rootless/
 templates/starter/   a tiny complete game to copy (Apache-2.0)
 game_files/          the original CLIo 1 sandbox
 tests/               python -m unittest discover -s tests
@@ -197,12 +208,14 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 148 tests, about twenty seconds
+python -m unittest discover -s tests     # 183 tests, under a minute
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
+python tests/levelbot.py 10              # an automatic player walks Rootless's E1M1 ten times
 ```
 
-The tests play both demo games to every ending from scripts, check that every screen fits
+The tests play the adventure and the dungeon to every ending from scripts, walk Rootless's
+first level to its exit (key presses in a redrawn screen and typed commands), check that every screen fits
 40 columns in both Unicode and ASCII (and down to 24), fight packs, run rogue mode until
 the bot falls, round-trip saves, and render every sound effect. They write nothing into the repository: saves and audio go to temporary folders.
 
@@ -226,7 +239,7 @@ CLIo is open source so that anyone can make games with it, including games they 
 | The engine: `engine/`, `clio.py`, `tests/`, `utils/`, `docs/` | [Apache-2.0](LICENSE) |
 | Everything the engine ships for games to use: the themes, the built-in sound effects, the music composer, the sprite generator, the CLIo logo art | Apache-2.0 - reuse and edit freely |
 | `templates/starter/` and the sandbox in `game_files/` | Apache-2.0 - copy them as a starting point |
-| The demo games `games/derelict/` and `games/depths/` (story, text, characters, art, sprites, music) | Copyright Daniel Sandner, all rights reserved - see the `LICENSE.md` in each folder |
+| The demo games `games/derelict/`, `games/depths/` and `games/rootless/` (story, text, characters, art, sprites, levels, music) | Copyright Daniel Sandner, all rights reserved - see the `LICENSE.md` in each folder |
 
 **What you make is yours.** A game you write for CLIo is your own work under whatever
 terms you choose, and so are the music, sound effects and sprites the engine generates

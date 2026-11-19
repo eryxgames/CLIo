@@ -1,0 +1,249 @@
+{
+ "pistol": [
+  {
+   "wave": "noise",
+   "noise_rate": 6000,
+   "freq": 0,
+   "dur": 0.12,
+   "vol": 0.5,
+   "decay": 0.11,
+   "sustain": 0
+  },
+  {
+   "wave": "square",
+   "freq": [
+    420,
+    110
+   ],
+   "dur": 0.08,
+   "vol": 0.25
+  }
+ ],
+ "shotgun": [
+  {
+   "wave": "noise",
+   "noise_rate": 2400,
+   "freq": 0,
+   "dur": 0.38,
+   "vol": 0.7,
+   "decay": 0.36,
+   "sustain": 0
+  },
+  {
+   "wave": "triangle",
+   "freq": [
+    170,
+    45
+   ],
+   "dur": 0.3,
+   "vol": 0.6
+  }
+ ],
+ "chaingun": [
+  {
+   "wave": "noise",
+   "noise_rate": 6000,
+   "freq": 0,
+   "dur": 0.09,
+   "vol": 0.5,
+   "decay": 0.08,
+   "sustain": 0
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 6000,
+   "freq": 0,
+   "dur": 0.09,
+   "vol": 0.5,
+   "decay": 0.08,
+   "sustain": 0,
+   "delay": 0.09
+  },
+  {
+   "wave": "square",
+   "freq": [
+    300,
+    90
+   ],
+   "dur": 0.16,
+   "vol": 0.2
+  }
+ ],
+ "punch": {
+  "wave": "noise",
+  "noise_rate": 900,
+  "freq": 0,
+  "dur": 0.09,
+  "vol": 0.55,
+  "decay": 0.08,
+  "sustain": 0
+ },
+ "locked": [
+  {
+   "wave": "square",
+   "freq": 200,
+   "dur": 0.08,
+   "vol": 0.3
+  },
+  {
+   "wave": "square",
+   "freq": 150,
+   "dur": 0.12,
+   "vol": 0.3,
+   "delay": 0.1
+  }
+ ],
+ "zombie_sight": {
+  "wave": "saw",
+  "freq": [
+   200,
+   130
+  ],
+  "dur": 0.45,
+  "vol": 0.28,
+  "vibrato": [
+   9,
+   0.06
+  ]
+ },
+ "zombie_death": {
+  "wave": "saw",
+  "freq": [
+   170,
+   50
+  ],
+  "dur": 0.55,
+  "vol": 0.3,
+  "vibrato": [
+   6,
+   0.04
+  ]
+ },
+ "orphan_sight": {
+  "wave": "square",
+  "freq": [
+   300,
+   520
+  ],
+  "dur": 0.3,
+  "vol": 0.22,
+  "duty": 0.3,
+  "vibrato": [
+   14,
+   0.08
+  ]
+ },
+ "orphan_windup": {
+  "wave": "noise",
+  "noise_rate": 800,
+  "freq": 0,
+  "dur": 0.3,
+  "vol": 0.3,
+  "attack": 0.2,
+  "decay": 0.1,
+  "sustain": 0
+ },
+ "fire_throw": {
+  "wave": "noise",
+  "noise_rate": 1800,
+  "freq": 0,
+  "dur": 0.35,
+  "vol": 0.4,
+  "decay": 0.3,
+  "sustain": 0.1
+ },
+ "orphan_death": {
+  "wave": "square",
+  "freq": [
+   500,
+   80
+  ],
+  "dur": 0.5,
+  "vol": 0.28,
+  "duty": 0.3
+ },
+ "daemon_sight": {
+  "wave": "saw",
+  "freq": [
+   110,
+   70
+  ],
+  "dur": 0.6,
+  "vol": 0.38,
+  "vibrato": [
+   18,
+   0.08
+  ]
+ },
+ "daemon_bite": [
+  {
+   "wave": "noise",
+   "noise_rate": 1200,
+   "freq": 0,
+   "dur": 0.12,
+   "vol": 0.5,
+   "decay": 0.1,
+   "sustain": 0
+  },
+  {
+   "wave": "saw",
+   "freq": [
+    140,
+    90
+   ],
+   "dur": 0.15,
+   "vol": 0.3
+  }
+ ],
+ "daemon_death": {
+  "wave": "saw",
+  "freq": [
+   130,
+   35
+  ],
+  "dur": 0.9,
+  "vol": 0.4,
+  "vibrato": [
+   10,
+   0.06
+  ]
+ },
+ "spawner_sight": {
+  "wave": "sine",
+  "freq": [
+   180,
+   90
+  ],
+  "dur": 0.7,
+  "vol": 0.4,
+  "vibrato": [
+   4,
+   0.1
+  ]
+ },
+ "soul": {
+  "wave": "square",
+  "freq": [
+   900,
+   1500
+  ],
+  "dur": 0.18,
+  "vol": 0.2,
+  "duty": 0.2
+ },
+ "soul_death": {
+  "wave": "noise",
+  "noise_rate": 3000,
+  "freq": 0,
+  "dur": 0.2,
+  "vol": 0.3,
+  "decay": 0.18,
+  "sustain": 0
+ },
+ "cron_wake": {
+  "notes": "c5:2 g4:2 e4:2 c4:6",
+  "tempo": 200,
+  "wave": "triangle",
+  "vol": 0.5
+ }
+}

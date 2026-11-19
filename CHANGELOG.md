@@ -24,7 +24,8 @@ game, RØØTLESS, shows them.
   instead of dying (`escape`, which sets off an event). Monsters wake on sight, on
   gunfire they hear, when hurt or on an event, and fight each other when one hurts another.
 - **Pick-ups and weapons**: items with a `pickup` block (health, armour, ammunition, keys,
-  weapons, `sudo` - nothing hurts for a while), and `first_person` in game.json for the
+  weapons, `sudo` - nothing hurts for a while, `boots` - toxic floor does not hurt for a
+  number of beats spent on it), and `first_person` in game.json for the
   weapons (fist, pistol, shotgun with pellets, chaingun with bursts) and the player's start.
 - **The picture**: walls in perspective with textures, a floor and ceiling that stay put
   as the player moves, sprites drawn smaller with distance and hidden behind walls, the
@@ -49,9 +50,10 @@ game, RØØTLESS, shows them.
   the sprite one to six cells away, keeps its far versions to paint over them pixel by
   pixel, makes them again, or leaves them to the game.
 - **RØØTLESS** (`games/rootless`), the third demo game: E1M1 *Boot Sector*, a first-person
-  level with zombie processes, orphans, daemons, a spawner, barrels, three secrets, a
-  locked arena and Cron, who rains fire on a schedule and escapes to be the final boss of
-  the whole game (the flag `cron_escaped`). Its own riff, sounds and 24 sprites.
+  level with zombie processes, orphans, daemons, a spawner, barrels, four secrets (one of
+  them hazmat boots), an acid vat with ring-0 armour across it, a locked arena and Cron,
+  who rains fire on a schedule and escapes to be the final boss of the whole game (the
+  flag `cron_escaped`). Its own riff, sounds and 26 sprites.
 - `--view STYLE`, `--lines` (every command typed, no single keys), `--scroll`.
   `--check` also counts levels and monsters, and checks their maps and references.
 - `tests/levelbot.py`: a simple player that walks a level by its `"bot"` goals - if it can
@@ -77,9 +79,11 @@ game, RØØTLESS, shows them.
 - **Ballistic's game sounds**: `engine.js` follows Ballistic 3603078, which adds liquids, mechanisms (doors, locks,
   switches, turrets), heat, fire, footsteps, creature and robot voices, and handling (pickups, coins, potions). Its C
   engine 0.5.0 follows the same commit; it renders RØØTLESS's weapons and Node renders these until they are ported.
-  A level plays `footstep` at every step, silent unless the game or its sound set has one. RØØTLESS's Ballistic set
-  gains 26 sounds: footsteps, its doors, secret walls, locks, switches, alarm and computer, pickups, coins and
-  healing, the player's pain, and the sight, attack and death calls of its zombies, orphan, daemon and spawner.
+  A level plays `footstep` at every step, silent unless the game or its sound set has one; a step into acid plays
+  `wade`, and acid that burns `acid_burn`. RØØTLESS's Ballistic set
+  gains 29 sounds: footsteps, wading through acid and acid burning, its doors, secret walls, locks, switches,
+  alarm and computer, pickups, coins, healing and boots put on, the player's pain, and the sight, attack and
+  death calls of its zombies, orphan, daemon and spawner.
 
 ### Changed
 

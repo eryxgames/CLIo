@@ -498,18 +498,29 @@
  },
  "w_fist": {
   "pixels": [
-   "...ssssss...",
-   "..sSsSsSss..",
-   "..ssssssss..",
-   "..sssssss...",
-   "...sssss....",
-   "..sssssss...",
-   ".sssssssss..",
-   "sssssssssss."
+   "....hShShSh....",
+   "...hsShsShsS...",
+   "..hssShssShssS.",
+   "..ssssssssssss.",
+   ".tsssssssssssS.",
+   ".ttssssssssssS.",
+   "..ttsssssssssS.",
+   "...tssssssssS..",
+   "....sssssssSS..",
+   "....bbbbbbbbb..",
+   "...cccccccccc..",
+   "...cCcccccCccc.",
+   "..ccCccccccCcc.",
+   "..cCccccccccCc."
   ],
   "palette": {
    "s": "#c89678",
-   "S": "#9a6e58"
+   "S": "#9a6e58",
+   "h": "#e2b496",
+   "t": "#b07e62",
+   "b": "#2e3229",
+   "c": "#4b5a3c",
+   "C": "#36422c"
   }
  },
  "w_pistol": {
@@ -717,6 +728,42 @@
    "b": "#b4f0ff",
    "w": "#ffffff",
    "k": "#1a3c78"
+  }
+ },
+ "boots": {
+  "pixels": [
+   ".yyy....yyy...",
+   ".yyy....yyy...",
+   ".rrr....rrr...",
+   ".yyy....yyy...",
+   ".yYy....yYy...",
+   ".yYyy...yYyy..",
+   ".yYyyy..yYyyy.",
+   ".kkkkkk.kkkkkk"
+  ],
+  "palette": {
+   "y": "#e8c630",
+   "Y": "#b8961e",
+   "r": "#2c2c2c",
+   "k": "#1e1e1e"
+  }
+ },
+ "armor_ring0": {
+  "pixels": [
+   "..GG....GG..",
+   ".GgG....GgG.",
+   ".GggGGGGggG.",
+   ".GggggggggG.",
+   ".GgggYYgggG.",
+   ".GggggggggG.",
+   ".GggggggggG.",
+   "..GggggggG..",
+   "...GGGGGG..."
+  ],
+  "palette": {
+   "g": "#4a7ad8",
+   "G": "#27458e",
+   "Y": "#f0f0f0"
   }
  }
 }

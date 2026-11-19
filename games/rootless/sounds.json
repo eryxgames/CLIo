@@ -245,5 +245,43 @@
   "tempo": 200,
   "wave": "triangle",
   "vol": 0.5
+ },
+ "boots_on": [
+  {
+   "wave": "noise",
+   "noise_rate": 1500,
+   "freq": 0,
+   "dur": 0.08,
+   "vol": 0.3,
+   "decay": 0.07,
+   "sustain": 0
+  },
+  {
+   "wave": "triangle",
+   "freq": [
+    180,
+    260
+   ],
+   "dur": 0.12,
+   "vol": 0.3
+  }
+ ],
+ "wade": {
+  "wave": "noise",
+  "noise_rate": 2200,
+  "freq": 0,
+  "dur": 0.2,
+  "vol": 0.25,
+  "decay": 0.16,
+  "sustain": 0
+ },
+ "acid_burn": {
+  "wave": "noise",
+  "noise_rate": 9000,
+  "freq": 0,
+  "dur": 0.35,
+  "vol": 0.22,
+  "decay": 0.3,
+  "sustain": 0.2
  }
 }

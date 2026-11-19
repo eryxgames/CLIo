@@ -218,11 +218,13 @@ class Player:
         self.max_ammo = dict(start.get("max_ammo") or {"bullets": 200, "shells": 50})
         self.keys = set()
         self.sudo = 0
+        self.boots = int(start.get("boots", 0))      # beats on toxic floor the boots have left
 
     def keep(self):
-        """What goes on to the next level (keys do not)."""
+        """What goes on to the next level (keys and root do not; boots do)."""
         return {"health": self.hp, "max_health": self.max_hp, "armor": self.armor, "weapons": self.weapons,
-                "weapon": self.weapon, "ammo": dict(self.ammo), "max_ammo": dict(self.max_ammo)}
+                "weapon": self.weapon, "ammo": dict(self.ammo), "max_ammo": dict(self.max_ammo),
+                "boots": self.boots}
 
 
 def bresenham(x0, y0, x1, y1):
@@ -276,6 +278,7 @@ class Level:
         self.events = set()
         self.noise_at = None
         self.stats = {"kills": 0, "items": 0, "secrets": 0, "taken": 0, "fired": 0, "hits": 0}
+        self.boots_said = False
         self.boss = None
         self.console = None
         self.sprites = {}
@@ -456,10 +459,10 @@ class Level:
         if self.console is not None:
             self.console.said(text, role)
 
-    def sfx(self, name):
+    def sfx(self, name, fallback=None):
         if self.audio is not None and name:
             try:
-                self.audio.sfx(name)
+                self.audio.sfx(name, fallback) if fallback else self.audio.sfx(name)
             except Exception:
                 pass
 
@@ -658,6 +661,8 @@ class Level:
             return True
         if t == "whoami":
             self.say("rootless   (uid 1000; root was revoked)" if not self.player.sudo else "root   (for now)", "dim")
+            if self.player.boots:
+                self.say("Hazmat boots on: %d more beats in acid." % self.player.boots, "toxic")
             return True
         if t.startswith("sudo"):
             if self.player.sudo:
@@ -701,7 +706,8 @@ class Level:
             return False
         ox, oy = p.x, p.y
         p.x, p.y = nx, ny
-        self.sfx("footstep")                    # silent unless the game or its sound set has a footstep
+        # silent unless the game or its sound set has them; a step into acid is "wade", or else a footstep
+        self.sfx("wade", "footstep") if self.cell(nx, ny).toxic else self.sfx("footstep")
         self.anim([FX(cam=(ox + (nx - ox) * ease(i / 4.0), oy + (ny - oy) * ease(i / 4.0))) for i in range(1, 5)],
                   0.03)
         self.update_seen()
@@ -749,6 +755,8 @@ class Level:
                 p.weapon = wid
         if pk.get("power") == "sudo":
             p.sudo = int(pk.get("beats", 20))
+        if pk.get("power") == "boots":
+            p.boots = max(p.boots, int(pk.get("beats", 20)))
         it.taken = True
         self.stats["items"] += 1
         self.say(pk.get("text") or "You pick up the %s." % name, "root" if pk.get("power") else "good")
@@ -1049,6 +1057,22 @@ class Level:
         if max(abs(p.x - b.x), abs(p.y - b.y)) <= 1 and not self.over:
             self.hurt(int(dmg * 0.75), "The blast catches you.", by=b)
 
+    def acid(self):
+        """A beat on toxic floor: it wears the boots down, or burns."""
+        p = self.player
+        if p.boots:
+            p.boots -= 1
+            if not p.boots:
+                self.say("The acid has eaten through your boots.", "alert")
+            elif p.boots == 5:
+                self.say("Your boots are wearing thin: 5 more beats in acid.", "alert")
+            elif not self.boots_said:
+                self.say("The rubber hisses. Your boots hold.", "toxic")
+            self.boots_said = True
+            return
+        self.sfx("acid_burn")
+        self.hurt(int(self.cfg.get("toxic_damage", 5)), "The floor burns through your boots.")
+
     def hurt(self, dmg, text, by=None):
         p = self.player
         if p.sudo:
@@ -1148,7 +1172,7 @@ class Level:
             self.boss_beat()
         cell = self.cell(p.x, p.y)
         if cell.toxic and not self.over:
-            self.hurt(int(self.cfg.get("toxic_damage", 5)), "The floor burns through your boots.")
+            self.acid()
         if p.sudo:
             p.sudo -= 1
             if not p.sudo:
@@ -1563,7 +1587,7 @@ class FrameConsole:
         keys = [(k if k in p.keys else g["dot"], ("key_" + k) if k in p.keys else "dim") for k in "rwx"]
         face = self.face(lv, fx)
         segs = [(" %s %d" % (g["heart"], p.hp), "hurt" if fx.hurt or p.hp < 30 else "text"),
-                ("  %s %d" % (g["armor"], p.armor), "info"), bar,
+                ("  %s %d" % (g["armor"], p.armor), "dim" if not p.armor else "key_x" if p.armor > 100 else "good"), bar,
                 ("%s %s " % (p.weapon, w.get("name", "?")), "text"), (ammo, "ammo"), bar] + keys + [
                 bar, (g["facing"][p.facing] + " " + FACE_NAMES[p.facing][0].upper(), "text"), bar,
                 ("%d/%d" % (lv.stats["kills"], lv.total_kills), "dim"), bar, (face, "root" if p.sudo else "title")]
@@ -1614,6 +1638,8 @@ class FrameConsole:
             segs.append((g["fire"] + " fire", "wind"))
         if lv.player.sudo:
             segs.append(("  # root: %d" % lv.player.sudo, "root"))
+        if lv.player.boots:
+            segs.append(("  boots: %d" % lv.player.boots, "toxic"))
         return sc.paint.text(segs, W, g["ell"])
 
     def page_rows(self, lv, lines, W, VR, automap):
@@ -1812,8 +1838,10 @@ class TextConsole:
         p = lv.player
         w = lv.weapons.get(p.weapon) or {}
         ammo = (" %s %d" % (w["ammo"], p.ammo.get(w["ammo"], 0))) if w.get("ammo") else ""
-        self.write("-- hp %d  armour %d | %s%s | keys %s | facing %s | beat %d --" % (
-            p.hp, p.armor, w.get("name", "?"), ammo, "".join(sorted(p.keys)) or "-", FACE_NAMES[p.facing], lv.beat))
+        power = "".join(" | %s %d" % (n, v) for n, v in (("root", p.sudo), ("boots", p.boots)) if v)
+        self.write("-- hp %d  armour %d | %s%s | keys %s%s | facing %s | beat %d --" % (
+            p.hp, p.armor, w.get("name", "?"), ammo, "".join(sorted(p.keys)) or "-", power, FACE_NAMES[p.facing],
+            lv.beat))
         for line in self.view(lv):
             self.write("   " + line)
         vis = lv.visible()

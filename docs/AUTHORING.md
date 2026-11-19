@@ -650,7 +650,8 @@ Sound effects are played by name (`{"sfx": "unlock"}`). Built in: `select back e
 step door airlock locked unlock pickup drop open use craft read computer power teleport
 secret coin quest quest_done levelup heal trap alarm encounter hit crit miss hurt guard
 focus special flee enemy_down win lose explosion`. A level also plays `footstep` at every step, which is
-silent unless the game or its sound set defines it. Add or replace them in `sounds.json`:
+silent unless the game or its sound set defines it; a step into toxic floor plays `wade` (or the footstep, if
+there is no `wade`), and `acid_burn` when the floor burns the player. Add or replace them in `sounds.json`:
 
 ```json
 "zap": {"wave": "saw", "freq": [900, 120], "dur": 0.2, "vol": 0.4},
@@ -1118,7 +1119,7 @@ The map is rows of characters, north at the top. Without a legend entry a charac
 | Character | Meaning |
 | --- | --- |
 | `#` `%` `=` | wall: steel panels, terminal screens, hazard stripes (a space is a wall too) |
-| `.` | floor; `~` toxic floor (hurts every beat, `toxic_damage` in `first_person`) |
+| `.` | floor; `~` toxic floor (hurts every beat spent on it, `toxic_damage` in `first_person`, unless the player wears boots) |
 | `@` | where the player starts (`facing`: n, e, s or w) |
 | `+` | a door: walk into it (or press Enter, `use`) to open it |
 | `R` `W` `X` | a door that needs the r, w or x key (drawn red, yellow or blue, marked `r--` `-w-` `--x`) |
@@ -1198,13 +1199,15 @@ walking onto it:
 "shells":  {"name": "shells", "pickup": {"ammo": {"shells": 4}, "sprite": "shells", "size": 0.45}},
 "key_x":   {"name": "x key", "pickup": {"key": "x", "sprite": "key_x", "sound": "unlock"}},
 "shotgun": {"name": "shotgun", "pickup": {"weapon": 3, "ammo": {"shells": 8}, "sprite": "shotgun"}},
-"sudo_orb": {"name": "sudo", "pickup": {"power": "sudo", "beats": 15, "sprite": "sudo_orb"}}
+"sudo_orb": {"name": "sudo", "pickup": {"power": "sudo", "beats": 15, "sprite": "sudo_orb"}},
+"boots":   {"name": "hazmat boots", "pickup": {"power": "boots", "beats": 20, "sprite": "boots"}}
 ```
 
 `health` (up to `max`, default the player's maximum; not taken at full health), `armor`
 (armour soaks a third of every hurt), `ammo`, `key`, `weapon`, `power: "sudo"` (nothing
-hurts the player for `beats`; the picture inverts). `size` is the picture's size on the
-floor (0.55 if not said).
+hurts the player for `beats`; the picture inverts), `power: "boots"` (toxic floor does not
+hurt for `beats` spent on it - they wear down only there, show under the picture, and go
+on to the next level). `size` is the picture's size on the floor (0.55 if not said).
 
 The weapons and the player's start are in game.json:
 

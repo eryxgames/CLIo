@@ -405,6 +405,10 @@ class View:
         if zn >= zf:
             return
         xa, xb = self.X(edge, zf), self.X(edge, zn)
+        if z - 0.5 <= 0.0:
+            # The face reaches the player: a wall beside him runs off the edge of the picture and hides
+            # everything beyond it (a corridor's walls, a door's jambs), the texture going on behind him.
+            xb = float(self.PW + 1) if edge > 0 else -1.0
         lo, hi = (xa, xb) if xa < xb else (xb, xa)
         X0, X1 = max(0, int(math.ceil(lo - 0.5))), min(self.PW, int(math.ceil(hi - 0.5)))
         span = edge * self.LW
@@ -413,7 +417,8 @@ class View:
             if t <= 0:
                 continue
             zc = math.log(t) / LN
-            u = min(TS - 1, max(0, int((zc - (z - 0.5)) * TS)))
+            v = zc - (z - 0.5)
+            u = int(v * TS) % TS if v < 0 else min(TS - 1, int(v * TS))
             y0, y1 = self.yh - self.CH * t, self.yh + self.FS * t
             Y0, Y1 = max(0, int(math.ceil(y0 - 0.5))), min(self.PH, int(math.ceil(y1 - 0.5)))
             if opened:
@@ -451,7 +456,7 @@ class View:
                 if cell is None or not cell.drawn_as_wall(fx.doors.get((x, y))):
                     continue
                 a, z = rel(x, y)
-                if z < -0.6 or z > FAR + 0.5:
+                if z < -0.5 or z > FAR + 0.5:                 # a wall wholly behind the player is not seen
                     continue
                 if abs(a) - 0.5 > (self.half / (self.LW * DECAY ** max(z - 0.5, -0.45))) + 0.5:
                     continue
@@ -483,14 +488,26 @@ class View:
             if -0.5 < z <= FAR:
                 items.append((z - 0.01, 5, 0, "boom", (a, k)))
         items.sort(key=lambda it: (-it[0], it[1], it[2]))
+
+        def solid(x, y):                                     # a face turned to this cell cannot be seen
+            c = lv.cell(x, y)
+            if c is None:
+                return True
+            if c.kind == "door":
+                return fx.doors.get((x, y), c.open) <= 0.0
+            return c.drawn_as_wall()
+
         for z, _o, _a, kind, obj in items:
             if kind == "wall":
                 cell, a, x, y = obj
                 opened = fx.doors.get((x, y), cell.open if cell.kind == "door" else 0.0)
                 tex = TEXTURES.get(cell.texture(), TEXTURES["steel"])
                 if abs(a) > 0.02:
-                    self.side_face(px, a, z, tex, opened)
-                if z - 0.5 > -0.45:
+                    k = 1 if a > 0 else -1
+                    if not solid(x - k * rx, y - k * ry):
+                        self.side_face(px, a, z, tex, opened)
+                # the face towards the player, if it is in front of him and nothing stands before it
+                if z - 0.5 > 0.0 and not solid(x - fx_, y - fy_):
                     hit = self.front_face(px, a, z, tex, opened)
                     if hit and cell.label and z <= 3.2 and not opened:
                         overlays.append((hit, cell.label, cell.label_role, z))
@@ -673,7 +690,10 @@ class View:
             self.glow(px, self.half, y0 - 2 * ws, 10 * ws, (255, 200, 90), 0.5)
             if mb:
                 self.blit(px, mb.rows, int(round(self.half - mb.w * ws / 2)), y0 - int(round(mb.h * ws)) + 1, ws)
-        self.blit(px, pic.rows, x0, y0, ws)
+        rows = pic.rows
+        if y0 + sh < self.PH:                  # raised (a punch): the arm goes on below it, to the bottom
+            rows = rows + [rows[-1]] * int(math.ceil((self.PH - y0 - sh) / ws))
+        self.blit(px, rows, x0, y0, ws)
 
     # ---- pixels to characters ------------------------------------------ #
     def halves(self, px, over):

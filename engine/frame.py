@@ -35,13 +35,14 @@ ROLE = {"text": (205, 205, 195), "dim": (130, 130, 124), "hurt": (255, 95, 85),
         "aim": (255, 80, 80), "wind": (255, 165, 50), "charge": (255, 120, 200),
         "prompt": (120, 220, 160), "ammo": (240, 200, 90), "key_r": (235, 70, 60),
         "key_w": (240, 205, 60), "key_x": (80, 140, 255), "boss": (170, 120, 255),
-        "secret": (210, 160, 255), "root": (255, 255, 255)}
+        "secret": (210, 160, 255), "root": (255, 255, 255), "toxic": (150, 235, 90)}
 
-# symbols a level draws; the full set keeps to fonts' common ground (WGL4) where it can
-GLYPHS = {"heart": "♥", "armor": "◈", "ammo": "▪", "bar": "│", "dot": "·", "charge": "»",
+# Symbols a level draws. The full set keeps to fonts' common ground (WGL4, the set of the Windows console's fonts
+# and of DOS before them): ♥ health and ♦ armour are there, where a shield (◈, ⛨, 🛡) is not.
+GLYPHS = {"heart": "♥", "armor": "♦", "ammo": "▪", "bar": "│", "dot": "·", "charge": "»",
           "rule": "─", "ell": "…", "fire": "●", "run": "»", "lr": "←→", "ud": "↑↓",
           "facing": "▲►▼◄", "block": "█", "half": "▀"}
-SAFE_GLYPHS = dict(GLYPHS, armor="#", ammo="=", heart="HP", facing="^>v<")
+SAFE_GLYPHS = dict(GLYPHS, armor="AR", ammo="=", heart="HP", facing="^>v<")
 ASCII_GLYPHS = {"heart": "HP", "armor": "AR", "ammo": "#", "bar": "|", "dot": ".", "charge": ">",
                 "rule": "-", "ell": "~", "fire": "*", "run": ">", "lr": "<>", "ud": "^v",
                 "facing": "^>v<", "block": "#", "half": "#"}

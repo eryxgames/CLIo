@@ -98,5 +98,26 @@
    "size": 0.55,
    "text": "sudo -s. You are root for 15 beats: nothing can hurt you."
   }
+ },
+ "boots": {
+  "name": "hazmat boots",
+  "description": "Yellow rubber, knee high, a black band. The acid cannot get through them - for a while.",
+  "pickup": {
+   "power": "boots",
+   "beats": 20,
+   "sprite": "boots",
+   "size": 0.55,
+   "sound": "boots_on",
+   "text": "Hazmat boots! Acid will not hurt you for 20 beats in it."
+  }
+ },
+ "armor_ring0": {
+  "name": "ring-0 armour",
+  "description": "Blue, kernel mode. Nothing in user space gets through it easily.",
+  "pickup": {
+   "armor": 200,
+   "sprite": "armor_ring0",
+   "text": "Ring-0 armour: kernel mode. (200)"
+  }
  }
 }

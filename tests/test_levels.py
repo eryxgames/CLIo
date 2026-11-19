@@ -48,7 +48,7 @@ class LevelTests(unittest.TestCase):
     def test_the_map(self):
         lv = level()
         self.assertEqual((lv.player.x, lv.player.y, lv.player.facing), (15, 28, 0))
-        self.assertEqual(lv.total_secrets, 3)
+        self.assertEqual(lv.total_secrets, 4)
         z1 = next(m for m in lv.monsters if m.tag == "z1")
         self.assertEqual((z1.x, z1.y), (16, 25))              # numbered in the order they are met
         self.assertIsNotNone(lv.boss)
@@ -107,6 +107,36 @@ class LevelTests(unittest.TestCase):
         lv.run_line("f")
         self.assertEqual(lv.cell(9, 17).kind, "floor")
         self.assertEqual(lv.stats["secrets"], 2)
+
+    def test_hazmat_boots_and_the_acid_vat(self):
+        lv = level()
+        put(lv, 15, 22, 3)                                     # the dented vent in the corridor's wall
+        for m in lv.monsters:
+            m.dead = True
+        lv.run_line("f")
+        self.assertEqual(lv.cell(14, 22).kind, "floor")
+        self.assertEqual(lv.stats["secrets"], 1)
+        boots = next(it for it in lv.items if it.iid == "boots")
+        self.assertEqual((boots.x, boots.y), (12, 23))
+        lv.player.x, lv.player.y = boots.x, boots.y
+        lv.arrive()
+        self.assertEqual(lv.player.boots, 20)
+        self.assertEqual(lv.player.keep()["boots"], 20)       # they go on to the next level
+        put(lv, 26, 23, 3)                                     # on the vat's ledge, the acid ahead
+        hp = lv.player.hp
+        for _ in range(3):
+            lv.run_line("k")
+        self.assertEqual((lv.player.x, lv.player.y, lv.player.hp, lv.player.boots), (23, 23, hp, 17))
+        lv.player.boots = 1
+        lv.run_line("j")                                       # the last beat the rubber holds
+        self.assertEqual((lv.player.hp, lv.player.boots), (hp, 0))
+        self.assertIn("eaten through", " ".join(str(t) for t in lv.console.told))
+        lv.run_line("j")
+        self.assertEqual(lv.player.hp, hp - 5)                 # and then it burns (armour 0)
+        ring = next(it for it in lv.items if it.iid == "armor_ring0")
+        lv.player.x, lv.player.y = ring.x, ring.y
+        lv.arrive()
+        self.assertEqual(lv.player.armor, 200)
 
     def test_the_key_room_closets(self):
         lv = level()
@@ -207,6 +237,31 @@ class CombatTests(unittest.TestCase):
 
 
 class PictureTests(unittest.TestCase):
+    def test_walls_beside_the_player_run_off_the_picture(self):
+        for x, y, f in ((15, 22, 0), (15, 21, 0), (15, 23, 2)):  # a corridor, a doorway, the corridor turned round
+            lv = level()
+            lv.cell(15, 21).open = 1.0
+            put(lv, x, y, f)
+            v = View(80, 17, "pixel")
+            v.render(lv, FX(), 0)
+            for col in (0, 79):                                # what is seen at both edges is the near wall
+                self.assertLess(v.cover[(8, col)], 0.0, (x, y, col))
+        lv = level()
+        put(lv, 15, 26, 0)                                     # in a room: the far wall is what is seen there
+        v = View(80, 17, "pixel")
+        v.render(lv, FX(), 0)
+        self.assertGreater(v.cover[(8, 40)], 0.5)
+
+    def test_a_punch_keeps_the_arm_on(self):
+        lv = level()
+        put(lv, 15, 27, 0)
+        lv.player.weapon = "1"
+        sleeve = set(lv.sprites["w_fist"].rows[-1]) - {None}
+        for rec in (0, -3):
+            bottom = View(80, 17, "pixel").render(lv, FX(recoil=rec), 0)[-1]
+            self.assertTrue({bottom[40][1], bottom[40][2]} <= sleeve, rec)
+
+
     def test_every_style(self):
         lv = level()
         put(lv, 15, 20, 0)

@@ -366,6 +366,9 @@ def main(argv=None):
                     help="first-person levels: low draws the floor and ceiling at half width (faster in a big "
                          "window); auto (the default) does so only for a very big picture")
     ap.add_argument("--lines", action="store_true", help="in first-person levels: typed lines only, no single keys")
+    ap.add_argument("--dev", action="store_true",
+                    help="for making a game: in levels *ID jumps to a level and saves are not counted (also CLIO_DEV=1)")
+    ap.add_argument("--level", metavar="ID", help="start a new game in the scene that plays level ID (implies --dev)")
     ap.add_argument("--scroll", action="store_true", help="play first-person levels in scrolling text")
     ap.add_argument("--fast", action="store_true", help="no text animation")
     ap.add_argument("--width", type=int, help="force the layout width in columns")
@@ -458,6 +461,10 @@ def main(argv=None):
             settings["view"] = args.view
         if args.detail:
             settings["detail"] = args.detail
+        if args.dev or args.level or os.environ.get("CLIO_DEV", "").lower() in ("1", "yes", "true", "on"):
+            settings["dev"] = True
+        if args.level:
+            settings["start_level"] = args.level
         if args.lines:
             settings["lines"] = True
         if args.scroll:

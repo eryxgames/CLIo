@@ -12,7 +12,7 @@ an arrow can move at once while typed commands still work (see
 * Windows (the console and Windows Terminal): ``msvcrt``.
 
 Keys are named: ``"up" "down" "left" "right" "home" "end" "pgup" "pgdn"
-"insert" "delete" "center" "f1".."f8" "enter" "tab" "space" "backspace" "esc"
+"insert" "delete" "center" "f1".."f9" "enter" "tab" "space" "backspace" "esc"
 "ctrl-u" "ctrl-d"``, a modified arrow as ``"ctrl-left"``, ``"alt-up"``,
 ``"shift-right"``, and any other key as the character it types.
 
@@ -33,7 +33,7 @@ SEQ = {"[A": "up", "[B": "down", "[C": "right", "[D": "left",
        "[H": "home", "[F": "end", "OH": "home", "OF": "end", "[1~": "home", "[4~": "end",
        "[7~": "home", "[8~": "end", "[2~": "insert", "[3~": "delete", "[5~": "pgup", "[6~": "pgdn",
        "[E": "center", "OE": "center", "[G": "center", "OP": "f1", "OQ": "f2", "OR": "f3", "OS": "f4",
-       "[15~": "f5", "[17~": "f6", "[18~": "f7", "[19~": "f8", "[11~": "f1", "[12~": "f2",
+       "[15~": "f5", "[17~": "f6", "[18~": "f7", "[19~": "f8", "[20~": "f9", "[11~": "f1", "[12~": "f2",
        "[13~": "f3", "[14~": "f4", "OM": "enter", "Oj": "*", "Ok": "+", "Om": "-", "On": ".", "Oo": "/",
        "[Z": "shift-tab"}
 SEQ.update({"O" + chr(ord("p") + i): str(i) for i in range(10)})        # keypad in application mode
@@ -44,7 +44,7 @@ ARROWS = {"A": "up", "B": "down", "C": "right", "D": "left", "H": "home", "F": "
 # Windows: the second code after a 0x00 / 0xE0 prefix
 WIN = {"H": "up", "P": "down", "K": "left", "M": "right", "G": "home", "O": "end", "I": "pgup",
        "Q": "pgdn", "R": "insert", "S": "delete", "L": "center", ";": "f1", "<": "f2", "=": "f3",
-       ">": "f4", "?": "f5", "@": "f6", "A": "f7", "B": "f8",
+       ">": "f4", "?": "f5", "@": "f6", "A": "f7", "B": "f8", "C": "f9",
        "s": "ctrl-left", "t": "ctrl-right", "\x8d": "ctrl-up", "\x91": "ctrl-down",
        "\x9b": "alt-left", "\x9d": "alt-right", "\x98": "alt-up", "\xa0": "alt-down",
        "\x97": "alt-home", "\x9f": "alt-end"}

@@ -25,8 +25,11 @@ from __future__ import annotations
 
 import contextlib
 import copy
+import json
 import math
+import os
 import random
+import zlib
 import re
 import time
 
@@ -55,7 +58,7 @@ KEYMAP = {
     "home": "h", "pgup": "l", "end": "turn around", "pgdn": "use",
     "space": "f", "insert": "f", "enter": "use", "tab": "map", "center": "w", "delete": "w",
     "1": "1", "2": "2", "3": "3", "4": "4", "5": "5", "6": "6", "7": "7",
-    "?": "help", "f1": "help", "f2": "goggles",
+    "?": "help", "f1": "help", "f2": "goggles", "f5": "save", "f9": "load",
 }
 
 WEAPONS = {
@@ -74,14 +77,19 @@ HELP = [
     ("Ctrl+← →  or  , .  strafe     space  fire", "text"),
     ("Enter  open, press   Tab  map   1-7  weapons", "text"),
     ("F2  TTY goggles on/off (the battery lasts while off)", "text"),
+    ("F5  save   F9  load the last save", "text"),
     ("", "text"),
     ("Typed: k j h l, turn left/right/around, use,", "dim"),
     ("f [x], kill [-9] x, t x, w [n], map, ps, man x,", "dim"),
     ("goggles [on|off], out (of a vehicle), history,", "dim"),
     ("alias n='...', keys, whoami, sound, q", "dim"),
+    ("save [name], load [name], saves", "dim"),
     ("a; b   a && b   a || b   !!  !3  !f   as in a shell", "dim"),
     ("A surprise stops a line, as ^C would.", "dim"),
 ]
+
+# lines about the game rather than in it: not kept in a level's journal (a save plays the journal back)
+META = re.compile(r"(?:save|load|saves)(?:\s+[\w-]+)?|\*[\w-]*")
 
 DETAILS = ("auto", "high", "low")     # a level's picture: "low" draws the floor and ceiling at half width
 
@@ -99,6 +107,7 @@ class StopLine(Exception):
 class Cell:
     __slots__ = ("x", "y", "ch", "kind", "tex", "key", "panel", "toxic", "open", "opens_on", "closes_on",
                  "on_enter", "sealed", "pressed", "label", "label_role", "secret", "found", "floor", "ceiling",
+                 "savepoint",
                  "crate", "plate", "down", "open_while", "teleport", "arrive_only", "pad_facing", "lift", "deck", "sunk",
                  "oil", "slick", "conveyor", "scorched", "exit_kind", "heavy")
 
@@ -132,6 +141,7 @@ class Cell:
         self.sealed = bool(spec.get("sealed")) or bool(spec.get("door") and spec.get("opens_on") and not spec.get("key"))
         self.pressed = False
         self.secret = bool(spec.get("secret")) or bool(self.panel)
+        self.savepoint = bool(spec.get("savepoint"))    # a checkpoint: the game is saved when it is first reached
         self.found = False
         self.open = 0.0
         self.exit_kind = "secret" if spec.get("exit") == "secret" else "exit"
@@ -341,6 +351,17 @@ class Level:
         self.vrng = random.Random(repr(seed) + "/looks")   # for what is only seen: the game's own chances stay as they were
         self.boss = None
         self.console = None
+        self.seed = seed
+        self.start_player = copy.deepcopy(player) if isinstance(player, dict) else None
+        self.journal = []                                # every line typed: a save is these, played back
+        self.replaying = False
+        self.host = None                                 # the game round the level: it saves, loads, jumps
+        self.dev = False                                 # --dev: *LEVEL jumps, saves are not counted
+        saves = self.cfg.get("saves")
+        self.saves_left = int(saves) if isinstance(saves, int) and not isinstance(saves, bool) else None
+        self.loaded = self.warp = None                   # a save to go on with, a level to jump to
+        self.reached = set()                             # checkpoints passed
+        self.opening = None                              # lines said in place of the title page (a loaded game)
         self.sprites = {}
         self._tags = {}
         self._ids = 0
@@ -610,7 +631,10 @@ class Level:
         console.start()
         try:
             self.music(self.spec.get("music"))
-            console.page(self, self.intro_lines())
+            if self.opening is None or not self.beat:        # a save from the very start begins like the level
+                console.page(self, self.intro_lines())
+            for text, role in self.opening or ():          # a loaded game: no title page, a word instead
+                self.say(text, role)
             while not self.over:
                 line = console.read(self)
                 if line is None:
@@ -658,9 +682,23 @@ class Level:
 
     # ---- a typed line: commands joined like a shell's -------------------- #
     def run_line(self, line):
+        """A typed line. Every line that plays is kept in the journal - a save is the journal, played
+        back - except the ones about the game itself (save, load, saves, *LEVEL)."""
         line = (line or "").strip()
         if not line:
             return
+        if META.fullmatch(line):
+            if not self.replaying:
+                self.meta(line)
+            return
+        self.journal.append(line)
+        try:
+            self.play_line(line)
+        finally:
+            if self.over in ("quit", "load", "warp") and self.journal and self.journal[-1] == line:
+                self.journal.pop()
+
+    def play_line(self, line):
         m = re.fullmatch(r"!(\d+|[a-z][\w ]*)", line)
         if m:
             key = m.group(1)
@@ -737,6 +775,8 @@ class Level:
             return self.use()
         if t in ("out", "leave", "dismount", "get out"):
             return self.leave()
+        if META.fullmatch(t):                            # within a line: "w; save"
+            return True if self.replaying else self.meta(t)
         if self.player.vehicle is not None and (t in self.weapons or (len(t) == 1 and t.isdigit())):
             self.say("Your hands are on the %s's levers: its claws are your weapon. (out: climb down)"
                      % self.player.vehicle.name, "dim")
@@ -797,6 +837,8 @@ class Level:
             self.say("rootless   (uid 1000; root was revoked)" if not self.player.sudo else "root   (for now)", "dim")
             if self.player.boots:
                 self.say("Hazmat boots on: %d more beats in acid." % self.player.boots, "toxic")
+            if self.saves_left is not None and not self.dev:
+                self.say("Saves left in this level: %d." % self.saves_left, "dim")
             return True
         if t.startswith("sudo"):
             if self.player.sudo:
@@ -812,6 +854,65 @@ class Level:
             return True
         self.say("rootless: %s: command not found" % tok.strip(), "hurt")
         raise StopLine()
+
+    # ---- saving, loading, jumping ------------------------------------------- #
+    def meta(self, t):
+        """``save [name]``, ``load [name]``, ``saves``, and ``*LEVEL`` (with --dev): about the game, not in it."""
+        word, _, arg = t.partition(" ")
+        arg = arg.strip() or None
+        if word.startswith("*"):
+            return self.jump(word[1:])
+        if self.host is None:
+            self.say("Saving needs the game round the level.", "dim")
+            return False
+        if word == "saves":
+            return self.host.list(self)
+        if word == "save":
+            return self.host.save(self, arg)
+        return self.host.load(self, arg)
+
+    def jump(self, lid):
+        """``*e1m2``: on to that level's scene, as you are (for trying levels out: with --dev)."""
+        if not self.dev:
+            self.say("rootless: *%s: command not found" % lid, "hurt")
+            return False
+        levels = sorted(self.data.levels or {})
+        if not lid:
+            self.say("Levels: " + ", ".join("%s (%s)" % (k, (self.data.levels[k] or {}).get("name", k))
+                                            for k in levels), "dim")
+            return True
+        if lid not in levels:
+            self.say("There is no level '%s'. There are: %s." % (lid, ", ".join(levels)), "hurt")
+            return False
+        if self.host is None or not self.host.scene_of(lid):
+            self.say("No scene plays level '%s', so there is nowhere to go on to from it." % lid, "hurt")
+            return False
+        self.warp, self.over = lid, "warp"
+        return True
+
+    def fingerprint(self):
+        """What the level is made of, in short: a save notes it, and says so when it has changed."""
+        d = self.data
+        stuff = [self.spec, d.monsters, getattr(d, "weapons", None), d.items, self.cfg]
+        return "%08x" % (zlib.crc32(json.dumps(stuff, sort_keys=True, default=str).encode("utf-8")) & 0xffffffff)
+
+    def save_block(self):
+        """The level in a save: how it began and every line played since."""
+        return {"id": self.id, "seed": self.seed, "start": self.start_player, "lines": list(self.journal),
+                "beat": self.beat, "saves_left": self.saves_left, "fingerprint": self.fingerprint()}
+
+    def replay(self, lines):
+        """Play ``lines`` again, unseen and unheard: True if they played through without the level ending."""
+        console, audio = self.console, self.audio
+        self.console, self.audio, self.replaying = TextConsole(lambda text: None, lambda prompt: None), None, True
+        try:
+            for line in lines:
+                self.run_line(line)
+                if self.over:
+                    return False
+            return True
+        finally:
+            self.console, self.audio, self.replaying = console, audio, False
 
     # ---- a machine to ride ------------------------------------------------- #
     def board(self, m):
@@ -1179,6 +1280,10 @@ class Level:
             self.say("A secret area!", "secret")
         if cell.on_enter and cell.on_enter not in self.events:
             self.event(cell.on_enter)
+        if cell.savepoint and (p.x, p.y) not in self.reached:      # a checkpoint
+            self.reached.add((p.x, p.y))
+            if self.host is not None and not self.replaying:
+                self.host.save(self, None, how="checkpoint")
         if cell.teleport and not cell.arrive_only and not teleported and not self.over:
             self.teleport(cell)
 
@@ -2993,12 +3098,88 @@ class TextConsole:
 # --------------------------------------------------------------------------- #
 # from a scene
 # --------------------------------------------------------------------------- #
-def play_scene(game, scene):
-    """Run the level of a scene for a CLIo game, then go on with the story."""
-    lid = scene.get("level")
+class Host:
+    """The game round a level, as the level sees it: saves (the world as it was when the level began, and
+    the level's journal), loads, and finds the scene that plays a level."""
+
+    def __init__(self, game):
+        self.game = game
+
+    def path(self, slot):
+        from .world import slot_path
+        return slot_path(self.game.saves(), slot or self.game.slot)
+
+    def scene_of(self, lid):
+        return next((sid for sid, sc in self.game.world.scenes.items() if sc.get("level") == lid), None)
+
+    def save(self, lv, slot, how="save"):
+        """``how``: "save" (typed; counted when the game limits them), "start" or "checkpoint" (free)."""
+        from .world import write_save
+        if how == "save" and lv.saves_left is not None and not lv.dev and lv.saves_left <= 0:
+            lv.say("No saves left in this level. (A checkpoint still saves.)", "hurt")
+            return False
+        if how == "save" and lv.saves_left is not None and not lv.dev:
+            lv.saves_left -= 1
+        blob = self.game.world.to_save()
+        blob["level"] = lv.save_block()
+        try:
+            write_save(self.path(slot), blob)
+        except (OSError, TypeError, ValueError) as e:
+            lv.say("Could not save: %s" % e, "hurt")
+            return False
+        if how == "start":
+            return True
+        lv.sfx("save")
+        left = ("  (%d left in this level)" % lv.saves_left) if lv.saves_left is not None and not lv.dev else ""
+        lv.say(("Checkpoint: saved." if how == "checkpoint" else "Saved%s." % (" as '%s'" % slot if slot else ""))
+               + (left if how == "save" else ""), "good")
+        return True
+
+    def list(self, lv):
+        from .world import list_saves
+        found = list_saves(self.game.saves())
+        lv.say("Saved games: " + (", ".join(s[0] for s in found) if found else "none"), "dim")
+        return True
+
+    def load(self, lv, slot):
+        from .world import read_save
+        path = self.path(slot)
+        if not os.path.isfile(path):
+            lv.say("There is no saved game%s." % (" called '%s'" % slot if slot else ""), "hurt")
+            return False
+        try:
+            blob = read_save(path)
+        except (OSError, ValueError) as e:
+            lv.say("Could not read that save: %s" % e, "hurt")
+            return False
+        if blob.get("game") != self.game.data.id:
+            lv.say("That save belongs to another game.", "hurt")
+            return False
+        lv.loaded, lv.over = blob, "load"
+        return True
+
+
+def resume(data, block, audio=None):
+    """A level as a save left it: built as it began, its journal played back. Returns ``(level, note)``;
+    a note says when the save did not play back as it was (the level changed since) - then the level
+    starts again from where it began."""
+    lv = Level(data, block["id"], seed=block.get("seed"), player=block.get("start"))
+    note = None
+    if block.get("fingerprint") and block["fingerprint"] != lv.fingerprint():
+        note = "The level has changed since this save was made."
+    if not lv.replay(block.get("lines") or []):
+        lv = Level(data, block["id"], seed=block.get("seed"), player=block.get("start"))
+        note = "That save no longer plays back on this level: it starts again from the beginning."
+    if isinstance(block.get("saves_left"), int):
+        lv.saves_left = block["saves_left"]
+    lv.audio = audio
+    return lv, note
+
+
+def play_scene(game, scene, resume_from=None):
+    """Run the level of a scene for a CLIo game, then go on with the story. ``resume_from``: a save's
+    level block, to go on from. Loading a save or jumping to a level (--dev) plays on here."""
     w = game.world
-    state = w.vars.get("_fp_player")
-    lv = Level(game.data, lid, audio=game.audio, seed=game.seed, player=state)
     term = game.term
     cfg = game.data.config.get("first_person") or {}
     settings = game.settings
@@ -3030,11 +3211,53 @@ def play_scene(game, scene):
                     return None
                 raise
         console = TextConsole(write, read)
-    outcome = lv.run(console)
+    dev = bool(settings.get("dev"))
+    host = Host(game)
+    while True:
+        lid = scene.get("level")
+        note = None
+        if resume_from is not None and resume_from.get("id") == lid:
+            lv, note = resume(game.data, resume_from, game.audio)
+        else:
+            lv = Level(game.data, lid, audio=game.audio, seed=game.seed, player=w.vars.get("_fp_player"))
+        lv.host, lv.dev = host, dev
+        if resume_from is None and cfg.get("autosave"):
+            host.save(lv, None, how="start")             # the level's beginning: what dying goes back to
+        if resume_from is not None:
+            lv.opening = [("Loaded%s." % (" - beat %d" % lv.beat if lv.beat else ""), "good")]
+            if note:
+                lv.opening.append((note, "alert"))
+        resume_from = None
+        outcome = lv.run(console)
+        if outcome == "load":
+            blob = lv.loaded
+            try:
+                w.load_save(blob)
+            except (KeyError, ValueError) as e:
+                lv.say("Could not load that save: %s" % e, "hurt")
+                resume_from = lv.save_block()           # back where we were
+                continue
+            game.over, game.started = None, True
+            scene = w.scene
+            if not scene.get("level"):
+                game.resume_music()
+                game.describe_scene(full=True)
+                return "loaded"
+            resume_from = blob.get("level") or None
+            continue
+        if outcome == "warp":
+            w.vars["_fp_player"] = lv.player.keep()
+            sid = host.scene_of(lv.warp)
+            w.scene_id = sid
+            if sid not in w.visited:
+                w.visited.append(sid)
+            scene = w.scene
+            continue
+        break
     w.vars["_fp_player"] = lv.player.keep()
     stats = dict(lv.stats, beats=lv.beat, par=lv.par, secrets_total=lv.total_secrets, kills_total=lv.total_kills,
                  items_total=lv.total_items)
-    w.vars.setdefault("levels", {})[lid] = stats
+    w.vars.setdefault("levels", {})[lv.id] = stats
     if outcome == "exit":
         if lv.boss is not None and lv.boss.gone:
             w.flags["%s_escaped" % lv.boss.kind] = True
@@ -3166,4 +3389,10 @@ def validate(data):
                 problems.append("level '%s': '%s' is a belt going '%s'; it should be n, e, s or w" % (lid, ch, spec["conveyor"]))
             if spec.get("exit") not in (None, False, True, "secret"):
                 problems.append("level '%s': '%s' is an exit '%s'; it should be true or \"secret\"" % (lid, ch, spec["exit"]))
+    fp = data.config.get("first_person") or {}
+    saves = fp.get("saves")
+    if saves is not None and (isinstance(saves, bool) or not isinstance(saves, int) or saves < 0):
+        problems.append("first_person \"saves\" should be a number of saves a level allows (0 or more), not %r" % (saves,))
+    if "autosave" in fp and not isinstance(fp["autosave"], bool):
+        problems.append("first_person \"autosave\" should be true or false")
     return problems

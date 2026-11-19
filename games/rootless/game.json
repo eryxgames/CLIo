@@ -53,7 +53,9 @@
     "rockets": 20,
     "grenades": 12
    }
-  }
+  },
+  "saves": 3,
+  "autosave": true
  },
  "help": "Arrows step and turn, Ctrl+arrows or , . strafe, space fires, Enter opens, Tab shows the map.",
  "about": "A demo of CLIo's first-person levels: frame mode, keys that act at once, a crontab boss.",

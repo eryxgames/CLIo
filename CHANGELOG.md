@@ -174,6 +174,18 @@ game, RØØTLESS, shows them.
   has a claw for a weapon, shoves heavy **containers** (`{"crate": "heavy"}`) that the
   player alone cannot move, wades through acid, fits through no door, and bursts when it is
   wrecked. The picture shows its cage and claws. The level bot can `board` and get `out`.
+- **Saving in levels**: `save [name]` (F5), `load [name]` (F9) and `saves` in a first-person
+  level. A save is the world as the level began and every line played since; loading
+  builds the level again and plays them back unseen (a whole level in about a tenth of a
+  second), so everything in it comes back as it was. A save notes what the level was made
+  of and says when it has changed; one that no longer plays through starts the level
+  again. `first_person` `"saves"` limits saves per level and `"autosave"` saves as each
+  level begins (what the death menu's "Load your last save" goes back to); a cell with
+  `{"savepoint": true}` is a checkpoint. The title screen names a level's save by its level
+  and beat. The key reader knows F9.
+- **Trying levels out**: `--level ID` starts a new game in the scene that plays a level;
+  with `--dev` (or `CLIO_DEV=1`) `*ID` typed in a level goes on to that level as you are,
+  `*` lists the levels, and saves are not counted.
 - **RØØTLESS E1M2 *Dynamic Loader***: the cargo dock where everything the facility runs is
   loaded first - containers, a belt of crates feeding an acid channel, the w key across it,
   and a cargo loader in its bay; three secrets; the rocket launcher and grenades; its own

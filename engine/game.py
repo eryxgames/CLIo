@@ -905,7 +905,7 @@ class Game(Actions):
                             ("by %s" % cfg["author"]) if cfg.get("author") else "", frames, reveals)
         else:
             ui.title_screen(art, self.data.title, "CLIo %s" % __version__, "", frames, reveals)
-        if self.term.interactive and self.offer_continue():
+        if self.term.interactive and not self.settings.get("start_level") and self.offer_continue():
             return
         if self.term.interactive:
             ui.pause("[Enter to begin]" if not ui.narrow else "[Enter]")
@@ -927,7 +927,12 @@ class Game(Actions):
                 who = (blob.get("player") or {}).get("name")
                 if who and self.cfg.get("character_creation"):
                     bits.append(str(who))
-                bits.append("turn %d" % int(blob.get("turn", 0)))
+                lvl = blob.get("level") or {}
+                if lvl.get("id"):                        # saved in a level: which, and how far in
+                    name = ((self.data.levels or {}).get(lvl["id"]) or {}).get("name", lvl["id"])
+                    bits.append("%s, beat %d" % (name, int(lvl.get("beat", 0))))
+                else:
+                    bits.append("turn %d" % int(blob.get("turn", 0)))
                 label = ", ".join(bits)
             except (OSError, ValueError, TypeError, AttributeError):
                 pass
@@ -953,6 +958,16 @@ class Game(Actions):
 
     def begin_story(self):
         cfg = self.cfg
+        jump = self.settings.get("start_level")
+        if jump:                                         # --level ID: straight to the scene that plays it
+            sid = next((k for k, sc in self.world.scenes.items() if sc.get("level") == jump), None)
+            if sid is None:
+                self.say("No scene plays level '%s'." % jump, "error")
+            else:
+                self.started = True
+                self.world.scene_id = sid
+                self.enter_scene(sid, quiet=True, first=True)
+                return
         self.choose_mode()
         cc = cfg.get("character_creation")
         if cc:
@@ -1156,7 +1171,8 @@ class Game(Actions):
                 self.say("Saved games: " + ", ".join(names), "system")
             return False
         try:
-            self.world.load_save(read_save(path))
+            blob = read_save(path)
+            self.world.load_save(blob)
         except (OSError, ValueError, KeyError) as e:
             self.say("Could not load that save: %s" % e, "error")
             return False
@@ -1164,6 +1180,10 @@ class Game(Actions):
         self.started = True
         self.battle = None
         self.audio.sfx("save")
+        if self.world.scene.get("level"):                # saved in a first-person level: it plays on from there
+            from . import level
+            level.play_scene(self, self.world.scene, resume_from=blob.get("level"))
+            return True
         self.say("Game loaded.", "success")
         self.resume_music()
         self.describe_scene(full=True)

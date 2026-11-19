@@ -1383,6 +1383,29 @@ work - for a slow machine or a very wide window) or `"auto"` (the default: low o
 very big picture); `--detail` overrides it. Walls are drawn 10 cells ahead; monsters, items
 and shots count within 7.
 
+### Saving in a level
+
+`save [name]` (F5) saves in a level and `load [name]` (F9) loads; `saves` lists them. A save
+is the game as it was when the level began, and every line played since: loading builds
+the level again and plays those lines back, unseen, in a moment - so everything in the
+level (fire, grenades, a ridden vehicle, a boss's timetable) comes back as it was. A save
+notes what the level was made of; if the level has changed since, loading says so, and if
+the lines no longer play through (the level would end on the way), it starts again from
+the beginning. The title screen offers a level's save by the level's name and beat.
+
+```json
+"first_person": {"saves": 3, "autosave": true, ...}
+```
+
+`saves` limits the saves a player may make in each level (left out: as many as he likes;
+`whoami` says how many are left); `autosave` saves as each level begins, so the death menu's
+"Load your last save" goes back to it. A cell with `{"savepoint": true}` is a **checkpoint**:
+the game is saved, free, the first time it is reached.
+
+For making a game, `--dev` (or `CLIO_DEV=1`) lets saves be made without counting, and
+`*ID` typed in a level goes on to the scene that plays level `ID`, as the player is (`*`
+alone lists the levels). `--level ID` starts a new game straight in that level.
+
 ### The end of a game of levels
 
 `"end_screen"` in game.json ends a won game on a screen of its own, on a terminal big

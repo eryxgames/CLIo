@@ -26,7 +26,7 @@ python clio.py rootless   # first-person shooter in a terminal
 | --- | --- |
 | **Derelict** (`games/derelict`) | A complete short adventure aboard an abandoned cargo hauler. Puzzles, dialogue trees, quests, a wandering NPC, one tactical fight that can also be talked around, and three endings. |
 | **The Hollow** (`games/depths`) | A dungeon crawler that is different on every run: three generated floors, three character classes, tactical combat against single monsters and packs, loot, shrines, a peddler, generated monster sprites and generated music. `--seed 7` replays the same dungeon. **Rogue mode** gives you one life and a dungeon that keeps going down, with a table of the best runs. |
-| **RØØTLESS** (`games/rootless`) | A first-person shooter drawn in the terminal, a beat at a time: a recruit's first battle simulation - E1M1 *Boot Sector*, E1M2 *Dynamic Loader* and the secret level E1M9 *Swap Partition*, the start of a game in the making. Walk with the arrow keys, strafe, fire with Space; zombie processes, orphans, daemons, flamethrowers, a minigun, a shovel, a chainsaw, a rocket launcher and grenades that bounce, a cargo loader to ride across the acid, barrels to shoot or roll, crates to push, oil that burns, slick floor, belts, keys and locked doors, secrets to punch and shoot, and Cron, who rains fire on a schedule. Typed commands work too, joined as in a shell (`f z1 && w || h`). `--view dots` draws it in braille. |
+| **RØØTLESS** (`games/rootless`) | A first-person shooter drawn in the terminal, a beat at a time: a recruit's first battle simulation - E1M1 *Boot Sector*, E1M2 *Dynamic Loader* and the secret level E1M9 *Swap Partition*, the start of a game in the making. Walk with the arrow keys, strafe, fire with Space; zombie processes, orphans, daemons, flamethrowers, a minigun, a shovel, a chainsaw, a rocket launcher and grenades that bounce, a cargo loader to ride across the acid, barrels to shoot or roll, crates to push, oil that burns, slick floor, belts, keys and locked doors, secrets to punch and shoot, and Cron, who rains fire on a schedule. Typed commands work too, joined as in a shell (`f z1 && w || h`). F5 saves (three times a level) and F9 loads. `--view dots` draws it in braille. |
 | **Sandbox** (`game_files`) | The original CLIo 1 test bed, loaded unchanged by the new engine. |
 
 ## Features
@@ -94,6 +94,8 @@ python clio.py [game] [options]
   --view STYLE    how first-person levels are drawn: pixel, dots, dots-fill
   --detail D      first-person levels: low draws the floor at half width (faster), auto (default), high
   --lines         in a level, every command is typed and ended with Enter (no single keys)
+  --level ID      start a new game in first-person level ID (rootless: e1m1, e1m2, e1m9)
+  --dev           for making games: *ID in a level jumps to level ID, saves are not counted
   --scroll        play levels in scrolling text instead of a redrawn picture
   --check         validate a game's data files and exit
   --looks         list the logos, banner styles, palettes and animations
@@ -217,7 +219,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 289 tests, under a minute
+python -m unittest discover -s tests     # 301 tests, under a minute
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 python tests/levelbot.py 10              # an automatic player walks Rootless's E1M1 ten times

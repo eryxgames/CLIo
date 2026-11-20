@@ -429,6 +429,11 @@ def main(argv=None):
                     help="first-person levels: low draws the floor and ceiling at half width (faster in a big "
                          "window); auto (the default) does so only for a very big picture")
     ap.add_argument("--lines", action="store_true", help="in first-person levels: typed lines only, no single keys")
+    ap.add_argument("--realtime", nargs="?", type=float, const=0.8, metavar="SECONDS",
+                    help="play first-person levels in real time: a beat passes every SECONDS (0.8) when no key "
+                         "is pressed; 0 turns it off for levels that ask for it")
+    ap.add_argument("--keys", action="store_true",
+                    help="show how this terminal reports keys to a game in real time (held, let go) and exit")
     ap.add_argument("--dev", action="store_true",
                     help="for making a game: in levels *ID jumps to a level and saves are not counted (also CLIO_DEV=1)")
     ap.add_argument("--level", metavar="ID", help="start a new game in the scene that plays level ID (implies --dev)")
@@ -484,6 +489,13 @@ def main(argv=None):
             return 2
     if args.test_display:
         return display_test(term, args.logo)
+    if args.keys:
+        from engine.realtime import key_test
+        if not term.is_tty:
+            print("--keys needs a terminal to read keys from.")
+            return 2
+        key_test()
+        return 0
     try:
         game_dir = resolve_game(args.game) if args.game else choose_game(term, args.logo, args.effect)
     except QuitGame:
@@ -541,6 +553,8 @@ def main(argv=None):
             settings["start_level"] = args.level
         if args.lines:
             settings["lines"] = True
+        if args.realtime is not None:
+            settings["realtime"] = max(0.0, args.realtime)
         if args.scroll:
             settings["scroll_levels"] = True
         if args.sounds:

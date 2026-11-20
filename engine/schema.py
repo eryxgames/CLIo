@@ -245,7 +245,8 @@ KINDS = [
      "editor": "level", "fields": [
         F("name"), F("title", label="Title shown when it starts"), F("par", "number", "Par (beats)"),
         F("music", "ref", of="music"), F("facing", "choice", "The player starts facing", options=["n", "e", "s", "w"]),
-        R("death_text", "ref", "Text when the player dies", of="texts")]},
+        R("death_text", "ref", "Text when the player dies", of="texts"),
+        R("realtime", "number", "Real time: seconds a beat lasts when no key is pressed (0: it waits)")]},
     {"key": "tiles", "file": "tiles", "label": "Tiles", "one": "tile", "shape": "map", "editor": "sprite", "fields": []},
     {"key": "weapons", "file": "weapons", "label": "Weapons", "one": "weapon", "shape": "map", "title": "name",
      "editor": "weapon", "fields": [

@@ -347,6 +347,18 @@ game, RØØTLESS, shows them.
 - The Hollow: a **Deck** mode - every fight a card battle, a starting deck for each class,
   18 cards of its own, and the Bone Warden and the Hollow King fight with decks of their own.
   `python tests/bot.py 30 cards` plays it.
+- **Real time** (`engine/realtime.py`): a fixed-rate clock that runs the ticks it owes (a few at
+  most, so a slow machine slows the game rather than making it jump), `Controls` for each tick
+  (keys held, pressed, let go), a journal of the keys by tick that plays back the same, and a
+  loop for games stepped tick by tick.
+- **Key events** (`engine/keys.py`): presses, repeats and releases, from the kitty keyboard
+  protocol (asked for, and turned on only when the terminal speaks it; Ctrl-C still stops),
+  from the Windows console, or - anywhere else - held keys guessed from their repeats, in
+  ticks, so even the guess plays back the same. `--keys` shows what a terminal reports.
+- **First-person levels in real time**: `"realtime"` (seconds a beat lasts) on a level or in
+  `first_person`, `--realtime [SECONDS]`, and the `realtime [off|SECONDS]` command. A beat
+  passes when no key acts in time; typing a line holds the clock; the beats that pass are
+  journaled (`.`), so saves play back the same. The footer says REAL TIME.
 
 ### Changed
 

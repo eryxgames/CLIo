@@ -1991,6 +1991,22 @@ monster waking, fire coming - stops the rest of a line, as Ctrl-C would. `--line
 the single keys off; `"keymap"` in `first_person` (key name -> command line) changes them.
 The window can be resized at any time; the picture is drawn again at once.
 
+**Real time.** A level can go on without the player: `"realtime": 0.8` (seconds) on the level,
+or in `first_person` for all of them, lets a beat pass every 0.8 seconds in which no key
+acts - the monsters move, aim and fire, fuses burn. A key still acts at once, and is a beat
+as before; a line being typed holds the clock until Enter, and pages (the map, `ps`, help)
+stop it. `"realtime": false` keeps a level waiting whatever the game says. The player can
+switch it with `realtime`, `realtime 0.5` and `realtime off`, or start with `--realtime
+[SECONDS]` (`--realtime 0` turns it off). The beats that pass are kept in the journal like
+any other (as `.`), so a save plays back the same. It needs single keys in a redrawn
+screen; scrolling text (`--scroll`, `--lines`) always waits.
+
+`python clio.py --keys` shows what the terminal tells a game in real time: whether it says
+when a key is let go (the kitty keyboard protocol, the Windows console), or only repeats
+it, and which keys it thinks are held. Games stepped tick by tick - arcade, platformers -
+are built on `engine/realtime.py`: a fixed-rate `Clock`, `Controls` for each tick (keys
+held, pressed, let go), and a journal of the keys by tick that plays back the same.
+
 A simple player (`engine/levelbot.py`) can walk a level: it follows the level's `"bot"`
 list of goals - item ids or map characters, the exit `E` last; `board` climbs into the
 nearest vehicle and `out` climbs down - fights what it sees and steps out of fire. If it can finish, a person can. `python tests/levelbot.py 10 rootless

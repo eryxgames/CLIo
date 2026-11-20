@@ -188,6 +188,7 @@ class Screen:
         self.last_size = None
         self.started = False
         self.shown = {}                   # what each row of the screen holds now: written again only if it changed
+        self.now = time.monotonic         # the clock a beat in real time is kept by (tests set their own)
 
     # ---- the terminal --------------------------------------------------- #
     def write(self, s):
@@ -280,11 +281,15 @@ class Screen:
                                               min(W, len(self.prompt_text) + len(self.typed) + 1)))
 
     # ---- input ---------------------------------------------------------- #
-    def read(self, redraw):
+    def read(self, redraw, deadline=None, idle=None):
         """The next command line: typed, or the command of a key from the keymap.
 
         ``redraw()`` draws the whole frame with the prompt; it is called at the
-        start and whenever the window changes size.  None at the end of input."""
+        start and whenever the window changes size.  None at the end of input.
+
+        In real time, ``deadline`` (on ``self.now``'s clock) is when the beat is over: if no key has
+        acted by then and nothing is being typed, the answer is ``idle`` (a beat of waiting). A line
+        being typed holds the clock until it is finished."""
         self.skip = False
         self.shown = {}                   # each new line starts from a whole frame: nothing can stay amiss
         if self.keys is None:
@@ -296,7 +301,13 @@ class Screen:
                 return None
         redraw()
         while True:
-            k, self.pending = self.pending or self.keys.get(0.1), None
+            wait = 0.1
+            if deadline is not None and not self.typed:
+                left = deadline - self.now()
+                if left <= 0 and not self.pending:
+                    return idle
+                wait = max(0.0, min(wait, left))
+            k, self.pending = self.pending or self.keys.get(wait), None
             if k is None:
                 if self.resized():
                     self.shown = {}

@@ -27,6 +27,7 @@
   "engine/parser.py",
   "engine/pixels.py",
   "engine/quests.py",
+  "engine/realtime.py",
   "engine/records.py",
   "engine/schema.py",
   "engine/sheets.py",

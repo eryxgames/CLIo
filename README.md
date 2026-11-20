@@ -101,6 +101,8 @@ python clio.py [game] [options]
   --view STYLE    how first-person levels are drawn: pixel, dots, dots-fill
   --detail D      first-person levels: low draws the floor at half width (faster), auto (default), high
   --lines         in a level, every command is typed and ended with Enter (no single keys)
+  --realtime [S]  levels in real time: a beat passes every S seconds (0.8) when no key acts
+  --keys          show how your terminal reports keys to games in real time (held, let go)
   --level ID      start a new game in first-person level ID (rootless: e1m1, e1m2, e1m3, e1m4, e1m9, sim1, sim2, sim3, sim4)
   --dev           for making games: *ID in a level jumps to level ID, saves are not counted
   --scroll        play levels in scrolling text instead of a redrawn picture
@@ -227,7 +229,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 477 tests, about a minute
+python -m unittest discover -s tests     # 492 tests, about a minute
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 python tests/bot.py 30 cards             # the same with card battles (the Deck mode)

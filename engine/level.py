@@ -72,6 +72,7 @@ WEAPONS = {
     "4": {"name": "chaingun", "ammo": "bullets", "sprite": "w_chaingun", "sound": "chaingun", "damage": [7, 12],
           "burst": 2},
 }
+IDLE = "."                   # the command of a beat that passes in real time with no key pressed
 ACCURACY = (1.0, 0.95, 0.9, 0.82, 0.72, 0.62, 0.52, 0.44, 0.38)   # by distance in cells
 COVER = 0.5                  # a shot that would hit one standing in cover hits the cover instead, this often
 CROSSFIRE = 0.1              # a squad's gun is this much surer for each other gun of it on him from another side
@@ -88,13 +89,13 @@ HELP = [
     ("f [x], kill [-9] x, t x, w [n], map, ps, man x,", "dim"),
     ("goggles [on|off], out (of a vehicle), history,", "dim"),
     ("alias n='...', keys, whoami, sound, q", "dim"),
-    ("save [name], load [name], saves", "dim"),
+    ("save [name], load [name], saves, realtime [off|s]", "dim"),
     ("a; b   a && b   a || b   !!  !3  !f   as in a shell", "dim"),
     ("A surprise stops a line, as ^C would.", "dim"),
 ]
 
 # lines about the game rather than in it: not kept in a level's journal (a save plays the journal back)
-META = re.compile(r"(?:save|load|saves)(?:\s+[\w-]+)?|\*[\w-]*")
+META = re.compile(r"(?:save|load|saves)(?:\s+[\w-]+)?|\*[\w-]*|realtime(?:\s+(?:off|on|\d+(?:\.\d+)?))?")
 
 DETAILS = ("auto", "high", "low")     # a level's picture: "low" draws the floor and ceiling at half width
 
@@ -1056,8 +1057,9 @@ class Level:
                 self.say("!!: event not found", "dim")
                 return
             line = line.replace("!!", self.last_line)
-        self.last_line = line
-        self.history = (self.history + [line])[-50:]
+        if line != IDLE:                                 # a beat that passed in real time is nobody's command
+            self.last_line = line
+            self.history = (self.history + [line])[-50:]
         if re.match(r"(un)?alias\b", line):
             self.alias(line)
             return
@@ -1208,11 +1210,14 @@ class Level:
 
     # ---- saving, loading, jumping ------------------------------------------- #
     def meta(self, t):
-        """``save [name]``, ``load [name]``, ``saves``, and ``*LEVEL`` (with --dev): about the game, not in it."""
+        """``save [name]``, ``load [name]``, ``saves``, ``realtime [off|SECONDS]`` and ``*LEVEL`` (with --dev):
+        about the game, not in it."""
         word, _, arg = t.partition(" ")
         arg = arg.strip() or None
         if word.startswith("*"):
             return self.jump(word[1:])
+        if word == "realtime":
+            return self.set_realtime(arg)
         if self.host is None:
             self.say("Saving needs the game round the level.", "dim")
             return False
@@ -1221,6 +1226,21 @@ class Level:
         if word == "save":
             return self.host.save(self, arg)
         return self.host.load(self, arg)
+
+    def set_realtime(self, arg):
+        """``realtime``: beats pass on their own (0.8 s, or the seconds given); ``realtime off``: they wait."""
+        con = self.console
+        if con is None or getattr(con, "keys", None) is None or not hasattr(con, "realtime"):
+            self.say("Real time needs single keys in a redrawn screen.", "dim")
+            return False
+        if arg == "off":
+            con.realtime = 0
+            self.say("The world waits for you again.", "info")
+            return True
+        con.realtime = float(arg) if arg not in (None, "on") else (beat_of(self) or 0.8)
+        self.say("Real time: a beat passes every %.1f s, whether you act or not. (realtime off: back)"
+                 % con.realtime, "alert")
+        return True
 
     def jump(self, lid):
         """``*e1m2``: on to that level's scene, as you are (for trying levels out: with --dev)."""
@@ -3461,10 +3481,12 @@ class Level:
 class FrameConsole:
     """Frame mode: the first-person picture, redrawn in place; keys act at once."""
 
-    def __init__(self, term, style="pixel", keys=True, keymap=None, animate=True, speed=1.0, detail="auto"):
+    def __init__(self, term, style="pixel", keys=True, keymap=None, animate=True, speed=1.0, detail="auto",
+                 realtime=None):
         from .frame import Screen
         from .keys import KeyReader
         self.screen = Screen(term, KeyReader() if keys else None, keymap or KEYMAP, animate, speed)
+        self.realtime = realtime          # seconds a beat lasts when no key is pressed (0: off; None: the level's)
         self.keymap = self.screen.keymap
         self.keys = self.screen.keys
         self.style = style
@@ -3660,15 +3682,27 @@ class FrameConsole:
         text = self.HINT if sc.glyphs.get("ud") == "↑↓" else self.HINT_ASCII
         if self.keys is None:
             text = "k j step  turn left/right  h l strafe  f fire  use  map  help"
+        elif self.realtime_now:
+            text = "REAL TIME %.1fs  %s" % (self.realtime_now, text)
         return sc.paint.text([(text, "dim")], self.size[0] if self.size else 80, sc.glyphs["ell"])
 
+    realtime_now = 0
+
     def draw(self, lv, fx=None, prompt="> ", cells=None):
+        self.realtime_now = self.beat(lv) if self.keys is not None else 0
         self.screen.frame(self.rows(lv, fx, cells), prompt=prompt, status=self.status, footer=self.hint())
 
     def read(self, lv):
         self.phase += 1
         self.status = ""
+        beat = self.beat(lv)
+        if beat and self.keys is not None:
+            return self.screen.read(lambda: self.draw(lv), deadline=self.screen.now() + beat, idle=IDLE)
         return self.screen.read(lambda: self.draw(lv))
+
+    def beat(self, lv):
+        """Seconds a beat lasts in real time (0: the level waits for the player)."""
+        return beat_of(lv, self.realtime)
 
     def page(self, lv, lines, automap=False):
         self.screen.wait(lambda: self.screen.frame(self.rows(lv, page=lines, automap=automap),
@@ -3967,7 +4001,7 @@ def play_scene(game, scene, resume_from=None):
         console = FrameConsole(term, settings.get("view") or cfg.get("view", "pixel"),
                                detail=settings.get("detail") or cfg.get("detail", "auto"),
                                keys=not settings.get("lines"), keymap=keymap, animate=term.animate,
-                               speed=max(0.0, float(term.speed or 1.0)))
+                               speed=max(0.0, float(term.speed or 1.0)), realtime=settings.get("realtime"))
     else:
         def write(text):
             term.line(text)
@@ -4042,6 +4076,21 @@ def play_scene(game, scene, resume_from=None):
     else:
         game.over = "quit"
     return outcome
+
+
+def beat_of(lv, setting=None):
+    """Seconds a beat of ``lv`` lasts in real time: ``setting`` (the command line's ``--realtime``), else the
+    level's ``"realtime"``, else game.json's ``first_person`` ``"realtime"``; 0 or false: not in real time."""
+    for v in (setting, lv.spec.get("realtime"), lv.cfg.get("realtime")):
+        if v is None:
+            continue
+        if v is False:
+            return 0.0
+        try:
+            return max(0.0, float(v))
+        except (TypeError, ValueError):
+            return 0.0
+    return 0.0
 
 
 def level_depth(data, lid, variables):
@@ -4319,4 +4368,8 @@ def validate(data):
         problems.append("first_person \"saves\" should be a number of saves a level allows (0 or more), not %r" % (saves,))
     if "autosave" in fp and not isinstance(fp["autosave"], bool):
         problems.append("first_person \"autosave\" should be true or false")
+    for where, v in [("first_person", fp.get("realtime"))] + [("level '%s'" % k, (lv or {}).get("realtime"))
+                                                           for k, lv in (data.levels or {}).items() if isinstance(lv, dict)]:
+        if v is not None and v is not False and (isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0):
+            problems.append("%s \"realtime\" should be the seconds a beat lasts (0 or false: not in real time)" % where)
     return problems

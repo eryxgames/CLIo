@@ -185,7 +185,11 @@ KINDS = [
         R("stage", "ref", "An arcade stage played here (in real time)", of="stages"),
         R("on_stage_clear", "effects", "When its stage is cleared"),
         R("on_stage_fail", "effects", "When its stage is failed (none: the game is lost)"),
-        R("on_stage_quit", "effects", "When its stage is left (none: the game ends)")]},
+        R("on_stage_quit", "effects", "When its stage is left (none: the game ends)"),
+        R("skirmish", "ref", "A skirmish played here (real-time strategy)", of="skirmishes"),
+        R("on_skirmish_win", "effects", "When its skirmish is won"),
+        R("on_skirmish_lose", "effects", "When its skirmish is lost (none: the game is lost)"),
+        R("on_skirmish_quit", "effects", "When its skirmish is left (none: the game ends)")]},
     {"key": "items", "file": "items", "label": "Items", "one": "item", "shape": "map", "title": "name", "fields": [
         F("name"), F("short", label="Short name"), F("description", "long"), F("aliases", "tags"),
         F("value", "number"), F("takeable", "bool"), F("usable", "bool"), F("use_text", "long"),
@@ -312,6 +316,15 @@ KINDS = [
             F("range", "number", "Shots fly (tiles)"), F("every", "number", "Seconds between shots")]),
         R("on_clear", "effects", "When it is cleared"), R("on_fail", "effects", "When it is failed"),
         R("death_text", "ref", "Text when it is failed (and nothing else is said)", of="texts")]},
+    {"key": "skirmishes", "file": "skirmishes", "label": "Skirmishes (strategy)", "one": "skirmish", "shape": "map",
+     "title": "name", "fields": [
+        F("name"), F("title", label="Title shown"), F("intro", "long", "Shown before it starts"),
+        F("music", "ref", of="music"),
+        F("goal", "choice", "Won by", options=["destroy", "survive"]),
+        R("time", "number", "Seconds to hold out (survive)"), R("limit", "number", "Units a side may have"),
+        R("crystal", "number", "Crystal in each crystal tile"),
+        R("on_win", "effects", "When it is won"), R("on_lose", "effects", "When it is lost"),
+        R("death_text", "ref", "Text when it is lost (and nothing else is said)", of="texts")]},
     {"key": "models", "file": "models", "label": "3D models", "one": "model", "shape": "map", "editor": "model", "fields": [
         F("smooth", "bool", "Smooth (lit at the corners: round things)"), F("scale", "number", "Scale (1: as built)"),
         F("break", "choice", "Destroyed, it breaks into", options=["shards", "parts", "groups"]),

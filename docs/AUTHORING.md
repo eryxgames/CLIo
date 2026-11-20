@@ -22,6 +22,7 @@ to have the engine look for broken references.
 - [Generated dungeons](#generated-dungeons)
 - [First-person levels](#first-person-levels)
 - [Arcade stages](#arcade-stages)
+- [Skirmishes (real-time strategy)](#skirmishes-real-time-strategy)
 - [Coming from CLIo 1](#coming-from-clio-1)
 
 ## A complete tiny game
@@ -2156,6 +2157,96 @@ python -m engine.stagebot rootless          # sim5: cleared in 34.6 seconds of p
 ```
 
 `--level ID` starts a game at the scene that plays stage ID, as for levels.
+
+## Skirmishes (real-time strategy)
+
+A scene can hold a skirmish: workers gather crystal and put up buildings, buildings train units,
+units fight, and a side is out when its buildings are gone. `"skirmish": "id"` in the scene; the
+skirmish in `skirmishes.json`:
+
+```json
+{
+  "border": {
+    "title": "Border Clash",
+    "map": ["##############################",
+            "#..$$$...........#........$$$#",
+            "#..$$$...........#........$$$#",
+            "#......1.........#....2......#",
+            "#............................#",
+            "#~~~~~~......................#",
+            "##############################"],
+    "sides": [{"name": "You", "control": "player"},
+              {"name": "Raiders", "control": "ai", "ai": {"wave": 4, "first": 180}}],
+    "on_win": [{"say": "The border holds."}, {"goto": "after_the_clash"}]
+  }
+}
+```
+
+The map: `.` ground, `#` rock, `~` water, `T` trees (none of them walked on), `$` crystal
+(`"crystal"`: how much in each, 600), and `1`-`4` where each side starts - its headquarters
+there, its workers round it. A `legend` gives other characters a meaning: a terrain
+(`"r": "rock"`) or something standing there from the start
+(`"g": {"unit": "soldier", "side": 2}`, `{"building": "tower", "side": 1}`).
+
+- `sides`: `name`, `control` (`player` - one side at most -, `ai`, or `none`: there, and doing
+  nothing), `credits` (200), `workers` (4), `units` (`{"soldier": 2}` more at the start),
+  `faction` (the kinds it may have, below), `color`, and for the computer `ai`: `workers` it
+  keeps (8), `wave` (army units in its first attack, 5; two more each time, up to `most`, 14),
+  `first` (seconds before its first attack, 150), `towers` (1), `mix` (how many of each role,
+  `{"melee": 2, "ranged": 2, "heavy": 1}`), `every` (seconds between its decisions, 1).
+- `goal`: `destroy` (every other side out) or `survive` (`time` seconds). `limit`: units a
+  side may have (40). `intro`, `music`.
+- When it ends, the scene's `on_skirmish_win` (or the skirmish's `on_win`) runs; lost,
+  `on_skirmish_lose` (or `on_lose`), and without one the game is lost (`death_text`); left,
+  `on_skirmish_quit`, and without one the game ends. The flag `<skirmish>_won` is set and the
+  variable `skirmishes` keeps each one's result, time, units and buildings.
+
+**Kinds.** The engine has a worker, soldier, ranger and tank, a headquarters, barracks,
+factory and tower. A game's own go in game.json `"rts"` (`"engine_kinds": false` leaves the
+engine's out), each with `faction` - a side has the kinds of its faction (none: those without):
+
+```json
+"rts": {"engine_kinds": false, "kinds": {
+  "rig": {"name": "Mining Rig", "role": "worker", "faction": "tam", "hp": 45, "speed": 2.6,
+          "cost": 50, "time": 10, "char": "m", "carry": 6, "gather": 3},
+  "command": {"name": "Command Post", "role": "hq", "faction": "tam", "building": true,
+              "size": [3, 3], "hp": 1400, "cost": 400, "time": 60, "char": "C",
+              "produces": ["rig"], "dropoff": true}}}
+```
+
+A kind has `role` (`worker`, `melee`, `ranged`, `heavy`, `hq`, `barracks`, `factory`, `tower`:
+what the computer player builds by), `char` (lower case for units, upper for buildings, by
+custom), `hp`, `armor` (taken off each hit), `speed` (tiles a second), `damage`, `range`
+(tiles), `cooldown` (seconds between shots), `splash` (tiles round the target hit for half),
+`sight` (tiles), `cost`, `time` (seconds to train or build); workers `carry` and `gather`
+(seconds a load); buildings `building`, `size` [w, h], `produces`, `needs` (a building kind
+first), `dropoff` (crystal is brought here). A tower is a building with `damage`.
+
+**Playing it.** The arrows move the cursor (held, they run on; Shift or Ctrl and an arrow,
+five at a time). Space chooses what is under it; Enter acts on it with what is chosen: an
+enemy is attacked, crystal gathered, a building of yours begun is helped along, else they go
+there. `v` starts and ends a box to choose by; Tab goes to an idle worker; `u` chooses the army,
+`e` everything like what is chosen. `a` attacks on the way to the cursor, `m` goes there (past
+enemies), `s` stops, `h` holds (fights only what comes in range), `g` gathers. `b` opens the
+build menu (a digit, then Enter where the cursor shows it fits); with a building chosen, digits
+train, `c` takes the last back (paid back), `r` sets where new units go. P or Esc pauses (Q then
+leaves). Where the terminal reports the mouse, a click chooses, a drag draws a box, and the
+right button acts. The panel shows crystal, units, the time, what is chosen and a map of the
+whole field with the view's frame on it. Piped, with `--lines` or on a screen under 40 x 14, a
+skirmish is played a typed line at a time: `select workers; gather; wait 20`,
+`build barracks 12,26`, `train trooper 2`, `look 30,10`, `map`, `status` (`help` lists them).
+
+It runs at 10 ticks a second in whole numbers with nothing left to chance, and paths come from
+flow fields (one per place units are sent to, shared by all of them). The orders a player gives
+are kept by tick (the world's `journal`); played back on the same skirmish they give the same
+game - which is all lockstep multiplayer needs. The computer plays any side; to see who wins:
+
+```
+python -m engine.rts rootless              # sim7: won (destroyed) at 5:50 of play, 1.4s
+```
+
+(the player's side is played with the skirmish's `player_ai`). `--level ID` starts a game at
+the scene that plays skirmish ID.
 
 ## Coming from CLIo 1
 

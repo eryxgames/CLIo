@@ -74,11 +74,13 @@ class FakeClock:
 
 class Controls:
     """What the keys did in one tick: ``held`` (a frozenset of names), ``pressed`` and ``released`` (in
-    order), and the ``tick``."""
-    __slots__ = ("tick", "held", "pressed", "released")
+    order), and the ``tick``; ``events``, the tick's key events as they came (``(name, kind)``: mouse
+    clicks are read from these, each one counting)."""
+    __slots__ = ("tick", "held", "pressed", "released", "events")
 
-    def __init__(self, tick, held=frozenset(), pressed=(), released=()):
+    def __init__(self, tick, held=frozenset(), pressed=(), released=(), events=()):
         self.tick, self.held, self.pressed, self.released = tick, frozenset(held), tuple(pressed), tuple(released)
+        self.events = tuple(events)
 
     def down(self, *names):
         """Whether any of these keys is held (or was pressed this tick)."""
@@ -151,6 +153,7 @@ class Recorder:
         if events:
             self.journal.append([self.tick, [[e.name, e.kind] for e in events]])
         c = self.held.feed(self.tick, events)
+        c.events = tuple((e.name, e.kind) for e in events)
         self.tick += 1
         return c
 

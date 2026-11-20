@@ -30,6 +30,7 @@
   "engine/quests.py",
   "engine/realtime.py",
   "engine/records.py",
+  "engine/rts.py",
   "engine/schema.py",
   "engine/sheets.py",
   "engine/snapshot.py",

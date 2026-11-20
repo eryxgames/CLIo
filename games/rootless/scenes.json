@@ -189,5 +189,12 @@
   "area": "Free programs",
   "description": "A training program, played in real time.",
   "stage": "sim6"
+ },
+ {
+  "id": "sim_xantrium_rush",
+  "name": "Simulatron: Xantrium Rush",
+  "area": "Free programs",
+  "description": "A training program, played in real time.",
+  "skirmish": "sim7"
  }
 ]

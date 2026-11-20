@@ -374,6 +374,22 @@ game, RØØTLESS, shows them.
   through a stage without losing a life, and the keys that play its run back.
 - RØØTLESS: two arcade sims - **SIM-5: Bus Run**, side on (`--level sim5`), and **SIM-6:
   Purge**, from above with a gun (`--level sim6`).
+- **Skirmishes: real-time strategy** (`skirmishes.json`, a scene's `"skirmish"`,
+  `engine/rts.py`). A map of ground, rock, water, trees and crystal with up to four sides; workers
+  gather crystal and build, buildings train units (queues, paid back when cancelled, rally
+  points), units move on flow fields shared by everyone sent to one place, fight what comes
+  near, attack on the way, hold, and splash; towers shoot; fog of war. The computer player keeps
+  its workers busy, builds barracks, towers and a factory, trains an army in its mix, defends,
+  and attacks in growing waves. Kinds and factions as data (game.json `"rts"`). On the screen:
+  a cursor, choosing by box, a build menu, a panel with a map of the whole field; the mouse where
+  the terminal reports it. Piped, typed commands (`select workers; gather; wait 20`). Ten ticks
+  a second in whole numbers: the orders kept by tick play a game back the same.
+  `python -m engine.rts GAME` lets the computer play every side.
+- **Mouse reports** (`engine/keys.py`): an SGR mouse report is read as `mouse:B:X:Y` (and
+  `mouseup:...`), and the real-time `Controls` carry each tick's events as they came.
+- RØØTLESS: **SIM-7: Xantrium Rush** (`--level sim7`), the TAM against the root process - mining
+  rigs, troopers, drum gunners and cargo loaders against kworkers, daemons, drones and spinlocks,
+  across a toxic channel with three crossings.
 
 ### Changed
 

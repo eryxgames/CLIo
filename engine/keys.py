@@ -65,9 +65,17 @@ CTRL = {"\r": "enter", "\n": "enter", "\t": "tab", " ": "space", "\x7f": "backsp
 
 
 def decode(seq):
-    """The name of a key from the characters after ESC (``"[A"`` -> ``"up"``); ``"esc"`` if unknown."""
+    """The name of a key from the characters after ESC (``"[A"`` -> ``"up"``); ``"esc"`` if unknown. A mouse
+    report (SGR, ``"[<0;12;5M"``) is ``"mouse:0:11:4"`` (button, column, row from 0), ``"mouseup:..."``
+    when let go; button 2 is the right one, +32 while moving with it held."""
     if not seq:
         return "esc"
+    if seq.startswith("[<") and seq[-1:] in ("M", "m"):
+        try:
+            b, x, y = (int(v) for v in seq[2:-1].split(";"))
+        except ValueError:
+            return "esc"
+        return "%s:%d:%d:%d" % ("mouse" if seq[-1] == "M" else "mouseup", b, x - 1, y - 1)
     if seq in SEQ:
         return SEQ[seq]
     # "[1;5D" (Ctrl+Left), also "[5D" from some terminals, and "[3;5~" (Ctrl+Delete)
@@ -285,7 +293,10 @@ class KeyReader:
             ev = kitty_event(text)
             if ev is not None and ev.name == "ctrl-c":
                 raise KeyboardInterrupt
-            if ev is None:
+            if ev is None and text.startswith("[<"):
+                name = decode(text)
+                ev = KeyEvent(name, PRESS) if name != "esc" else None
+            elif ev is None:
                 name = decode(text)
                 if name != "esc" or not text:
                     ev = KeyEvent(name.split("-")[-1] if "-" in name and len(name) > 2 else name, PRESS)
@@ -380,6 +391,10 @@ class KeyReader:
             seq = b""
             while select.select([self.fd], [], [], 0.03)[0]:
                 seq += os.read(self.fd, 1)
+                if seq.startswith(b"[<"):                  # a mouse report: up to its M or m
+                    if seq[-1:] in (b"M", b"m") or len(seq) > 24:
+                        break
+                    continue
                 if (len(seq) >= 2 and (seq[-1:].isalpha() or seq[-1:] == b"~")) or len(seq) > 7 \
                         or (len(seq) == 1 and seq not in (b"[", b"O")):
                     break

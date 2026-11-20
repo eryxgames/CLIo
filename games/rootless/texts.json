@@ -8,7 +8,7 @@
   "show_once": false
  },
  "outro_demo": {
-  "text": "SIMULATION PAUSED. End of the demo - Episode 1 goes on in the full game.\n\nFree programs of the simulatron, made new each run: --level sim1 (Long Fens, open land without end), sim2 (Deep Swap, floor after floor) and sim3 (Swap Sprawl, rooms without end); and training programs: sim4 (Kill House: squads), sim5 (Bus Run, side on, in real time) and sim6 (Purge, from above, in real time).",
+  "text": "SIMULATION PAUSED. End of the demo - Episode 1 goes on in the full game.\n\nFree programs of the simulatron, made new each run: --level sim1 (Long Fens, open land without end), sim2 (Deep Swap, floor after floor) and sim3 (Swap Sprawl, rooms without end); and training programs: sim4 (Kill House: squads), sim5 (Bus Run, side on, in real time) and sim6 (Purge, from above, in real time) and sim7 (Xantrium Rush, real-time strategy).",
   "show_once": false
  },
  "outro_lose": {
@@ -55,6 +55,10 @@
  },
  "sim6_end": {
   "text": "UNIT EVALUATION: sector purge. The last sentry goes dark and the map fades to its grid. \"Clean,\" says the instructor bot. \"Now do it without seeing it from above.\"",
+  "show_once": false
+ },
+ "sim7_end": {
+  "text": "UNIT EVALUATION: command. The last kernel node folds into the grid and the swamp goes quiet. \"You think in squads now,\" says the instructor bot. \"The real Xantrium fields will not hold still for you.\"",
   "show_once": false
  }
 }

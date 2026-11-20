@@ -112,6 +112,19 @@ class _RoomCell(ctypes.Structure if ctypes else object):
 ROOM_CELL_FN = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_int, ctypes.c_int64, ctypes.c_int64,
                                 ctypes.POINTER(_RoomCell)) if ctypes else None
 CLEAR = 0xFFFFFFFF
+class _Frame(ctypes.Structure if ctypes else object):
+    _fields_ = [("pw", ctypes.c_int), ("ph", ctypes.c_int), ("sx", ctypes.c_int), ("sy", ctypes.c_int),
+                ("rgb", ctypes.c_void_p), ("depth", ctypes.c_void_p), ("cur_z", ctypes.c_double),
+                ("cover", ctypes.c_void_p), ("zbuf", ctypes.c_void_p), ("zgen", ctypes.c_void_p),
+                ("gen", ctypes.c_uint32)] if ctypes else []
+
+
+class _Tone(ctypes.Structure if ctypes else object):
+    _fields_ = [("kind", ctypes.c_int), ("fog", ctypes.c_double), ("haze", ctypes.c_uint32), ("k", ctypes.c_double),
+                ("gone", ctypes.c_double), ("step", ctypes.c_double), ("id", ctypes.c_int64),
+                ("flash", ctypes.c_int), ("tinted", ctypes.c_int), ("tint", ctypes.c_uint32)] if ctypes else []
+
+
 CHUNK_FN = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int64, ctypes.c_int64) if ctypes else None
 CHUNK_BYTES = 256 * 8 + 256 * 4 + 256 * 2                    # clio_chunk: heights, colours, kinds
 U32 = "I" if array("I").itemsize == 4 else "L"
@@ -134,6 +147,37 @@ def _open(path):
         lib.clio_land_draw.argtypes = [ctypes.POINTER(_Ground), CHUNK_FN, P, P, I, P, P]
         lib.clio_sky_draw.restype = I
         lib.clio_sky_draw.argtypes = [ctypes.POINTER(_Sky), P, P, P, ctypes.POINTER(I)]
+    if hasattr(lib, "clio_frame_blit"):                 # 0.4 and later
+        F = ctypes.POINTER(_Frame)
+        lib.clio_frame_land_cover.restype = None
+        lib.clio_frame_land_cover.argtypes = [F]
+        lib.clio_frame_front.restype = None
+        lib.clio_frame_front.argtypes = [F, P, I, I, I, I, I, I, D, D, D, D, D, D, D]
+        lib.clio_frame_side.restype = None
+        lib.clio_frame_side.argtypes = [F, P, I, I, I, P, P, P, D, D, D, D, D, D, D]
+        lib.clio_frame_blit.restype = None
+        lib.clio_frame_blit.argtypes = [F, P, I, I, I, I, D, I, I, ctypes.POINTER(_Tone), I, D]
+        lib.clio_frame_darken.restype = None
+        lib.clio_frame_darken.argtypes = [F, I, I, I, I, D]
+        lib.clio_frame_model.restype = None
+        lib.clio_frame_model.argtypes = [F]
+        lib.clio_frame_triangle.restype = None
+        lib.clio_frame_triangle.argtypes = [F, P, P, I]
+        lib.clio_frame_recolour.restype = None
+        lib.clio_frame_recolour.argtypes = [F, I, D, ctypes.c_uint32]
+        lib.clio_frame_vignette.restype = None
+        lib.clio_frame_vignette.argtypes = [F, D, I]
+        lib.clio_frame_shake.restype = None
+        lib.clio_frame_shake.argtypes = [F, I]
+        U = ctypes.c_uint32
+        lib.clio_frame_canopy.restype = None
+        lib.clio_frame_canopy.argtypes = [F, U]
+        lib.clio_frame_dashboard.restype = None
+        lib.clio_frame_dashboard.argtypes = [F, U, I, I, I, I, I, I, I, I, I]
+        lib.clio_frame_cage.restype = None
+        lib.clio_frame_cage.argtypes = [F]
+        lib.clio_dots32.restype = I
+        lib.clio_dots32.argtypes = [P, I, I, ctypes.POINTER(_Dots), P]
     if hasattr(lib, "clio_room_draw"):                  # 0.3 and later
         lib.clio_room_draw.restype = I
         lib.clio_room_draw.argtypes = [ctypes.POINTER(_Room), ROOM_CELL_FN, P, P, P, ctypes.POINTER(I)]
@@ -374,10 +418,11 @@ def _ptr(a):
     return a.buffer_info()[0]
 
 
-def land_draw(land, view, cam, eye, phase, sky_rows):
+def land_draw(land, view, cam, eye, phase, sky_rows, frame=None):
     """``Land.cast`` in C: (rows of colours, rows of distances) - or None without the library, or for a
     picture it cannot take (then the Python does it). ``eye``: the eye's height counted from the ground's
-    zero (Land.cast's eye plus the land's base)."""
+    zero (Land.cast's eye plus the land's base). With a ``frame`` (0.4): drawn into it, its cells covered
+    marked; True when done."""
     lib = load()
     if lib is None or not hasattr(lib, "clio_land_draw") or not isinstance(phase, int):
         return None
@@ -432,13 +477,19 @@ def land_draw(land, view, cam, eye, phase, sky_rows):
         return ctypes.addressof(got[1])
     fn = CHUNK_FN(need)
     n = PW * PH
-    rgb = (ctypes.c_uint32 * n)()
-    dep = (ctypes.c_double * n)()
+    if frame is not None:
+        rgb, dep = frame.rgb, frame.depth
+    else:
+        rgb = (ctypes.c_uint32 * n)()
+        dep = (ctypes.c_double * n)()
     r = lib.clio_land_draw(ctypes.byref(g), fn, None, sky[2], sky[1], rgb, dep)
     if failed:
         raise failed[0]
     if r != 0:
         return None
+    if frame is not None:
+        lib.clio_frame_land_cover(frame.ref)
+        return True
     if len(_rgb) > 200000:
         _rgb.clear()
     get = _rgb.__getitem__
@@ -513,7 +564,10 @@ def _texture(rows):
     return got
 
 
-def room(PW, PH, yh, step, half, cam, phase, rows, sky_rows, info, held):
+texture = _texture
+
+
+def room(PW, PH, yh, step, half, cam, phase, rows, sky_rows, info, held, out=None):
     """``View._backdrop`` in C: (rows of colours, the pixels y * PW + x left for the caller - teleporters with
     no tile over them, drawn as haze) - or None without the library, or for a picture it cannot take.
     ``rows``: (kinds, distances, fogs, spans) for each pixel row; ``info(what, ix, iy)``: a cell's floor
@@ -557,7 +611,7 @@ def room(PW, PH, yh, step, half, cam, phase, rows, sky_rows, info, held):
             return 1
     fn = ROOM_CELL_FN(ask)
     n = PW * PH
-    rgb = (ctypes.c_uint32 * n)()
+    rgb = (ctypes.c_uint32 * n)() if out is None else out
     later = (ctypes.c_int32 * n)()
     count = ctypes.c_int(0)
     skybuf = None
@@ -569,6 +623,8 @@ def room(PW, PH, yh, step, half, cam, phase, rows, sky_rows, info, held):
         raise failed[0]
     if res != 0:
         return None
+    if out is not None:
+        return None, later[:count.value]
     if len(_rgb) > 200000:
         _rgb.clear()
     get = _rgb.__getitem__

@@ -434,6 +434,121 @@ class SameAsPython(unittest.TestCase):
         self.assertEqual(fast, slow)
 
     @with_library
+    def test_frames_kept_in_the_library_are_the_same(self):
+        """0.4: walls, pictures, shadows, models, colour changes, hurt, shaking and the cells drawn in the
+        library's frame - against the Python, with every effect a frame can carry, in rooms and open land."""
+        if not hasattr(picture.load(), "clio_frame_blit"):
+            self.skipTest("this library has no frames (0.4)")
+        from engine.data import GameData
+        from engine.level import Level
+        from test_levels import ROOTLESS, Quiet
+
+        def effects(lv, k):
+            p = lv.player
+            near = [m for m in lv.monsters if not m.gone and abs(m.x - p.x) + abs(m.y - p.y) < 9]
+            ids = [m.id for m in near]
+            fx = FX()
+            if ids:
+                fx.flash = set(ids[:1]) if k % 2 == 0 else ()
+                fx.tint = {i: (200, 30, 30) for i in ids[1:2]}
+                fx.dissolve = {i: 0.45 for i in ids[2:3]}
+                fx.pos = {m.id: (m.x + 0.4, m.y) for m in near[:2]}
+                fx.emuzzle = set(ids[:1]) if k % 2 else ()
+                fx.lunge = {i: 1.2 for i in ids[:1]}
+                fx.texts = [(near[0], "Ouch", "bad", 1)]
+            fx.hurt, fx.hurt_dir = (0.6, (None, "left", "right", "back")[k % 4]) if k % 2 else (0.0, None)
+            fx.shake = (0, 1, -1)[k % 3]
+            fx.whiten = 0.3 if k % 3 == 1 else 0.0
+            fx.fade = 0.4 if k % 3 == 2 else 0.0
+            fx.booms = [(p.x + 1, p.y - 2, 0.1 + 0.2 * (k % 4))]
+            fx.missiles = [(p.x + 0.3, p.y - 2.5, 0.4, "rocket", (255, 150, 40))]
+            fx.parts = [(p.x + 0.2, p.y - 1.5, 0.5, (200, 40, 40), 1.0)]
+            fx.muzzle, fx.casing, fx.recoil = k % 2 == 0, 0.4, k % 2
+            return fx
+
+        for lvl, styles in (("e1m1", (("pixel", "high"), ("dots", "low"))), ("e1m3", (("dots-fill", "high"),)),
+                            ("e1m4", (("pixel", "low"), ("dots", "high"))), ("sim4", (("pixel", "high"),))):
+            for style, detail in styles:
+                def frames():
+                    lv = Level(GameData(ROOTLESS), lvl, seed=1)
+                    lv.console = Quiet()
+                    v = View(48, 14, style, detail)
+                    out = []
+                    for k, cmd in enumerate(["forward", "left", "forward", "right", "forward", "wait"]):
+                        if k == 2:
+                            lv.player.sudo = 3
+                        if k == 4:
+                            lv.player.sudo, lv.player.goggles, lv.player.goggles_on = 0, 50, True
+                        out.append(v.render(lv, effects(lv, k), k))
+                        out.append(v.render(lv, FX(), k))
+                        lv.run_line(cmd)
+                    return out
+                fast, slow = python_too(frames)
+                self.assertEqual(fast, slow, (lvl, style, detail))
+
+    @with_library
+    def test_a_cockpit_in_the_frame_is_the_same(self):
+        """The hopper's canopy and dashboard and the loader's cage, ridden as the bot rides them."""
+        if not hasattr(picture.load(), "clio_frame_blit"):
+            self.skipTest("this library has no frames (0.4)")
+        from engine import levelbot
+        from engine.data import GameData
+        from engine.level import Level
+        from test_levels import ROOTLESS, Quiet
+        data = GameData(ROOTLESS)
+        for lvl in ("e1m2", "e1m3"):
+            _outcome, played = levelbot.play(data, lvl, seed=1)
+            lines = [line for _b, line in played.journal]
+
+            def frames():
+                lv = Level(data, lvl, seed=1)
+                lv.console = Quiet()
+                v = View(52, 14, "dots")
+                out, riding = [], 0
+                for k, line in enumerate(lines):
+                    if lv.player.vehicle is not None:
+                        riding += 1
+                        if riding % 3 == 1:
+                            fx = FX()
+                            fx.muzzle, fx.shake = riding % 2 == 1, riding % 2
+                            out.append(v.render(lv, fx, k))
+                        if riding > 12:
+                            break
+                    lv.run_line(line)
+                return out
+            fast, slow = python_too(frames)
+            self.assertTrue(fast)
+            self.assertEqual(fast, slow, lvl)
+
+    def test_frame_rows_behave_as_the_rows_did(self):
+        if picture.load() is None or not hasattr(picture.load(), "clio_frame_blit"):
+            self.skipTest("this library has no frames (0.4)")
+        from engine.picture import frame as pf
+        v = View(6, 2, "pixel")
+        v.cur_z = 1.0
+        fr = pf.frame_for(v)
+        px = fr.start(False)
+        px[1][2] = (1, 2, 3)
+        self.assertEqual(px[1][2], (1, 2, 3))
+        px[0][-1] = (9, 9, 9)
+        self.assertEqual(px[0][5], (9, 9, 9))
+        self.assertEqual(len(px[0]), 6)
+        self.assertEqual(px[1][1:3], [px[1][1], (1, 2, 3)])
+        with self.assertRaises(IndexError):
+            px[0][6] = (0, 0, 0)
+        px = fr.start(True)                                  # open land: written only where the land is further
+        fr.depth[0], fr.depth[1] = 0.5, 2.0
+        px[0][0] = px[0][1] = (7, 7, 7)
+        self.assertNotEqual(px[0][0], (7, 7, 7))
+        self.assertEqual(px[0][1], (7, 7, 7))
+        cover = fr.cover_view
+        self.assertEqual(cover.get((0, 0), 99.0), 99.0)
+        cover[(0, 0)] = 3.5
+        self.assertEqual(cover.get((0, 0), 99.0), 3.5)
+        self.assertEqual(cover.get((0, 9), 99.0), 99.0)
+        self.assertEqual(cover.get((-1, 0), 99.0), 99.0)
+
+    @with_library
     def test_a_phase_that_is_not_whole_goes_to_the_python(self):
         from engine.firstperson import sky_spec
         self.assertIsNone(picture.sky(sky_spec({}), 20, 5, 0, 0.0, 1.5, [(0, 0, 0)] * 5, [(1, 1, 1)] * 2))

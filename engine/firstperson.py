@@ -28,6 +28,7 @@ from array import array
 
 from . import model as model_mod
 from . import picture
+from .picture import frame as picture_frame
 from .frame import mix, shade, lum
 
 DECAY = 0.64                 # apparent size falls to 64% with each cell of distance
@@ -212,6 +213,30 @@ def dot_level(l):
     """How lit a pixel of luminance ``l`` is in the dots style, 0..8: it shows where this is above its
     step of the 2 x 4 Bayer pattern (and a half)."""
     return min(1.0, (l / 255.0) ** 1.15 * 2.1) * 8
+
+
+class _Tone:
+    """How blit colours a picture's pixel: times ``fog`` indoors, into ``haze`` by ``k`` in open land; a monster's
+    dissolving (``gone``), white ``flash`` and ``tint`` first. A function of (colour, i, j), and numbers the
+    library can read."""
+    __slots__ = ("fog", "haze", "k", "gone", "step", "mid", "flash", "tint")
+
+    def __init__(self, fog, haze=None, k=0.0, gone=0.0, step=1.0, mid=0, flash=False, tint=None):
+        self.fog, self.haze, self.k = fog, haze, k
+        self.gone, self.step, self.mid, self.flash, self.tint = gone, step, mid, flash, tint
+
+    def __call__(self, c, i, j):
+        if self.gone and noise(int(i / self.step), int(j / self.step), self.mid) < self.gone:
+            return None
+        if self.flash:
+            return (255, 255, 255)
+        if self.tint:
+            c = mix(c, self.tint, 0.6)
+        return shade(c, self.fog) if self.haze is None else mix(c, self.haze, self.k)
+
+    def struct(self):
+        return picture_frame.tone(1 if self.haze is None else 2, self.fog, self.haze or (0, 0, 0), self.k, self.gone,
+                                  self.step, self.mid, self.flash, self.tint)
 
 
 def _avg(cols):
@@ -718,7 +743,23 @@ class View:
             sky = self.skies[key] = sky_picture(look, self.PW, self.yh, f, lateral, phase)
         return sky
 
-    def _backdrop(self, lv, cx, cy, f, phase):
+    def backdrop_frame(self, frame, lv, cx, cy, f, phase):
+        """``backdrop`` into CLIo Picture's frame (0.4): its rows, or None when the library cannot draw it."""
+        key = ("frame", id(lv), round(cx, 3), round(cy, 3), f, phase, lv.marks_version, round(self.FS, 2))
+        px = frame.start(False)
+        got = self.cache.get(key)
+        if got is not None:
+            frame.put_bytes(got)
+        else:
+            if not self._backdrop(lv, cx, cy, f, phase, frame):
+                return None
+            if len(self.cache) > 40:
+                self.cache.clear()
+            self.cache[key] = bytes(frame.rgb)
+        self.cover = frame.cover_view
+        return px
+
+    def _backdrop(self, lv, cx, cy, f, phase, frame=None):
         """The floor and ceiling, per pixel.  The hot loop of a frame: what depends only on a cell is
         worked out once per cell, and a colour in a row's fog once per row."""
         fx, fy = DIRS[f]
@@ -750,8 +791,8 @@ class View:
                     marks.get((ix, iy)))
 
         if picture.load() is not None:                    # in C with CLIo Picture; teleporters' rings here
-            fast = self._backdrop_c(lv, cx, cy, f, phase, sky, step, under, drawing, ceiling_tile, below)
-            if fast is not None:
+            fast = self._backdrop_c(lv, cx, cy, f, phase, sky, step, under, drawing, ceiling_tile, below, frame)
+            if fast is not None or frame is not None:
                 return fast
             below.clear()
         out = []
@@ -866,7 +907,7 @@ class View:
             got = self._rows_c = (key, (kinds, zs, fogs, spans))
         return got[1]
 
-    def _backdrop_c(self, lv, cx, cy, f, phase, sky, step, under, drawing, ceiling_tile, below):
+    def _backdrop_c(self, lv, cx, cy, f, phase, sky, step, under, drawing, ceiling_tile, below, frame=None):
         """_backdrop with CLIo Picture: the cells' floors and ceilings worked out here as there, in the same
         order; None when the library cannot draw it."""
         fx, fy = DIRS[f]
@@ -910,10 +951,12 @@ class View:
 
         rows = self._rows()
         got = picture.room(PW, PH, self.yh, step, self.half, (cx, cy, fx, fy, rx, ry), phase, rows, sky, info,
-                           held)
+                           held, None if frame is None else frame.rgb)
         if got is None:
             return None
         out, later = got
+        if frame is not None:
+            out = frame.rows
         kinds, zs, fogs, spans = rows
         half = self.half
         for p in later:                                  # a teleporter's rings, as _backdrop draws them
@@ -947,7 +990,7 @@ class View:
             out[y][x] = v
             if step == 2 and x + 1 < PW:
                 out[y][x + 1] = v
-        return out
+        return out if frame is None else True
 
     @staticmethod
     def fixture(cell, ux, uy, phase):
@@ -994,6 +1037,10 @@ class View:
         if not nh or not nw:
             return 0, 0
         sw, sh = max(1, int(round(nw * s))), max(1, int(round(nh * s)))
+        fr = getattr(px, "frame", None)
+        if fr is not None and s > 0 and (fn is None or isinstance(fn, _Tone)) and self._fits(rows):
+            fr.blit(rows, x0, y0, s, sw, sh, None if fn is None else fn.struct(), dist)
+            return sw, sh
         for j in range(sh):
             yy = y0 + j
             if not 0 <= yy < self.PH:
@@ -1061,6 +1108,13 @@ class View:
             return
         fog = 0.18 + 0.82 * min(1.0, t) ** 0.75
         tw, th = x1 - x0, y1 - y0
+        fr = getattr(px, "frame", None)
+        if fr is not None and self._fits(tex):                # in CLIo Picture's frame
+            fr.front(tex, X0, X1, Y0, Y1, x0, tw, y0, th, opened, fog, z - 0.5)
+            if holes and not opened:
+                r = max(1, int(round(th * 0.05)))
+                self.dents(px, [(x0 + u * tw, y0 + h * th, r) for u, h in holes], fog, X0, X1)
+            return (x0 + x1) / 2, y0, y1, t
         TH, TW = len(tex), len(tex[0])
         us = [min(TW - 1, int((x + 0.5 - x0) / tw * TW)) for x in range(X0, X1)]
         fogged = {}                                    # a texture's few colours, each in this face's fog once
@@ -1081,6 +1135,15 @@ class View:
         self._mark_cover(X0, X1, Y0, Y1, z - 0.5)
         return (x0 + x1) / 2, y0, y1, t
 
+    @staticmethod
+    def _fits(rows):
+        """A tile or picture the library takes: rows of one length, of (r, g, b) or None."""
+        try:
+            picture.texture(rows)
+            return True
+        except (picture.Odd, TypeError, ValueError, OverflowError, IndexError):
+            return False
+
     def side_face(self, px, a, z, tex, opened=0.0, to_edge=False, holes=()):
         edge = a - 0.5 if a > 0 else a + 0.5          # the face turned towards the middle
         if abs(edge) < 1e-6:
@@ -1096,8 +1159,23 @@ class View:
         lo, hi = (xa, xb) if xa < xb else (xb, xa)
         X0, X1 = max(0, int(math.ceil(lo - 0.5))), min(self.PW, int(math.ceil(hi - 0.5)))
         span = edge * self.LW
+        fr = getattr(px, "frame", None)
+        if fr is not None and self._fits(tex):                # in CLIo Picture's frame: the distances here
+            xs, zcs, fogs = array("i"), array("d"), array("d")
+            for x in range(X0, X1):
+                t = (x + 0.5 - self.half) / span
+                if t <= 0:
+                    continue
+                xs.append(x)
+                zcs.append(self.zt(t))
+                fogs.append((0.18 + 0.82 * min(1.0, t) ** 0.75) * 0.72)
+            if xs:
+                fr.side(tex, xs, zcs, fogs, self.half, span, self.yh, self.CH, self.FS, opened, z)
+                self.cur_z = zcs[-1]
+        else:
+            fr = None
         TH, TW = len(tex), len(tex[0])
-        for x in range(X0, X1):
+        for x in range(X0, X1) if fr is None else ():
             t = (x + 0.5 - self.half) / span
             if t <= 0:
                 continue
@@ -1142,6 +1220,8 @@ class View:
         land = getattr(lv, "land", None)
         self.cover = {}
         self.cur_z = -1e9
+        frame = picture_frame.frame_for(self) if self.use_frame else None     # CLIo Picture 0.4: kept in C
+        px = None
         if land is not None:                                  # open land: a true perspective, the ground drawn first
             self.persp = land.Z0 if hasattr(land, "Z0") else 1.6
             g = lv.ground(cx, cy)
@@ -1149,13 +1229,21 @@ class View:
             self.set_eye_abs(g + (self.EYE0 if eye is None else eye))
             land.look(getattr(lv, "sky_look", None))
             self.air = (land.haze, land.vis)                  # far things fade into the haze, as the land does
-            px = land.draw(self, cam, self.EYE, phase, self.sky_rows(lv, cx, cy, f, phase) or [],
-                           (getattr(lv, "map_w", 0), getattr(lv, "map_h", 0)))
+            sky = self.sky_rows(lv, cx, cy, f, phase) or []
+            if frame is not None:
+                px = land.draw_frame(self, frame, cam, self.EYE, phase, sky)
+            if px is None:
+                self.cover = {}
+                px = land.draw(self, cam, self.EYE, phase, sky, (getattr(lv, "map_w", 0), getattr(lv, "map_h", 0)))
             sight, far = land.see, 40
         else:
             self.persp = self.air = None
             self.set_eye(fx.eye if fx.eye is not None else self.eye_of(lv))
-            px = self.backdrop(lv, cx, cy, f, phase)
+            if frame is not None:
+                px = self.backdrop_frame(frame, lv, cx, cy, f, phase)
+            if px is None:
+                self.cover = {}
+                px = self.backdrop(lv, cx, cy, f, phase)
             sight, far = SIGHT, FAR
 
         def gnd(a, z):                                       # the ground under a point ahead (0 in rooms)
@@ -1412,23 +1500,47 @@ class View:
         self.cur_z = -1e9                                     # what is in the hands is nearer than anything
         self.weapon(px, lv, fx)
         if any(k < 0.2 for _x, _y, k in fx.booms):
-            px = recolour(px, lambda c: shade(c, 1.35))
+            px = self.recolour(px, 1, 1.35, None, lambda c: shade(c, 1.35))
         if lv.player.sudo:
-            px = recolour(px, lambda c: mix(c, (255 - int(lum(c)),) * 3, 0.85))
+            px = self.recolour(px, 2, 0.0, None, lambda c: mix(c, (255 - int(lum(c)),) * 3, 0.85))
         if getattr(lv.player, "nightvision", False):
-            px = recolour(px, _goggled)
+            px = self.recolour(px, 3, 0.0, None, _goggled)
         if fx.hurt:
-            self.vignette(px, fx.hurt, fx.hurt_dir)
+            fr = getattr(px, "frame", None)
+            if fr is not None:
+                fr.vignette(fx.hurt, fx.hurt_dir)
+            else:
+                self.vignette(px, fx.hurt, fx.hurt_dir)
         if fx.whiten:
-            px = recolour(px, lambda c: mix(c, (255, 255, 255), fx.whiten))
+            px = self.recolour(px, 4, fx.whiten, (255, 255, 255), lambda c: mix(c, (255, 255, 255), fx.whiten))
         if fx.fade:
-            px = recolour(px, lambda c: mix(c, (40, 0, 0), fx.fade))
+            px = self.recolour(px, 4, fx.fade, (40, 0, 0), lambda c: mix(c, (40, 0, 0), fx.fade))
         if fx.shake:
             s = fx.shake * self.sx
-            black = (0, 0, 0)
-            px = [([black] * s + row[:-s]) if s > 0 else (row[-s:] + [black] * -s) for row in px]
+            fr = getattr(px, "frame", None)
+            if fr is not None and abs(s) < self.PW:
+                fr.shake(s)
+            else:
+                if fr is not None:
+                    px = fr.lists()
+                black = (0, 0, 0)
+                px = [([black] * s + row[:-s]) if s > 0 else (row[-s:] + [black] * -s) for row in px]
         over = self.place_labels(labels, overlays)
+        fr = getattr(px, "frame", None)
+        if fr is not None and self.style == "pixel":
+            return fr.halves(over, shade, mix)
         return self.halves(px, over) if self.style == "pixel" else self.braille(px, over)
+
+    use_frame = True                                          # CLIo Picture's frame when it has one (tests turn it off)
+
+    def recolour(self, px, how, k, colour, fn):
+        """The whole picture through ``fn``: in the library's frame by its number ``how`` (1 times k, 2 sudo,
+        3 the goggles, 4 towards colour by k), else in Python."""
+        fr = getattr(px, "frame", None)
+        if fr is not None:
+            fr.recolour(how, k, colour or (0, 0, 0))
+            return px
+        return recolour(px, fn)
 
     # ---- 3D models (engine/model.py) ---------------------------------------- #
     LIGHT = (-0.2, -0.72, 0.66)         # from the viewer's left and above (a little behind): back, left, up
@@ -1494,6 +1606,8 @@ class View:
                     s[1] += n[1]
                     s[2] += n[2]
         top, xs, shown = self.PH, [], False
+        fr = getattr(px, "frame", None)
+        drawn = [] if fr is not None else None               # CLIo Picture's frame: the triangles together
         for (p0, p1, p2), f in tris:
             pts = [project(p[0], p[1], p[2]) for p in (p0, p1, p2)]
             if None in pts:
@@ -1530,10 +1644,15 @@ class View:
                     cols = (255, 255, 255)
                 elif tint:
                     cols = mix(cols, tint, 0.6)
-            model_mod.raster(px, zbuf, W, H, pts, cols)
+            if drawn is not None:
+                drawn.append((pts, cols))
+            else:
+                model_mod.raster(px, zbuf, W, H, pts, cols)
             shown = True
             top = min(top, pts[0][1], pts[1][1], pts[2][1])
             xs += [pts[0][0], pts[1][0], pts[2][0]]
+        if drawn:
+            fr.triangles(drawn)
         if not shown:
             return None
         return top, (min(xs) + max(xs)) / 2
@@ -1542,11 +1661,14 @@ class View:
         """How a thing this far off is coloured, for blit: darker with the distance indoors, into the haze in
         open land."""
         if self.air is None:
-            return lambda c, i, j: shade(c, fog)
-        haze, k = self.air[0], 1.0 - math.exp(-max(0.0, z) / self.air[1])
-        return lambda c, i, j: mix(c, haze, k)
+            return _Tone(fog)
+        return _Tone(fog, self.air[0], 1.0 - math.exp(-max(0.0, z) / self.air[1]))
 
     def shadow(self, px, x, base, w):
+        fr = getattr(px, "frame", None)
+        if fr is not None:
+            fr.darken(int(x - w * 0.4), int(x + w * 0.4), int(base) - self.sy // 2, int(base), 0.6)
+            return
         for yy in range(int(base) - self.sy // 2, int(base) + 1):
             if 0 <= yy < self.PH:
                 for xx in range(int(x - w * 0.4), int(x + w * 0.4) + 1):
@@ -1604,11 +1726,7 @@ class View:
             lift += fx.rise[m.id] * self.PH
         x = self.X(a, z)
         x0, y0 = int(round(x - sw / 2)), int(round(base - sh - lift))
-        for yy in range(int(base) - self.sy // 2, int(base) + 1):        # a shadow on the floor
-            if 0 <= yy < self.PH:
-                for xx in range(int(x - sw * 0.4), int(x + sw * 0.4) + 1):
-                    if 0 <= xx < self.PW:
-                        px[yy][xx] = shade(px[yy][xx], 0.6)
+        self.shadow(px, x, base, sw)                          # a shadow on the floor
         fog = 0.5 + 0.5 * min(1.0, t * 1.6)
         tone = self.toner(z, fog)
         haze = self.air[0] if self.air is not None else None
@@ -1622,19 +1740,8 @@ class View:
         if m is None:
             self.blit(px, pp.rows, x0, y0, s, tone, z)
             return
-        flash = m.id in fx.flash
-        tint = fx.tint.get(m.id)
-        gone = fx.dissolve.get(m.id, 0.0)
-        mid = m.id
-
-        def fn(c, i, j):
-            if gone and noise(int(i / max(s, 0.01)), int(j / max(s, 0.01)), mid) < gone:
-                return None
-            if flash:
-                return (255, 255, 255)
-            if tint:
-                c = mix(c, tint, 0.6)
-            return shade(c, fog) if haze is None else mix(c, haze, hk)
+        fn = _Tone(fog, haze, hk, gone=fx.dissolve.get(m.id, 0.0), step=max(s, 0.01), mid=m.id,
+                   flash=m.id in fx.flash, tint=fx.tint.get(m.id))
         self.blit(px, pp.rows, x0, y0, s, fn, z)
         if m.intent == "windup" and not m.dead:                   # fire gathering in its hand
             fs = s * 0.8
@@ -1720,6 +1827,10 @@ class View:
 
     def canopy(self, px, colour):
         """A cockpit's canopy: a frame across the top, two posts slanting in from the bottom corners."""
+        fr = getattr(px, "frame", None)
+        if fr is not None:
+            fr.canopy(colour)
+            return
         dark, lite = shade(colour, 0.55), mix(colour, (255, 255, 255), 0.25)
         bh = max(2, self.PH // 14)
         bw = max(2, self.PW // 40)
@@ -1742,6 +1853,16 @@ class View:
         h = max(3, self.PH // 9)
         y0 = self.PH - h
         x0, x1 = int(self.PW * 0.2), int(self.PW * 0.8)
+        fr = getattr(px, "frame", None)
+        if fr is not None:
+            w = x1 - x0
+            fuel = getattr(v, "fuel", 0)
+            full = max(fuel, getattr(v, "fuel_max", 0) or 1)
+            v.fuel_max = full
+            gx0, gx1 = x0 + w * 3 // 10, x1 - w * 3 // 10
+            fr.dashboard(colour, h, y0, x0, x1, gx0, gx1, y0 + h // 2, gx0 + int((gx1 - gx0) * fuel / float(full)),
+                         fuel <= 5)
+            return
         dark = shade(colour, 0.4)
         for y in range(y0, self.PH):
             for x in range(x0, x1):
@@ -1788,13 +1909,17 @@ class View:
                     self.glow(px, gx, self.PH * 0.72, max(2.0, self.PH * 0.06), (255, 200, 90), 0.8)
             return
         bw, bh = max(1, self.PW // 70), max(1, self.PH // 26)
-        for y in range(self.PH):
-            c = (214, 168, 48) if (y // max(2, bh * 2)) % 2 else (34, 32, 30)
-            for x in list(range(bw)) + list(range(self.PW - bw, self.PW)):
-                px[y][x] = c
-        for y in range(bh):
-            for x in range(self.PW):
-                px[y][x] = (214, 168, 48) if (x // max(3, bw * 3)) % 2 else (34, 32, 30)
+        fr = getattr(px, "frame", None)
+        if fr is not None:
+            fr.cage()
+        else:
+            for y in range(self.PH):
+                c = (214, 168, 48) if (y // max(2, bh * 2)) % 2 else (34, 32, 30)
+                for x in list(range(bw)) + list(range(self.PW - bw, self.PW)):
+                    px[y][x] = c
+            for y in range(bh):
+                for x in range(self.PW):
+                    px[y][x] = (214, 168, 48) if (x // max(3, bw * 3)) % 2 else (34, 32, 30)
         pic = lv.sprites.get(lv.weapon_sprite())
         if pic is None:
             return
@@ -1850,7 +1975,11 @@ class View:
 
     def braille(self, px, over):
         fill = self.style == "dots-fill"
-        fast = picture.dots(px, self.W, self.VR, fill, dot_level)     # in C, when CLIo Picture is here
+        fr = getattr(px, "frame", None)
+        if fr is not None:
+            fast = fr.dots(fill, dot_level)
+        else:
+            fast = picture.dots(px, self.W, self.VR, fill, dot_level)     # in C, when CLIo Picture is here
         if fast is not None:
             for (r, c), o in over.items():
                 if o and 0 <= r < self.VR and 0 <= c < self.W:

@@ -417,6 +417,15 @@ class Land:
                         cover[key] = d
         return out
 
+    def draw_frame(self, view, frame, cam, eye, phase, sky_rows):
+        """``draw`` into CLIo Picture's frame (0.4): its rows (FrameRows that keep the distances), or None when
+        the library cannot draw it (then ``draw``)."""
+        px = frame.start(True)
+        if picture.land_draw(self, view, cam, eye + self.base, phase, sky_rows, frame) is None:
+            return None
+        view.cover = frame.cover_view
+        return px
+
     def cast(self, view, cam, eye, phase, sky_rows):
         """The ground caster, in Python: (rows of colours, rows of distances)."""
         PW, PH, yh, half = view.PW, view.PH, view.yh, view.half

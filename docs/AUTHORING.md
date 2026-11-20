@@ -1829,10 +1829,12 @@ and shots count within 7.
 
 **Faster pictures.** `python clio.py --get-picture` installs CLIo Picture, a small C library
 ([eryxgames/clio-picture](https://github.com/eryxgames/clio-picture)) that draws the open
-land's ground and the sky over open cells, the rooms' floor and ceiling, works out the land's
-heights, and makes the braille of the `dots` and `dots-fill` views. A frame of open land takes
-a fifth to a quarter of the time (E1M4 at 150 columns: 52 ms -> 12 ms, in dots 137 ms -> 25
-ms), a room two thirds, in dots two fifths (E1M1: 8.5 -> 5.8 ms, in dots 33 -> 13 ms). It gives exactly what the Python gives - every pixel, height and dot the
+land's ground and the sky over open cells, the rooms' floor and ceiling, and from release 0.4
+keeps the whole picture in C from the floor to the cells - walls, pictures, shadows, the
+triangles of models, colour changes, the cockpit - while CLIo still decides what is drawn
+where. Along the bot's own games at 150 x 34: a room frame takes 4-5 ms instead of 10 (in the
+dots view 6 instead of 40), open land 9-16 ms instead of 65-75 (in dots 12-21 instead of
+130-140); models are the part still in Python. It gives exactly what the Python gives - every pixel, height and dot the
 same, to the last bit; CLIo checks some before it uses the library and keeps to the Python if
 any differs - so a game plays and looks the same, only faster, and never needs it. It is found as Ballistic's library is: `CLIO_PICTURE_LIB` (`none` turns it
 off), then `engine/picture/lib/` (a build of your own: `make` in its folder), then your data

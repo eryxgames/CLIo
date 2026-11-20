@@ -63,7 +63,8 @@
   "engine/editor/texts.py",
   "engine/editor/views.py",
   "engine/picture/__init__.py",
-  "engine/picture/fetch.py"
+  "engine/picture/fetch.py",
+  "engine/picture/frame.py"
  ],
  "starter": {
   "id": "starter",

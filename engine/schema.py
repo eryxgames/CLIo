@@ -84,6 +84,8 @@ EFFECTS = [
     V("turns", "Let turns pass", "number"), V("save", "Save the game", "none"), V("deepen", "Add a dungeon floor", "none"),
     V("win", "Win, with the text", {"ref": "texts"}), V("lose", "Lose, with the text", {"ref": "texts"}),
     V("random", "One of these at random", "json"), V("do", "A group of effects", "json"),
+    V("add_card", "Put a card in the player's deck", {"ref": "cards"}),
+    V("remove_card", "Take a card out of the player's deck", {"ref": "cards"}),
 ]
 
 CONDITIONS = [
@@ -207,7 +209,11 @@ KINDS = [
         F("refuse_text", "long"), F("no_fight_text", "long"), F("immune", "tags"),
         F("stats", "group", fields=STATS), F("moves", "rows", "Moves in a fight", fields=MOVE, one="move"),
         R("gives", "map", "When given something", one="item it is given", fields=GIVEN),
-        R("ambush_if", "condition", "Attacks first when"), R("on_defeat", "effects", "When defeated")]},
+        R("ambush_if", "condition", "Attacks first when"), R("on_defeat", "effects", "When defeated"),
+        R("battle", "choice", "Fights with", options=["cards", "classic"]),
+        R("deck", "refs", "Its own deck in a card battle (a duellist)", of="cards"),
+        R("energy", "number", "A duellist's energy a turn"), R("hand", "number", "Cards a duellist draws a turn"),
+        R("card_rewards", "refs", "Cards offered when it is beaten", of="cards")]},
     {"key": "dialogues", "file": "dialogues", "label": "Dialogues", "one": "dialogue", "shape": "map", "fields": [
         F("start", label="Starts at node"),
         F("nodes", "map", one="node", fields=[F("text", "long", "What is said"), F("speaker"), F("goto", label="Then go to node"),
@@ -262,7 +268,29 @@ KINDS = [
         F("float", "number", "Floats above the floor (0..1)"), F("sight", "number", "Sees this many cells"),
         F("awake", "bool", "Awake from the start"), F("boss", "bool"), F("drops", "ref", "Drops", of="items"),
         F("death", label="When it dies (%s: its tag)"),
-        R("model", "ref", "A 3D model drawn instead of the sprite", of="models")]},
+        R("model", "ref", "A 3D model drawn instead of the sprite", of="models"),
+        R("brain", "choice", "Its brain (how it fights)",
+          options=["brute", "skirmisher", "soldier", "heavy", "coward", "assault", "swarm"]),
+        R("squad_tactic", "choice", "In a squad it fights as",
+          options=["pincer", "fire_team", "hold", "rush", "assault", "sweep", "ambush", "swarm"]),
+        R("grenades", "group", "Grenades it carries", fields=[F("count", "number"), F("range", "number"),
+                                                                F("fuse", "number", "Fuse (beats)"),
+                                                                F("blast", "number"), F("every", "number", "At most every (beats)")]),
+        R("mines", "group", "Mines it lays", fields=[F("count", "number"), F("item", "ref", "The mine (an item)", of="items")])]},
+    {"key": "cards", "file": "cards", "label": "Cards", "one": "card", "shape": "map", "title": "name", "fields": [
+        F("name"), F("cost", "number", "Cost (energy)"), F("type", "choice", options=["attack", "skill", "power"]),
+        F("target", "choice", "Played at", options=["enemy", "all", "self"]),
+        F("rarity", "choice", options=["starter", "common", "uncommon", "rare"]),
+        F("effects", "rows", "What it does, in order", one="effect", fields=[
+            F("damage", "number"), F("times", "number", "Hits (damage this many times)"), F("block", "number"),
+            F("draw", "number", "Draw cards"), F("energy", "number", "Energy"), F("heal", "number"),
+            F("strength", "number", "Strength (more damage a hit, for the fight)"),
+            F("status", "choice", "Status on the target", options=["weak", "exposed", "poison", "burn", "bleed", "stun", "blind"]),
+            F("turns", "number"), F("power", "number", "Power (a turn)")]),
+        F("exhaust", "bool", "Gone for the rest of the fight once played"),
+        R("reward", "bool", "Offered after a win (false: an enemy's card)"),
+        R("classes", "tags", "Offered only to these classes"), R("text", "long", "What it says it does"),
+        R("say", "text", "Said when it is played"), R("sfx", "text", "Sound when it is played")]},
     {"key": "models", "file": "models", "label": "3D models", "one": "model", "shape": "map", "editor": "model", "fields": [
         F("smooth", "bool", "Smooth (lit at the corners: round things)"), F("scale", "number", "Scale (1: as built)"),
         F("break", "choice", "Destroyed, it breaks into", options=["shards", "parts", "groups"]),

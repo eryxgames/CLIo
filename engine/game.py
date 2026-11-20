@@ -450,7 +450,8 @@ class Game(Actions):
         if cid is None:
             return None
         ids = self.fight_group(cid)
-        battle = Battle(self, ids, can_flee)
+        from . import cards
+        battle = (cards.CardBattle if cards.wanted(self, ids) else Battle)(self, ids, can_flee)
         self.fight_started(ids)
         result = battle.run()
         self.fight_ended()

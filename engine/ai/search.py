@@ -86,54 +86,72 @@ def _ln(x):
 
 
 class _Node:
-    __slots__ = ("move", "parent", "children", "untried", "visits", "wins")
+    __slots__ = ("move", "parent", "children", "untried", "visits", "wins", "who")
 
-    def __init__(self, move, parent, moves):
+    def __init__(self, move, parent, moves, who=None):
         self.move, self.parent = move, parent
         self.children = []
         self.untried = list(moves)
         self.visits = 0
         self.wins = 0.0
+        self.who = who                                      # the side that made ``move``
+
+
+def _side(state, depth):
+    """Whose move it is: the state's ``to_play()`` if it has one (a side may make several moves in a row, as
+    in cards), else the sides take turns."""
+    to_play = getattr(state, "to_play", None)
+    return to_play() if to_play is not None else depth % 2
 
 
 def mcts(state, rng, playouts=400, horizon=60, c=1.4):
     """The move most often chosen by ``playouts`` games played on from here (UCT); ``rng`` is the caller's
     random generator - the level's, so that it is part of what a save keeps."""
+    visits = mcts_visits(state, rng, playouts, horizon, c)
+    if not visits:
+        return None
+    best = max(range(len(visits)), key=lambda i: (visits[i][1], -i))
+    return visits[best][0]
+
+
+def mcts_visits(state, rng, playouts=400, horizon=60, c=1.4):
+    """``[(move, visits)]`` for the moves from here, in ``moves()``'s order, after ``playouts`` games (UCT).
+    Add the visits of searches from several guesses at what cannot be seen, and the most visited move is the
+    choice of an information-set search (cards in a hand one does not know)."""
     moves = state.moves()
     if not moves:
-        return None
+        return []
     if len(moves) == 1:
-        return moves[0]
+        return [(moves[0], 1)]
     root = _Node(None, None, moves)
     for _ in range(int(playouts)):
-        node, s = root, state
+        node, s, depth = root, state, 0
         while not node.untried and node.children:           # down the tree by UCT
             node = max(node.children, key=lambda n: (n.wins / n.visits
                                                       + c * math.sqrt(_ln(node.visits) / n.visits)))
             s = s.play(node.move)
+            depth += 1
         if node.untried and not s.done():                   # one new move
             mv = node.untried.pop(0)
+            who = _side(s, depth)
             s = s.play(mv)
-            child = _Node(mv, node, s.moves())
+            depth += 1
+            child = _Node(mv, node, s.moves(), who)
             node.children.append(child)
             node = child
         steps = 0                                           # a game played on at random
-        flips = 0
         while not s.done() and steps < horizon:
             ms = s.moves()
             if not ms:
                 break
             s = s.play(ms[rng.randrange(len(ms))])
             steps += 1
-            flips += 1
-        result = s.score()                                  # for the side to play at the end
-        if flips % 2:
-            result = -result                                # for the side to play at ``node``
-        result = -result                                    # for the side that made ``node``'s move ...
-        while node is not None:
+        result = s.score()                                  # for the side to play at the end ...
+        last = _side(s, depth + steps)
+        while node is not None:                             # ... and so for each move's maker, up the tree
             node.visits += 1
-            node.wins += (result + 1) / 2.0                 # ... and so on up, each level the other side's
-            result = -result
+            if node.who is not None:
+                node.wins += ((result if node.who == last else -result) + 1) / 2.0
             node = node.parent
-    top = max(root.children, key=lambda n: (n.visits, -root.children.index(n)))
-    return top.move
+    seen = {repr(n.move): n.visits for n in root.children}
+    return [(mv, seen.get(repr(mv), 0)) for mv in moves]

@@ -346,6 +346,75 @@ enemy that falls, also when the player then runs away.
   are area skills.
 - The `combat` block of an item takes `"area": true` as well (a bomb, a flash powder).
 
+### Card battles
+
+A fight can be played with a deck of cards instead: `"battle": "cards"` in `game.json`,
+in one of its [modes](#game-modes-scores-and-records), or on one character
+(`"battle": "classic"` on a character keeps the old fight for it). The Hollow's *Deck*
+mode plays every fight this way.
+
+Each turn the player gets `energy` (3) and draws `hand` (5) cards; he plays what he can
+pay for, by number (`2`, or `2 1` to aim at enemy 1), and ends the turn with `end`. What
+is left in his hand goes to the discard pile, which is shuffled into a new draw pile when
+that runs out. `piles` shows them, `use` takes an item from the pack (1 energy), `flee`
+tries to run (ending the turn if it fails). Block soaks damage until his next turn.
+
+```json
+"cards": {"energy": 3, "hand": 5, "rewards": 3,
+          "deck": ["strike", "strike", "strike", "strike", "strike", "defend", "defend", "defend", "defend", "bash"],
+          "decks": {"warrior": ["strike", "...", "shield_bash"]},
+          "enemy_health": 1.0, "enemy_damage": 1.1}
+```
+
+The player's deck starts as his class's (`decks`), else `deck`, else the engine's
+starter, and is kept with the game (`deck` shows it). A won fight offers `rewards` cards:
+the enemy's `"card_rewards"` if it has any, else the game's cards by rarity (common six
+times as often as rare; `"reward": false` keeps a card out, `"classes"` keeps it to some
+classes). Effects `{"add_card": "id"}` and `{"remove_card": "id"}` change the deck from
+anywhere: a shrine, a shop, a quest.
+
+Cards live in `cards.json` (over the engine's own `strike`, `defend`, `bash`, `cleave`,
+`twin_strike`, `heavy_blow`, `second_wind`, `quick_step`, `hamstring`, `envenom`, `rally`,
+`bandage`, `adrenaline`, `iron_wall`):
+
+```json
+"backstab": {"name": "Backstab", "cost": 1, "type": "attack", "rarity": "starter",
+             "effects": [{"damage": 7}, {"status": "bleed", "turns": 3, "power": 3}]}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `cost` | energy, 0 to 9 |
+| `type` | `attack`, `skill` or `power` |
+| `target` | `enemy` (one, aimed), `all`, `self` - by default `enemy` when it hurts or hexes |
+| `effects` | in order: `damage` (`times` over), `block`, `draw`, `energy`, `heal`, `strength` (more damage on every hit, for the fight), `status` with `turns` and `power` |
+| `exhaust` | gone for the rest of the fight once played |
+| `rarity`, `reward`, `classes` | how and to whom it is offered after a win |
+| `text`, `say`, `sfx` | what it says it does (else made from its effects), a line when played, a sound |
+
+Statuses: `weak` (hits a quarter softer), `exposed` (takes half again), `blind` (hits half
+as hard), `poison`, `burn`, `bleed` (`power` at the end of each of its turns), `stun`
+(loses its next turn). The player's `attack` adds one to every hit for each two points
+over 5; his `defense` takes half of itself off every hit he takes.
+
+Enemies fight by their `moves`, and show what they will do with numbers: an attack's
+damage is (4 + attack) times its `mult`, times `enemy_damage`; a guard gives it block (4 +
+twice its defence); a heavy move winds up a turn ahead and says how hard it will land.
+`enemy_health` scales their health in card battles.
+
+**Duellists.** A character with a `"deck"` (and `"energy"`, `"hand"`) plays cards as the
+player does, from a hand he cannot see (only how many cards it holds). It chooses each
+card by Monte Carlo tree search (engine/ai/search.py) over a few guesses of what it cannot
+know - his hand and the order of both draw piles - and adds the guesses' visits up: an
+information-set search, the simple way. It takes a kill when it has one, guards when a
+blow is coming, and plays its big cards when they count. The search stops at a number of
+games played, not at a time, so it chooses the same on any machine. In a classic fight
+the deck is ignored and the `moves` are used.
+
+The editor's *odds* for an enemy (and `python tests/bot.py 30 cards` for The Hollow) play
+card battles too, the plain greedy way: block what is coming when it would hurt, hit the
+weakest.
+
 ## Text, colour and themes
 
 Inline markup works in every text:
@@ -809,6 +878,7 @@ start (or passes `--mode rogue` on the command line); the first one listed is th
 | `flags`, `on_start` | Extra flags to set and effects to run when the mode starts. |
 | `text`, `intro`, `help` | A line shown on choosing the mode; an intro and a help text that replace the game's. |
 | `slot` | Save slot of the mode. The first mode uses `save`, the others their own name, so a story save and a rogue run do not overwrite each other. |
+| `battle` | `"cards"`: every fight in this mode is a [card battle](#card-battles). |
 
 The chosen mode sets the flag `mode_<id>` and the variable `mode`, so any condition can
 ask for it: `{"if": "mode_rogue", "then": [...], "else": [...]}`.

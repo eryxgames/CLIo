@@ -1,0 +1,357 @@
+{
+  "shield_bash": {
+    "name": "Shield Bash",
+    "cost": 2,
+    "type": "attack",
+    "rarity": "starter",
+    "exhaust": true,
+    "effects": [
+      {
+        "damage": 7
+      },
+      {
+        "status": "stun",
+        "turns": 1
+      }
+    ]
+  },
+  "backstab": {
+    "name": "Backstab",
+    "cost": 1,
+    "type": "attack",
+    "rarity": "starter",
+    "effects": [
+      {
+        "damage": 7
+      },
+      {
+        "status": "bleed",
+        "turns": 3,
+        "power": 3
+      }
+    ]
+  },
+  "firebolt": {
+    "name": "Firebolt",
+    "cost": 1,
+    "type": "attack",
+    "rarity": "starter",
+    "effects": [
+      {
+        "damage": 8
+      },
+      {
+        "status": "burn",
+        "turns": 2,
+        "power": 3
+      }
+    ]
+  },
+  "mend": {
+    "name": "Mend",
+    "cost": 1,
+    "type": "skill",
+    "rarity": "starter",
+    "exhaust": true,
+    "effects": [
+      {
+        "heal": 8
+      }
+    ]
+  },
+  "riposte": {
+    "name": "Riposte",
+    "cost": 1,
+    "type": "attack",
+    "rarity": "common",
+    "effects": [
+      {
+        "block": 5
+      },
+      {
+        "damage": 5
+      }
+    ]
+  },
+  "iron_hide": {
+    "name": "Iron Hide",
+    "cost": 2,
+    "type": "skill",
+    "rarity": "common",
+    "effects": [
+      {
+        "block": 13
+      }
+    ]
+  },
+  "whetstone": {
+    "name": "Whetstone",
+    "cost": 1,
+    "type": "power",
+    "rarity": "uncommon",
+    "exhaust": true,
+    "effects": [
+      {
+        "strength": 2
+      }
+    ]
+  },
+  "sweeping_cut": {
+    "name": "Sweeping Cut",
+    "cost": 2,
+    "type": "attack",
+    "target": "all",
+    "rarity": "uncommon",
+    "classes": [
+      "warrior"
+    ],
+    "effects": [
+      {
+        "damage": 9
+      }
+    ]
+  },
+  "war_cry": {
+    "name": "War Cry",
+    "cost": 1,
+    "type": "skill",
+    "target": "all",
+    "rarity": "common",
+    "classes": [
+      "warrior"
+    ],
+    "effects": [
+      {
+        "status": "weak",
+        "turns": 2
+      },
+      {
+        "draw": 1
+      }
+    ]
+  },
+  "twin_daggers": {
+    "name": "Twin Daggers",
+    "cost": 1,
+    "type": "attack",
+    "rarity": "uncommon",
+    "classes": [
+      "rogue"
+    ],
+    "effects": [
+      {
+        "damage": 4,
+        "times": 3
+      }
+    ]
+  },
+  "smoke_bomb": {
+    "name": "Smoke Bomb",
+    "cost": 1,
+    "type": "skill",
+    "target": "all",
+    "rarity": "common",
+    "classes": [
+      "rogue"
+    ],
+    "exhaust": true,
+    "effects": [
+      {
+        "status": "blind",
+        "turns": 1
+      },
+      {
+        "status": "weak",
+        "turns": 2
+      }
+    ]
+  },
+  "shadow_step": {
+    "name": "Shadow Step",
+    "cost": 0,
+    "type": "skill",
+    "rarity": "uncommon",
+    "classes": [
+      "rogue"
+    ],
+    "effects": [
+      {
+        "block": 4
+      },
+      {
+        "draw": 1
+      }
+    ]
+  },
+  "ember": {
+    "name": "Ember",
+    "cost": 1,
+    "type": "attack",
+    "target": "all",
+    "rarity": "common",
+    "classes": [
+      "mystic"
+    ],
+    "effects": [
+      {
+        "damage": 4
+      },
+      {
+        "status": "burn",
+        "turns": 2,
+        "power": 3
+      }
+    ]
+  },
+  "nova": {
+    "name": "Nova",
+    "cost": 2,
+    "type": "attack",
+    "target": "all",
+    "rarity": "rare",
+    "classes": [
+      "mystic"
+    ],
+    "effects": [
+      {
+        "damage": 11
+      }
+    ]
+  },
+  "ward": {
+    "name": "Ward",
+    "cost": 1,
+    "type": "skill",
+    "rarity": "common",
+    "classes": [
+      "mystic"
+    ],
+    "effects": [
+      {
+        "block": 8
+      }
+    ]
+  },
+  "kindle": {
+    "name": "Kindle",
+    "cost": 0,
+    "type": "skill",
+    "rarity": "uncommon",
+    "classes": [
+      "mystic"
+    ],
+    "exhaust": true,
+    "effects": [
+      {
+        "energy": 1
+      }
+    ]
+  },
+  "shrine_light": {
+    "name": "Shrine Light",
+    "cost": 2,
+    "type": "skill",
+    "rarity": "rare",
+    "exhaust": true,
+    "effects": [
+      {
+        "heal": 12
+      }
+    ]
+  },
+  "halberd_chop": {
+    "name": "Halberd Chop",
+    "cost": 1,
+    "type": "attack",
+    "reward": false,
+    "effects": [
+      {
+        "damage": 8
+      }
+    ]
+  },
+  "overhead_chop": {
+    "name": "The Overhead Chop",
+    "cost": 2,
+    "type": "attack",
+    "reward": false,
+    "effects": [
+      {
+        "damage": 17
+      }
+    ]
+  },
+  "crossed_halberd": {
+    "name": "Halberd Crossed",
+    "cost": 1,
+    "type": "skill",
+    "reward": false,
+    "effects": [
+      {
+        "block": 9
+      }
+    ]
+  },
+  "greatsword": {
+    "name": "Rusted Greatsword",
+    "cost": 1,
+    "type": "attack",
+    "reward": false,
+    "effects": [
+      {
+        "damage": 9
+      }
+    ]
+  },
+  "crowns_fire": {
+    "name": "The Crown's Fire",
+    "cost": 3,
+    "type": "attack",
+    "reward": false,
+    "effects": [
+      {
+        "damage": 26
+      }
+    ]
+  },
+  "furnace_breath": {
+    "name": "Breath of the Furnace",
+    "cost": 2,
+    "type": "attack",
+    "reward": false,
+    "effects": [
+      {
+        "damage": 5
+      },
+      {
+        "status": "burn",
+        "turns": 3,
+        "power": 5
+      }
+    ]
+  },
+  "grounded": {
+    "name": "Sword Grounded",
+    "cost": 1,
+    "type": "skill",
+    "reward": false,
+    "effects": [
+      {
+        "block": 12
+      }
+    ]
+  },
+  "draw_on_crown": {
+    "name": "Draw on the Crown",
+    "cost": 2,
+    "type": "skill",
+    "target": "self",
+    "exhaust": true,
+    "reward": false,
+    "effects": [
+      {
+        "heal": 18
+      }
+    ]
+  }
+}

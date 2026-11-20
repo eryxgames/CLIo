@@ -9,6 +9,7 @@ handy for tuning difficulty:
 
     python tests/bot.py            # 30 runs per class, prints win rates
     python tests/bot.py 30 rogue   # the same in rogue mode: how deep does it get
+    python tests/bot.py 30 cards   # the same with card battles (the Deck mode)
 """
 import os
 import sys
@@ -35,6 +36,10 @@ class DepthsBot(Session):
             return self.battle_action()
         if "Target>" in prompt:
             return str(self.aim)
+        if "Play>" in prompt:                   # a card battle (the Deck mode): plain, greedy play
+            cmd = self.game.battle.auto_command()
+            self.aim = int(cmd.split()[1]) if len(cmd.split()) > 1 else 1
+            return cmd
         return "1"
 
     def heal_index(self, items):
@@ -217,7 +222,7 @@ def trial(runs=30, mode="story"):
         wins, levels, turns, deaths, depths = 0, [], [], {}, []
         for seed in range(1, runs + 1):
             bot = DepthsBot(seed=seed, klass=klass, mode=mode)
-            result = bot.play(900 if mode == "story" else 4000)
+            result = bot.play(4000 if mode == "rogue" else 900)
             w = bot.world
             depths.append(int(w.vars.get("depth", 0)))
             if result == "win":
@@ -230,7 +235,7 @@ def trial(runs=30, mode="story"):
                 killer = (b.killer.name if b and b.killer else "?") if result == "lose" else "-"
                 key = "%s f%s %s" % (result, floor, killer)
                 deaths[key] = deaths.get(key, 0) + 1
-        if mode == "story":
+        if mode in ("story", "cards"):
             print("%-8s wins %2d/%d  avg level %.1f  avg turns %d" % (
                 label, wins, runs, (sum(levels) / len(levels)) if levels else 0,
                 (sum(turns) / len(turns)) if turns else 0))
@@ -244,4 +249,4 @@ def trial(runs=30, mode="story"):
 
 if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if a.isdigit()]
-    trial(int(args[0]) if args else 30, "rogue" if "rogue" in sys.argv[1:] else "story")
+    trial(int(args[0]) if args else 30, "rogue" if "rogue" in sys.argv[1:] else "cards" if "cards" in sys.argv[1:] else "story")

@@ -39,6 +39,71 @@
       "endless": true,
       "text": "You leave no word with anyone about when you will be back. It seems more honest.",
       "help": "Goal: go as deep as you can. One life - the run is saved as you go and erased when you fall. 'records' lists the best runs. 'map' is your friend; shrines (+) heal."
+    },
+    "cards": {
+      "name": "Deck",
+      "description": "The Hollow with a deck of cards: every fight is a card battle, and each win adds a card.",
+      "battle": "cards",
+      "slot": "deck",
+      "text": "You shuffle the old deck your grandmother left you. The cards are warm.",
+      "help": "Goal: as in the story - three floors and a crown - but every fight is a card battle. Play cards by number, 'end' your turn; after each win take a card for your deck. 'deck' shows it."
+    }
+  },
+  "cards": {
+    "energy": 3,
+    "hand": 5,
+    "rewards": 3,
+    "enemy_health": 1.0,
+    "enemy_damage": 1.1,
+    "deck": [
+      "strike",
+      "strike",
+      "strike",
+      "strike",
+      "strike",
+      "defend",
+      "defend",
+      "defend",
+      "defend",
+      "defend"
+    ],
+    "decks": {
+      "warrior": [
+        "strike",
+        "strike",
+        "strike",
+        "strike",
+        "strike",
+        "defend",
+        "defend",
+        "defend",
+        "defend",
+        "shield_bash"
+      ],
+      "rogue": [
+        "strike",
+        "strike",
+        "strike",
+        "strike",
+        "defend",
+        "defend",
+        "defend",
+        "defend",
+        "backstab",
+        "quick_step"
+      ],
+      "mystic": [
+        "strike",
+        "strike",
+        "strike",
+        "defend",
+        "defend",
+        "defend",
+        "defend",
+        "firebolt",
+        "firebolt",
+        "mend"
+      ]
     }
   },
   "score": {

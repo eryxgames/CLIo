@@ -5,6 +5,7 @@
   "engine/art.py",
   "engine/automap.py",
   "engine/banner.py",
+  "engine/cards.py",
   "engine/chunks.py",
   "engine/combat.py",
   "engine/conditions.py",
@@ -77,6 +78,7 @@
    "about": "Dungeon crawler. Generated floors, tactical fights against one or many - and a rogue mode with one life.",
    "files": [
     "games/depths/LICENSE.md",
+    "games/depths/cards.json",
     "games/depths/characters.json",
     "games/depths/dialogues.json",
     "games/depths/dungeon.json",

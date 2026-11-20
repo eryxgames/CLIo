@@ -58,6 +58,7 @@ VERBS = {
     "restart": ["restart", "start over", "new game"],
     "about": ["about", "version", "credits", "info"],
     "records": ["records", "record", "scores", "highscores", "high scores", "hall of fame", "ranking"],
+    "deck": ["deck", "cards", "my deck", "show deck"],
     "again": ["again", "g", "repeat"],
 }
 

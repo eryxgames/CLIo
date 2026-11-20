@@ -141,6 +141,14 @@ class _Player:
             return self.act()
         if "Target>" in prompt:
             return str(self.aim)
+        if "Play>" in prompt:                               # a card battle plays itself the plain way
+            self.turns += 1
+            cmd = self.game.battle.auto_command()
+            parts = cmd.split()
+            self.aim = int(parts[1]) if len(parts) > 1 else 1
+            return cmd
+        if "Card>" in prompt:
+            return "1"
         return "1"
 
     def act(self):
@@ -179,7 +187,7 @@ class _Player:
         return "strike" + aim
 
 
-def _one_fight(work, enemies, klass, level, seed):
+def _one_fight(work, enemies, klass, level, seed, mode=None):
     from ..audio import Audio
     from ..audio.backends import NullBackend
     from ..combat import Battle
@@ -189,7 +197,7 @@ def _one_fight(work, enemies, klass, level, seed):
     term = Term(out=io.StringIO(), inp=player.answer, width=80, height=40, color=0, unicode=False, animate=False, env={})
     game = Game(work, term=term, audio=Audio(backend=NullBackend(), enabled=False), seed=seed)
     player.game = game
-    game.mode_request = next(iter(game.modes), None)
+    game.mode_request = mode if mode in game.modes else next(iter(game.modes), None)
     try:
         game.choose_mode()
         cc = game.cfg.get("character_creation")
@@ -207,7 +215,8 @@ def _one_fight(work, enemies, klass, level, seed):
             if who.get("level", 1) == before:
                 break
         player.answers = 0
-        battle = Battle(game, list(enemies), can_flee=False)
+        from ..cards import CardBattle, wanted
+        battle = (CardBattle if wanted(game, list(enemies)) else Battle)(game, list(enemies), can_flee=False)
         game.battle = battle
         result = battle.run()
     except (_TooLong, EOFError):
@@ -216,7 +225,7 @@ def _one_fight(work, enemies, klass, level, seed):
     return result, left, player.turns
 
 
-def odds(game_dir, enemies, pending=None, extra=None, level=1, fights=30, seed=1):
+def odds(game_dir, enemies, pending=None, extra=None, level=1, fights=30, seed=1, mode=None):
     """How fights against ``enemies`` (character ids, fought together) go, for each class the game has.
 
     ``extra`` is ``{id: character}`` to try without adding it to the game.
@@ -247,7 +256,7 @@ def odds(game_dir, enemies, pending=None, extra=None, level=1, fights=30, seed=1
             won = undecided = 0
             left, turns = [], []
             for i in range(fights):
-                result, health, took = _one_fight(work, enemies, klass, level, seed * 100003 + i)
+                result, health, took = _one_fight(work, enemies, klass, level, seed * 100003 + i, mode)
                 turns.append(took)
                 if result == "win":
                     won += 1

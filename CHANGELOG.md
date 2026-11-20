@@ -333,6 +333,20 @@ game, RØØTLESS, shows them.
   of squad. Bugrat packs roam SIM-1's fens; packs of all three come with depth in SIM-2 and SIM-3.
 - The level bot steps out of a grenade's blast, never steps on a mine it has seen, and leaves
   alone items dropped where it cannot stand or under a parked machine.
+- **Card battles** (`engine/cards.py`, `cards.json`): a fight played with a deck - energy and
+  a hand each turn, a draw and a discard pile, block, strength, weak, exposed, poison, burn,
+  bleed, stun, cards that exhaust. Enemies keep their moves and show them with numbers (a
+  heavy blow a turn ahead). `"battle": "cards"` in game.json, a mode or a character; decks
+  per class; a card to take after each win (the enemy's `card_rewards`, else by rarity and
+  class); effects `add_card` and `remove_card`; the `deck` command; `--check` checks cards,
+  decks and battles; the editor has a Cards page and its odds play card battles.
+- **Duellists**: a character with a `"deck"` plays cards as the player does, choosing each
+  one by Monte Carlo tree search over guesses of the hand it cannot see (the visits of a few
+  guesses added up). MCTS now asks a state whose move it is (`to_play`), so one side may make
+  several moves in a row, and gives its visit counts (`search.mcts_visits`).
+- The Hollow: a **Deck** mode - every fight a card battle, a starting deck for each class,
+  18 cards of its own, and the Bone Warden and the Hollow King fight with decks of their own.
+  `python tests/bot.py 30 cards` plays it.
 
 ### Changed
 

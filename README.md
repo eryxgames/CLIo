@@ -25,7 +25,7 @@ python clio.py rootless   # first-person shooter in a terminal
 | Game | What it shows |
 | --- | --- |
 | **Derelict** (`games/derelict`) | A complete short adventure aboard an abandoned cargo hauler. Puzzles, dialogue trees, quests, a wandering NPC, one tactical fight that can also be talked around, and three endings. |
-| **The Hollow** (`games/depths`) | A dungeon crawler that is different on every run: three generated floors, three character classes, tactical combat against single monsters and packs, loot, shrines, a peddler, generated monster sprites and generated music. `--seed 7` replays the same dungeon. **Rogue mode** gives you one life and a dungeon that keeps going down, with a table of the best runs. |
+| **The Hollow** (`games/depths`) | A dungeon crawler that is different on every run: three generated floors, three character classes, tactical combat against single monsters and packs, loot, shrines, a peddler, generated monster sprites and generated music. `--seed 7` replays the same dungeon. **Rogue mode** gives you one life and a dungeon that keeps going down, with a table of the best runs. **Deck mode** plays every fight as a card battle: a deck per class, a card to take after every win, and a Hollow King who plays his own deck and chooses his cards by Monte Carlo tree search. |
 | **RØØTLESS** (`games/rootless`) | A first-person shooter drawn in the terminal, a beat at a time: a recruit's first battle simulation - E1M1 *Boot Sector*, E1M2 *Dynamic Loader*, E1M3 *Drone Refit Assembly*, E1M4 *Xantrium Fens* (open land to the horizon) and the secret level E1M9 *Swap Partition*, the start of a game in the making; and three free programs made new each run - SIM-1 *Long Fens* (open land without end), SIM-2 *Deep Swap* (floor after floor) and SIM-3 *Swap Sprawl* (rooms without end); and a training program, SIM-4 *Kill House* (a room for each kind of squad: bugrat packs, sweep squads, an ambush, commandos). Walk with the arrow keys, strafe, fire with Space; zombie processes, orphans, daemons, flamethrowers, a minigun, a shovel, a chainsaw, a rocket launcher and grenades that bounce, a cargo loader to ride across the acid, drones drawn as 3D models, balls of Xantrium that roll and crush, a hopper to fly out over a swamp under an alien sky, fens and hills to cross on foot or in the air, barrels to shoot or roll, crates to push, oil that burns, slick floor, belts, keys and locked doors, secrets to punch and shoot, and Cron, who rains fire on a schedule. Typed commands work too, joined as in a shell (`f z1 && w || h`). F5 saves (three times a level) and F9 loads. `--view dots` draws it in braille. |
 | **Sandbox** (`game_files`) | The original CLIo 1 test bed, loaded unchanged by the new engine. |
 
@@ -57,6 +57,8 @@ python clio.py rootless   # first-person shooter in a terminal
 - [x] Auto-map
 - [x] Generative maze, monster packs, endless dungeons that scale with depth
 - [x] Game modes (for example story and rogue), permadeath, scores and a records table
+- [x] Card battles: decks, hands and energy, enemies that show what they will do, duellists with
+      decks of their own that choose by search, card rewards; a mode or a character turns them on
 - [x] First-person levels: a map drawn in perspective and redrawn in place (frame mode),
       textured walls, sprites that shrink with distance and keep their eyes, monsters that
       aim, throw fire, charge, spawn and fight each other, keys, doors, secrets, events,
@@ -225,9 +227,10 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 458 tests, about a minute
+python -m unittest discover -s tests     # 477 tests, about a minute
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
+python tests/bot.py 30 cards             # the same with card battles (the Deck mode)
 python tests/levelbot.py 10              # an automatic player walks Rootless's E1M1 ten times
 python tests/levelbot.py 10 rootless e1m9  # ...and its secret level
 python tests/levelbot.py 10 rootless e1m2  # ...and E1M2, the loader and all

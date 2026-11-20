@@ -208,6 +208,19 @@
         "weight": 1
       }
     ],
+    "deck": [
+      "halberd_chop",
+      "halberd_chop",
+      "halberd_chop",
+      "halberd_chop",
+      "overhead_chop",
+      "overhead_chop",
+      "crossed_halberd",
+      "crossed_halberd",
+      "crossed_halberd"
+    ],
+    "energy": 2,
+    "hand": 3,
     "greeting": "It stands before the stair down, motionless, watching.",
     "show_hostile": true,
     "tags": [
@@ -534,6 +547,21 @@
         "below": 0.5
       }
     ],
+    "deck": [
+      "greatsword",
+      "greatsword",
+      "greatsword",
+      "greatsword",
+      "crowns_fire",
+      "crowns_fire",
+      "furnace_breath",
+      "furnace_breath",
+      "grounded",
+      "grounded",
+      "draw_on_crown"
+    ],
+    "energy": 3,
+    "hand": 4,
     "greeting": "It has not noticed you. Yet.",
     "show_hostile": true,
     "tags": [

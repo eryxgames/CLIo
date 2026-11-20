@@ -489,6 +489,28 @@ def _e_deepen(g, arg, eff, ctx):
         maze.extend(g)
 
 
+def _e_add_card(g, arg, eff, ctx):
+    """Card battles: put a card (or several) into the player's deck."""
+    from . import cards
+    deck = cards.deck_of(g)
+    for cid in _aslist(arg):
+        if cid in cards.table(g.data):
+            deck.append(cid)
+            if not eff.get("quiet"):
+                g.say("%s goes into your deck." % cards.table(g.data)[cid].get("name", cid), "success")
+
+
+def _e_remove_card(g, arg, eff, ctx):
+    """Card battles: take one copy of a card out of the player's deck."""
+    from . import cards
+    deck = cards.deck_of(g)
+    for cid in _aslist(arg):
+        if cid in deck:
+            deck.remove(cid)
+            if not eff.get("quiet"):
+                g.say("%s is gone from your deck." % cards.table(g.data).get(cid, {}).get("name", cid), "system")
+
+
 def _e_look(g, arg, eff, ctx):
     g.describe_scene(full=True)
 
@@ -504,5 +526,5 @@ _EFFECTS = {
     "fight": _e_fight, "dialogue": _e_dialogue, "win": _e_win, "lose": _e_lose,
     "random": _e_random, "do": _e_do, "learn": _e_learn, "end_dialogue": _e_end_dialogue,
     "turns": _e_turns, "shop": _e_shop, "story": _e_story, "transition": _e_transition,
-    "look": _e_look, "save": _e_save, "deepen": _e_deepen,
+    "look": _e_look, "save": _e_save, "deepen": _e_deepen, "add_card": _e_add_card, "remove_card": _e_remove_card,
 }

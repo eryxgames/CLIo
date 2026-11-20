@@ -196,6 +196,26 @@ class Actions:
         if w.player.get("gold"):
             self.say("%s %d %s" % (ui.g("coin"), w.player["gold"], self.cfg.get("currency", "gold")), "quest")
 
+    def do_deck(self, cmd):
+        """The cards the player fights with (games with card battles)."""
+        from . import cards
+        if not (cards.wanted(self, []) or isinstance(self.world.player.get("deck"), list)):
+            self.say("You do not fight with cards here.", "hint")
+            return
+        table = cards.table(self.data)
+        deck = cards.deck_of(self)
+        counts = {}
+        for c in deck:
+            counts[c] = counts.get(c, 0) + 1
+        ui = self.ui
+        ui.gap()
+        ui.rule("Your deck (%d cards)" % len(deck))
+        for c in sorted(counts, key=lambda c: (int(table.get(c, {}).get("cost", 1)), table.get(c, {}).get("name", c))):
+            spec = table.get(c, {"name": c})
+            ui.line(" %s %s %s  %s" % (ui.c("%dx" % counts[c], "key"), ui.c("(%d)" % int(spec.get("cost", 1)), "system"),
+                                        ui.c(spec.get("name", c), "item"), ui.c(cards.describe(spec), "hint")))
+        ui._last = "text"
+
     def do_stats(self, cmd):
         w, ui = self.world, self.ui
         st, p = w.stats, w.player

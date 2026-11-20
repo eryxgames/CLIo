@@ -380,9 +380,45 @@ class Land:
             self.share()
         self.haze = haze
 
+    def steps(self):
+        """The distances the ground's rays step through, near to far, and the haze at each (1 - e^(-d/haze))."""
+        key = (Z0, self.view, self.vis)
+        got = getattr(self, "_steps", None)
+        if got is None or got[0] != key:
+            ds, fog = [], []
+            D = Z0 * 0.8
+            while D < self.view:
+                ds.append(D)
+                fog.append(1.0 - math.exp(-D / self.vis))
+                D = D * (1.02 if D < 12 else 1.035 if D < 50 else 1.05) + 0.02
+            got = self._steps = (key, ds, fog)
+        return got[1], got[2]
+
     def draw(self, view, cam, eye, phase, sky_rows, stamp_floor=None):
         """The sky and the ground as the player sees them, his eye ``eye`` above the pad's height: rows of the
         picture (``DepthRow``) that keep each pixel's distance."""
+        got = picture.land_draw(self, view, cam, eye + self.base, phase, sky_rows)   # in C, with CLIo Picture
+        rows, depth = got if got is not None else self.cast(view, cam, eye, phase, sky_rows)
+        PW, PH = view.PW, view.PH
+        cover = view.cover
+        out = []
+        sy = view.sy
+        for y in range(PH):
+            r = DepthRow(rows[y])
+            r.depth, r.view = depth[y], view
+            out.append(r)
+            cy_ = y // sy
+            dr = depth[y]
+            for x in range(0, PW, view.sx * 2):                         # labels hide behind the hills
+                d = dr[x]
+                if d < INF:
+                    key = (cy_, x // view.sx)
+                    if d < cover.get(key, 99.0):
+                        cover[key] = d
+        return out
+
+    def cast(self, view, cam, eye, phase, sky_rows):
+        """The ground caster, in Python: (rows of colours, rows of distances)."""
         PW, PH, yh, half = view.PW, view.PH, view.yh, view.half
         LW, TALL = view.LW, view.TALL
         cx, cy, fx, fy, rx, ry = cam
@@ -400,7 +436,6 @@ class Land:
         stamp, stamp_chunks = self.stamp, self.stamp_chunks
         D = Z0 * 0.8
         alive = len(cols)
-        cover = view.cover
         while D < self.view and alive:
             tD = Z0 / D
             syk = TALL * tD
@@ -461,21 +496,7 @@ class Land:
                     if top <= 0:
                         alive -= 1
             D = D * (1.02 if D < 12 else 1.035 if D < 50 else 1.05) + 0.02
-        out = []
-        sy = view.sy
-        for y in range(PH):
-            r = DepthRow(rows[y])
-            r.depth, r.view = depth[y], view
-            out.append(r)
-            cy_ = y // sy
-            dr = depth[y]
-            for x in range(0, PW, view.sx * 2):                         # labels hide behind the hills
-                d = dr[x]
-                if d < INF:
-                    key = (cy_, x // view.sx)
-                    if d < cover.get(key, 99.0):
-                        cover[key] = d
-        return out
+        return rows, depth
 
     def props_near(self, cx, cy, radius):
         """The props (reeds, rocks, trees...) of the cells within ``radius``: (x, y, prop)."""

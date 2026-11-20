@@ -98,7 +98,7 @@ python clio.py [game] [options]
   --no-sound      run silently
   --sounds SET    another set of sound effects (rootless: ballistic, which needs Node.js or baked takes)
   --get-ballistic install Ballistic's C engine for this machine in your data folder (renders without Node.js)
-  --get-picture   install CLIo Picture, a C library that draws the open land and the dots styles faster
+  --get-picture   install CLIo Picture, a C library that draws the open land, its sky and the dots faster
   --import-model F  bring a glTF model (.glb/.gltf, e.g. from Blender) into a game's models.json
   --no-color      plain text
   --ascii         no box-drawing or block characters
@@ -218,7 +218,7 @@ engine/
   automap.py         auto-map                 maze.py     dungeon generator
   audio/             synth, composer, sound effects, playback backends
     ballistic/       Ballistic Foley Lab's sound engine (Node.js, or its C engine: --get-ballistic)
-  picture/           CLIo Picture: the land's heights and the braille dots in C, when installed
+  picture/           CLIo Picture: the land, the sky and the braille dots in C, when installed
   data.py            loading and normalising game files
   world.py           game state, save/load
   parser.py          command parser           actions.py  the verbs
@@ -243,7 +243,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 586 tests, about a minute
+python -m unittest discover -s tests     # 591 tests, about a minute
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 python tests/bot.py 30 cards             # the same with card battles (the Deck mode)

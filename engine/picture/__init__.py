@@ -3,9 +3,10 @@
 """CLIo Picture: the inner loops of the pictures in C, when the library is installed - as Ballistic Engine is
 for sound.  A game never needs it: without it CLIo draws everything in Python, as before.
 
-What it does now (CLIo Picture 0.1): the land's heights for a chunk at once (``land_raw``), and the dots and
-dots-fill styles' braille cells from a frame's pixels (``dots``).  Both give exactly what the Python gives - the
-same floats, to the last bit - so a game looks and plays the same with it or without it; only faster.  When the
+What it does now (CLIo Picture 0.2): the land's heights for a chunk at once (``land_raw``), the open land's
+ground caster (``land_draw``), the sky over open cells but for the sun (``sky``), and the dots and dots-fill
+styles' braille cells from a frame's pixels (``dots``).  All give exactly what the Python gives - the same floats, to the last bit - so a game looks and
+plays the same with it or without it; only faster.  When the
 library is loaded it is checked against the Python on a few known values first, and not used if anything
 differs (``status()`` says why).
 
@@ -19,6 +20,7 @@ import itertools
 import os
 import struct
 import sys
+from array import array
 
 try:                                    # not in every Python (the editor's in a browser has none)
     import ctypes
@@ -67,6 +69,34 @@ class _Dots(ctypes.Structure if ctypes else object):
                 ("most", ctypes.c_double), ("flat", ctypes.c_double)] if ctypes else []
 
 
+class _Ground(ctypes.Structure if ctypes else object):
+    _fields_ = [("pw", ctypes.c_int), ("ph", ctypes.c_int), ("yh", ctypes.c_int), ("step", ctypes.c_int),
+                ("half", ctypes.c_double), ("lw", ctypes.c_double), ("tall", ctypes.c_double),
+                ("z0", ctypes.c_double), ("cx", ctypes.c_double), ("cy", ctypes.c_double),
+                ("fx", ctypes.c_double), ("fy", ctypes.c_double), ("rx", ctypes.c_double),
+                ("ry", ctypes.c_double), ("eye", ctypes.c_double), ("base", ctypes.c_double),
+                ("phase", ctypes.c_int64), ("haze", ctypes.c_uint32), ("steps", ctypes.c_int),
+                ("d", ctypes.c_void_p), ("fog", ctypes.c_void_p), ("stamps", ctypes.c_int),
+                ("stamp_xy", ctypes.c_void_p), ("stamp_tex", ctypes.c_void_p), ("tex_w", ctypes.c_void_p),
+                ("tex_h", ctypes.c_void_p), ("tex_at", ctypes.c_void_p), ("texels", ctypes.c_void_p)] \
+        if ctypes else []
+
+
+class _Sky(ctypes.Structure if ctypes else object):
+    _fields_ = [("pw", ctypes.c_int), ("yh", ctypes.c_int), ("f", ctypes.c_double), ("lateral", ctypes.c_double),
+                ("phase", ctypes.c_int64), ("base", ctypes.c_void_p), ("stars", ctypes.c_double),
+                ("clouds", ctypes.c_int), ("cloud_rgb", ctypes.c_uint32), ("cloud_amount", ctypes.c_double),
+                ("ridges", ctypes.c_int), ("ridge_rgb", ctypes.c_void_p), ("ridge_height", ctypes.c_void_p),
+                ("ridge_near", ctypes.c_void_p), ("ridge_rough", ctypes.c_void_p), ("ridge_seed", ctypes.c_void_p),
+                ("sun", ctypes.c_int), ("sun_at", ctypes.c_double), ("sun_height", ctypes.c_double),
+                ("sun_size", ctypes.c_double), ("sun_glow", ctypes.c_double)] if ctypes else []
+
+
+CHUNK_FN = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int64, ctypes.c_int64) if ctypes else None
+CHUNK_BYTES = 256 * 8 + 256 * 4 + 256 * 2                    # clio_chunk: heights, colours, kinds
+U32 = "I" if array("I").itemsize == 4 else "L"
+
+
 def _open(path):
     lib = ctypes.CDLL(path)
     D, I64, I, P = ctypes.c_double, ctypes.c_int64, ctypes.c_int, ctypes.c_void_p
@@ -79,6 +109,11 @@ def _open(path):
     lib.clio_land_raw.argtypes = [ctypes.POINTER(_Land), I64, I64, I, I, P]
     lib.clio_dots.restype = I
     lib.clio_dots.argtypes = [P, I, I, ctypes.POINTER(_Dots), P]
+    if hasattr(lib, "clio_land_draw"):                  # 0.2 and later; an older library does the rest
+        lib.clio_land_draw.restype = I
+        lib.clio_land_draw.argtypes = [ctypes.POINTER(_Ground), CHUNK_FN, P, P, I, P, P]
+        lib.clio_sky_draw.restype = I
+        lib.clio_sky_draw.argtypes = [ctypes.POINTER(_Sky), P, P, P, ctypes.POINTER(I)]
     return lib
 
 
@@ -248,3 +283,185 @@ def dots(px, cols, rows, fill, level, reach=215.0, most=1.9, flat=9.0):
             i += 8
         cells.append(line)
     return cells
+
+
+# --------------------------------------------------------------------------- #
+# the open land's ground
+# --------------------------------------------------------------------------- #
+class _Colours(dict):
+    """0xRRGGBB -> (r, g, b), each made once."""
+    def __missing__(self, v):
+        t = self[v] = (v >> 16, (v >> 8) & 255, v & 255)
+        return t
+
+
+_rgb = _Colours()
+
+
+def _pack_chunk(ch):
+    """A chunk as Land.build keeps it -> clio_chunk's bytes (kept alive by whoever holds them)."""
+    heights, cols, kinds = ch[0], ch[1], ch[2]
+    b = (array("d", heights).tobytes() + array(U32, [(c[0] << 16) | (c[1] << 8) | c[2] for c in cols]).tobytes()
+         + array("h", kinds).tobytes())
+    if len(b) != CHUNK_BYTES:
+        raise ValueError("a chunk of %d bytes" % len(b))
+    return (ctypes.c_char * CHUNK_BYTES).from_buffer_copy(b)
+
+
+def _stamps(land):
+    """The cells a map stands on, for clio_ground: (count, xy, tex, widths, heights, starts, texels), kept."""
+    stamp = land.stamp
+    if not stamp:
+        return 0, None, None, None, None, None, None
+    texs = land.__dict__.setdefault("_tex", {})          # id -> (rows, index) for this picture
+    order, ws, hs, ats, texels = {}, array("i"), array("i"), array("i"), array(U32)
+    xy, tx = array("q"), array("i")
+    for (x, y), t in stamp.items():
+        xy.append(x)
+        xy.append(y)
+        if not t:
+            tx.append(-1)
+            continue
+        i = order.get(id(t))
+        if i is None:
+            got = texs.get(id(t))
+            if got is None or got[0] is not t:
+                w, h = len(t[0]), len(t)
+                px = array(U32)
+                for row in t:
+                    for k in range(w):
+                        c = row[k] or (60, 60, 64)
+                        px.append((c[0] << 16) | (c[1] << 8) | c[2])
+                got = texs[id(t)] = (t, w, h, px)
+            i = order[id(t)] = len(ws)
+            ws.append(got[1])
+            hs.append(got[2])
+            ats.append(len(texels))
+            texels.extend(got[3])
+        tx.append(i)
+    if len(texs) > 64:
+        texs.clear()
+    return len(tx), xy, tx, ws, hs, ats, texels
+
+
+def _ptr(a):
+    """An array's address (None for none or empty)."""
+    if a is None or not len(a):
+        return None
+    return a.buffer_info()[0]
+
+
+def land_draw(land, view, cam, eye, phase, sky_rows):
+    """``Land.cast`` in C: (rows of colours, rows of distances) - or None without the library, or for a
+    picture it cannot take (then the Python does it). ``eye``: the eye's height counted from the ground's
+    zero (Land.cast's eye plus the land's base)."""
+    lib = load()
+    if lib is None or not hasattr(lib, "clio_land_draw") or not isinstance(phase, int):
+        return None
+    PW, PH = view.PW, view.PH
+    step = 2 if view.detail == "low" else 1
+    try:
+        sky = view.__dict__.get("_sky_bytes")
+        if sky is None or sky[0] is not sky_rows:
+            n = min(len(sky_rows), PH)
+            data = bytes(itertools.chain.from_iterable(itertools.chain.from_iterable(sky_rows[:n]))) if n else b""
+            if len(data) != n * PW * 3:
+                return None
+            sky = view._sky_bytes = (sky_rows, n, data)
+        ds, fog = land.steps()
+        steps = land.__dict__.get("_steps_c")
+        if steps is None or steps[0] is not ds:
+            steps = land._steps_c = (ds, array("d", ds), array("d", fog))
+        nst, xy, tx, ws, hs, ats, texels = _stamps(land)
+        hr, hg, hb = land.haze
+        cx, cy, fx, fy, rx, ry = cam
+        g = _Ground(PW, PH, int(view.yh), step, float(view.half), float(view.LW), float(view.TALL),
+                    float(land.Z0), float(cx), float(cy), float(fx), float(fy), float(rx), float(ry),
+                    float(eye), float(land.base), phase, (hr << 16) | (hg << 8) | hb, len(ds),
+                    _ptr(steps[1]), _ptr(steps[2]), nst, _ptr(xy), _ptr(tx), _ptr(ws), _ptr(hs), _ptr(ats),
+                    _ptr(texels))
+    except (TypeError, ValueError, OverflowError, IndexError, AttributeError):
+        return None
+    packed = land.__dict__.setdefault("_packed", {})      # (kx, ky) -> (the chunk, its bytes)
+    chunks, build = land.chunks, land.build
+    if len(packed) > 2 * max(600, len(chunks)):
+        for key in [k for k, v in packed.items() if chunks.get(k) is not v[0]]:
+            del packed[key]
+    held, failed, odd = [], [], []
+
+    def need(_user, kx, ky):
+        key = (kx, ky)
+        try:
+            ch = chunks.get(key)
+            if ch is None:
+                ch = build(kx, ky)
+        except BaseException as e:                     # noqa: BLE001 - raised again below, as the Python would
+            failed.append(e)
+            return None
+        try:
+            got = packed.get(key)
+            if got is None or got[0] is not ch:
+                got = packed[key] = (ch, _pack_chunk(ch))
+        except (TypeError, ValueError, OverflowError, IndexError) as e:     # not as clio_chunk has it
+            odd.append(e)
+            return None
+        held.append(got[1])                             # alive until the picture is done, whatever happens
+        return ctypes.addressof(got[1])
+    fn = CHUNK_FN(need)
+    n = PW * PH
+    rgb = (ctypes.c_uint32 * n)()
+    dep = (ctypes.c_double * n)()
+    r = lib.clio_land_draw(ctypes.byref(g), fn, None, sky[2], sky[1], rgb, dep)
+    if failed:
+        raise failed[0]
+    if r != 0:
+        return None
+    if len(_rgb) > 200000:
+        _rgb.clear()
+    get = _rgb.__getitem__
+    rows = [list(map(get, rgb[y * PW:(y + 1) * PW])) for y in range(PH)]
+    depth = [dep[y * PW:(y + 1) * PW] for y in range(PH)]
+    return rows, depth
+
+
+# --------------------------------------------------------------------------- #
+# the sky over open cells
+# --------------------------------------------------------------------------- #
+def _u32(c):
+    return (c[0] << 16) | (c[1] << 8) | c[2]
+
+
+def sky(spec, PW, yh, f, lateral, phase, base, ridge_rgb):
+    """``sky_picture`` in C, all but the sun: (rows of colours, each ridge's heights by column, the pixels
+    y * PW + x the sun may reach - left before the sun and the ridges) - or None without the library.
+    ``base``: each row's colour (the gradient); ``ridge_rgb``: each ridge's colour."""
+    lib = load()
+    if lib is None or not hasattr(lib, "clio_sky_draw") or not isinstance(phase, int) or PW <= 0 or yh <= 0:
+        return None
+    ridges, sun, clouds = spec["ridges"], spec["sun"], spec["clouds"]
+    try:
+        bases = array(U32, [_u32(c) for c in base])
+        rrgb = array(U32, [_u32(c) for c in ridge_rgb])
+        rh = array("d", [r[1] for r in ridges])
+        rseed = array("q", [r[2] for r in ridges])
+        rnear = array("d", [r[3] for r in ridges])
+        rrough = array("d", [r[4] for r in ridges])
+        s = _Sky(PW, yh, float(f), float(lateral), phase, _ptr(bases), float(spec["stars"] or 0.0),
+                 1 if clouds else 0, _u32(clouds[0]) if clouds else 0, float(clouds[1]) if clouds else 0.0,
+                 len(ridges), _ptr(rrgb), _ptr(rh), _ptr(rnear), _ptr(rrough), _ptr(rseed),
+                 1 if sun is not None else 0, *(float(v) for v in ((sun[0], sun[1], sun[2], sun[4]) if sun is not None
+                                                                   else (0, 0, 0, 0))))
+    except (TypeError, ValueError, OverflowError, IndexError):
+        return None
+    n = PW * yh
+    rgb = (ctypes.c_uint32 * n)()
+    hs = (ctypes.c_double * max(1, len(ridges) * PW))()
+    spots = (ctypes.c_int32 * (n if sun is not None else 1))()
+    count = ctypes.c_int(0)
+    if lib.clio_sky_draw(ctypes.byref(s), rgb, hs, spots, ctypes.byref(count)) != 0:
+        return None
+    if len(_rgb) > 200000:
+        _rgb.clear()
+    get = _rgb.__getitem__
+    rows = [list(map(get, rgb[y * PW:(y + 1) * PW])) for y in range(yh)]
+    return rows, [hs[i * PW:(i + 1) * PW] for i in range(len(ridges))], spots[:count.value]

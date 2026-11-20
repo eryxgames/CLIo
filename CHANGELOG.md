@@ -425,9 +425,11 @@ game, RØØTLESS, shows them.
   nohup, chmod 000, fsck, rm -rf, overclock), Black ICE and the Kernel Sentinel, and
   **SIM-10: Root Shell** (`--level sim10`): hack a terminal, then out-deal a sentinel.
 - **CLIo Picture** (`engine/picture/`, `--get-picture`): a C library, found and installed as
-  Ballistic's is, for the inner loops of the pictures. Its first release works out the open
-  land's heights a chunk at a time (new ground about four times faster) and the braille of
-  the dots and dots-fill views (four to seven times faster). It gives exactly the Python's
+  Ballistic's is, for the inner loops of the pictures. It draws the open land's ground (the
+  caster, `Land.cast`) and the sky over open cells (all but the sun's disc and glow, which
+  stay in Python), works out the land's heights a chunk at a time, and makes the braille of
+  the dots and dots-fill views. A frame of open land takes a fifth to a quarter of the time
+  (E1M4 at 150 columns: 52 -> 12 ms; in dots 137 -> 25 ms). It gives exactly the Python's
   results, to the last bit, and is checked against the Python before it is used; without it
   everything is drawn in Python as before.
 

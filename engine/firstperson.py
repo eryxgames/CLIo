@@ -121,12 +121,46 @@ def sky_spec(spec):
     return out
 
 
+def _sun_on(c, u, e, sun, PW, yh):
+    """A sky pixel with the sun or planet on it (as in sky_picture's loop)."""
+    at, sh, size, scol, glow, bands = sun
+    du = ((u - at + 0.5) % 1.0 - 0.5) * 4 * PW
+    dv = (e - sh) * yh
+    r = size * yh
+    d = math.hypot(du, dv)
+    if d < r:
+        lit = 0.55 + 0.45 * max(0.0, min(1.0, 0.5 + (du + dv) / (2.5 * r)))
+        sc = scol
+        if bands is not None and int((dv / r + 1) * 4.5 + 0.3 * math.sin(du / r * 3)) % 2:
+            sc = mix(scol, bands, 0.6)
+        return shade(sc, lit)
+    if glow and d < r * 3.5:
+        return mix(c, scol, glow * (1 - (d - r) / (2.5 * r)) ** 2)
+    return c
+
+
 def sky_picture(sky, PW, yh, f, lateral, phase):
     """The sky above the horizon, ``yh`` rows of ``PW`` pixels, looking ``f`` (a quarter turn is the picture's
     width): a gradient, a sun or a planet, clouds that drift, stars, and ridges - the near ones move a little
     as the player moves sideways."""
     rows = []
     top, hor = sky["top"], sky["horizon"]
+    if picture.load() is not None:                     # in C with CLIo Picture; the sun's pixels finished here
+        base = [mix(hor, top, min(1.0, ((yh - y - 0.5) / float(yh)) ** 0.55)) for y in range(yh)]
+        tint = [mix(col, hor, 0.3 * (1 - near)) for col, height, seed, near, rough in sky["ridges"]]
+        fast = picture.sky(sky, PW, yh, f, lateral, phase, base, tint)
+        if fast is not None:
+            rows, heights, spots = fast
+            ridges = list(zip(tint, heights))
+            sun = sky["sun"]
+            for p in spots:
+                y, x = divmod(p, PW)
+                c = _sun_on(rows[y][x], (f + (x + 0.5) / PW - 0.5) / 4.0, (yh - y - 0.5) / float(yh), sun, PW, yh)
+                for rc, hs in ridges:
+                    if (yh - y - 0.5) < hs[x]:
+                        c = rc
+                rows[y][x] = c
+            return rows
     sun, clouds, stars = sky["sun"], sky["clouds"], sky["stars"]
     ridges = []                                        # each ridge's height in rows, per column
     for col, height, seed, near, rough in sky["ridges"]:

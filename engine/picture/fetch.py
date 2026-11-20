@@ -19,7 +19,7 @@ import sys
 import urllib.request
 import zipfile
 
-RELEASE = "0.1.0"
+RELEASE = "0.2.0"
 URL = "https://github.com/eryxgames/clio-picture/releases/download/v{v}/clio-picture-{v}-{p}.zip"
 SOURCE = "https://github.com/eryxgames/clio-picture"
 SHA256 = {                      # filled in from the release's checksums.txt once it is published
@@ -103,6 +103,6 @@ def get(out=print, env=None, plat=None, opener=None):
     if got is None:
         out("It is not used: %s" % why)
         return 1
-    out("It loads and agrees with CLIo's Python: CLIo Picture %s. The land and the dots styles are now drawn "
-        "by it." % got.clio_picture_version().decode("ascii", "replace"))
+    out("It loads and agrees with CLIo's Python: CLIo Picture %s. The open land, its sky and the dots styles "
+        "are now drawn by it." % got.clio_picture_version().decode("ascii", "replace"))
     return 0

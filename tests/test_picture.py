@@ -19,7 +19,7 @@ sys.path.insert(0, ROOT)
 
 from engine import land as land_mod  # noqa: E402
 from engine import picture  # noqa: E402
-from engine.firstperson import View, dot_level  # noqa: E402
+from engine.firstperson import FX, View, dot_level  # noqa: E402
 from engine.picture import fetch  # noqa: E402
 
 
@@ -251,6 +251,97 @@ class SameAsPython(unittest.TestCase):
         for style in ("dots", "dots-fill"):
             fast, slow = python_too(lambda: frames(style))
             self.assertEqual(fast, slow)
+
+    @with_library
+    def test_land_frames_are_the_same(self):
+        """The ground caster and the sky in C: frames of E1M3, E1M4 and SIM-1 from a few places, each style."""
+        from engine.data import GameData
+        from engine.level import Level
+        from test_levels import ROOTLESS, Quiet
+        for lvl, styles in (("e1m4", (("pixel", "high"), ("pixel", "low"), ("dots", "high"), ("dots-fill", "low"))),
+                            ("e1m3", (("dots", "high"),)), ("sim1", (("pixel", "high"),))):
+            lv = Level(GameData(ROOTLESS), lvl, seed=1)
+            lv.console = Quiet()
+            p = lv.player
+            for style, detail in styles:
+                def frames():
+                    v = View(64, 16, style, detail)
+                    out = []
+                    for i, (dx, dy, face) in enumerate(((0, 0, None), (0.5, 0, 1), (-2, 3.25, 2), (1, -1, 3))):
+                        fx = FX()
+                        fx.cam, fx.face = (p.x + dx, p.y + dy), face
+                        out.append(v.render(lv, fx, i))
+                    return out
+                fast, slow = python_too(frames)
+                self.assertEqual(fast, slow, (lvl, style, detail))
+
+    @with_library
+    def test_a_map_on_the_land_is_the_same(self):
+        """E1M4's compound (cells a map stands on, with their floor tiles), seen from the south, near and far."""
+        from engine.data import GameData
+        from engine.level import Level
+        from test_levels import ROOTLESS, Quiet
+
+        def frames():
+            lv = Level(GameData(ROOTLESS), "e1m4", seed=1)
+            lv.console = Quiet()
+            self.assertTrue(lv.land.stamp)
+            v = View(70, 18, "pixel")
+            out = []
+            for y in (19.5, 23, 34, 60):
+                fx = FX()
+                fx.cam, fx.face = (95.0, y), 0
+                out.append(v.render(lv, fx, 3))
+            return out
+        fast, slow = python_too(frames)
+        self.assertEqual(fast, slow)
+
+    @with_library
+    def test_skies_are_the_same(self):
+        from engine.firstperson import sky_picture, sky_spec
+        specs = [sky_spec({}), sky_spec({"stars": 0.4, "clouds": {"amount": 0.7},
+                                         "sun": {"at": 0.1, "height": 0.4, "size": 0.2, "bands": "#aa6644", "glow": 0.6}}),
+                 sky_spec({"sun": {"at": 0.9, "height": 0.1, "size": 0.05, "glow": 0},
+                           "ridges": [{"near": 1, "height": 0.4, "seed": 5}]}),
+                 sky_spec({"sun": {"at": 0.4, "size": 0}, "ridges": []})]
+        for spec in specs:
+            for f in range(4):
+                for PW, yh in ((40, 9), (97, 21)):
+                    for lateral, phase in ((0.0, 0), (-13.25, 7), (401.5, 1234)):
+                        fast, slow = python_too(lambda: sky_picture(spec, PW, yh, f, lateral, phase))
+                        self.assertEqual(fast, slow, (spec, f, PW, lateral, phase))
+
+    @with_library
+    def test_a_chunk_that_fails_to_build_fails_as_in_python(self):
+        from engine.data import GameData
+        from engine.level import Level
+        from test_levels import ROOTLESS, Quiet
+        land_mod._SHARED.clear()
+        lv = Level(GameData(ROOTLESS), "e1m4", seed=1)
+        lv.console = Quiet()
+        v = View(60, 16, "pixel")
+        v.render(lv, FX(), 0)
+        built = lv.land.build
+
+        def broken(kx, ky):
+            if kx > 9:
+                raise RuntimeError("no ground here")
+            return built(kx, ky)
+        lv.land.build = broken
+        lv.land.chunks.clear()
+        fx = FX()
+        fx.cam, fx.face = (150.0, 80.0), 1
+        for on in (True, False):
+            picture.use(on)
+            with self.assertRaises(RuntimeError):
+                v.render(lv, fx, 1)
+        picture.use(True)
+        land_mod._SHARED.clear()
+
+    @with_library
+    def test_a_phase_that_is_not_whole_goes_to_the_python(self):
+        from engine.firstperson import sky_spec
+        self.assertIsNone(picture.sky(sky_spec({}), 20, 5, 0, 0.0, 1.5, [(0, 0, 0)] * 5, [(1, 1, 1)] * 2))
 
     @with_library
     def test_pixels_it_cannot_take_go_to_the_python(self):

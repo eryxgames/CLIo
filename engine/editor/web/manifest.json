@@ -33,6 +33,7 @@
   "engine/rts.py",
   "engine/schema.py",
   "engine/sheets.py",
+  "engine/sim.py",
   "engine/snapshot.py",
   "engine/sprite.py",
   "engine/stagebot.py",

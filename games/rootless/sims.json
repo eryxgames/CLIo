@@ -1,0 +1,235 @@
+{
+ "sim8": {
+  "name": "Fen Hopper",
+  "title": "SIM-8: Fen Hopper",
+  "music": "xantrium_fens",
+  "intro": [
+   "A training program of the simulatron: fly the hopper over the Xantrium fens.",
+   "Five checkpoints in order, then land on the far pad - softly. Rock stands three high,",
+   "the relay mast two, reeds one. Climbing hard heats the engine; the fuel pad is mid-way."
+  ],
+  "map": [
+   "######################################################################",
+   "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+   "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+   "#,,,,,,,~~~~~~~~~~~~~~~~~~~~~~~,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+   "#,,,,,,,~~~~~~~~~~~~~~~~~~~~~~~,,,,,,,,,#####,,,,,,,,,,,,,,,,BB,,,,,,#",
+   "#,,,,,,,~~~~~~~~~~~~~~~~~~~~~~~,,,,,,,,,#####,,,,,,,,,,,,,,,,BB,,,,,,#",
+   "#,,,,,,,~~~~~~~~~~~~~~~~~~~~~~~,,,,,,,,,#####,,3,,,,,,,,,,,,,BB,,,,,,#",
+   "#,,,,,,,~~~~~~~~~~~~~~~~~~~~~~~,,,,,,,,,#####,,,,,,,,,,,,,,,,,,,,,,,,#",
+   "#,,,,,,,~~~~~~~~1~~~~~~~~~~~~~~,,,,,,,,,#####,,,,,,,,,,,,,,,,,,,,,,,,#",
+   "#,,,,,,,~~~~~~~~~~~~~~~~~~~~~~~,,,,,,,,,#####,,,,,,,,,,,,,4,,,,,,,,,,#",
+   "#,,,,,,,~~~~~~~~~~~~~~~~~~~~~~~,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+   "#,,,,,,,~~~~~~~~~~~~~~~~~~~~~~~,,,,,,,,,,,,,,,,,,,,,####,,,,,,,,,,,,,#",
+   "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,TTTT,,####,,,,,,,,,,,,,#",
+   "#,,,,,,,,,,,,,,,,,,,####,,,,,,,,,,FF,,,,,,,,,,TTTT,,####,,,,,,,,,,,,,#",
+   "#,,,,,,,,,,,,,,,,,,,####,,,,,,,,,,FF,,,,,,,,,,TTTT,,####,,,,,,,,,,,,,#",
+   "#,,,,,,,,,,,,,,,,,,,####,,,,2,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+   "#,,,,,,,,,,,,,,,,,,,####,,,,,,,,,,,,~~~~~~~~~~~~~~~~~~~~~~~~~,,,,,,,,#",
+   "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,~~~~~~~~~~~~~~~~~~~~~~~~~,,,,,,,,#",
+   "#,,,,,,,,,,,,,:::::::::::::,,,TTTT,,~~~~~~~~~~~~~~~~~~~~~~~~~,,,,,,,,#",
+   "#,,,,,,,,,,,,,:::::::::::::,,,TTTT,,~~~~~~~~~~~~~~~~~~~~~~~~~,,,,,,,,#",
+   "#,,,,,,,,TTTT,:::::::::::::,,,TTTT,,~~~~~~~~~~~~~~~~~~~~~~~~~,,,,,,,,#",
+   "#,,,,,,,,TTTT,:::::::::::::,,,TTTT,,~~~~~~~~~~~~~~~~~~~~~~~~~,,,,,,,,#",
+   "#,,,,,,,,TTTT,:::::::::::::,,,TTTT,,~~~~~~~~~~~~~~5~~~~~~~~~~,,,,,,,,#",
+   "#,,,,,,,,,,,,,:::::::::::::,,,TTTT,,~~~~~~~~~~~~~~~~~~~~~~~~~,,,HHH,,#",
+   "#,,HHH,,,,,,,,:::::::::::::,,,TTTT,,~~~~~~~~~~~~~~~~~~~~~~~~~,,,HHH,,#",
+   "#,,H@H,,,,,,,,:::::::::::::,,,,,,,,,~~~~~~~~~~~~~~~~~~~~~~~~~,,,HHH,,#",
+   "#,,HHH,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,~~~~~~~~~~~~~~~~~~~~~~~~~,,,,,,,,#",
+   "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+   "#,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,#",
+   "######################################################################"
+  ],
+  "goal": "checkpoints",
+  "land": true,
+  "time": 180,
+  "vehicle": {
+   "model": "hover",
+   "fuel": 55,
+   "max_speed": 6.5,
+   "heading": 0
+  },
+  "systems": {
+   "heat": {
+    "rate": "thrust * 9 + max(0, climb) * 3 - (heat - 20) * 0.25",
+    "start": 20,
+    "min": 20,
+    "max": 140,
+    "damage_over": 95,
+    "damage_rate": 0.6,
+    "label": "engine heat"
+   }
+  },
+  "gauges": [
+   {
+    "show": "speed",
+    "label": "SPEED",
+    "max": "max_speed",
+    "scale": 10,
+    "unit": "km/h"
+   },
+   {
+    "show": "height",
+    "label": "ALT",
+    "max": "ceiling"
+   },
+   {
+    "show": "climb",
+    "label": "CLIMB",
+    "style": "center",
+    "max": "max_climb"
+   },
+   {
+    "show": "heading",
+    "style": "compass"
+   },
+   {
+    "show": "fuel",
+    "label": "FUEL",
+    "max": "fuel_max",
+    "warn": -0.2
+   },
+   {
+    "show": "heat",
+    "label": "HEAT",
+    "max": 140,
+    "warn": 0.65
+   },
+   {
+    "show": "damage",
+    "label": "DAMAGE",
+    "max": 100,
+    "warn": 0.6
+   },
+   {
+    "show": "next",
+    "label": "NEXT",
+    "style": "number",
+    "unit": "tiles"
+   }
+  ],
+  "on_done": [
+   {
+    "story": "sim8_end"
+   },
+   {
+    "pause": true
+   },
+   {
+    "win": "outro_demo"
+   }
+  ],
+  "death_text": "outro_lose"
+ },
+ "sim9": {
+  "name": "Coolant Loop",
+  "title": "SIM-9: Coolant Loop",
+  "mode": "systems",
+  "music": "swap_partition",
+  "intro": [
+   "A training program of the simulatron: run the facility's reactor through a shift.",
+   "Deliver 700 units of power. Demand changes every twenty seconds. Withdraw the rods",
+   "for power (up/down); the pumps (right/left) cool it but drain the coolant."
+  ],
+  "controls": {
+   "rods": {
+    "label": "rods out",
+    "keys": [
+     "up",
+     "down"
+    ],
+    "min": 0,
+    "max": 100,
+    "start": 40,
+    "step": 20
+   },
+   "pumps": {
+    "label": "pumps",
+    "keys": [
+     "right",
+     "left"
+    ],
+    "min": 0,
+    "max": 100,
+    "start": 50,
+    "step": 25
+   }
+  },
+  "systems": {
+   "demand": {
+    "value": "60 + 40 * (floor(time / 20) % 2)"
+   },
+   "power": {
+    "rate": "(rods * 1.5 - power) * 0.4",
+    "start": 60,
+    "min": 0
+   },
+   "temp": {
+    "rate": "power * 0.5 - pumps * 0.6 * min(1, coolant / 20) - (temp - 30) * 0.02",
+    "start": 120,
+    "min": 30
+   },
+   "coolant": {
+    "rate": "1.5 - pumps * 0.03",
+    "start": 60,
+    "min": 0,
+    "max": 100
+   },
+   "delivered": {
+    "rate": "min(power, demand) / 10",
+    "start": 0
+   }
+  },
+  "gauges": [
+   {
+    "show": "demand",
+    "label": "DEMAND",
+    "max": 150
+   },
+   {
+    "show": "power",
+    "label": "POWER",
+    "max": 150
+   },
+   {
+    "show": "temp",
+    "label": "CORE °C",
+    "max": 450,
+    "warn": 0.7
+   },
+   {
+    "show": "coolant",
+    "label": "COOLANT",
+    "max": 100,
+    "warn": -0.2
+   },
+   {
+    "show": "delivered",
+    "label": "SHIFT",
+    "max": 700
+   }
+  ],
+  "chart": [
+   "power",
+   "demand",
+   "temp"
+  ],
+  "win_if": "delivered >= 700",
+  "fail_if": "temp > 400",
+  "fail_text": "MELTDOWN",
+  "time": 150,
+  "score": "delivered * 10 - min(power, demand) * 0 - max(0, temp - 250) * 8 - max(0, 15 - coolant) * 20",
+  "on_done": [
+   {
+    "story": "sim9_end"
+   },
+   {
+    "pause": true
+   },
+   {
+    "win": "outro_demo"
+   }
+  ],
+  "death_text": "outro_lose"
+ }
+}

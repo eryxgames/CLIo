@@ -393,12 +393,25 @@ game, RØØTLESS, shows them.
   (`G` and a digit; the digit again; twice to go there); groups that keep their shape and the
   slowest one's pace. The computer player puts workers on gas, researches, builds an airfield
   for an air mix, mends its buildings and attacks with what it has when its crystal is gone.
+- **Simulators** (`sims.json`, a scene's `"sim"`, `engine/sim.py`): a vehicle over a map in real
+  time - a car (grip, drift, terrain that slows, walls that hurt), a boat, a hover craft (thrust,
+  lift, gentle sinking, soft or hard landings, falling when dry) and a plane (throttle, stalls,
+  runways) - with fuel and fuel pads, checkpoints in order, landing pads, time limits, and
+  instruments as data (bars, centred bars, numbers, a compass strip). **Systems** as data:
+  stocks that change by formulas each tick (a small, safe formula language), harming the vehicle
+  above a limit, and `win_if` / `fail_if`. **Systems sims** without a vehicle: controls on keys,
+  gauges, charts - an economy, an ecology, a reactor. Sines and cosines from a table made with
+  whole numbers. Piped, typed keys for seconds. `python -m engine.sim GAME`: the autopilot does
+  each one, and its keys play the run back.
 - **Mouse reports** (`engine/keys.py`): an SGR mouse report is read as `mouse:B:X:Y` (and
   `mouseup:...`), and the real-time `Controls` carry each tick's events as they came.
 - RØØTLESS: **SIM-7: Xantrium Rush** (`--level sim7`), the TAM against the root process - mining
   rigs, troopers, drum gunners and cargo loaders against kworkers, daemons, drones and spinlocks,
   across a toxic channel with three crossings; Xantrium and plasma, hoppers and landers from the
   TAM's hangar, hornets from the root's hive, four upgrades a side.
+- RØØTLESS: **SIM-8: Fen Hopper** (`--level sim8`), the hopper flown over the fens through five
+  checkpoints to a landing, minding fuel and engine heat; **SIM-9: Coolant Loop** (`--level
+  sim9`), a reactor through a shift - rods and pumps against a changing demand.
 
 ### Changed
 

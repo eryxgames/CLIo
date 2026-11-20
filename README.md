@@ -75,6 +75,9 @@ python clio.py rootless   # first-person shooter in a terminal
       and tech, armies on flow fields, fliers and transports, control groups, fog of war, a
       computer player that builds, researches and attacks in waves; keys and the mouse; orders
       kept by tick, so a game plays back (the base for lockstep multiplayer)
+- [x] Simulators: cars, boats, a hopper and planes in fixed steps over a map, instruments,
+      fuel and systems as data (formulas), checkpoints and landings; systems sims with controls
+      and charts; an autopilot that proves each one can be done
 - [x] Save / load of the *whole* world, named slots
 - [x] Three demo games, a starter template, over two hundred automated tests
 - [x] Game editor in the browser: `python clio.py mygame --edit`, or
@@ -110,9 +113,9 @@ python clio.py [game] [options]
   --lines         in a level, every command is typed and ended with Enter (no single keys)
   --realtime [S]  levels in real time: a beat passes every S seconds (0.8) when no key acts
   --keys          show how your terminal reports keys to games in real time (held, let go)
-  --level ID      start a new game in first-person level (or arcade stage, or skirmish) ID
+  --level ID      start a new game in first-person level (or arcade stage, skirmish or sim) ID
                   (rootless: e1m1, e1m2, e1m3, e1m4, e1m9, sim1, sim2, sim3, sim4; stages sim5, sim6;
-                  skirmish sim7)
+                  skirmish sim7; sims sim8, sim9)
   --dev           for making games: *ID in a level jumps to level ID, saves are not counted
   --scroll        play levels in scrolling text instead of a redrawn picture
   --check         validate a game's data files and exit
@@ -238,7 +241,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 543 tests, about a minute
+python -m unittest discover -s tests     # 559 tests, about a minute
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 python tests/bot.py 30 cards             # the same with card battles (the Deck mode)

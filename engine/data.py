@@ -89,7 +89,7 @@ class GameData:
                     "sprites": "sprites.json", "dungeon": "dungeon.json", "levels": "levels.json",
                     "monsters": "monsters.json", "tiles": "tiles.json", "weapons": "weapons.json",
                     "models": "models.json", "cards": "cards.json", "stages": "stages.json",
-                    "skirmishes": "skirmishes.json"}
+                    "skirmishes": "skirmishes.json", "sims": "sims.json"}
 
         def load(key, required=False):
             name = files.get(key, defaults[key])
@@ -122,6 +122,7 @@ class GameData:
         self.cards = load("cards") or {}               # cards for card battles (engine/cards.py)
         self.stages = load("stages") or {}             # arcade stages played in real time (engine/arcade.py)
         self.skirmishes = load("skirmishes") or {}     # real-time strategy on a map (engine/rts.py)
+        self.sims = load("sims") or {}                 # vehicles and systems in fixed steps (engine/sim.py)
         self.art_dir = os.path.join(self.dir, cfg.get("art_dir", "art"))
 
         self.theme = cfg.get("style") or cfg.get("style_config") or "default"
@@ -323,6 +324,9 @@ class GameData:
         if self.skirmishes or self.config.get("rts") or any(sc.get("skirmish") for sc in self.scenes.values()):
             from . import rts
             problems += rts.problems(self)
+        if self.sims or any(sc.get("sim") for sc in self.scenes.values()):
+            from . import sim
+            problems += sim.problems(self)
         return problems
 
     def _validate_looks(self):

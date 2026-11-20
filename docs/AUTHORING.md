@@ -23,6 +23,7 @@ to have the engine look for broken references.
 - [First-person levels](#first-person-levels)
 - [Arcade stages](#arcade-stages)
 - [Skirmishes (real-time strategy)](#skirmishes-real-time-strategy)
+- [Simulators](#simulators)
 - [Coming from CLIo 1](#coming-from-clio-1)
 
 ## A complete tiny game
@@ -2275,6 +2276,94 @@ python -m engine.rts rootless              # sim7: won (destroyed) at 5:50 of pl
 
 (the player's side is played with the skirmish's `player_ai`). `--level ID` starts a game at
 the scene that plays skirmish ID.
+
+## Simulators
+
+A scene can hold a sim: a vehicle driven, sailed or flown in real time over a map, with its
+instruments, fuel and systems - or a model of systems alone, run with controls. `"sim": "id"`
+in the scene; the sim in `sims.json`:
+
+```json
+{
+  "delivery": {
+    "title": "Night Delivery",
+    "map": ["##################",
+            "#@...1.....,,,,..#",
+            "#....====2===....#",
+            "#..::::.....3..H.#",
+            "##################"],
+    "vehicle": {"model": "hover", "fuel": 40},
+    "land": true, "time": 90,
+    "systems": {"heat": {"rate": "thrust * 9 - (heat - 20) * 0.25", "start": 20, "min": 20,
+                         "damage_over": 95}},
+    "on_done": [{"say": "Delivered."}, {"goto": "the_depot"}]
+  }
+}
+```
+
+The map: `.` ground, `,` grass (slower), `=` road (faster, more grip), `:` mud (slow,
+slippery), `~` water, `#` rock (3 high), `T` trees (1), `B` buildings (2), `H` a pad, `F` fuel
+(stand on it, or land on it, and the tank fills), `@` the start, `1`-`9` checkpoints, passed in
+order. A `legend` gives other characters one of these.
+
+`vehicle`: `model` and its numbers (tiles and seconds):
+
+- `car` - `accel`, `brake`, `max_speed`, `reverse`, `drag`, `turn` (degrees a second, at speed
+  `turn_speed` and above), `grip` (how fast it stops sliding sideways). ↑ goes, ↓ brakes (and
+  backs), ←→ steer, Space the handbrake. Rock, trees, buildings and water stop it; the harder
+  the hit, the more damage.
+- `boat` - the same, on water only, and with little grip: it drifts.
+- `hover` - `thrust`, `max_speed`, `drag`, `turn`, `max_climb`, `descend` (how fast S sinks it,
+  1.4), `gravity` (when the fuel is gone), `ceiling`, `safe_climb` and `safe_speed` (faster than
+  that when it touches down hurts). ↑↓ thrust along its heading, ←→ turn, W climbs, S sinks,
+  neither holds it where it is. What is higher than it stops it.
+- `plane` - `accel`, `max_speed`, `stall` (slower than that it drops), `climb`, `land_speed`.
+  ↑↓ the throttle, ←→ turn, W climbs, S dives, Space brakes on the ground. It takes off above
+  its stall speed with W, and lands on a road or a pad.
+
+Every model has `fuel` (its tank), `burn` (a second at full thrust), `idle`, `toughness`, and
+`heading`, `altitude`, `fuel_start`. Out of fuel, a car rolls to a stop, the hopper falls.
+
+**Goals.** `goal`: `checkpoints` (all of them, in order; with `"land": true`, then a landing on
+a pad), `land` (on a pad), or `survive` (`time` seconds); `time` is otherwise a limit. A
+landing hard enough, a crash, a sinking, an empty tank on the ground, or `fail_if` ends it
+(`fail_text` names it); `win_if` is done at once. When it ends, the scene's `on_sim_done` (or the
+sim's `on_done`) runs; failed, `on_sim_fail` (or `on_fail`), and without one the game is lost
+(`death_text`); left, `on_sim_quit`. The flag `<sim>_done` is set and the variable `sims` keeps its
+result, time, damage and fuel.
+
+**Systems** are stocks that change each tick: `rate` (a formula, how much a second), `start`,
+`min`, `max`; or `value` (a formula worked out afresh each tick). `damage_over` hurts the vehicle
+while a system is above it (`damage_rate`). Formulas use numbers, + - * / % //, comparisons,
+`and`, `or`, `not`, `a if c else b`, `min`, `max`, `abs`, `clamp`, `floor`, `sqrt`, and names:
+`speed`, `forward`, `altitude`, `height` (above the ground), `climb`, `heading`, `throttle`,
+`thrust`, `fuel`, `damage`, `time`, `landed`, `passed`, `next` (to the next checkpoint), the
+model's numbers, the controls and the other systems.
+
+**Instruments** (`gauges`, else the model's): each `{"show": NAME, "label", "max" (a number or a
+name), "style", "warn", "scale", "unit"}` - `style` `bar`, `center` (a bar either way from zero,
+for climbing), `number` or `compass` (a strip of the compass round the heading); `warn` turns it
+red at that part of `max` and above, or (below zero) at that part and below.
+
+**Systems alone** (`"mode": "systems"`): no map, no vehicle - `controls` the player moves
+(`{"rods": {"keys": ["up", "down"], "min": 0, "max": 100, "start": 40, "step": 20}}`: a key
+raises it, the other lowers it, `step` a second), `systems`, `gauges`, `chart` (systems drawn as
+lines over time), `win_if`, `fail_if`, `time`, and `score` (a formula: better when higher, for
+the autopilot below). An economy, an ecology, a reactor: whatever stocks and flows say.
+
+**Playing it.** At 20 ticks a second; the map follows the vehicle (north up), an arrow at its
+edge points to what is next, and the instruments stand beside it. Piped, or on a small screen,
+it is played a typed line at a time: keys held for seconds - `up 2; up right 1.5; w 1; wait 3`,
+`status`, `map`.
+
+Floats, but only + - * / and square roots - the same on every machine - and the sines and
+cosines of a table made with whole numbers: the same keys at the same ticks fly the same flight.
+**The autopilot** flies, drives or runs each sim (a systems sim by trying the controls ahead on
+copies) and its keys play the run back:
+
+```
+python -m engine.sim rootless       # sim8: won (done) at 33.7 seconds, damage 0, fuel 22
+```
 
 ## Coming from CLIo 1
 

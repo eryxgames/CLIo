@@ -196,5 +196,19 @@
   "area": "Free programs",
   "description": "A training program, played in real time.",
   "skirmish": "sim7"
+ },
+ {
+  "id": "sim_fen_hopper",
+  "name": "Simulatron: Fen Hopper",
+  "area": "Free programs",
+  "description": "A training program, flown in real time.",
+  "sim": "sim8"
+ },
+ {
+  "id": "sim_coolant_loop",
+  "name": "Simulatron: Coolant Loop",
+  "area": "Free programs",
+  "description": "A training program: a reactor through a shift.",
+  "sim": "sim9"
  }
 ]

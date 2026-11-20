@@ -8,7 +8,7 @@
   "show_once": false
  },
  "outro_demo": {
-  "text": "SIMULATION PAUSED. End of the demo - Episode 1 goes on in the full game.\n\nFree programs of the simulatron, made new each run: --level sim1 (Long Fens, open land without end), sim2 (Deep Swap, floor after floor) and sim3 (Swap Sprawl, rooms without end); and training programs: sim4 (Kill House: squads), sim5 (Bus Run, side on, in real time) and sim6 (Purge, from above, in real time) and sim7 (Xantrium Rush, real-time strategy).",
+  "text": "SIMULATION PAUSED. End of the demo - Episode 1 goes on in the full game.\n\nFree programs of the simulatron, made new each run: --level sim1 (Long Fens, open land without end), sim2 (Deep Swap, floor after floor) and sim3 (Swap Sprawl, rooms without end); and training programs: sim4 (Kill House: squads), sim5 (Bus Run, side on, in real time) and sim6 (Purge, from above, in real time) sim7 (Xantrium Rush, real-time strategy), sim8 (Fen Hopper, flight) and sim9 (Coolant Loop, a reactor's systems).",
   "show_once": false
  },
  "outro_lose": {
@@ -59,6 +59,14 @@
  },
  "sim7_end": {
   "text": "UNIT EVALUATION: command. The last kernel node folds into the grid and the swamp goes quiet. \"You think in squads now,\" says the instructor bot. \"The real Xantrium fields will not hold still for you.\"",
+  "show_once": false
+ },
+ "sim8_end": {
+  "text": "UNIT EVALUATION: flight. The hopper settles on the far pad and the fens fade to grid. \"Soft enough,\" says the instructor bot. \"The real hopper has a crew compartment. Remember that.\"",
+  "show_once": false
+ },
+ "sim9_end": {
+  "text": "UNIT EVALUATION: systems. The shift log closes in the green. \"The facility ran on a loop like that once,\" says the instructor bot, and does not say what happened to it.",
   "show_once": false
  }
 }

@@ -8,7 +8,7 @@
   "show_once": false
  },
  "outro_demo": {
-  "text": "SIMULATION PAUSED. End of the demo - Episode 1 goes on in the full game.",
+  "text": "SIMULATION PAUSED. End of the demo - Episode 1 goes on in the full game.\n\nFree programs of the simulatron, made new each run: --level sim1 (Long Fens, open land without end), sim2 (Deep Swap, floor after floor) and sim3 (Swap Sprawl, rooms without end).",
   "show_once": false
  },
  "outro_lose": {
@@ -31,6 +31,18 @@
  },
  "e1m4_end": {
   "text": "The switch drops. The mast's lamp stops blinking and burns steady, and the fens go quiet - the drones settle where they hover, the water stops moving, the sky holds still like a picture.\n\n\"Relay reached,\" says the instructor bot, too calm. \"Evaluation complete. Uplink to User Space in three.\" Two. Nobody counts the one.\n\nNext: User Space.",
+  "show_once": false
+ },
+ "sim1_end": {
+  "text": "The relay's switch drops and the program stops where it is: the fens hold still to every horizon. Somewhere past the last hill, the simulatron has already stopped drawing them.\n\n\"Free program complete,\" says the instructor bot. \"Run it again and it will be another place.\"",
+  "show_once": false
+ },
+ "sim2_down": {
+  "text": "You drop through the exit. Under you the next floor is being written as you fall: rooms first, then corridors, then what waits in them.",
+  "show_once": false
+ },
+ "sim3_end": {
+  "text": "The exit takes you out of the sprawl. Behind you its rooms go on, made only when someone walks into them - and nobody will.",
   "show_once": false
  }
 }

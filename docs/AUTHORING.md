@@ -1267,6 +1267,96 @@ ground near by (about half a second). After that a frame takes about as long as 
 The level bot finds its way over open land by working the way out from its goal once and
 then following it.
 
+### Levels without end
+
+A level with a `"world"` block is never built whole: it is made a chunk (16 x 16 cells) at a
+time, round the player, as he goes. Its monsters and items wake with the chunks near him
+(`"awake"`: 2 chunks each way) and go to sleep where they stand when he has gone on. What
+changed in a chunk - a door opened, a monster hurt or moved, an item taken - is kept for when
+he comes back. A chunk nobody touched is forgotten and made again, the same, if he does.
+Cells further off than `"keep"` chunks (6) are forgotten too, keeping only what changed, so a
+long journey keeps little. The same seed makes the same world; `"seed": "run"` makes a new
+one every game (a save keeps the seed). The map's characters, the level's `"legend"` and its
+`"floor"` and `"ceiling"` work as in any level; a world has no `"map"`.
+
+**Open land without end** (`"kind": "land"`): the level's `"land"` (see Open land) going on
+for ever, with sites - small maps - set down on it.
+
+```json
+"world": {"kind": "land", "seed": "run", "awake": 2,
+          "sites": [{"name": "start", "at": [0, 0], "map": ["##...##", "#.....#", "...@...", "##...##"]},
+                    {"name": "relay", "at": [180, -150], "map": ["#####", "#.E.#", "##.##"],
+                     "landmarks": [{"at": [2, -2], "model": "relay_mast", "solid": true}]},
+                    {"name": "camp", "chance": 0.07, "away": 30, "spacing": 2,
+                     "map": ["#####", "#f.m#", "##.##"], "legend": {"#": {"wall": "fence"}, "f": "fuel", "m": "medkit"}}],
+          "spawns": [{"monster": "scout", "per_chunk": 0.12, "on": ["fen", "heath"], "away": 30, "more": 0.003},
+                     {"item": "stimpack", "per_chunk": 0.3}]}
+```
+
+- **Sites** with `"at"` stand there, measured from the start (the middle of the site's map);
+  the start itself is the `@` in one of them, or the world's middle. Such places are known
+  from the start: the level bot can head for their exit, and their landmarks stand on the
+  horizon. A world of land needs an exit (`E`) in one of them.
+- **Sites by chance** have a `"chance"` (0..1) of standing in a chunk at least `"away"` cells
+  from the start, never within `"spacing"` chunks of another, and only where the ground is
+  dry and near the start's height. They are at most 14 x 14; `"weight"` makes one kind more
+  common than another. The ground under every site is flattened, at the start's height.
+- A site's `"legend"` (over the level's) puts monsters and items in it; its `"landmarks"` are
+  measured from its map's corner.
+- **Spawns** put monsters and items about each chunk as it is first woken: `"per_chunk"` of
+  them on average, `"on"` the biomes named (`"water"` and `"deep water"` are names too), at
+  least `"away"` cells from the start. With `"more"`, there are more the further from the start
+  (so many more a cell of distance), up to `"most"` times as many (3).
+- `"things"` put a monster or item at a place (`"at"`, from the start).
+
+**A dungeon without end** (`"kind": "dungeon"`): a room to a chunk (or a crossing of
+corridors), joined to the chunks round it through gaps in their edges.
+
+```json
+"world": {"kind": "dungeon", "seed": "run", "rooms": 0.8, "room_size": [4, 11], "links": 0.7,
+          "doors": 0.35, "pools": 0.2, "walls": ["#", "#", "%", "|"], "depth_every": 2,
+          "exit": {"away": 6},
+          "monsters": [{"monster": "zombie", "weight": 3}, {"monster": "daemon", "from": 3}],
+          "per_room": [0, 2], "more": 0.5, "most": 6,
+          "items": [{"item": "medkit", "weight": 2}], "items_per_room": [0, 1]}
+```
+
+`"rooms"` is the chance a chunk has a room, `"room_size"` how big (cells), `"links"` the chance
+two chunks are joined, `"doors"` the chance of a door at a room's mouth, `"pools"` of acid in a
+room, `"walls"` the map characters a room's walls are drawn with (one a room). It gets deeper
+every `"depth_every"` chunks from the start: monsters and items with a `"from"` depth come in
+then, and each room has `"more"` monsters a depth more (at most `"most"` more). The exit is in a
+room `"away"` chunks off, in a direction the seed chooses.
+
+### Dungeon floors from a seed
+
+A level with a `"generate"` block makes its map each time it is built: rooms set about the
+floor, joined by corridors (all of them, and a few more ways round), doors at some of their
+mouths. The player starts in one room; the exit is in the room furthest from it.
+
+```json
+"generate": {"type": "dungeon", "seed": "run", "depth": "swap_depth", "size": [44, 32],
+             "rooms": [7, 10], "room_size": [4, 8], "loops": 0.2, "doors": 0.45,
+             "key": {"door": "W", "item": "key_w"}, "secret": "armor", "pools": 0.25,
+             "walls": ["#", "%"], "guard": "kswapd",
+             "monsters": [{"monster": "zombie", "weight": 3}, {"monster": "daemon", "from": 3}],
+             "per_room": [0, 2], "more": 0.4, "most": 6,
+             "items": [{"item": "medkit", "weight": 2}], "items_per_room": [0, 1]}
+```
+
+- `"key"`: the exit's room is shut behind locked doors (`R`, `W` or `X`), and the key lies in
+  a room one can reach without it.
+- `"secret"`: an item in a closet behind a fist panel, off one of the rooms.
+- `"guard"`: a monster in the exit's room.
+- `"loops"` (0..1): how many more ways round there are than the fewest that join the rooms.
+- `"seed"`: `"run"` for a new floor every game (a save keeps it), or a number; otherwise the
+  game's seed.
+- `"depth"` names a game variable: how deep this floor is. A scene can go down a floor by
+  adding to it and going to itself again:
+  `"on_level_exit": [{"var": ["swap_depth", "+", 1]}, {"goto": "deep_swap"}]`. The level's
+  title page says which floor it is; monsters and items with a `"from"` depth come in, and
+  rooms hold `"more"` monsters a floor (at most `"most"` more).
+
 ### Things that move
 
 The rules move a cell at a time, a beat at a time:

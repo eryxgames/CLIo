@@ -99,5 +99,63 @@
     "goto": "dynamic_loader"
    }
   ]
+ },
+ {
+  "id": "sim_long_fens",
+  "name": "Simulatron: Long Fens",
+  "area": "Free programs",
+  "description": "The fens without an edge, made new each run: walk or fly to the relay mast 230 cells off.",
+  "level": "sim1",
+  "on_level_exit": [
+   {
+    "story": "sim1_end"
+   },
+   {
+    "pause": true
+   },
+   {
+    "win": "outro_demo"
+   }
+  ]
+ },
+ {
+  "id": "sim_deep_swap",
+  "name": "Simulatron: Deep Swap",
+  "area": "Free programs",
+  "description": "Swap space a floor at a time, each one new and deeper than the last.",
+  "level": "sim2",
+  "on_level_exit": [
+   {
+    "var": [
+     "swap_depth",
+     "+",
+     1
+    ]
+   },
+   {
+    "story": "sim2_down"
+   },
+   {
+    "goto": "sim_deep_swap"
+   }
+  ]
+ },
+ {
+  "id": "sim_swap_sprawl",
+  "name": "Simulatron: Swap Sprawl",
+  "area": "Free programs",
+  "description": "Swap space with no walls round it: rooms for ever, the exit a few rooms off.",
+  "level": "sim3",
+  "on_level_exit": [
+   {
+    "story": "sim3_end"
+   },
+   {
+    "pause": true
+   },
+   {
+    "win": "outro_demo"
+   }
+  ]
  }
 ]

@@ -259,6 +259,24 @@ game, RØØTLESS, shows them.
   toxic water, Xantrium crystals on the hills, a survey camp with a spare hopper and fuel
   cells, a secret on the rocks, and a relay mast to the north-east whose compound holds the
   switch that ends the simulation. Its own music. E1M3's ending leads there; it ends the demo.
+- **Levels without end** (`engine/chunks.py`, a level's `"world"`): made a chunk at a time
+  round the player. Monsters and items wake near him and sleep where they stand when he goes;
+  what changed in a chunk is kept for when he comes back, untouched chunks are forgotten and
+  made again the same, and far cells are let go, so a long way keeps little. Two kinds: open
+  land without end, with sites (small maps) at fixed places and by chance, and spawns per
+  chunk by biome and distance; and dungeons without end, a room to a chunk, deeper the
+  further one goes. The same seed makes the same world, `"seed": "run"` a new one each game,
+  and saves play back the same.
+- **Dungeon floors from a seed** (`engine/levelgen.py`, a level's `"generate"`): rooms,
+  corridors, doors, the exit in the room furthest from the start, behind a locked door with
+  its key where one can reach it, a secret closet, acid pools, rooms in their own walls, and
+  monsters and items by depth - from a game variable, so a scene can go down a floor at a time.
+- RØØTLESS: three free programs of the simulatron, made new each run - **SIM-1 Long Fens**
+  (the fens without end: camps, ruins, hopper pads and shrines by chance, the relay mast 230
+  cells off), **SIM-2 Deep Swap** (floor after floor, each worse) and **SIM-3 Swap Sprawl**
+  (rooms without end). `--level sim1`, `sim2`, `sim3`; the demo's last page says so.
+- The level bot plans its way in a window round itself in a world without end, keeps out of
+  acid unless booted, and picks up what helps on a long way.
 
 ### Changed
 

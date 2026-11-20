@@ -8,6 +8,8 @@ characters; the exit ``E`` last; ``board`` climbs into the nearest vehicle and
 the distance, sidesteps fire and steps off a boss's marked floor. It is not clever:
 if it can finish a level, a person can.
 """
+import math
+
 from .firstperson import DIRS
 from .level import Level, TextConsole
 
@@ -62,6 +64,8 @@ class Bot(TextConsole):
         p = lv.player
         if (p.x, p.y) == (x, y):
             return None
+        if getattr(lv, "world", None) is not None:
+            return self.go_window(lv, x, y)
         if getattr(lv, "land", None) is not None:
             return self.go_far(lv, x, y)
         for hot in (False, True):
@@ -127,6 +131,77 @@ class Bot(TextConsole):
         if m is not None and not m.vehicle:             # blocked by a monster: face it and shoot
             return self.face(lv, dx, dy) or "f"
         return self.face(lv, dx, dy) or "k"
+
+    def go_window(self, lv, x, y, R=44):
+        """In a world without end: the way within ``R`` cells round the player to the goal, or (when the goal
+        is further, or cannot be reached from here) to the reachable cell nearest it; kept a few beats."""
+        p = lv.player
+        plan = getattr(self, "plan", None)
+        if plan and plan[0] == (x, y) and lv.beat - plan[1] < 10 and plan[2] and plan[2][0] == (p.x, p.y):
+            path = plan[2]
+        else:
+            path = self.window_path(lv, x, y, R)
+        if len(path) < 2:
+            self.plan = None
+            return None
+        nx, ny = path[1]
+        if not self.open_cell(lv, (nx, ny), True):
+            self.plan = None
+            m = lv.monster_at(nx, ny)
+            if m is not None and not m.vehicle:
+                return self.face(lv, nx - p.x, ny - p.y) or "f"
+            path = self.window_path(lv, x, y, R)
+            if len(path) < 2:
+                return None
+            nx, ny = path[1]
+        turn = self.face(lv, nx - p.x, ny - p.y)
+        if turn:
+            self.plan = ((x, y), lv.beat, path)
+            return turn
+        m = lv.monster_at(nx, ny)
+        if m is not None and not m.vehicle:
+            return "f"
+        self.plan = ((x, y), lv.beat, path[1:])
+        return "k"
+
+    def window_path(self, lv, gx, gy, R):
+        import heapq
+        p = lv.player
+        start = (p.x, p.y)
+        parked = {(m.x, m.y) for m in lv.monsters if not m.dead and not m.gone and (m.vehicle or m.barrel)}
+        parked.discard((gx, gy))
+        safe = p.vehicle is not None or p.boots > 0           # acid does not hurt: no reason to go round it
+        cost = {start: 0}
+        came = {start: None}
+        heap = [(0, start)]
+        best, best_k = start, math.hypot(gx - p.x, gy - p.y)
+        while heap:
+            d, c = heapq.heappop(heap)
+            if d > cost[c]:
+                continue
+            if c == (gx, gy):
+                best = c
+                break
+            k = math.hypot(gx - c[0], gy - c[1]) + 0.15 * d
+            if k < best_k:
+                best, best_k = c, k
+            for dx, dy in DIRS:
+                n = (c[0] + dx, c[1] + dy)
+                if abs(n[0] - p.x) > R or abs(n[1] - p.y) > R or n in parked:
+                    continue
+                cell = lv.cell(*n)
+                if not self.open_ground(lv, cell):
+                    continue
+                nd = d + (1 if safe or not cell.toxic else 8)
+                if nd < cost.get(n, 1 << 30):
+                    cost[n], came[n] = nd, c
+                    heapq.heappush(heap, (nd, n))
+        path = []
+        c = best
+        while c is not None:
+            path.append(c)
+            c = came[c]
+        return path[::-1]
 
     def field_to(self, lv, gx, gy):
         """Steps to (gx, gy) from every cell (toxic ones count three), for go_far."""
@@ -340,6 +415,19 @@ class Bot(TextConsole):
             if meds:
                 it = min(meds, key=lambda it: abs(it.x - p.x) + abs(it.y - p.y))
                 return it.x, it.y
+        if getattr(lv, "world", None) is not None and p.vehicle is None:   # a long way to go: take what helps
+            def helps(it):
+                pk = it.pickup
+                if "health" in pk:
+                    return p.hp < 90
+                if pk.get("weapon") or pk.get("armor"):
+                    return True
+                return any(p.ammo.get(a, 0) < (12 if a == "shells" else 30) for a in (pk.get("ammo") or {}))
+            near = [it for it in lv.items if not it.taken and (it.x, it.y) in lv.seen_cells
+                    and max(abs(it.x - p.x), abs(it.y - p.y)) <= 7 and helps(it)]
+            if near:
+                it = min(near, key=lambda it: abs(it.x - p.x) + abs(it.y - p.y))
+                return it.x, it.y
         return self.goal_cell(lv)
 
     def barrel_worth(self, lv, b):
@@ -385,4 +473,5 @@ def check(data, level, runs=5):
     lv = Level(data, level, seed=0)
     return {"games": games, "finished": sum(1 for g in games if g["outcome"] == "exit"), "runs": runs,
             "par": lv.par, "monsters": lv.total_kills, "items": lv.total_items, "secrets": lv.total_secrets,
-            "goals": list(lv.spec.get("bot") or ["E"]), "size": [lv.w, lv.h]}
+            "goals": list(lv.spec.get("bot") or ["E"]),
+            "size": None if getattr(lv, "world", None) is not None else [lv.w, lv.h]}   # a world has no size

@@ -38,7 +38,7 @@ def _lat(ix, iy, s):
     key = (ix, iy, s)
     v = _LATTICE.get(key)
     if v is None:
-        if len(_LATTICE) > 400000:
+        if len(_LATTICE) > 150000:
             _LATTICE.clear()
         v = _LATTICE[key] = _h(ix, iy, s)
     return v
@@ -147,6 +147,8 @@ class Land:
         self.at = tuple(int(v) for v in (spec.get("at") or [0, 0])[:2])
         self.base = 0.0                                           # the height things are counted from (the pad's)
         self.stamp = {}                                           # (x, y) of a map cell -> its floor tile's rows
+        self.stamp_chunks = set()                                 # the chunks with a map cell in them
+        self.pad_fn = None                                        # a world's sites: (kx, ky) -> pads in the chunk
         try:
             self.numbers = json.dumps(spec, sort_keys=True, default=str)
         except (TypeError, ValueError):
@@ -192,10 +194,28 @@ class Land:
         self.base = float(height)
         self.share()
 
-    def surface(self, x, y):
+    def add_stamp(self, x, y, tex=None):
+        """A map cell stands here: its floor (a tile's rows, or None for plain) is drawn on the land."""
+        self.stamp[(x, y)] = tex
+        self.stamp_chunks.add((x >> 4, y >> 4))
+
+    def drop_stamp(self, x, y):
+        self.stamp.pop((x, y), None)
+
+    def pads_for(self, kx, ky):
+        """The pads that reach into a chunk: the land's own, and those a world sets down there (its sites)."""
+        if self.pad_fn is None:
+            return self.pads
+        got = list(self.pads)
+        for j in (-1, 0, 1):
+            for i in (-1, 0, 1):
+                got.extend(self.pad_fn(kx + i, ky + j))
+        return got
+
+    def surface(self, x, y, pads=None):
         """The ground's height at a cell (pads and the edge counted), and whether it is under water."""
         h = self.raw(x, y) * self.top
-        for x0, y0, x1, y1, ph, blend in self.pads:
+        for x0, y0, x1, y1, ph, blend in (self.pads if pads is None else pads):
             dx = max(x0 - x, 0, x - x1)
             dy = max(y0 - y, 0, y - y1)
             d = math.hypot(dx, dy)
@@ -217,9 +237,10 @@ class Land:
         n = CHUNK
         x0, y0 = kx * n, ky * n
         raw = {}
+        pads = self.pads_for(kx, ky)
         for y in range(y0 - 1, y0 + n + 1):
             for x in range(x0 - 1, x0 + n + 1):
-                raw[(x, y)] = self.surface(x, y)
+                raw[(x, y)] = self.surface(x, y, pads)
         heights, cols, kinds, steep, props = [], [], [], [], []
         sea, top = self.sea_h, max(0.01, self.top)
         lx, ly, lz = self.sun
@@ -371,9 +392,7 @@ class Land:
         offs = [x + step * 0.5 - half for x in cols]
         eye_abs = eye + self.base
         chunks, build = self.chunks, self.build
-        stamp = self.stamp
-        sx0, sy0 = self.at
-        sx1, sy1 = sx0 + (stamp_floor or (0, 0))[0], sy0 + (stamp_floor or (0, 0))[1]
+        stamp, stamp_chunks = self.stamp, self.stamp_chunks
         D = Z0 * 0.8
         alive = len(cols)
         cover = view.cover
@@ -400,7 +419,7 @@ class Land:
                     ch = build(*key)
                 k = ((iy & 15) << 4) | (ix & 15)
                 kind = ch[2][k]
-                if sx0 <= ix < sx1 and sy0 <= iy < sy1 and (ix, iy) in stamp:
+                if key in stamp_chunks and (ix, iy) in stamp:
                     h = self.base
                     tex = stamp[(ix, iy)]
                     if tex:

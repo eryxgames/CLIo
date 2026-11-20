@@ -345,13 +345,17 @@ def ease(k):
 # the level
 # --------------------------------------------------------------------------- #
 class Level:
-    def __init__(self, data, level_id, audio=None, seed=None, player=None):
+    def __init__(self, data, level_id, audio=None, seed=None, player=None, depth=0):
         spec = (data.levels or {}).get(level_id)
         if not isinstance(spec, dict):
             raise ValueError("there is no level '%s'" % level_id)
         self.data, self.id, self.spec = data, level_id, spec
         self.cfg = data.config.get("first_person") or {}
         self.audio = audio
+        made = spec.get("generate") if isinstance(spec.get("generate"), dict) else spec.get("world")
+        if seed is None and isinstance(made, dict) and made.get("seed") == "run":
+            seed = random.SystemRandom().randrange(1, 1 << 30)   # a new place every game (the save keeps the seed)
+        self.depth = int(depth or 0)                     # how deep: a generated level's floor, from a game variable
         self.rng = random.Random(seed if seed is not None else level_id)
         self.name = spec.get("name", level_id)
         self.par = int(spec.get("par", 0))
@@ -393,18 +397,68 @@ class Level:
         self.sprites = {}
         self._tags = {}
         self._ids = 0
-        self.parse_map()
+        self.world = None
+        if isinstance(spec.get("world"), dict):
+            self.start_world(spec["world"])
+        else:
+            self.parse_map()
         self.load_models()
         self.load_sprites()
         self.load_tiles()
+        if self.world is not None:
+            self.world.begin()
+            self.land_walls = self.world.walls
         self.plates(quiet=True)
         self.update_seen()
 
     # ---- building ------------------------------------------------------- #
+    @property
+    def world_seed(self):
+        """The number a generated level is made from: the level's seed, its name, and how deep."""
+        base = self.seed if self.seed is not None else zlib.crc32(str(self.id).encode())
+        return zlib.crc32(("%s/%s/%d" % (base, self.id, self.depth)).encode()) & 0x3FFFFFFF
+
+    def start_world(self, wspec):
+        """A level without end (engine/chunks.py): nothing is built here but the start; the chunks round the
+        player are made as he goes."""
+        from .chunks import SIZE, Chunks
+        self.land = None
+        self.w = self.h = SIZE
+        self.map_w = self.map_h = 0
+        self.plate_cells, self.held_cells, self.pads, self.lifts, self.belts = [], [], [], [], []
+        self.fires = {}
+        self.total_kills = self.total_items = self.total_secrets = 0
+        self.world = Chunks(self, wspec)
+        self.grid = self.world
+        self.cell = self.world.cell                      # the cells come from the world's chunks
+        self.player.x, self.player.y = self.world.start
+        face = self.spec.get("facing")
+        self.player.facing = FACING.get(str(face).lower(), 0) if face else (self.world.facing or 0)
+
+    def protos(self):
+        """The level's monsters and items, and those its world may put about later: for their pictures."""
+        mons, items = list(self.monsters), list(self.items)
+        if self.world is not None:
+            kinds, iids = self.world.meets()
+            for k in sorted(kinds):
+                spec = (self.data.monsters or {}).get(k)
+                if isinstance(spec, dict):
+                    mons.append(Monster(0, k, spec, 0, 0, "?"))
+            for i in sorted(iids):
+                spec = (self.data.items or {}).get(i)
+                if isinstance(spec, dict):
+                    items.append(Item(i, spec, 0, 0))
+        return mons, items
+
     def parse_map(self):
         legend = dict(LEGEND)
         legend.update(self.spec.get("legend") or {})
         rows = [str(r) for r in self.spec.get("map") or []]
+        gen = self.spec.get("generate")
+        if isinstance(gen, dict):                        # a map made from a seed: a dungeon's floor
+            from .levelgen import generate
+            rows, more = generate(gen, random.Random(self.world_seed), self.depth, self.data, legend)
+            legend.update(more)
         self.h = len(rows)
         self.w = max((len(r) for r in rows), default=0)
         self.map_w, self.map_h = self.w, self.h
@@ -430,7 +484,7 @@ class Level:
                     if ch == " ":
                         line.append(Cell(x, y, self.land.char(x, y), self.land.cell_spec(x, y)))
                         continue
-                    self.land.stamp[(x, y)] = None
+                    self.land.add_stamp(x, y)
                 else:
                     ch = rows[y][x] if x < len(rows[y]) else " "
                 spec = legend.get(ch)
@@ -510,9 +564,12 @@ class Level:
                 self.data._built_models = built
             except AttributeError:
                 pass
-        want = {m.model for m in self.monsters if m.model} | {it.model for it in self.items if it.model}
+        mons, items = self.protos()
+        want = {m.model for m in mons if m.model} | {it.model for it in items if it.model}
         if self.land is not None:
             want |= self.land.uses()[1]
+        if self.world is not None:
+            want |= self.world.maker.uses()[1]
         for name in want:
             if name in table and name not in built[1]:
                 built[1].update(model_mod.load({name: table[name]}))
@@ -520,19 +577,22 @@ class Level:
 
     def load_sprites(self):
         from .sprite import _rgb, far_versions, walk_frames
-        names = {m.sprite for m in self.monsters} | {it.sprite for it in self.items}
+        mons, items = self.protos()
+        names = {m.sprite for m in mons} | {it.sprite for it in items}
         names |= {w.get("sprite") for w in self.weapons.values()} | {"fireball", "muzzle", "gore", "crate", "container",
                                                                      "grenade", "rocket"}
-        names |= {m.vehicle.get("cockpit") for m in self.monsters if m.vehicle}
+        names |= {m.vehicle.get("cockpit") for m in mons if m.vehicle}
         if self.land is not None:
             names |= self.land.uses()[0]
-        names |= {(m.spec.get("attack") or {}).get("spawn") for m in self.monsters}
+        if self.world is not None:
+            names |= self.world.maker.uses()[0]
+        names |= {(m.spec.get("attack") or {}).get("spawn") for m in mons}
         for kind in list(names):
             spec = (self.data.monsters or {}).get(kind)
             if isinstance(spec, dict):
                 names.add(spec.get("sprite") or kind)
         movers = set()                                  # the pictures of monsters that walk
-        for kind in {m.kind for m in self.monsters} | {(m.spec.get("attack") or {}).get("spawn") for m in self.monsters}:
+        for kind in {m.kind for m in mons} | {(m.spec.get("attack") or {}).get("spawn") for m in mons}:
             spec = (self.data.monsters or {}).get(kind)
             if isinstance(spec, dict) and not spec.get("float") \
                     and (spec.get("attack") or {}).get("kind") not in ("barrel", "spawner", "cron"):
@@ -568,20 +628,22 @@ class Level:
                     self.see_through.add(name)
         self.floor_tile, self.ceiling_tile = self.spec.get("floor"), self.spec.get("ceiling")
         from .firstperson import sky_spec
-        open_air = self.land is not None or any(c.sky for row in self.grid for c in row)
+        open_air = self.land is not None or (self.world is None and any(c.sky for row in self.grid for c in row))
         self.sky_look = sky_spec(self.spec.get("sky")) if open_air else None   # how the sky over open cells looks
-        if self.land is not None and not self.spec["land"].get("sky_ridges"):
+        if self.land is not None and not (self.spec.get("land") or {}).get("sky_ridges"):
             self.sky_look["ridges"] = []                     # the land's own hills stand on the horizon
-        if self.land is not None:                            # the map's floors, drawn on the land; its walls
+        if self.land is not None and self.world is None:     # the map's floors, drawn on the land; its walls
             for (x, y) in list(self.land.stamp):
-                c = self.cell(x, y)
-                name = c.floor or self.floor_tile
-                if c.toxic and not name:
-                    self.land.stamp[(x, y)] = [[(60, 150, 50), (80, 180, 60)], [(80, 180, 60), (60, 150, 50)]]
-                else:
-                    self.land.stamp[(x, y)] = fp.View.texture(self, name) if name else None
+                self.land.stamp[(x, y)] = self.stamp_floor(self.cell(x, y))
             self.land_walls = [(x, y) for (x, y) in self.land.stamp
                                if self.cell(x, y).kind in ("wall", "panel", "exit", "switch", "door")]
+
+    def stamp_floor(self, c):
+        """How a map cell's floor looks drawn on open land: a tile's rows, or None for the plain one."""
+        name = c.floor or self.floor_tile
+        if c.toxic and not name:
+            return [[(60, 150, 50), (80, 180, 60)], [(80, 180, 60), (60, 150, 50)]]
+        return fp.View.texture(self, name) if name else None
 
     # ---- the grid ------------------------------------------------------- #
     def place_on_land(self, legend, start):
@@ -838,6 +900,9 @@ class Level:
 
     def intro_lines(self):
         lines = [(self.spec.get("title") or self.name.upper(), "title")]
+        made = self.spec.get("generate") if isinstance(self.spec.get("generate"), dict) else self.spec.get("world")
+        if isinstance(made, dict) and made.get("depth"):
+            lines.append(("floor %d" % (self.depth + 1), "info"))   # a generated level: how deep this one is
         intro = self.spec.get("intro") or []
         for t in [intro] if isinstance(intro, str) else intro:   # a line, or a list of them
             lines.append((t, "dim"))
@@ -1085,7 +1150,8 @@ class Level:
     def save_block(self):
         """The level in a save: how it began and every line played since."""
         return {"id": self.id, "seed": self.seed, "start": self.start_player, "lines": list(self.journal),
-                "beat": self.beat, "saves_left": self.saves_left, "fingerprint": self.fingerprint()}
+                "beat": self.beat, "saves_left": self.saves_left, "fingerprint": self.fingerprint(),
+                "depth": self.depth}
 
     def replay(self, lines):
         """Play ``lines`` again, unseen and unheard: True if they played through without the level ending."""
@@ -2546,6 +2612,8 @@ class Level:
             return
         self.beat += 1
         p = self.player
+        if self.world is not None:
+            self.world.follow()                          # wake what is near, put what he left to sleep
         self.fly()
         if self.over:
             return
@@ -3477,9 +3545,13 @@ class TextConsole:
     def whole_map(self, lv):
         p = lv.player
         out = []
-        for y in range(lv.h):
+        if lv.world is not None:                         # no end to it: the part round the player
+            ys, xs = range(p.y - 20, p.y + 21), range(p.x - 38, p.x + 39)
+        else:
+            ys, xs = range(lv.h), range(lv.w)
+        for y in ys:
             row = []
-            for x in range(lv.w):
+            for x in xs:
                 if (x, y) == (p.x, p.y):
                     row.append("^>v<"[p.facing])
                 elif (x, y) not in lv.seen_cells:
@@ -3629,12 +3701,13 @@ def resume(data, block, audio=None):
     """A level as a save left it: built as it began, its journal played back. Returns ``(level, note)``;
     a note says when the save did not play back as it was (the level changed since) - then the level
     starts again from where it began."""
-    lv = Level(data, block["id"], seed=block.get("seed"), player=block.get("start"))
+    depth = block.get("depth") if isinstance(block.get("depth"), int) else 0
+    lv = Level(data, block["id"], seed=block.get("seed"), player=block.get("start"), depth=depth)
     note = None
     if block.get("fingerprint") and block["fingerprint"] != lv.fingerprint():
         note = "The level has changed since this save was made."
     if not lv.replay(block.get("lines") or []):
-        lv = Level(data, block["id"], seed=block.get("seed"), player=block.get("start"))
+        lv = Level(data, block["id"], seed=block.get("seed"), player=block.get("start"), depth=depth)
         note = "That save no longer plays back on this level: it starts again from the beginning."
     if isinstance(block.get("saves_left"), int):
         lv.saves_left = block["saves_left"]
@@ -3685,7 +3758,8 @@ def play_scene(game, scene, resume_from=None):
         if resume_from is not None and resume_from.get("id") == lid:
             lv, note = resume(game.data, resume_from, game.audio)
         else:
-            lv = Level(game.data, lid, audio=game.audio, seed=game.seed, player=w.vars.get("_fp_player"))
+            lv = Level(game.data, lid, audio=game.audio, seed=game.seed, player=w.vars.get("_fp_player"),
+                       depth=level_depth(game.data, lid, w.vars))
         lv.host, lv.dev = host, dev
         if resume_from is None and cfg.get("autosave"):
             host.save(lv, None, how="start")             # the level's beginning: what dying goes back to
@@ -3738,6 +3812,57 @@ def play_scene(game, scene, resume_from=None):
     else:
         game.over = "quit"
     return outcome
+
+
+def level_depth(data, lid, variables):
+    """How deep a generated level is this time: the game variable its ``"depth"`` names (0 if none)."""
+    spec = (data.levels or {}).get(lid) or {}
+    made = spec.get("generate") if isinstance(spec.get("generate"), dict) else spec.get("world")
+    name = made.get("depth") if isinstance(made, dict) else None
+    v = variables.get(name, 0) if isinstance(name, str) else 0
+    return int(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else 0
+
+
+def made_problems(lv, data, sprites):
+    """What is wrong with a level made as it goes (``"world"``) or from a seed (``"generate"``)."""
+    out = []
+    if lv.get("world") is not None and lv.get("generate") is not None:
+        out.append("a level is made as it goes (\"world\") or from a seed (\"generate\"), not both")
+    if lv.get("map") is not None:
+        out.append("a %s level makes its own map: leave \"map\" out" % ("world" if lv.get("world") is not None
+                                                                          else "generated"))
+    if lv.get("generate") is not None:
+        from . import levelgen
+        out += levelgen.problems(lv["generate"], data)
+        return out
+    from . import chunks as world_mod
+    wspec = lv["world"]
+    out += world_mod.problems(wspec, data)
+    if not isinstance(wspec, dict):
+        return out
+    if wspec.get("kind", "land") == "land":
+        from . import land as land_mod
+        land = dict(lv.get("land") or {})
+        land.pop("size", None)
+        out += land_mod.problems(land, sprites, getattr(data, "models", None) or {})
+        mons = data.monsters or {}
+        ends = False
+        for s in wspec.get("sites") or []:
+            if not isinstance(s, dict) or not isinstance(s.get("at"), list):
+                continue
+            legend = dict(LEGEND)
+            legend.update(lv.get("legend") or {})
+            legend.update(s.get("legend") or {})
+            for ch in set("".join(str(r) for r in s.get("map") or [])):
+                sp = legend.get(ch)
+                if not isinstance(sp, dict):
+                    sp = {"monster": sp} if sp in mons else {}
+                veh = (mons.get(sp.get("monster")) or {}).get("vehicle") if sp.get("monster") else None
+                if sp.get("exit") or (isinstance(veh, dict) and veh.get("on_empty") == "exit"):
+                    ends = True
+        if not ends:
+            out.append("there is no exit (E) in a site with an \"at\": a world without end needs one somewhere")
+    return out
 
 
 def validate(data):
@@ -3836,6 +3961,11 @@ def validate(data):
             if lv.get(key) and lv[key] not in known_tiles:
                 problems.append("level '%s': its %s is an unknown tile '%s'" % (lid, key, lv[key]))
         land = lv.get("land")
+        if lv.get("death_text") and lv["death_text"] not in (getattr(data, "texts", None) or {}):
+            problems.append("level '%s': death_text '%s' is not a text in texts.json" % (lid, lv["death_text"]))
+        if lv.get("world") is not None or lv.get("generate") is not None:   # made as it goes, or from a seed
+            problems.extend("level '%s': %s" % (lid, p) for p in made_problems(lv, data, sprites))
+            continue
         rows = lv.get("map")
         if land is not None and rows is None:
             rows = []                                # open land: the map (a camp, a compound) is optional
@@ -3879,8 +4009,6 @@ def validate(data):
         land_things = list(land.get("things") or []) if isinstance(land, dict) else []
         if not any(ends(legend.get(ch)) for ch in used) and not any(ends(t) for t in land_things):
             problems.append("level '%s': there is no exit (E)" % lid)
-        if lv.get("death_text") and lv["death_text"] not in (getattr(data, "texts", None) or {}):
-            problems.append("level '%s': death_text '%s' is not a text in texts.json" % (lid, lv["death_text"]))
         if lv.get("sky") is not None and not isinstance(lv["sky"], dict):
             problems.append("level '%s': sky should be an object (top, horizon, sun, ridges, clouds, stars)" % lid)
         listening = set()

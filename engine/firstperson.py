@@ -26,6 +26,7 @@ from __future__ import annotations
 import math
 
 from . import model as model_mod
+from . import picture
 from .frame import mix, shade, lum
 
 DECAY = 0.64                 # apparent size falls to 64% with each cell of distance
@@ -170,6 +171,12 @@ def sky_picture(sky, PW, yh, f, lateral, phase):
             row.append(c)
         rows.append(row)
     return rows
+
+
+def dot_level(l):
+    """How lit a pixel of luminance ``l`` is in the dots style, 0..8: it shows where this is above its
+    step of the 2 x 4 Bayer pattern (and a half)."""
+    return min(1.0, (l / 255.0) ** 1.15 * 2.1) * 8
 
 
 def _avg(cols):
@@ -1698,6 +1705,13 @@ class View:
 
     def braille(self, px, over):
         fill = self.style == "dots-fill"
+        fast = picture.dots(px, self.W, self.VR, fill, dot_level)     # in C, when CLIo Picture is here
+        if fast is not None:
+            for (r, c), o in over.items():
+                if o and 0 <= r < self.VR and 0 <= c < self.W:
+                    block = [px[4 * r + dy][2 * c + dx] for dy in range(4) for dx in range(2)]
+                    fast[r][c] = (o[0], o[1], o[2] or (shade(_avg(block), 0.45) if fill else None))
+            return fast
         cells = []
         level, bright, lums_of = {}, {}, {}                  # per colour, once: how lit, its dot colour, luminance
         for r in range(self.VR):
@@ -1736,7 +1750,7 @@ class View:
                     for colour, dy, dx in block:
                         v8 = level.get(colour)
                         if v8 is None:
-                            v8 = level[colour] = min(1.0, (lum(colour) / 255.0) ** 1.15 * 2.1) * 8
+                            v8 = level[colour] = dot_level(lum(colour))
                         if v8 > BAYER_2X4[dy][dx] + 0.5:
                             bits |= BRAILLE_BIT[dy][dx]
                             lit.append(colour)

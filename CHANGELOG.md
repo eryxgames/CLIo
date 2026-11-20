@@ -424,6 +424,12 @@ game, RØØTLESS, shows them.
 - RØØTLESS: a hacking deck (ping, firewall, traceroute, fork bomb, kill -9, sudo, grep,
   nohup, chmod 000, fsck, rm -rf, overclock), Black ICE and the Kernel Sentinel, and
   **SIM-10: Root Shell** (`--level sim10`): hack a terminal, then out-deal a sentinel.
+- **CLIo Picture** (`engine/picture/`, `--get-picture`): a C library, found and installed as
+  Ballistic's is, for the inner loops of the pictures. Its first release works out the open
+  land's heights a chunk at a time (new ground about four times faster) and the braille of
+  the dots and dots-fill views (four to seven times faster). It gives exactly the Python's
+  results, to the last bit, and is checked against the Python before it is used; without it
+  everything is drawn in Python as before.
 
 ### Changed
 

@@ -61,7 +61,9 @@
   "engine/editor/server.py",
   "engine/editor/service.py",
   "engine/editor/texts.py",
-  "engine/editor/views.py"
+  "engine/editor/views.py",
+  "engine/picture/__init__.py",
+  "engine/picture/fetch.py"
  ],
  "starter": {
   "id": "starter",

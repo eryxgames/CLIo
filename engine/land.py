@@ -16,6 +16,7 @@ walls, monsters and models are drawn over it only where they are nearer (``Depth
 import json
 import math
 
+from . import picture
 from .firstperson import _colour, mix
 
 CHUNK = 16                                  # cells a side, worked out together
@@ -212,9 +213,10 @@ class Land:
                 got.extend(self.pad_fn(kx + i, ky + j))
         return got
 
-    def surface(self, x, y, pads=None):
-        """The ground's height at a cell (pads and the edge counted), and whether it is under water."""
-        h = self.raw(x, y) * self.top
+    def surface(self, x, y, pads=None, raw=None):
+        """The ground's height at a cell (pads and the edge counted), and whether it is under water.
+        ``raw``: the cell's ``raw(x, y)`` if already worked out."""
+        h = (self.raw(x, y) if raw is None else raw) * self.top
         for x0, y0, x1, y1, ph, blend in (self.pads if pads is None else pads):
             dx = max(x0 - x, 0, x - x1)
             dy = max(y0 - y, 0, y - y1)
@@ -238,9 +240,12 @@ class Land:
         x0, y0 = kx * n, ky * n
         raw = {}
         pads = self.pads_for(kx, ky)
+        block = picture.land_raw(self, x0 - 1, y0 - 1, n + 2, n + 2)       # in C, when CLIo Picture is here
+        i = 0
         for y in range(y0 - 1, y0 + n + 1):
             for x in range(x0 - 1, x0 + n + 1):
-                raw[(x, y)] = self.surface(x, y, pads)
+                raw[(x, y)] = self.surface(x, y, pads, None if block is None else block[i])
+                i += 1
         heights, cols, kinds, steep, props = [], [], [], [], []
         sea, top = self.sea_h, max(0.01, self.top)
         lx, ly, lz = self.sun

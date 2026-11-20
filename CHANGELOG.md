@@ -442,6 +442,14 @@ game, RØØTLESS, shows them.
   release does what it can and leaves the rest to the Python; without it everything is drawn
   in Python as before.
 
+- **Taps and swipes in first-person levels** (on by default in Termux, `--touch on|off`
+  elsewhere): the picture in thirds - the sides turn, their bottom corners strafe, the
+  middle's top steps forward, its centre fires, its bottom uses; a swipe up or down steps
+  forward or back (one step per 0.3 s of swiping); the status line changes weapon, the lines
+  under the picture show the map; a tap closes a page. `help` lists them. `next` (key `]`)
+  readies the next weapon. `--termux-keys` prints a row of extra keys for Termux's keyboard
+  (fire, strafe, use, map, goggles, save and load) and how to install it.
+
 ### Changed
 
 - RØØTLESS's first episode is called **Roasted in the Shell**.

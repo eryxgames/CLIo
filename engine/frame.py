@@ -176,6 +176,16 @@ class Painter:
         return "".join(out)
 
 
+def tapped(name):
+    """A tap or a click (not a release, not the wheel): a mouse report's name from engine/keys.py."""
+    if not name.startswith("mouse:"):
+        return False
+    try:
+        return not int(name.split(":")[1]) & 64
+    except (IndexError, ValueError):
+        return False
+
+
 class Screen:
     """The terminal as one frame: rows written in place, a prompt, keys, pages."""
 
@@ -203,6 +213,7 @@ class Screen:
         self.started = False
         self.shown = {}                   # what each row of the screen holds now: written again only if it changed
         self.now = time.monotonic         # the clock a beat in real time is kept by (tests set their own)
+        self.pointer = None               # a tap or a swipe (a mouse report) -> the key it stands for, or None
 
     # ---- the terminal --------------------------------------------------- #
     def write(self, s):
@@ -331,6 +342,10 @@ class Screen:
                     self.shown = {}
                     redraw()
                 continue
+            if k.startswith(("mouse:", "mouseup:")):
+                k = self.pointer(k) if self.pointer is not None and not self.typed else None
+                if k is None:
+                    continue
             if not self.typed and k in self.keymap:
                 return self.keymap[k]
             if k == "enter":
@@ -366,12 +381,16 @@ class Screen:
                 if self.resized():
                     redraw()
                 continue
-            if k in ("enter", "space", "esc", "q", "ctrl-d", "tab"):
+            if k in ("enter", "space", "esc", "q", "ctrl-d", "tab") or tapped(k):
                 return
 
     def typeahead(self, keys):
         typed, pending = self.typed, None
         for k in keys:
+            if k.startswith(("mouse:", "mouseup:")):
+                k = self.pointer(k) if self.pointer is not None and not typed else None
+                if k is None:
+                    continue
             if not typed and k in self.keymap:
                 pending = pending or k
             elif k == "space":

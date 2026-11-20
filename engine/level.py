@@ -61,7 +61,7 @@ KEYMAP = {
     "home": "h", "pgup": "l", "end": "turn around", "pgdn": "use",
     "space": "f", "insert": "f", "enter": "use", "tab": "map", "center": "w", "delete": "w",
     "1": "1", "2": "2", "3": "3", "4": "4", "5": "5", "6": "6", "7": "7",
-    "?": "help", "f1": "help", "f2": "goggles", "f5": "save", "f9": "load",
+    "?": "help", "f1": "help", "f2": "goggles", "f5": "save", "f9": "load", "]": "next",
 }
 
 WEAPONS = {
@@ -81,18 +81,29 @@ PELLET = (1.0, 1.0, 0.85, 0.6, 0.42, 0.3, 0.22, 0.16, 0.12)
 HELP = [
     ("↑ ↓  step forward, back      ← →  turn", "text"),
     ("Ctrl+← →  or  , .  strafe     space  fire", "text"),
-    ("Enter  open, press   Tab  map   1-7  weapons", "text"),
+    ("Enter  open, press   Tab  map   1-7 ]  weapons", "text"),
     ("F2  TTY goggles on/off (the battery lasts while off)", "text"),
     ("F5  save   F9  load the last save", "text"),
     ("", "text"),
     ("Typed: k j h l, turn left/right/around, use,", "dim"),
-    ("f [x], kill [-9] x, t x, w [n], map, ps, man x,", "dim"),
+    ("f [x], kill [-9] x, t x, w [n], next, map, ps, man x,", "dim"),
     ("goggles [on|off], out (of a vehicle), history,", "dim"),
     ("alias n='...', keys, whoami, sound, q", "dim"),
     ("save [name], load [name], saves, realtime [off|s]", "dim"),
     ("a; b   a && b   a || b   !!  !3  !f   as in a shell", "dim"),
     ("A surprise stops a line, as ^C would.", "dim"),
 ]
+
+# taps on the picture (a phone in Termux, or a mouse): what each part of it does - see FrameConsole.touch_key
+TOUCH_HELP = [
+    ("", "text"),
+    ("Touch: the picture in thirds -", "text"),
+    ("  left, right: turn    bottom corners: strafe", "text"),
+    ("  top middle: forward  centre: fire  bottom: use", "text"),
+    ("  swipe up, down: forward, back", "text"),
+    ("  the status line: next weapon   under it: map", "text"),
+]
+SWIPE_GAP = 0.3              # seconds: a swipe sends a run of wheel steps; one step of the player per this
 
 # lines about the game rather than in it: not kept in a level's journal (a save plays the journal back)
 DUELLED = re.compile(r" =((?:won|lost|fled)(?::\d+)?)$")   # a duel's outcome on the line that started it
@@ -1238,8 +1249,10 @@ class Level:
                 self.say("rootless is not in the sudoers file. This incident will be reported.", "hurt")
             return True
         if t in ("?", "help"):
-            self.console.page(self, HELP)
+            self.console.page(self, HELP + (TOUCH_HELP if getattr(self.console, "touch", False) else []))
             return True
+        if t in ("next", "nw", "next weapon"):
+            return self.next_weapon()
         if t in ("q", "quit", "exit"):
             self.over = "quit"
             return True
@@ -2156,6 +2169,21 @@ class Level:
             if not w.get("ammo") or p.ammo.get(w["ammo"], 0) > 0:
                 return self.switch(k)
         return self.switch(mine[0])
+
+    def next_weapon(self):
+        """The next weapon he has (with ammunition, if it needs any), in weapons.json's order, round to
+        the first."""
+        p = self.player
+        order = [k for k in self.weapons if k in p.weapons]
+        if p.weapon in order:
+            i = order.index(p.weapon)
+            order = order[i + 1:] + order[:i]
+        for k in order:
+            w = self.weapons[k]
+            if not w.get("ammo") or p.ammo.get(w["ammo"], 0) > 0:
+                return self.switch(k)
+        self.say("Nothing else to change to.", "dim")
+        return True
 
     def switch(self, wid):
         p = self.player
@@ -3536,10 +3564,14 @@ class FrameConsole:
     """Frame mode: the first-person picture, redrawn in place; keys act at once."""
 
     def __init__(self, term, style="pixel", keys=True, keymap=None, animate=True, speed=1.0, detail="auto",
-                 realtime=None):
+                 realtime=None, touch=False):
         from .frame import Screen
         from .keys import KeyReader
         self.screen = Screen(term, KeyReader() if keys else None, keymap or KEYMAP, animate, speed)
+        self.touch = bool(touch)                         # taps and swipes act (where the terminal reports them)
+        if self.touch:
+            self.screen.pointer = self.touch_key
+        self.swiped = None
         self.realtime = realtime          # seconds a beat lasts when no key is pressed (0: off; None: the level's)
         self.keymap = self.screen.keymap
         self.keys = self.screen.keys
@@ -3553,12 +3585,51 @@ class FrameConsole:
 
     def start(self):
         self.screen.start()
+        if self.touch and self.screen.keys is not None:      # (typed lines only: no reports in the way)
+            self.screen.write("\x1b[?1000h\x1b[?1006h")     # taps as clicks, swipes as the wheel; SGR numbers
+            self.mouse_on = True
+
+    mouse_on = False
 
     def stop(self):
+        if self.mouse_on and self.screen.started:
+            self.screen.write("\x1b[?1000l\x1b[?1006l")
+            self.mouse_on = False
         self.screen.stop()
 
     def said(self, text, role):
         pass
+
+    def touch_key(self, name):
+        """A tap or a swipe (a mouse report: engine/keys.py) as the key it stands for. The picture in
+        thirds: left and right turn, their bottom corners strafe; the middle's top steps forward, its
+        centre fires, its bottom uses. A swipe up or down (the wheel, in Termux) steps forward or back,
+        a step per SWIPE_GAP however long the swipe. The status line: the next weapon; under the
+        picture: the map."""
+        try:
+            kind, b, x, y = name.split(":")
+            b, x, y = int(b), int(x), int(y)
+        except ValueError:
+            return None
+        if kind != "mouse":
+            return None                                   # a release: the press has acted
+        if b & 64:
+            now = self.screen.now()
+            if self.swiped is not None and 0 <= now - self.swiped < SWIPE_GAP:
+                return None
+            self.swiped = now
+            # Termux: a finger moving up scrolls down (65); moving down, up (64)
+            return {0: "down", 1: "up", 2: "left", 3: "right"}[b & 3]
+        if b & 3:
+            return None                                   # only the first button: a tap
+        W, H, VR = self.layout()
+        if y == 0:
+            return "]"
+        if y > VR:
+            return "tab"
+        col = 0 if x < W // 3 else 2 if x >= W - W // 3 else 1
+        row = min(2, (y - 1) * 3 // VR)
+        return (("left", "up", "right"), ("left", "space", "right"), (",", "enter", "."))[row][col]
 
     def layout(self):
         W, H = self.screen.size()
@@ -4056,6 +4127,11 @@ def resume(data, block, audio=None):
     return finish(lv, note)
 
 
+def _termux():
+    from .term import is_termux
+    return is_termux()
+
+
 def play_scene(game, scene, resume_from=None):
     """Run the level of a scene for a CLIo game, then go on with the story. ``resume_from``: a save's
     level block, to go on from. Loading a save or jumping to a level (--dev) plays on here."""
@@ -4078,7 +4154,8 @@ def play_scene(game, scene, resume_from=None):
         console = FrameConsole(term, settings.get("view") or cfg.get("view", "pixel"),
                                detail=settings.get("detail") or cfg.get("detail", "auto"),
                                keys=not settings.get("lines"), keymap=keymap, animate=term.animate,
-                               speed=max(0.0, float(term.speed or 1.0)), realtime=settings.get("realtime"))
+                               speed=max(0.0, float(term.speed or 1.0)), realtime=settings.get("realtime"),
+                               touch=settings.get("touch", _termux()))
     else:
         def write(text):
             term.line(text)

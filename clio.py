@@ -223,6 +223,16 @@ def draw_banner(term, text, style=None, palette=None, effect=None, export=None):
     return 0
 
 
+TERMUX_KEYS = r"""# Extra keys for playing CLIo's first-person levels in Termux. Put these lines in
+# ~/.termux/termux.properties (mkdir -p ~/.termux first), then run: termux-reload-settings
+# Swipe up on a key for the key above it. Volume Up + Q shows or hides the row; Volume Up +
+# W A S D are the arrows. In a level, taps on the picture act too (clio.py --touch off: not).
+#
+#   ESC (F1 help)  <<  strafe  UP  >>  strafe   FIRE        NEXT weapon (1 fist)  SAVE (LOAD)
+#   MAP            LEFT turn   DOWN RIGHT turn  USE (open)  TTY goggles           KEYBOARD
+extra-keys = [[   {key: ESC, popup: F1},   {key: ',', display: '<<', popup: '<'},   {key: UP},   {key: '.', display: '>>', popup: '>'},   {key: SPACE, display: FIRE},   {key: ']', display: NEXT, popup: '1'},   {key: F5, display: SAVE, popup: F9} ], [   {key: TAB, display: MAP},   {key: LEFT},   {key: DOWN},   {key: RIGHT},   {key: ENTER, display: USE},   {key: F2, display: TTY},   {key: KEYBOARD} ]]"""
+
+
 def display_test(term, logo_name=None):
     """Draw a page that shows at a glance whether this terminal renders CLIo correctly."""
     from engine.sprite import generate
@@ -442,6 +452,11 @@ def main(argv=None):
                     help="first-person levels: low draws the floor and ceiling at half width (faster in a big "
                          "window); auto (the default) does so only for a very big picture")
     ap.add_argument("--lines", action="store_true", help="in first-person levels: typed lines only, no single keys")
+    ap.add_argument("--touch", choices=("on", "off"),
+                    help="first-person levels: taps on the picture turn, step, fire and use, swipes step "
+                         "(on by default in Termux; it takes the mouse, so text cannot be selected)")
+    ap.add_argument("--termux-keys", action="store_true",
+                    help="print a row of extra keys for Termux's keyboard that plays first-person levels, and exit")
     ap.add_argument("--realtime", nargs="?", type=float, const=0.8, metavar="SECONDS",
                     help="play first-person levels in real time: a beat passes every SECONDS (0.8) when no key "
                          "is pressed; 0 turns it off for levels that ask for it")
@@ -505,6 +520,9 @@ def main(argv=None):
             return 2
     if args.test_display:
         return display_test(term, args.logo)
+    if args.termux_keys:
+        print(TERMUX_KEYS)
+        return 0
     if args.keys:
         from engine.realtime import key_test
         if not term.is_tty:
@@ -571,6 +589,8 @@ def main(argv=None):
             settings["lines"] = True
         if args.realtime is not None:
             settings["realtime"] = max(0.0, args.realtime)
+        if args.touch:
+            settings["touch"] = args.touch == "on"
         if args.scroll:
             settings["scroll_levels"] = True
         if args.sounds:

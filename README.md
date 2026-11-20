@@ -100,6 +100,8 @@ python clio.py [game] [options]
   --get-ballistic install Ballistic's C engine for this machine in your data folder (renders without Node.js)
   --get-picture   install CLIo Picture, a C library that draws the land, the sky, rooms and dots faster
   --import-model F  bring a glTF model (.glb/.gltf, e.g. from Blender) into a game's models.json
+  --touch on|off  taps and swipes in first-person levels (on in Termux)
+  --termux-keys   print a row of extra keys for Termux that plays the levels
   --no-color      plain text
   --ascii         no box-drawing or block characters
   --glyphs MODE   full, console (the old Windows console fonts; the default in that window),
@@ -144,6 +146,14 @@ python clio.py
 
 For sound, install any one player: `pkg install play-audio` (recommended) or `pkg install mpv`.
 Without one the game is simply silent; the in-game `sound` command tells you what it found.
+
+In first-person levels the picture answers taps: its left and right thirds turn, their bottom
+corners strafe, the top of the middle steps forward, the centre fires and the bottom uses
+(opens, presses). Swipe up or down to step forward or back; tap the status line for the next
+weapon, or under the picture for the map. For a row of game keys above the keyboard (fire,
+strafe, use, map, save), run `python clio.py --termux-keys` and follow what it prints.
+`--touch off` turns the taps off (they take the mouse, so text cannot be selected meanwhile);
+`--touch on` turns them on in another terminal.
 
 The layout follows the screen: it is tested from 24 columns up, and re-measures the
 terminal on every line, so rotating the phone or pinching to zoom just works. Art that
@@ -248,7 +258,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 608 tests, about a minute
+python -m unittest discover -s tests     # 610 tests, about a minute
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 python tests/bot.py 30 cards             # the same with card battles (the Deck mode)

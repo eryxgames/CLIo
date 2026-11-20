@@ -1215,6 +1215,50 @@ class ChecksAndGameTests(unittest.TestCase):
         self.assertIn("\x1b[?1049l", out[-100:])                # ...given back at the end
         self.assertNotIn("command not found", out)
 
+    def test_played_with_taps_and_swipes(self):
+        from engine.level import KEYMAP, FrameConsole
+        term = Term(out=io.StringIO(), width=90, height=30, color=3, unicode=True, animate=False, env={})
+        con = FrameConsole(term, "pixel", keys=False, keymap=KEYMAP, animate=False, touch=True)
+        con.screen.size = lambda: (90, 30)                     # the picture: rows 1-23, thirds at 30 and 60
+        self.assertEqual([con.touch_key(t) for t in ("mouse:0:45:3", "mouse:0:5:3", "mouse:0:80:12", "mouse:0:45:12",
+                                                      "mouse:0:45:20", "mouse:0:2:22", "mouse:0:88:22", "mouse:0:45:0",
+                                                      "mouse:0:45:26", "mouseup:0:45:3", "mouse:2:45:3")],
+                         ["up", "left", "right", "space", "enter", ",", ".", "]", "tab", None, None])
+        clock = [100.0]
+        con.screen.now = lambda: clock[0]
+        self.assertEqual(con.touch_key("mouse:65:40:10"), "up")    # a finger moving up: forward
+        self.assertIsNone(con.touch_key("mouse:65:40:10"))         # the same swipe's next wheel step
+        clock[0] += 0.5
+        self.assertEqual(con.touch_key("mouse:64:40:10"), "down")  # moving down: back
+
+        con.screen.keys = con.keys = keys_mod.ScriptedKeys([
+            "enter", "mouse:0:45:3", "mouseup:0:45:3", "mouse:0:80:12", "mouse:0:5:12", "mouse:0:45:12",
+            "mouse:0:45:0", "mouse:0:45:26", "mouse:0:10:10"])     # the map, closed by a tap
+        lv = Level(GameData(ROOTLESS), "e1m1", seed=1)
+        start = (lv.player.x, lv.player.y)
+        self.assertEqual(lv.run(con), "quit")
+        self.assertEqual((lv.player.x, lv.player.y), (start[0], start[1] - 1))   # a step; turning is free
+        self.assertEqual(lv.player.ammo["bullets"], 49)                      # a shot
+        self.assertEqual(lv.player.weapon, "1")                              # the next weapon after the pistol: round to the fist
+        out = term.out.getvalue()
+        self.assertIn("\x1b[?1000h\x1b[?1006h", out)
+        self.assertIn("\x1b[?1000l", out[-200:])                             # the mouse given back
+        self.assertNotIn("command not found", out)
+
+    def test_touch_help_and_next(self):
+        from engine.level import KEYMAP, TOUCH_HELP, FrameConsole
+        term = Term(out=io.StringIO(), width=90, height=30, color=3, unicode=True, animate=False, env={})
+        shown = []
+        for touch in (False, True):
+            con = FrameConsole(term, "pixel", keys=False, keymap=KEYMAP, animate=False, touch=touch)
+            con.page = lambda lv, lines, automap=False: shown.append(lines)
+            lv = Level(GameData(ROOTLESS), "e1m1", seed=1)
+            lv.console = con
+            lv.run_line("help")
+        self.assertNotIn(TOUCH_HELP[1], shown[0])
+        self.assertIn(TOUCH_HELP[1], shown[1])
+        self.assertEqual(KEYMAP["]"], "next")
+
     def test_the_bot_finishes_the_level(self):
         import levelbot
         for seed in (0, 1, 2):

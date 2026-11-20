@@ -1675,12 +1675,21 @@ how the model bobs, turns, spins and breaks. The picture follows every change.
 ### Saving in a level
 
 `save [name]` (F5) saves in a level and `load [name]` (F9) loads; `saves` lists them. A save
-is the game as it was when the level began, and every line played since: loading builds
-the level again and plays those lines back, unseen, in a moment - so everything in the
-level (fire, grenades, a ridden vehicle, a boss's timetable) comes back as it was. A save
-notes what the level was made of; if the level has changed since, loading says so, and if
-the lines no longer play through (the level would end on the way), it starts again from
-the beginning. The title screen offers a level's save by the level's name and beat.
+holds the game as it was when the level began, a **snapshot** of the level now, and the
+lines played since it began. Loading builds the level again from its seed and puts the
+snapshot back on it - in a moment, however long the game has gone on. Everything in the
+level comes back as it was: fire, grenades, a ridden vehicle, a boss's timetable, the chunks
+of a level without end. The level then plays on exactly as it would have (engine/snapshot.py).
+
+A save asked for during a line (`w; save`, or a checkpoint reached on the way) is made when
+the line is done, so it always holds whole beats. Each line is kept with the beat it was
+played on; a save keeps the last 20000 of them.
+
+A save notes what the level was made of. If the level has changed since, loading plays
+the lines back instead of the snapshot, and says so. If even they no longer play through,
+the level starts again from the beginning. A save is written whole or not at all, and the
+one it replaces is kept beside it (`.bak`); if a save is ever damaged, loading takes that
+one and says so. The title screen offers a level's save by the level's name and beat.
 
 ```json
 "first_person": {"saves": 3, "autosave": true, ...}

@@ -277,6 +277,19 @@ game, RØØTLESS, shows them.
   (rooms without end). `--level sim1`, `sim2`, `sim3`; the demo's last page says so.
 - The level bot plans its way in a window round itself in a world without end, keeps out of
   acid unless booted, and picks up what helps on a long way.
+- **Saves hold the level's state** (`engine/snapshot.py`). Loading puts it back on the level
+  built afresh instead of playing every line again: 0.05 s rather than seconds for a long
+  game. The snapshot's digest is checked on loading, and the level plays on exactly as
+  before. Nothing is listed as "to save": every part of a level is kept unless it is made
+  again when the level is built. Tests snapshot every kind of level half way through,
+  play the rest on both copies and compare, and compare the digest across processes, so
+  two machines can check they agree (the ground for multiplayer).
+- Lines are kept with the beat they were played on. A save asked for during a line is made
+  when the line is done (whole beats). Saves keep the last 20000 lines, and old saves
+  still load.
+- Saves are written whole (flushed to the disk, then put in place) and the one before is
+  kept as `.bak`, which loading falls back on if a save is damaged. A rogue run's death
+  removes both.
 
 ### Changed
 

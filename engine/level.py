@@ -27,6 +27,7 @@ import contextlib
 import copy
 import json
 import math
+import operator
 import os
 import random
 import zlib
@@ -202,6 +203,12 @@ class Cell:
 
 
 VOID = Cell(-1, -1, " ", {"wall": "steel"})
+# what can change in a cell while a level is played (the rest is as the map made it): saved, and kept for a
+# forgotten chunk. A test plays every level through and checks that nothing else changes.
+CELL_STATE = ("kind", "open", "pressed", "found", "crate", "heavy", "down", "sunk", "scorched", "sealed",
+              "toxic", "oil", "slick", "secret", "panel", "key")
+cell_state = operator.attrgetter(*CELL_STATE)
+JOURNAL_KEEP = 20000         # lines of play a save keeps (a snapshot carries the rest)
 
 
 class Monster:
@@ -392,6 +399,7 @@ class Level:
         saves = self.cfg.get("saves")
         self.saves_left = int(saves) if isinstance(saves, int) and not isinstance(saves, bool) else None
         self.loaded = self.warp = None                   # a save to go on with, a level to jump to
+        self.pending_save = []                           # (slot, how): saves to make when this line is done
         self.reached = set()                             # checkpoints passed
         self.opening = None                              # lines said in place of the title page (a loaded game)
         self.sprites = {}
@@ -410,6 +418,8 @@ class Level:
             self.land_walls = self.world.walls
         self.plates(quiet=True)
         self.update_seen()
+        if self.world is None:                           # the cells as built: a save keeps only what changed
+            self._pristine = [cell_state(c) for row in self.grid for c in row]
 
     # ---- building ------------------------------------------------------- #
     @property
@@ -942,12 +952,21 @@ class Level:
             if not self.replaying:
                 self.meta(line)
             return
-        self.journal.append(line)
+        self.journal.append([self.beat, line])           # the beat it was typed on: [beat, line] (player 0)
         try:
             self.play_line(line)
         finally:
-            if self.over in ("quit", "load", "warp") and self.journal and self.journal[-1] == line:
+            if self.over in ("quit", "load", "warp") and self.journal and self.journal[-1][1] == line:
                 self.journal.pop()
+        self.flush_save()
+
+    def flush_save(self):
+        """A save asked for during a line (a checkpoint reached, "w; save") is made when the line is done,
+        so it holds whole beats."""
+        asked, self.pending_save = self.pending_save, []
+        for slot, how in asked:
+            if self.host is not None and not self.replaying and not self.over:
+                self.host.save(self, slot, how=how)
 
     def play_line(self, line):
         m = re.fullmatch(r"!(\d+|[a-z][\w ]*)", line)
@@ -1026,8 +1045,16 @@ class Level:
             return self.use()
         if t in ("out", "leave", "dismount", "get out"):
             return self.leave()
-        if META.fullmatch(t):                            # within a line: "w; save"
-            return True if self.replaying else self.meta(t)
+        if META.fullmatch(t):                            # within a line: "w; save" (saved when the line is done)
+            if self.replaying:
+                return True
+            word, _, arg = t.partition(" ")
+            if word == "save":
+                if self.host is None:
+                    return self.meta(t)
+                self.pending_save.append((arg.strip() or None, "save"))
+                return True
+            return self.meta(t)
         if self.player.vehicle is not None and (t in self.weapons or (len(t) == 1 and t.isdigit())):
             self.say("Your hands are on the %s's levers: its claws are your weapon. (out: climb down)"
                      % self.player.vehicle.name, "dim")
@@ -1148,18 +1175,41 @@ class Level:
         return "%08x" % (zlib.crc32(json.dumps(stuff, sort_keys=True, default=str).encode("utf-8")) & 0xffffffff)
 
     def save_block(self):
-        """The level in a save: how it began and every line played since."""
-        return {"id": self.id, "seed": self.seed, "start": self.start_player, "lines": list(self.journal),
-                "beat": self.beat, "saves_left": self.saves_left, "fingerprint": self.fingerprint(),
-                "depth": self.depth}
+        """The level in a save: how it began (id, seed, depth, the player as he came in), a snapshot of it
+        now (engine/snapshot.py) with its digest, and the lines played since it began - the last
+        ``JOURNAL_KEEP`` of them; ``lines_from`` says the beat they go back to, when not to the start."""
+        from . import snapshot
+        lines = [list(e) if isinstance(e, list) else e for e in self.journal]
+        block = {"id": self.id, "seed": self.seed, "start": self.start_player, "depth": self.depth,
+                 "beat": self.beat, "saves_left": self.saves_left, "fingerprint": self.fingerprint()}
+        if len(lines) > JOURNAL_KEEP:
+            lines = lines[-JOURNAL_KEEP:]
+            block["lines_from"] = lines[0][0] if isinstance(lines[0], list) else 1
+        block["lines"] = lines
+        try:
+            snap = snapshot.capture(self)
+            block["snapshot"], block["digest"] = snapshot.pack(snap), snapshot.digest(snap)
+        except snapshot.SnapshotError as e:              # the lines still carry it
+            block["snapshot_error"] = str(e)
+        return block
+
+    def state_hash(self):
+        """A short sum of the level's state: the same lines played on the same seed give the same sum,
+        on any machine (what only looks different is left out)."""
+        from . import snapshot
+        return snapshot.digest(snapshot.capture(self))
 
     def replay(self, lines):
         """Play ``lines`` again, unseen and unheard: True if they played through without the level ending."""
         console, audio = self.console, self.audio
         self.console, self.audio, self.replaying = TextConsole(lambda text: None, lambda prompt: None), None, True
         try:
-            for line in lines:
-                self.run_line(line)
+            for entry in lines:
+                if isinstance(entry, list):              # [beat, line]: it must come on the same beat
+                    if len(entry) < 2 or entry[0] != self.beat:
+                        return False
+                    entry = entry[1]
+                self.run_line(entry)
                 if self.over:
                     return False
             return True
@@ -1746,7 +1796,7 @@ class Level:
         if cell.savepoint and (p.x, p.y) not in self.reached:      # a checkpoint
             self.reached.add((p.x, p.y))
             if self.host is not None and not self.replaying:
-                self.host.save(self, None, how="checkpoint")
+                self.pending_save.append((None, "checkpoint"))   # saved when this line is done
         if cell.teleport and not cell.arrive_only and not teleported and not self.over:
             self.teleport(cell)
 
@@ -3693,26 +3743,53 @@ class Host:
         if blob.get("game") != self.game.data.id:
             lv.say("That save belongs to another game.", "hurt")
             return False
+        if blob.pop("_backup", False):
+            lv.say("That save was damaged: loading the one made before it.", "alert")
         lv.loaded, lv.over = blob, "load"
         return True
 
 
 def resume(data, block, audio=None):
-    """A level as a save left it: built as it began, its journal played back. Returns ``(level, note)``;
-    a note says when the save did not play back as it was (the level changed since) - then the level
+    """A level as a save left it. Returns ``(level, note)``; a note says when it did not come back exactly.
+
+    The level is built as it began and its snapshot put back on it; the snapshot's digest must come out
+    the same. When the level has changed since the save (its data are not what they were) or the save
+    has no snapshot (an older one), its lines are played back instead; when nothing fits, the level
     starts again from where it began."""
+    from . import snapshot
     depth = block.get("depth") if isinstance(block.get("depth"), int) else 0
-    lv = Level(data, block["id"], seed=block.get("seed"), player=block.get("start"), depth=depth)
-    note = None
-    if block.get("fingerprint") and block["fingerprint"] != lv.fingerprint():
-        note = "The level has changed since this save was made."
-    if not lv.replay(block.get("lines") or []):
-        lv = Level(data, block["id"], seed=block.get("seed"), player=block.get("start"), depth=depth)
+
+    def fresh():
+        return Level(data, block["id"], seed=block.get("seed"), player=block.get("start"), depth=depth)
+
+    def finish(lv, note):
+        if isinstance(block.get("saves_left"), int):
+            lv.saves_left = block["saves_left"]
+        lv.audio = audio
+        return lv, note
+
+    lv = fresh()
+    lines = block.get("lines") or []
+    same = not block.get("fingerprint") or block["fingerprint"] == lv.fingerprint()
+    snap = block.get("snapshot")
+    whole = not block.get("lines_from")                  # the lines go back to the level's beginning
+
+    def from_snapshot(lv):
+        snapshot.restore(lv, snapshot.unpack(snap))
+        if block.get("digest") and lv.state_hash() != block["digest"]:
+            raise snapshot.SnapshotError("it did not come back the same")
+        lv.journal = [list(e) if isinstance(e, list) else e for e in lines]
+        return lv
+    if snap and (same or not whole):
+        try:
+            return finish(from_snapshot(lv), None if same else "The level has changed since this save was made.")
+        except (snapshot.SnapshotError, KeyError, IndexError, TypeError, AttributeError, ValueError):
+            lv = fresh()
+    note = None if same else "The level has changed since this save was made."
+    if not whole or not lv.replay(lines):
+        lv = fresh()
         note = "That save no longer plays back on this level: it starts again from the beginning."
-    if isinstance(block.get("saves_left"), int):
-        lv.saves_left = block["saves_left"]
-    lv.audio = audio
-    return lv, note
+    return finish(lv, note)
 
 
 def play_scene(game, scene, resume_from=None):

@@ -183,15 +183,42 @@ def slot_path(folder, slot):
 
 
 def write_save(path, blob):
+    """Write a save whole or not at all (a temporary file, flushed to the disk, then put in place); the
+    save it replaces is kept beside it as ``.bak``, in case the new one is ever damaged."""
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(blob, f)
+        f.flush()
+        try:
+            os.fsync(f.fileno())
+        except OSError:
+            pass
+    if os.path.isfile(path):
+        try:
+            os.replace(path, path + ".bak")
+        except OSError:
+            pass
     os.replace(tmp, path)
 
 
 def read_save(path):
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    """A save; if it is damaged (or gone) and the one before it is kept, that one, marked ``_backup``."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            blob = json.load(f)
+        if not isinstance(blob, dict):
+            raise ValueError("not a save")
+        return blob
+    except (OSError, ValueError):
+        bak = path + ".bak"
+        if not os.path.isfile(bak):
+            raise
+        with open(bak, "r", encoding="utf-8") as f:
+            blob = json.load(f)
+        if not isinstance(blob, dict):
+            raise ValueError("not a save")
+        blob["_backup"] = True
+        return blob
 
 
 def list_saves(folder):

@@ -21,16 +21,14 @@ from __future__ import annotations
 
 import json
 import math
-import operator
 import random
+
+from .level import CELL_STATE as MUTABLE, cell_state as _state
 
 N = 16                       # a chunk is N x N cells
 ORIGIN = 1 << 20             # where the start is: room to go a long way each way
 SIZE = 1 << 21
 WALL_KINDS = ("wall", "panel", "exit", "switch", "door")
-# what can change in a cell while the game goes on: kept for a chunk when it is forgotten
-MUTABLE = ("kind", "open", "pressed", "found", "crate", "heavy", "down", "sunk", "scorched", "sealed",
-           "toxic", "oil", "slick", "secret", "panel", "key")
 
 
 def _hash(*parts):
@@ -43,8 +41,6 @@ def _hash(*parts):
     x ^= x >> 13
     return x / 4294967296.0
 
-
-_state = operator.attrgetter(*MUTABLE)             # a cell's state: what can change in it
 
 
 def _weighted(rng, table):

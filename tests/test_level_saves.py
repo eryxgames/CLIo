@@ -37,7 +37,7 @@ class JournalTests(unittest.TestCase):
                         "#####"])
         for line in ("w", "turn left; w", "save", "load slot2", "saves", "*e1m2", "  ", "q"):
             lv.run_line(line)
-        self.assertEqual(lv.journal, ["w", "turn left; w"])     # quitting is not kept either
+        self.assertEqual(lv.journal, [[0, "w"], [1, "turn left; w"]])     # with their beats; not quitting
         self.assertTrue(META.fullmatch("save quick") and not META.fullmatch("saved"))
 
     def test_a_game_played_back_ends_as_it_did(self):
@@ -106,7 +106,7 @@ class SaveTests(Saves):
         lv.run_line("turn right; k")
         lv.run_line("save")
         blob = read_save(slot_path(g.saves(), g.slot))
-        self.assertEqual(blob["level"]["lines"], ["turn right; k"])
+        self.assertEqual(blob["level"]["lines"], [[0, "turn right; k"]])
         self.assertEqual((blob["level"]["id"], blob["level"]["saves_left"]), ("e1m2", 2))
         self.assertIn("2 left", told(lv))
         lv.run_line("save quick")
@@ -133,7 +133,7 @@ class SaveTests(Saves):
         lv.run_line("k; k")
         lv.run_line("load")
         self.assertEqual(lv.over, "load")
-        self.assertEqual(lv.loaded["level"]["lines"], ["k"])
+        self.assertEqual(lv.loaded["level"]["lines"], [[0, "k"]])
         lv2 = self.level(g)
         lv2.run_line("load nothing")
         self.assertIn("no saved game called 'nothing'", told(lv2))
@@ -161,7 +161,7 @@ class PlayTests(Saves):
         out = self.out.getvalue()
         self.assertIn("Loaded - beat 1", out)
         blob = read_save(slot_path(g.saves(), g.slot))
-        self.assertEqual(blob["level"]["lines"], ["k"])
+        self.assertEqual(blob["level"]["lines"], [[0, "k"]])
         self.assertEqual(g.over, "quit")
 
     def test_the_level_start_is_saved_and_dying_can_go_back_to_it(self):

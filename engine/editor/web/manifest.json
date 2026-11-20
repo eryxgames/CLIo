@@ -29,6 +29,7 @@
   "engine/records.py",
   "engine/schema.py",
   "engine/sheets.py",
+  "engine/snapshot.py",
   "engine/sprite.py",
   "engine/term.py",
   "engine/theme.py",

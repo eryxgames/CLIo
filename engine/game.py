@@ -1115,10 +1115,12 @@ class Game(Actions):
             self.burn_save()
 
     def burn_save(self):
-        try:
-            os.remove(slot_path(self.saves(), self.slot))
-        except OSError:
-            pass
+        path = slot_path(self.saves(), self.slot)
+        for p in (path, path + ".bak"):                  # the one before it too: one life means one life
+            try:
+                os.remove(p)
+            except OSError:
+                pass
 
     def after_game(self):
         """Offer to load / restart. Returns True if play continues."""
@@ -1172,6 +1174,8 @@ class Game(Actions):
             return False
         try:
             blob = read_save(path)
+            if blob.pop("_backup", False):
+                self.say("That save was damaged: loading the one made before it.", "system")
             self.world.load_save(blob)
         except (OSError, ValueError, KeyError) as e:
             self.say("Could not load that save: %s" % e, "error")

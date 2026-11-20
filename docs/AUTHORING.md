@@ -1193,6 +1193,80 @@ and `glow` round it. `ridges`, far to near: `height` (0..1 of the sky), `seed` (
 seed, another skyline), `rough`, `near` (0..1: how much it moves as the player does).
 `stars`: how many (0.01 is a clear night). Everything has a default: `"sky": {}` is a dusk.
 
+### Open land
+
+A level can stand on open land: hills, lakes, a coast, as far as one can see. Give it a
+`"land"` object. The map is then optional. It is a camp or a compound set down on the land
+at `at`; the ground under it is flattened, and every space and every cell outside the map is
+land. The level's size becomes the land's `size`.
+
+```json
+"land": {"size": [112, 112], "seed": 4207, "scale": 30, "height": 5, "sea": 0.42, "ridges": 0.25,
+         "at": [90, 10], "start": [16, 80], "haze": 60,
+         "water": {"color": "#2a4a3c", "deep": "#14261f", "toxic": true, "shallow": 0.05},
+         "biomes": [{"name": "fen", "below": 0.3, "color": "#3f4c2c", "color2": "#4c5a30", "char": ".",
+                     "props": [{"sprite": "prop_reeds", "density": 0.1, "size": 0.75}]},
+                    {"name": "rock", "below": 2, "color": "#5c5850", "char": "^",
+                     "props": [{"sprite": "prop_crystal", "density": 0.05, "solid": true}]}],
+         "landmarks": [{"at": [95, 8], "model": "relay_mast", "solid": true}],
+         "things": [{"at": [80, 60], "monster": "hopper_fens"}, {"at": [52, 80], "item": "armor", "secret": true}],
+         "scatter": [{"monster": "hornet", "count": 16, "on": ["water", "deep water"], "away": 14},
+                     {"item": "medkit", "count": 5, "on": ["fen"]}]}
+```
+
+**The ground** is worked out from the numbers, not stored: the same `seed` makes the same
+land every time.
+
+- `scale` is how many cells a hill spans.
+- `height` is the highest ground, in walls' heights.
+- `sea` (0..1 of the heights) is where the water starts.
+- `ridges` (0..1) is how much of the land is mountain ridges.
+- `rough` is how broken the ground is.
+- `warp` (0..1) is how far the shapes are twisted.
+
+Because the ground is a sum of the coordinates, it goes on past the level's `size`: the
+picture draws it to the horizon (`view` cells off). The level itself, the part one can walk
+and that the rules keep track of, is `size` cells across. At its edge, hills rise (`"edge":
+"rim"`) or the land goes on flat as it is (`"open"`), with no way out. An endless world would
+load the land in pieces as one walks; the land is ready for that, and the rules may follow.
+
+**Water** lies flat at the sea line. It mirrors the sky, and it is `toxic` if you say so.
+`shallow` (0..1 of the heights) is how far under the line one can still wade. Deeper water
+stops a walker.
+
+**Slopes.** A slope steeper than `climb` (walls' heights per cell, 0.55) is a cliff: it stops
+a walker too, and is drawn in the `cliff` colour. Drones that float go over water and cliffs.
+A flying machine flies at `altitude` (2.6) over the ground.
+
+**Sight.** Hills hide: a monster behind a ridge does not see you, and you do not see it.
+
+**Biomes** colour the land by height above the water, from low to high: `below` (0..1) is
+where each one ends. Each has a `color` and a `color2` (mixed in patches) and a `char` for
+the text view. It can be `toxic`. Its `props` stand about on it: a `sprite` or a `model`, a
+`density` (0..1: how many cells have one) and a `size`. A `solid` prop (a tree, a rock) is in
+the way like a cliff is. The default biomes are shore, grass, forest, rock and snow.
+
+**Landmarks** are models (or sprites) that stand far off and are seen from far: a mast, a
+wreck, a tower. Each has `at`, `size`, `turn` (degrees) and `lift` (walls' heights up or down).
+A `solid` landmark blocks its cell. Landmarks show on the map from the start.
+
+**Things** put a monster or an item at a place; `"secret": true` makes the place a secret.
+**Scatter** puts `count` of a monster or an item about the land: `on` the biomes named
+(`"water"` and `"deep water"` are names too), `near` a place within a `radius`, and at least
+`away` cells from the start. The same seed puts them in the same places every time.
+
+The land's `start` is where the player starts, unless the map has an `@`. Also: `see` (how
+far things are drawn, 24), `props_view` (18), `haze` (how far off half a colour is haze, 70),
+`haze_color`, `pad` and `blend` (the height of the ground under the map and how far it blends
+into the land), and `sky_ridges` (draw the sky's ridges as well, which the land's own hills
+otherwise replace).
+
+The picture of open land is in true perspective: the ground is drawn first, near to far,
+then what stands on it, and far things fade into the haze. The first look round builds the
+ground near by (about half a second). After that a frame takes about as long as a room's.
+The level bot finds its way over open land by working the way out from its goal once and
+then following it.
+
 ### Things that move
 
 The rules move a cell at a time, a beat at a time:

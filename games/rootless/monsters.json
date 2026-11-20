@@ -731,5 +731,50 @@
    "and burns a beat of it every beat once it has lifted off. Space fires the twin cannon.",
    "It flies over acid, water and belts; it will not go through doors or onto pads."
   ]
+ },
+ "hopper_fens": {
+  "name": "Swamp Hopper",
+  "tag": "H",
+  "model": "hopper",
+  "hp": 220,
+  "size": 1.0,
+  "kind": "barrel",
+  "attack": {
+   "kind": "barrel",
+   "damage": 30
+  },
+  "vehicle": {
+   "fly": true,
+   "fuel": 30,
+   "on_empty": "land",
+   "canopy": "#4b5047",
+   "gun": {
+    "name": "twin cannon",
+    "damage": [
+     9,
+     15
+    ],
+    "burst": 2,
+    "sound": "hopper_gun",
+    "text": "DAKKA."
+   },
+   "board": "You drop into the survey hopper's seat. Thirty beats of fuel left in it - more in the cells round the camp.",
+   "start": "The fans spool up and the hopper lifts off the pad.",
+   "leave": "You pop the canopy and climb down.",
+   "empty": "The fuel gauge hits zero. The fans cough, slow, and stop; the hopper settles. (Enter: climb out)",
+   "wreck": "The hopper's fan pods tear loose. You are thrown out as it goes up.",
+   "sounds": {
+    "step": "hopper_fly",
+    "board": "loader_board",
+    "start": "hopper_start",
+    "empty": "hopper_stop"
+   },
+   "altitude": 2.6
+  },
+  "man": [
+   "A survey team's X-47B, left at its camp in the fens with a little fuel in it.",
+   "",
+   "It flies over water and slopes until its fuel runs out, then glides down to the nearest firm, dry ground."
+  ]
  }
 }

@@ -555,5 +555,403 @@
    "board",
    "L"
   ]
+ },
+ "e1m4": {
+  "name": "Xantrium Fens",
+  "title": "E1M4: Xantrium Fens",
+  "intro": [
+   "Open country: the fens past the refit plant, as far as the sim can draw them.",
+   "The relay mast blinks red to the north-east. Its switch ends the simulatron."
+  ],
+  "par": 320,
+  "music": "xantrium_fens",
+  "facing": "e",
+  "death_text": "outro_lose",
+  "sky": {
+   "top": "#0a0e1e",
+   "horizon": "#b25a3c",
+   "stars": 0.014,
+   "sun": {
+    "at": 0.62,
+    "height": 0.3,
+    "size": 0.3,
+    "color": "#d9b07a",
+    "bands": "#a8744a",
+    "glow": 0.3
+   },
+   "clouds": {
+    "color": "#3a2c44",
+    "amount": 0.3
+   }
+  },
+  "map": [
+   "###########",
+   "#.........#",
+   "#.&.....&.#",
+   "#...BEB...#",
+   "#.........#",
+   "#.V.....V.#",
+   "#.&.....&.#",
+   "#..m.$.q..#",
+   "####...####"
+  ],
+  "legend": {
+   "#": {
+    "wall": "fence"
+   },
+   "B": {
+    "wall": "steel"
+   },
+   "V": {
+    "monster": "warden"
+   },
+   "$": {
+    "savepoint": true
+   },
+   "m": "medkit",
+   "q": "rockets"
+  },
+  "land": {
+   "size": [
+    112,
+    112
+   ],
+   "seed": 4207,
+   "scale": 30,
+   "height": 5,
+   "sea": 0.42,
+   "ridges": 0.25,
+   "warp": 0.6,
+   "at": [
+    90,
+    10
+   ],
+   "start": [
+    16,
+    80
+   ],
+   "haze": 60,
+   "view": 150,
+   "see": 24,
+   "water": {
+    "color": "#2a4a3c",
+    "deep": "#14261f",
+    "toxic": true,
+    "shallow": 0.05
+   },
+   "cliff": "#4e4a44",
+   "biomes": [
+    {
+     "name": "mud",
+     "below": 0.06,
+     "color": "#4a4230",
+     "color2": "#3c3626",
+     "char": ",",
+     "props": [
+      {
+       "sprite": "prop_reeds",
+       "density": 0.06,
+       "size": 0.7
+      }
+     ]
+    },
+    {
+     "name": "fen",
+     "below": 0.3,
+     "color": "#3f4c2c",
+     "color2": "#4c5a30",
+     "char": ".",
+     "props": [
+      {
+       "sprite": "prop_reeds",
+       "density": 0.1,
+       "size": 0.75
+      },
+      {
+       "sprite": "prop_deadtree",
+       "density": 0.012,
+       "size": 1.2,
+       "solid": true
+      }
+     ]
+    },
+    {
+     "name": "heath",
+     "below": 0.55,
+     "color": "#4a4434",
+     "color2": "#3a3c2a",
+     "char": "\"",
+     "props": [
+      {
+       "sprite": "prop_scrub",
+       "density": 0.07,
+       "size": 0.7
+      },
+      {
+       "sprite": "prop_deadtree",
+       "density": 0.02,
+       "size": 1.3,
+       "solid": true
+      },
+      {
+       "sprite": "prop_rock",
+       "density": 0.015,
+       "size": 0.9,
+       "solid": true
+      }
+     ]
+    },
+    {
+     "name": "rock",
+     "below": 2.0,
+     "color": "#5c5850",
+     "color2": "#4c4a44",
+     "char": "^",
+     "props": [
+      {
+       "sprite": "prop_crystal",
+       "density": 0.05,
+       "size": 0.9,
+       "solid": true
+      },
+      {
+       "sprite": "prop_rock",
+       "density": 0.04,
+       "size": 1.0,
+       "solid": true
+      }
+     ]
+    }
+   ],
+   "landmarks": [
+    {
+     "at": [
+      95,
+      8
+     ],
+     "model": "relay_mast",
+     "solid": true
+    },
+    {
+     "at": [
+      13,
+      83
+     ],
+     "model": "hopper",
+     "lift": -0.3,
+     "turn": 30,
+     "solid": true
+    }
+   ],
+   "things": [
+    {
+     "at": [
+      18,
+      79
+     ],
+     "item": "boots"
+    },
+    {
+     "at": [
+      17,
+      82
+     ],
+     "item": "shells"
+    },
+    {
+     "at": [
+      20,
+      81
+     ],
+     "item": "medkit"
+    },
+    {
+     "at": [
+      80,
+      60
+     ],
+     "monster": "hopper_fens"
+    },
+    {
+     "at": [
+      79,
+      59
+     ],
+     "item": "fuel"
+    },
+    {
+     "at": [
+      81,
+      61
+     ],
+     "item": "fuel"
+    },
+    {
+     "at": [
+      79,
+      61
+     ],
+     "item": "fuel"
+    },
+    {
+     "at": [
+      81,
+      62
+     ],
+     "item": "fuel"
+    },
+    {
+     "at": [
+      81,
+      59
+     ],
+     "item": "medkit"
+    },
+    {
+     "at": [
+      78,
+      60
+     ],
+     "item": "shells"
+    },
+    {
+     "at": [
+      78,
+      62
+     ],
+     "item": "clip"
+    },
+    {
+     "at": [
+      64,
+      80
+     ],
+     "item": "rocket_launcher"
+    },
+    {
+     "at": [
+      52,
+      80
+     ],
+     "item": "armor",
+     "secret": true
+    }
+   ],
+   "scatter": [
+    {
+     "monster": "hornet",
+     "count": 16,
+     "on": [
+      "water",
+      "deep water"
+     ],
+     "away": 14
+    },
+    {
+     "monster": "scout",
+     "count": 9,
+     "on": [
+      "fen",
+      "heath"
+     ],
+     "away": 16
+    },
+    {
+     "monster": "crawler",
+     "count": 8,
+     "on": [
+      "fen",
+      "mud"
+     ],
+     "away": 16
+    },
+    {
+     "monster": "warden",
+     "count": 1,
+     "near": [
+      86,
+      58
+     ],
+     "radius": 6,
+     "away": 10
+    },
+    {
+     "monster": "kworker",
+     "count": 4,
+     "on": [
+      "heath",
+      "rock"
+     ],
+     "away": 20
+    },
+    {
+     "item": "fuel_drop",
+     "count": 3,
+     "on": [
+      "rock",
+      "heath"
+     ],
+     "away": 30
+    },
+    {
+     "item": "medkit",
+     "count": 5,
+     "on": [
+      "fen",
+      "heath"
+     ],
+     "away": 10
+    },
+    {
+     "item": "stimpack",
+     "count": 8,
+     "on": [
+      "fen",
+      "heath",
+      "mud"
+     ],
+     "away": 6
+    },
+    {
+     "item": "shells",
+     "count": 5,
+     "on": [
+      "fen",
+      "heath"
+     ],
+     "away": 10
+    },
+    {
+     "item": "clip",
+     "count": 5,
+     "on": [
+      "fen",
+      "heath"
+     ],
+     "away": 10
+    },
+    {
+     "item": "rockets",
+     "count": 3,
+     "on": [
+      "rock",
+      "heath"
+     ],
+     "away": 20
+    }
+   ]
+  },
+  "bot": [
+   "boots",
+   "rocket_launcher",
+   "fuel",
+   "fuel",
+   "fuel",
+   "fuel",
+   "board",
+   "$",
+   "out",
+   "E"
+  ]
  }
 }

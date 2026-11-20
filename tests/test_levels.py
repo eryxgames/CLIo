@@ -1027,8 +1027,8 @@ class SecretLevelTests(unittest.TestCase):
             return "exit"
         with mock.patch.object(level_mod.Level, "run", run):
             level_mod.play_scene(g, g.world.scenes["boot_sector"])
-        self.assertEqual(played, ["e1m1", "e1m9", "e1m2", "e1m3"])  # the secret level, then back to E1M2 and on
-        self.assertEqual(g.world.scene_id, "drone_refit")
+        self.assertEqual(played, ["e1m1", "e1m9", "e1m2", "e1m3", "e1m4"])  # the secret level, then back and on
+        self.assertEqual(g.world.scene_id, "xantrium_fens")
         self.assertEqual(g.over, "win")
         out = term.out.getvalue().lower()
         self.assertIn("swap partition", out)
@@ -1049,7 +1049,7 @@ class SecretLevelTests(unittest.TestCase):
             return "exit"
         with mock.patch.object(level_mod.Level, "run", run):
             level_mod.play_scene(g, g.world.scenes["boot_sector"])
-        self.assertEqual(played, ["e1m1", "e1m2", "e1m3"])
+        self.assertEqual(played, ["e1m1", "e1m2", "e1m3", "e1m4"])
         self.assertIn("pod six", term.out.getvalue().lower())
         self.assertIn("user space", term.out.getvalue().lower())
 

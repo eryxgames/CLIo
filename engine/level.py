@@ -112,7 +112,7 @@ class Cell:
                  "on_enter", "sealed", "pressed", "label", "label_role", "secret", "found", "floor", "ceiling",
                  "savepoint",
                  "crate", "plate", "down", "open_while", "teleport", "arrive_only", "pad_facing", "lift", "deck", "sunk",
-                 "oil", "slick", "conveyor", "scorched", "exit_kind", "heavy", "switch", "sky")
+                 "oil", "slick", "conveyor", "scorched", "exit_kind", "heavy", "switch", "sky", "deep", "steep")
 
     def __init__(self, x, y, ch, spec):
         self.x, self.y, self.ch = x, y, ch
@@ -147,6 +147,8 @@ class Cell:
         self.savepoint = bool(spec.get("savepoint"))    # a checkpoint: the game is saved when it is first reached
         self.switch = spec.get("switch")                # a switch in the wall: using it sets off this event
         self.sky = bool(spec.get("sky"))                # open to the sky: no ceiling over it
+        self.deep = bool(spec.get("deep"))              # water too deep to wade: floaters and fliers only
+        self.steep = bool(spec.get("steep"))            # too steep to climb (open land): floaters and fliers only
         self.found = False
         self.open = 0.0
         self.exit_kind = "secret" if spec.get("exit") == "secret" else "exit"
@@ -405,12 +407,32 @@ class Level:
         rows = [str(r) for r in self.spec.get("map") or []]
         self.h = len(rows)
         self.w = max((len(r) for r in rows), default=0)
+        self.map_w, self.map_h = self.w, self.h
+        self.land = None
+        ax = ay = 0
+        if isinstance(self.spec.get("land"), dict):         # open land: the map stands on it, the rest is the land's
+            from .land import Land
+            lspec = self.spec["land"]
+            self.land = Land(lspec, seed=zlib.crc32(str(self.id).encode()) & 0xFFFF)
+            self.land.look(fp.sky_spec(self.spec.get("sky")))   # its light, before the ground is worked out
+            ax, ay = self.land.at
+            if rows:
+                self.land.set_pad(ax, ay, ax + self.w - 1, ay + self.h - 1, lspec.get("pad"), lspec.get("blend", 6))
+            self.w, self.h = self.land.w, self.land.h
         self.grid = []
         start = None
         for y in range(self.h):
             line = []
             for x in range(self.w):
-                ch = rows[y][x] if x < len(rows[y]) else " "
+                if self.land is not None:
+                    mx, my = x - ax, y - ay
+                    ch = rows[my][mx] if 0 <= my < len(rows) and 0 <= mx < len(rows[my]) else " "
+                    if ch == " ":
+                        line.append(Cell(x, y, self.land.char(x, y), self.land.cell_spec(x, y)))
+                        continue
+                    self.land.stamp[(x, y)] = None
+                else:
+                    ch = rows[y][x] if x < len(rows[y]) else " "
                 spec = legend.get(ch)
                 if spec is None:
                     spec = {}
@@ -432,6 +454,8 @@ class Level:
                     if it is not None:
                         it.on_pickup = spec.get("on_pickup")
             self.grid.append(line)
+        if self.land is not None:
+            start = self.place_on_land(legend, start)
         if start is None:
             start = next(((c.x, c.y) for row in self.grid for c in row if not c.solid), (1, 1))
         self.player.x, self.player.y = start
@@ -487,6 +511,8 @@ class Level:
             except AttributeError:
                 pass
         want = {m.model for m in self.monsters if m.model} | {it.model for it in self.items if it.model}
+        if self.land is not None:
+            want |= self.land.uses()[1]
         for name in want:
             if name in table and name not in built[1]:
                 built[1].update(model_mod.load({name: table[name]}))
@@ -498,6 +524,8 @@ class Level:
         names |= {w.get("sprite") for w in self.weapons.values()} | {"fireball", "muzzle", "gore", "crate", "container",
                                                                      "grenade", "rocket"}
         names |= {m.vehicle.get("cockpit") for m in self.monsters if m.vehicle}
+        if self.land is not None:
+            names |= self.land.uses()[0]
         names |= {(m.spec.get("attack") or {}).get("spawn") for m in self.monsters}
         for kind in list(names):
             spec = (self.data.monsters or {}).get(kind)
@@ -540,10 +568,90 @@ class Level:
                     self.see_through.add(name)
         self.floor_tile, self.ceiling_tile = self.spec.get("floor"), self.spec.get("ceiling")
         from .firstperson import sky_spec
-        open_air = any(c.sky for row in self.grid for c in row)
+        open_air = self.land is not None or any(c.sky for row in self.grid for c in row)
         self.sky_look = sky_spec(self.spec.get("sky")) if open_air else None   # how the sky over open cells looks
+        if self.land is not None and not self.spec["land"].get("sky_ridges"):
+            self.sky_look["ridges"] = []                     # the land's own hills stand on the horizon
+        if self.land is not None:                            # the map's floors, drawn on the land; its walls
+            for (x, y) in list(self.land.stamp):
+                c = self.cell(x, y)
+                name = c.floor or self.floor_tile
+                if c.toxic and not name:
+                    self.land.stamp[(x, y)] = [[(60, 150, 50), (80, 180, 60)], [(80, 180, 60), (60, 150, 50)]]
+                else:
+                    self.land.stamp[(x, y)] = fp.View.texture(self, name) if name else None
+            self.land_walls = [(x, y) for (x, y) in self.land.stamp
+                               if self.cell(x, y).kind in ("wall", "panel", "exit", "switch", "door")]
 
     # ---- the grid ------------------------------------------------------- #
+    def place_on_land(self, legend, start):
+        """Open land: its ``"things"`` where they are put, and its ``"scatter"``: so many of a monster or an
+        item about the land (on the biomes named, near a place, away from the start), the same every time."""
+        lspec = self.spec["land"]
+        if start is None and isinstance(lspec.get("start"), list):
+            start = tuple(int(v) for v in lspec["start"][:2])
+        for t in lspec.get("things") or []:
+            if not isinstance(t, dict) or not isinstance(t.get("at"), list):
+                continue
+            x, y = (int(v) for v in t["at"][:2])
+            if not (0 <= x < self.w and 0 <= y < self.h):
+                continue
+            self.put_thing(t, x, y)
+            if t.get("secret"):                          # a hidden place: found by standing on it
+                self.grid[y][x].secret = True
+        sx, sy = start or (self.w // 2, self.h // 2)
+        for i, s in enumerate(lspec.get("scatter") or []):
+            if not isinstance(s, dict) or not (s.get("monster") or s.get("item")):
+                continue
+            rng = random.Random("%s/%d/%d" % (self.id, self.land.seed, i))
+            on = set(s.get("on") or [])
+            near = s.get("near")
+            radius = float(s.get("radius", max(self.w, self.h)))
+            away = float(s.get("away", 8))
+            floats = bool((self.data.monsters or {}).get(s.get("monster"), {}).get("float"))
+            placed, tries = 0, 0
+            while placed < int(s.get("count", 1)) and tries < 4000:
+                tries += 1
+                if isinstance(near, list):
+                    x = int(near[0] + rng.uniform(-radius, radius))
+                    y = int(near[1] + rng.uniform(-radius, radius))
+                else:
+                    x, y = rng.randrange(self.w), rng.randrange(self.h)
+                c = self.cell(x, y)
+                if c is VOID or c.solid or (x, y) in self.land.stamp or math.hypot(x - sx, y - sy) < away:
+                    continue
+                if (c.deep or c.steep) and not floats:
+                    continue
+                if on and self.land.biome_of(x, y) not in on:
+                    continue
+                if self.monster_at(x, y) is not None or any((it.x, it.y) == (x, y) for it in self.items):
+                    continue
+                self.put_thing(s, x, y)
+                placed += 1
+        return start
+
+    def put_thing(self, spec, x, y):
+        """A monster or an item of a land's ``things`` or ``scatter`` at (x, y)."""
+        if spec.get("monster"):
+            m = self.add_monster(spec["monster"], x, y)
+            if m is not None:
+                m.wake_on = spec.get("wake_on")
+                if spec.get("awake"):
+                    m.awake = True
+        if spec.get("item"):
+            it = self.add_item(spec["item"], x, y)
+            if it is not None:
+                it.on_pickup = spec.get("on_pickup")
+
+    def ground(self, x, y):
+        """How high the ground is at (x, y) - cells or between them - above the floor the map stands on
+        (0 everywhere in rooms)."""
+        if self.land is None:
+            return 0.0
+        if (int(round(x)), int(round(y))) in self.land.stamp and float(x).is_integer() and float(y).is_integer():
+            return 0.0
+        return self.land.ground(x, y) - self.land.base
+
     def cell(self, x, y):
         if 0 <= y < self.h and 0 <= x < self.w:
             return self.grid[y][x]
@@ -558,19 +666,44 @@ class Level:
                 return m
         return None
 
-    def passable(self, x, y):
+    def passable(self, x, y, who=None, floats=False):
+        """Can a monster (``who``, or one that floats) be at (x, y)? Deep water and slopes too steep to climb
+        only for those that float."""
         c = self.cell(x, y)
-        return not c.solid
+        if c.solid:
+            return False
+        if c.deep or c.steep:
+            return floats or bool(getattr(who, "float", 0))
+        return True
 
     def free(self, x, y, skip=None):
         p = self.player
-        return self.passable(x, y) and not self.monster_at(x, y, skip) and (x, y) != (p.x, p.y)
+        return self.passable(x, y, skip) and not self.monster_at(x, y, skip) and (x, y) != (p.x, p.y)
 
     def line_of_sight(self, x0, y0, x1, y1):
-        for (x, y) in bresenham(x0, y0, x1, y1)[1:-1]:
+        cells = bresenham(x0, y0, x1, y1)
+        for (x, y) in cells[1:-1]:
             if self.cell(x, y).solid:
                 return False
+        if self.land is not None and len(cells) > 2:          # open land: a hill between hides
+            h0, h1 = self.eye_height(x0, y0), self.eye_height(x1, y1)
+            n = len(cells) - 1
+            for i, (x, y) in enumerate(cells[1:-1], 1):
+                if self.ground(x, y) > h0 + (h1 - h0) * i / n + 0.05:
+                    return False
         return True
+
+    def eye_height(self, x, y):
+        """How high one sees from at (x, y) in open land: the ground, and a head above it (higher flying)."""
+        p = self.player
+        up = 0.5
+        if (x, y) == (p.x, p.y) and p.vehicle is not None and p.vehicle.vehicle.get("fly") and p.vehicle.started:
+            up = float(p.vehicle.vehicle.get("altitude", self.land.altitude))
+        else:
+            m = self.monster_at(x, y)
+            if m is not None and m.float:
+                up += m.float
+        return self.ground(x, y) + up
 
     def rel(self, x, y):
         """(sideways, ahead) of a cell from where the player stands and looks."""
@@ -605,8 +738,8 @@ class Level:
         return sorted([m for m in self.monsters if m.seen and not m.dead and not m.gone],
                       key=lambda m: (self.dist(m), abs(self.rel(m.x, m.y)[0])))
 
-    def distances(self, x0, y0, limit=40):
-        """Steps to (x0, y0) from every cell that can walk there (monsters do not block)."""
+    def distances(self, x0, y0, limit=40, floats=False):
+        """Steps to (x0, y0) from every cell that can walk there - or float there (monsters do not block)."""
         dist = {(x0, y0): 0}
         frontier = [(x0, y0)]
         while frontier:
@@ -617,7 +750,7 @@ class Level:
                     continue
                 for dx, dy in DIRS:
                     n = (x + dx, y + dy)
-                    if n not in dist and self.passable(*n):
+                    if n not in dist and self.passable(n[0], n[1], floats=floats):
                         dist[n] = d + 1
                         nxt.append(n)
                 for n in self.pad_links().get((x, y), ()):     # a pad that leads here is a step away
@@ -991,6 +1124,13 @@ class Level:
         self.end_beat()
         return True
 
+    def fly_eye(self, v):
+        """How high a flying machine's eye is above the ground: its ``"eye"`` in rooms, its ``"altitude"`` in
+        open land."""
+        if self.land is not None:
+            return float(v.vehicle.get("altitude", self.land.altitude))
+        return float(v.vehicle.get("eye", 0.74))
+
     def refuel(self, v):
         """The fuel the player carries goes into the machine's tanks."""
         p = self.player
@@ -1013,12 +1153,50 @@ class Level:
         v.started = False
         self.sfx((spec.get("sounds") or {}).get("empty") or "power_down", "power")
         self.say(spec.get("empty") or "The engines cough and stop. The %s settles." % v.name, "alert")
-        up = float(spec.get("eye", 0.74)) if spec.get("fly") else 0.52
+        up = self.fly_eye(v) if spec.get("fly") else 0.52
+        p = self.player
+        here = self.cell(p.x, p.y)
+        if spec.get("fly") and (here.deep or here.steep or here.toxic):   # it glides down where one can stand
+            spot = self.landing(p.x, p.y)
+            if spot is not None:
+                ox, oy = p.x, p.y
+                p.x, p.y = spot
+                self.anim([FX(cam=(ox + (spot[0] - ox) * ease(i / 6.0), oy + (spot[1] - oy) * ease(i / 6.0)),
+                              eye=up - (up - 0.52) * 0.3 * i / 6.0) for i in range(1, 7)], 0.07)
+                self.say("It glides down on its last breath to firmer ground.", "dim")
+                self.update_seen()
+                up = up - (up - 0.52) * 0.3
         self.anim([FX(shake=s, whiten=w, eye=up - (up - 0.52) * k) for s, w, k in
                    ((1, 0.0, 0.1), (-1, 0.0, 0.3), (1, 0.1, 0.6), (0, 0.2, 0.85), (0, 0.35, 1.0))], 0.08)
         if spec.get("on_empty") == "exit":               # the ride is the end of the level
             self.exit_kind = "exit"
             self.over = "exit"
+
+    def landing(self, x, y, reach=12):
+        """The nearest cell a machine running dry can set down on, from (x, y): firm, dry and clear, with such a
+        cell beside it to climb down to - or None."""
+        def firm(n):
+            c = self.cell(*n)
+            return not (c.solid or c.kind == "door" or c.crate or c.deep or c.steep or c.toxic) \
+                and not self.monster_at(*n) and n not in self.fires
+
+        seen, frontier = {(x, y)}, [(x, y)]
+        for _ in range(reach):
+            nxt = []
+            for (cx, cy) in frontier:
+                for dx, dy in DIRS:
+                    n = (cx + dx, cy + dy)
+                    if n in seen:
+                        continue
+                    seen.add(n)
+                    c = self.cell(*n)
+                    if c.solid or c.kind == "door" or c.crate:
+                        continue
+                    if firm(n) and any(firm((n[0] + ex, n[1] + ey)) for ex, ey in DIRS):
+                        return n
+                    nxt.append(n)
+            frontier = nxt
+        return None
 
     def leave(self):
         """Climb down from the vehicle: behind you, or to a side - it stays where it stands."""
@@ -1180,7 +1358,7 @@ class Level:
                 self.sfx((v.vehicle.get("sounds") or {}).get("start") or "power", "power")
                 self.say(v.vehicle.get("start") or "The engines spool up. (%d beats of fuel)" % v.fuel, "good")
                 if v.vehicle.get("fly"):                    # it lifts: the eye goes up with it
-                    up = float(v.vehicle.get("eye", 0.74))
+                    up = self.fly_eye(v)
                     self.anim([FX(eye=0.52 + (up - 0.52) * k, shake=s) for k, s in
                                ((0.1, 1), (0.3, -1), (0.55, 1), (0.8, 0), (0.95, 0))], 0.07)
             m = self.monster_at(nx, ny)
@@ -1189,6 +1367,10 @@ class Level:
                 return self.stomp(m, nx, ny)
         if cell.crate and v is not None and v.vehicle.get("fly"):
             self.say("The %s bumps the %s and hovers back." % (v.name, "container" if cell.heavy else "crate"), "dim")
+            return False
+        if (cell.deep or cell.steep) and not cell.solid and not (v is not None and v.vehicle.get("fly")):
+            self.say("Too deep to wade." if cell.deep else "Too steep to climb.", "dim")
+            self.sfx("locked")
             return False
         if cell.crate and cell.heavy and v is None:
             self.say("A container: it will not budge for you. Something with hydraulics might move it.", "dim")
@@ -2633,9 +2815,13 @@ class Level:
         adjacent = abs(m.x - tx) + abs(m.y - ty) == 1
         los = self.line_of_sight(m.x, m.y, tx, ty)
         reach = int(a.get("range", 8))
+        fl = bool(m.float) and self.land is not None             # in open land, a floater takes its own way
+        lim = 24 if self.land is not None else 40                # open land: the hunt goes this far, no further
         if not hasattr(self, "_field") or self._field[0] != (tx, ty, self.beat):
-            self._field = ((tx, ty, self.beat), self.distances(tx, ty))
-        field = self._field[1]
+            self._field = ((tx, ty, self.beat), self.distances(tx, ty, limit=lim), None)
+        if fl and self._field[2] is None:
+            self._field = (self._field[0], self._field[1], self.distances(tx, ty, limit=lim, floats=True))
+        field = self._field[2] if fl else self._field[1]
         every = int(a.get("move_every", 1) or 1)
         still = every > 1 and (self.beat + m.id) % every != 0          # a heavy one moves every other beat
         if kind == "hitscan" and a.get("spinup"):
@@ -3141,8 +3327,12 @@ class FrameConsole:
         x0 = max(0, min(p.x - cw // 2, lv.w - cw)) if lv.w > cw else -(cw - lv.w) // 2
         y0 = max(0, min(p.y - chh // 2, lv.h - chh)) if lv.h > chh else -(chh - lv.h) // 2
         dark = (14, 14, 18)
+        land = lv.land
+        beacons = {(int(m["at"][0]), int(m["at"][1])) for m in land.marks} if land is not None else set()
 
         def colour(x, y):
+            if (x, y) in beacons:                        # a landmark is seen from far off: on the map from the start
+                return (230, 90, 70)
             if (x, y) not in lv.seen_cells:
                 return dark
             if (x, y) == (p.x, p.y):
@@ -3163,6 +3353,9 @@ class FrameConsole:
                 return (140, 104, 64)
             if c.kind in ("wall", "panel"):
                 return (120, 124, 136)
+            if land is not None and (x, y) not in land.stamp:   # open land: its own colours, darker
+                rgb = land.at_cell(x, y)[1]
+                return (int(rgb[0] * 0.62), int(rgb[1] * 0.62), int(rgb[2] * 0.62))
             if c.toxic:
                 return (40, 140, 60)
             if c.teleport:
@@ -3642,15 +3835,39 @@ def validate(data):
         for key in ("floor", "ceiling"):
             if lv.get(key) and lv[key] not in known_tiles:
                 problems.append("level '%s': its %s is an unknown tile '%s'" % (lid, key, lv[key]))
+        land = lv.get("land")
         rows = lv.get("map")
-        if not isinstance(rows, list) or not rows or not all(isinstance(r, str) for r in rows):
+        if land is not None and rows is None:
+            rows = []                                # open land: the map (a camp, a compound) is optional
+        elif not isinstance(rows, list) or not rows or not all(isinstance(r, str) for r in rows):
             problems.append("level '%s': map should be a list of rows of text" % lid)
             continue
         legend = dict(LEGEND)
         legend.update(lv.get("legend") or {})
         starts = sum(r.count(ch) for r in rows for ch, spec in legend.items()
                      if isinstance(spec, dict) and spec.get("start"))
-        if starts != 1:
+        if land is not None:
+            from . import land as land_mod
+            problems.extend("level '%s': %s" % (lid, p) for p in land_mod.problems(
+                land, sprites, getattr(data, "models", None) or {}))
+            if isinstance(land, dict):
+                size = land.get("size") if isinstance(land.get("size"), list) else [96, 96]
+                st = land.get("start")
+                if starts == 0 and st is None:
+                    problems.append("level '%s': give the land a \"start\": [x, y], or the map a start (@)" % lid)
+                elif starts > 1 or (starts and st is not None):
+                    problems.append("level '%s': one start: the map's (@) or the land's \"start\", not both" % lid)
+                elif st is not None and not (isinstance(st, list) and len(st) == 2 and
+                                             all(isinstance(v, int) for v in st) and 0 <= st[0] < size[0] and 0 <= st[1] < size[1]):
+                    problems.append("level '%s': the land's start should be [x, y] inside its size" % lid)
+                for t in list(land.get("things") or []) + list(land.get("scatter") or []):
+                    if not isinstance(t, dict):
+                        continue
+                    if t.get("monster") and t["monster"] not in mons:
+                        problems.append("level '%s': the land has an unknown monster '%s'" % (lid, t["monster"]))
+                    if t.get("item") and t["item"] not in (data.items or {}):
+                        problems.append("level '%s': the land has an unknown item '%s'" % (lid, t["item"]))
+        elif starts != 1:
             problems.append("level '%s': the map should have one start (@), it has %d" % (lid, starts))
         used = set("".join(rows))
 
@@ -3659,7 +3876,8 @@ def validate(data):
                 sp = {"monster": sp} if sp in mons else {}
             veh = (mons.get(sp.get("monster")) or {}).get("vehicle") if sp.get("monster") else None
             return bool(sp.get("exit")) or (isinstance(veh, dict) and veh.get("on_empty") == "exit")
-        if not any(ends(legend.get(ch)) for ch in used):
+        land_things = list(land.get("things") or []) if isinstance(land, dict) else []
+        if not any(ends(legend.get(ch)) for ch in used) and not any(ends(t) for t in land_things):
             problems.append("level '%s': there is no exit (E)" % lid)
         if lv.get("death_text") and lv["death_text"] not in (getattr(data, "texts", None) or {}):
             problems.append("level '%s': death_text '%s' is not a text in texts.json" % (lid, lv["death_text"]))

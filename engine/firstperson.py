@@ -596,27 +596,50 @@ class View:
         self.cache = {}
         self.skies = {}
         self.cover = {}
+        self.persp = None                                     # open land: a true perspective from this far behind
+        self.air = None                                       # open land: (haze colour, how far half is haze)
+        self.cur_z = -1e9                                     # how far off what is being drawn now is (open land)
         self.half = self.PW / 2.0
 
     def set_eye(self, eye):
         """The eye ``eye`` high (of a wall's height): more floor below the horizon, less wall above it -
         a machine flying sees from higher up. None: standing."""
         eye = self.EYE0 if eye is None else max(0.2, min(0.95, float(eye)))
+        self.set_eye_abs(eye)
+
+    def set_eye_abs(self, eye):
+        """The eye ``eye`` above the floor things stand on (in open land: above the pad, so any height)."""
         self.FS, self.CH = self.TALL * eye, self.TALL * (1 - eye)
         self.EYE = eye
 
     @staticmethod
     def eye_of(lv):
-        """How high the player's eye is: a flying machine's ``"eye"`` (0.74) once it is up, with a little sway."""
+        """How high the player's eye is above the ground: a flying machine's ``"eye"`` (0.74) once it is up -
+        in open land its ``"altitude"`` (the land's, 2.6) - with a little sway. None: standing."""
         v = getattr(lv.player, "vehicle", None)
         spec = getattr(v, "vehicle", None) or {}
         if v is None or not spec.get("fly") or not getattr(v, "started", False):
             return None
-        return float(spec.get("eye", 0.74)) + 0.012 * math.sin(lv.beat * 1.7)
+        land = getattr(lv, "land", None)
+        up = float(spec.get("altitude", land.altitude)) if land is not None else float(spec.get("eye", 0.74))
+        return up + 0.012 * math.sin(lv.beat * 1.7) * (4 if land is not None else 1)
+
+    def tz(self, z):
+        """How big a thing ``z`` cells ahead is, against one beside the player: the rooms' exponential distance,
+        or in open land a true perspective from ``persp`` cells behind him."""
+        if self.persp is None:
+            return DECAY ** z
+        return self.persp / max(0.05, z + self.persp)
+
+    def zt(self, t):
+        """The distance at which things are ``t`` as big (the other way round from ``tz``)."""
+        if self.persp is None:
+            return math.log(t) / LN
+        return self.persp / t - self.persp
 
     # ---- projection ----------------------------------------------------- #
     def X(self, a, z):
-        return self.half + a * self.LW * DECAY ** z
+        return self.half + a * self.LW * self.tz(z)
 
     @staticmethod
     def texture(lv, name, phase=0):
@@ -636,6 +659,21 @@ class View:
             rows = self.cache[key] = self._backdrop(lv, cx, cy, f, phase)
         return [r[:] for r in rows]
 
+    def sky_rows(self, lv, cx, cy, f, phase):
+        """The sky's rows for this facing and beat (None: the level has no sky)."""
+        look = getattr(lv, "sky_look", None)
+        if look is None:
+            return None
+        rx, ry = DIRS[(f + 1) % 4]
+        lateral = round((cx * rx + cy * ry) * 4) / 4.0
+        key = (f, lateral, phase, id(look))
+        sky = self.skies.get(key)
+        if sky is None:
+            if len(self.skies) > 16:
+                self.skies.clear()
+            sky = self.skies[key] = sky_picture(look, self.PW, self.yh, f, lateral, phase)
+        return sky
+
     def _backdrop(self, lv, cx, cy, f, phase):
         """The floor and ceiling, per pixel.  The hot loop of a frame: what depends only on a cell is
         worked out once per cell, and a colour in a row's fog once per row."""
@@ -646,16 +684,7 @@ class View:
         fires = getattr(lv, "fires", None) or ()
         marks, cell_at, fixture, floor_ = lv.marks, lv.cell, self.fixture, math.floor
         drawings, below, above = {}, {}, {}
-        sky = None
-        look = getattr(lv, "sky_look", None)
-        if look is not None:                                 # open cells: the sky over them
-            lateral = round((cx * rx + cy * ry) * 4) / 4.0
-            key = (f, lateral, phase, id(look))
-            sky = self.skies.get(key)
-            if sky is None:
-                if len(self.skies) > 16:
-                    self.skies.clear()
-                sky = self.skies[key] = sky_picture(look, PW, self.yh, f, lateral, phase)
+        sky = self.sky_rows(lv, cx, cy, f, phase)
         step = 2 if self.detail == "low" else 1                # low: every other pixel, each drawn twice
 
         def drawing(name):                                   # a floor or ceiling tile, fixed to the world
@@ -866,7 +895,8 @@ class View:
 
     def front_face(self, px, a, z, tex, opened=0.0, holes=()):
         zf = max(z - 0.5, -0.45)
-        t = DECAY ** zf
+        t = self.tz(zf)
+        self.cur_z = z - 0.5
         x0, x1 = self.half + (a - 0.5) * self.LW * t, self.half + (a + 0.5) * self.LW * t
         y0, y1 = self.yh - self.CH * t, self.yh + self.FS * t
         X0, X1 = max(0, int(math.ceil(x0 - 0.5))), min(self.PW, int(math.ceil(x1 - 0.5)))
@@ -917,7 +947,8 @@ class View:
             t = (x + 0.5 - self.half) / span
             if t <= 0:
                 continue
-            zc = math.log(t) / LN
+            zc = self.zt(t)
+            self.cur_z = zc
             v = zc - (z - 0.5)
             u = int(v * TW) % TW if v < 0 else min(TW - 1, int(v * TW))
             y0, y1 = self.yh - self.CH * t, self.yh + self.FS * t
@@ -939,10 +970,10 @@ class View:
         if holes and not opened and X1 > X0:
             spots = []
             for v, h in holes:
-                t = DECAY ** (z - 0.5 + v)
+                t = self.tz(z - 0.5 + v)
                 y0, y1 = self.yh - self.CH * t, self.yh + self.FS * t
                 spots.append((self.half + span * t, y0 + h * (y1 - y0), max(1, int(round((y1 - y0) * 0.05)))))
-            self.dents(px, spots, (0.18 + 0.82 * min(1.0, DECAY ** z) ** 0.75) * 0.72, X0, X1)
+            self.dents(px, spots, (0.18 + 0.82 * min(1.0, self.tz(z)) ** 0.75) * 0.72, X0, X1)
 
     # ---- one picture ---------------------------------------------------- #
     def render(self, lv, fx, phase=0):
@@ -954,9 +985,32 @@ class View:
         fx_, fy_ = DIRS[f]
         rx, ry = DIRS[(f + 1) % 4]
         cam = (cx, cy, fx_, fy_, rx, ry)
-        self.set_eye(fx.eye if fx.eye is not None else self.eye_of(lv))
-        px = self.backdrop(lv, cx, cy, f, phase)
+        land = getattr(lv, "land", None)
         self.cover = {}
+        self.cur_z = -1e9
+        if land is not None:                                  # open land: a true perspective, the ground drawn first
+            self.persp = land.Z0 if hasattr(land, "Z0") else 1.6
+            g = lv.ground(cx, cy)
+            eye = fx.eye if fx.eye is not None else self.eye_of(lv)
+            self.set_eye_abs(g + (self.EYE0 if eye is None else eye))
+            land.look(getattr(lv, "sky_look", None))
+            self.air = (land.haze, land.vis)                  # far things fade into the haze, as the land does
+            px = land.draw(self, cam, self.EYE, phase, self.sky_rows(lv, cx, cy, f, phase) or [],
+                           (getattr(lv, "map_w", 0), getattr(lv, "map_h", 0)))
+            sight, far = land.see, 40
+        else:
+            self.persp = self.air = None
+            self.set_eye(fx.eye if fx.eye is not None else self.eye_of(lv))
+            px = self.backdrop(lv, cx, cy, f, phase)
+            sight, far = SIGHT, FAR
+
+        def gnd(a, z):                                       # the ground under a point ahead (0 in rooms)
+            if land is None:
+                return 0.0
+            return lv.ground(cx + rx * a + fx_ * z, cy + ry * a + fy_ * z)
+
+        def foot(a, z, t):
+            return self.yh + (self.FS - gnd(a, z) * self.TALL) * t
         self.fireball = lv.sprites.get("fireball")
         labels, overlays = [], []
 
@@ -970,57 +1024,70 @@ class View:
         items = []
         icx, icy = int(round(cx)), int(round(cy))
         sub_a, sub_z = rel(icx, icy)                          # the camera between cells, while it moves
-        for dz in range(-BACK, FAR + 2):                      # every cell that can show: the picture widens with distance
-            reach = int(self.half / (self.LW * DECAY ** (dz + 0.5))) + 2
-            for da in range(-reach, reach + 1):
-                x, y = icx + fx_ * dz + rx * da, icy + fy_ * dz + ry * da
-                cell = lv.cell(x, y)
-                if cell is None or not cell.drawn_as_wall(fx.doors.get((x, y))):
-                    continue
-                a, z = da + sub_a, dz + sub_z
-                if z < -BACK - 0.5 or z > FAR + 0.5:
-                    continue
-                edge = abs(a) - 0.5                           # its nearest side to the middle of the picture
-                if edge > 0 and self.half + edge * self.LW * DECAY ** (z + 0.5) > self.PW + 1:
-                    continue                                  # wholly off the side of the picture
-                if z < -0.5 and edge <= 0:                    # behind the player, with no side turned to him
-                    continue
-                items.append((z, 0, -abs(a), "wall", (cell, a, x, y)))
+        if land is not None:                                  # open land: the walls are the map's, few and known
+            near = [(x, y) for x, y in getattr(lv, "land_walls", ())]
+        else:
+            near = []
+            for dz in range(-BACK, FAR + 2):                  # every cell that can show: the picture widens with distance
+                reach = int(self.half / (self.LW * DECAY ** (dz + 0.5))) + 2
+                near += [(icx + fx_ * dz + rx * da, icy + fy_ * dz + ry * da) for da in range(-reach, reach + 1)]
+        for x, y in near:
+            cell = lv.cell(x, y)
+            if cell is None or not cell.drawn_as_wall(fx.doors.get((x, y))):
+                continue
+            a, z = rel(x, y)
+            if z < -BACK - 0.5 or z > far + 0.5:
+                continue
+            edge = abs(a) - 0.5                               # its nearest side to the middle of the picture
+            if edge > 0 and self.half + edge * self.LW * self.tz(z + 0.5) > self.PW + 1:
+                continue                                      # wholly off the side of the picture
+            if z < -0.5 and edge <= 0:                        # behind the player, with no side turned to him
+                continue
+            items.append((z, 0, -abs(a), "wall", (cell, a, x, y)))
+        if land is not None:                                  # what grows on the land, and what stands far off
+            for x, y, prop in land.props_near(cx, cy, land.props_view):
+                a, z = rel(x, y)
+                if 0.25 < z <= land.props_view and abs(a) < z * 1.6 + 1:
+                    items.append((z, 2, 0, "prop", (a, x, y, prop)))
+            for mark in land.marks:
+                a, z = rel(*mark["at"][:2])
+                if z > 0.3:
+                    items.append((z, 2, 0, "landmark", (a, mark)))
         for x, y, pic in lv.decals:
             a, z = rel(x, y)
-            if -0.3 < z <= SIGHT:
+            if -0.3 < z <= sight:
                 items.append((z + 0.02, 1, 0, "decal", (a, pic)))
         for it in lv.items:
             if it.taken:
                 continue
             a, z = rel(it.x, it.y)
-            if -0.3 < z <= SIGHT:
+            if -0.3 < z <= sight:
                 items.append((z, 2, 0, "itemmodel" if it.model and it.model in getattr(lv, "models", {}) else "item",
                               (a, it)))
         for (x, y) in getattr(lv, "crate_cells", lambda: ())():
             cx_, cy_ = fx.crates.get((x, y), (x, y))
             a, z = rel(cx_, cy_)
-            if -0.3 < z <= SIGHT + 0.5:
+            if -0.3 < z <= sight + 0.5:
                 items.append((z, 2, 0, "crate", (a, getattr(lv.cell(x, y), "heavy", False))))
         for (x, y), left in (getattr(lv, "fires", None) or {}).items():
             a, z = rel(x, y)
-            if 0.1 < z <= SIGHT + 0.5:
+            if 0.1 < z <= sight + 0.5:
                 items.append((z - 0.01, 3, 0, "flame", (a, x, y, left)))
                 for k in range(3):                           # embers going up, in the redraw's own time
                     h = ((phase * 0.29 + k * 0.37 + x * 0.13 + y * 0.07) % 1.0) * 1.1
                     ea, ez = rel(x + (noise(x, y, k) - 0.5) * 0.6, y + (noise(y, x, k + 3) - 0.5) * 0.6)
-                    if 0.12 < ez <= SIGHT:
+                    if 0.12 < ez <= sight:
                         items.append((ez - 0.02, 6, 0, "part", (ea, h, (255, 190, 80) if k % 2 else (255, 120, 40), 0.5)))
         for wx, wy, h, col, size in fx.parts:
             a, z = rel(wx, wy)
-            if 0.12 < z <= SIGHT:
+            if 0.12 < z <= sight:
                 items.append((z - 0.005, 6, 0, "part", (a, h, col, size)))
         for m in lv.monsters:
             if m.gone or (m.dead and m.id not in fx.dissolve):
                 continue
             mx, my = fx.pos.get(m.id, (m.x, m.y))
             a, z = rel(mx, my)
-            if -0.4 < z <= SIGHT + 0.5:
+            if -0.4 < z <= sight + 0.5:
                 if m.model and m.model in getattr(lv, "models", {}):
                     items.append((z, 3, 0, "model", (a, m, mx, my)))
                 else:
@@ -1028,19 +1095,19 @@ class View:
         shots = fx.shots if fx.shots is not None else [(s.x, s.y) for s in lv.shots]
         for sx_, sy_ in shots:
             a, z = rel(sx_, sy_)
-            if -0.4 < z <= SIGHT:
+            if -0.4 < z <= sight:
                 items.append((z, 4, 0, "shot", a))
         for bx, by, k in fx.booms:
             a, z = rel(bx, by)
-            if -0.5 < z <= SIGHT:
+            if -0.5 < z <= sight:
                 items.append((z - 0.01, 5, 0, "boom", (a, k)))
         for mx, my, h, name, glow in fx.missiles:
             a, z = rel(mx, my)
-            if 0.15 < z <= SIGHT + 4:
+            if 0.15 < z <= sight + 4:
                 items.append((z, 4, 0, "missile", (a, h, name, glow)))
         for g in getattr(lv, "grenades", ()):
             a, z = rel(g.x, g.y)
-            if -0.3 < z <= SIGHT:
+            if -0.3 < z <= sight:
                 items.append((z, 2, 0, "grenade", (a, g)))
         items.sort(key=lambda it: (-it[0], it[1], it[2]))
 
@@ -1055,6 +1122,8 @@ class View:
             return c.drawn_as_wall() and c.texture() not in see_through
 
         for z, _o, _a, kind, obj in items:
+            if land is not None:
+                self.cur_z = z                                # the ground nearer than this hides it
             if kind == "wall":
                 cell, a, x, y = obj
                 opened = fx.doors.get((x, y), cell.open if cell.kind == "door" else 0.0)
@@ -1084,14 +1153,14 @@ class View:
                         overlays.append((hit, cell.label, cell.label_role, z))
             elif kind == "decal":
                 a, pic = obj
-                t = DECAY ** z
+                t = self.tz(z)
                 s = t * self.K * 0.9
-                base = self.yh + self.FS * t
-                fog = 0.4 + 0.6 * min(1.0, t * 1.6)
+                base = foot(a, z, t)
+                tone = self.toner(z, 0.4 + 0.6 * min(1.0, t * 1.6))
                 pp = pic.pick(pic.h * s)
                 s2 = pic.h * s / pp.h
                 self.blit(px, pp.rows, int(round(self.X(a, z) - pp.w * s2 / 2)), int(round(base - pp.h * s2)), s2,
-                          lambda c, i, j: shade(c, fog))
+                          tone)
             elif kind == "model":
                 a, m, mx, my = obj
                 self.draw_monster_model(px, lv, m, a, z, mx, my, fx, labels, cam, phase)
@@ -1100,28 +1169,49 @@ class View:
                 mdl = lv.models[it.model]
                 t = phase + fx.tick
                 self.draw_model(px, mdl, it.x, it.y, math.radians(mdl.turning * t), "idle", t, cam,
-                                lift=fx.lift_items.get(it, 0.0) * 0.3)
+                                lift=fx.lift_items.get(it, 0.0) * 0.3 + gnd(a, z))
             elif kind == "item":
                 a, it = obj
                 self.draw_thing(px, lv.sprites.get(it.sprite), a, z, it.size, None, fx, labels=None,
-                                lift=fx.lift_items.get(it, 0.0))
+                                lift=fx.lift_items.get(it, 0.0), ground=gnd(a, z))
+            elif kind == "prop":
+                a, x, y, prop = obj
+                mdl = (getattr(lv, "models", None) or {}).get(prop.get("model"))
+                if mdl is not None:
+                    self.draw_model(px, mdl, x, y, (x * 7 + y * 13) % 6.283, "idle", phase + fx.tick, cam,
+                                    lift=gnd(a, z), size=float(prop.get("size", 1.0)))
+                else:
+                    pic = lv.sprites.get(prop.get("sprite"))
+                    self.draw_thing(px, pic, a, z, float(prop.get("size", 0.8)), None, fx, labels=None, ground=gnd(a, z))
+            elif kind == "landmark":
+                a, mark = obj
+                mx_, my_ = mark["at"][:2]
+                mdl = (getattr(lv, "models", None) or {}).get(mark.get("model"))
+                if mdl is not None:
+                    self.draw_model(px, mdl, mx_, my_, math.radians(float(mark.get("turn", 0))), "idle", phase + fx.tick,
+                                    cam, lift=lv.ground(mx_, my_) + float(mark.get("lift", 0)),
+                                    size=float(mark.get("size", 1.0)))
+                elif lv.sprites.get(mark.get("sprite")) is not None:
+                    self.draw_thing(px, lv.sprites.get(mark.get("sprite")), a, z, float(mark.get("size", 2.0)), None, fx,
+                                    labels=None, ground=lv.ground(mx_, my_) + float(mark.get("lift", 0)))
             elif kind == "crate":
                 a, heavy = obj
                 pic = (lv.sprites.get("container") if heavy else None) or lv.sprites.get("crate") or CRATE
-                self.draw_thing(px, pic, a, z, 0.98 if heavy else 0.75, None, fx, labels=None)
+                self.draw_thing(px, pic, a, z, 0.98 if heavy else 0.75, None, fx, labels=None, ground=gnd(a, z))
             elif kind == "grenade":
                 a, g = obj
-                self.draw_thing(px, lv.sprites.get("grenade") or GRENADE, a, z, 0.26, None, fx, labels=None)
+                self.draw_thing(px, lv.sprites.get("grenade") or GRENADE, a, z, 0.26, None, fx, labels=None,
+                                ground=gnd(a, z))
                 if (phase + g.fuse) % 2 == 0 or g.fuse <= 1:          # its light blinks; on the last beat, steady
-                    t = DECAY ** z
-                    self.glow(px, self.X(a, z), self.yh + self.FS * t - 0.2 * REF_H * t * self.K * 0.26 * 3,
+                    t = self.tz(z)
+                    self.glow(px, self.X(a, z), foot(a, z, t) - 0.2 * REF_H * t * self.K * 0.26 * 3,
                               max(1.5, 3.0 * t * self.K), (255, 40, 30), 0.85)
             elif kind == "missile":
                 a, h, name, glow = obj
-                t = DECAY ** z
+                t = self.tz(z)
                 s = t * self.K * 0.9
                 x = self.X(a, z)
-                y = self.yh + self.FS * t - h * REF_H * t * self.K
+                y = foot(a, z, t) - h * REF_H * t * self.K
                 if glow:
                     self.glow(px, x, y, 7 * s + 1, glow, 0.6)
                 pic = lv.sprites.get(name) or (GRENADE if name == "grenade" else ROCKET)
@@ -1129,24 +1219,25 @@ class View:
             elif kind == "flame":
                 a, x, y, left = obj
                 pic = FLAMES[(phase + x * 7 + y * 3) % len(FLAMES)]
-                self.draw_thing(px, lv.sprites.get("flame") or pic, a, z, 0.45 + min(0.3, 0.07 * left), None, fx, labels=None)
+                self.draw_thing(px, lv.sprites.get("flame") or pic, a, z, 0.45 + min(0.3, 0.07 * left), None, fx, labels=None,
+                                ground=gnd(a, z))
             elif kind == "part":
                 a, h, col, size = obj
-                t = DECAY ** z
+                t = self.tz(z)
                 r = max(1, int(round(size * t * self.K * 0.9)))
                 x0 = int(self.X(a, z) - r / 2)
-                y0 = int(self.yh + self.FS * t - h * REF_H * t * self.K - r / 2)
+                y0 = int(foot(a, z, t) - h * REF_H * t * self.K - r / 2)
                 for yy in range(max(0, y0), min(self.PH, y0 + r)):
                     row = px[yy]
                     for xx in range(max(0, x0), min(self.PW, x0 + r)):
                         row[xx] = col
             elif kind == "mob":
                 a, m = obj
-                self.draw_thing(px, lv.sprites.get(m.sprite), a, z, m.size, m, fx, labels)
+                self.draw_thing(px, lv.sprites.get(m.sprite), a, z, m.size, m, fx, labels, ground=gnd(a, z))
             elif kind == "shot":
-                t = DECAY ** z
+                t = self.tz(z)
                 s = t * self.K * 0.9
-                mid = self.yh + self.FS * t - REF_H * t * self.K * 0.55
+                mid = foot(obj, z, t) - REF_H * t * self.K * 0.55
                 x = self.X(obj, z)
                 fb = lv.sprites.get("fireball")
                 self.glow(px, x, mid, 9 * s, (255, 120, 30), 0.45)
@@ -1154,8 +1245,9 @@ class View:
                     self.blit(px, fb.rows, int(round(x - fb.w * s / 2)), int(round(mid - fb.h * s / 2)), s)
             else:
                 a, k = obj
-                t = DECAY ** z
-                self.boom(px, self.X(a, z), self.yh + self.FS * t - 7 * t * self.K, (4 + 19 * k) * t * self.K, k)
+                t = self.tz(z)
+                self.boom(px, self.X(a, z), foot(a, z, t) - 7 * t * self.K, (4 + 19 * k) * t * self.K, k)
+        self.cur_z = -1e9                                     # what is in the hands is nearer than anything
         self.weapon(px, lv, fx)
         if any(k < 0.2 for _x, _y, k in fx.booms):
             px = recolour(px, lambda c: shade(c, 1.35))
@@ -1187,7 +1279,7 @@ class View:
         a, z = dx * rx + dy * ry, dx * fx_ + dy * fy_
         if z < 0.12:
             return None
-        t = DECAY ** z
+        t = self.tz(z)
         return self.half + a * self.LW * t, self.yh + self.FS * t - h * (self.FS + self.CH) * t, z
 
     def draw_model(self, px, mdl, wx, wy, heading, clip, t, cam, lift=0.0, size=1.0, gone=0.0, seed=0,
@@ -1214,7 +1306,7 @@ class View:
             def project(x, y, h):
                 dx, dy = x - cx_, y - cy_
                 a, z = dx * rx_ + dy * ry_, dx * fx_ + dy * fy_
-                t = DECAY ** (zm + (max(z, 0.0) - zm) * (1 - flat))
+                t = self.tz(zm + (max(z, 0.0) - zm) * (1 - flat))
                 return self.half + a * self.LW * t, self.yh + self.FS * t - h * (self.FS + self.CH) * t, max(z, 0.05)
         else:
             project = lambda x, y, h: self.project(cam, x, y, h)   # noqa: E731
@@ -1250,14 +1342,18 @@ class View:
             mat = mdl.materials[f[3]]
             rgb = f[4] or mat.rgb
             depth = (pts[0][2] + pts[1][2] + pts[2][2]) / 3
-            fog = (0.5 + 0.5 * min(1.0, DECAY ** depth * 1.6)) if not mat.glow else 1.0    # as sprites
+            fog = (0.5 + 0.5 * min(1.0, self.tz(depth) * 1.6)) if not mat.glow else 1.0    # as sprites
+            haze = None
+            if self.air is not None:                      # open land: into the haze instead (a lamp keeps more)
+                fog, haze = 1.0, self.air[0]
+                hk = (1.0 - math.exp(-depth / self.air[1])) * (0.35 if mat.glow else 1.0)
             if smooth:
                 cols = []
                 for i, p in zip(f[:3], (p0, p1, p2)):
                     n = _unit3(normals[i])
                     v = _unit3((ex - p[0], ey - p[1], self.EYE - p[2]))
                     c = model_mod.pbr(mat, rgb, (n[0], n[1], n[2]), light, v)
-                    cols.append([c[0] * fog, c[1] * fog, c[2] * fog])
+                    cols.append(list(mix(c, haze, hk)) if haze else [c[0] * fog, c[1] * fog, c[2] * fog])
             else:
                 n = _normal(p0, p1, p2)
                 if not cull and n[0] * (ex - p0[0]) + n[1] * (ey - p0[1]) + n[2] * (self.EYE - p0[2]) < 0:
@@ -1267,7 +1363,7 @@ class View:
                 mz_ = (p0[2] + p1[2] + p2[2]) / 3
                 v = _unit3((ex - mx_, ey - my_, self.EYE - mz_))
                 c = model_mod.pbr(mat, rgb, n, light, v)
-                cols = (int(c[0] * fog), int(c[1] * fog), int(c[2] * fog))
+                cols = mix(c, haze, hk) if haze else (int(c[0] * fog), int(c[1] * fog), int(c[2] * fog))
                 if flash:
                     cols = (255, 255, 255)
                 elif tint:
@@ -1279,6 +1375,14 @@ class View:
         if not shown:
             return None
         return top, (min(xs) + max(xs)) / 2
+
+    def toner(self, z, fog):
+        """How a thing this far off is coloured, for blit: darker with the distance indoors, into the haze in
+        open land."""
+        if self.air is None:
+            return lambda c, i, j: shade(c, fog)
+        haze, k = self.air[0], 1.0 - math.exp(-max(0.0, z) / self.air[1])
+        return lambda c, i, j: mix(c, haze, k)
 
     def shadow(self, px, x, base, w):
         for yy in range(int(base) - self.sy // 2, int(base) + 1):
@@ -1301,12 +1405,11 @@ class View:
         clip = ("attack" if m.intent in ("aim", "windup", "spin") or m.id in fx.emuzzle else
                 "walk" if m.id in fx.pos else "idle")
         lift = m.float * 0.6 + (fx.rise.get(m.id, 0.0) if fx.rise else 0.0)
-        if not m.float:
-            tz = DECAY ** z
-            self.shadow(px, self.X(a, z), self.yh + self.FS * tz, mdl.radius * 2 * m.size * self.LW * tz)
-        else:
-            tz = DECAY ** z
-            self.shadow(px, self.X(a, z), self.yh + self.FS * tz, mdl.radius * 1.4 * m.size * self.LW * tz)
+        g = lv.ground(mx, my) if getattr(lv, "land", None) is not None else 0.0
+        lift += g
+        tz = self.tz(z)
+        foot = self.yh + (self.FS - g * self.TALL) * tz
+        self.shadow(px, self.X(a, z), foot, mdl.radius * (1.4 if m.float else 2) * m.size * self.LW * tz)
         roll = 0.0
         if getattr(m, "ball", False):                  # a ball turns as far as it has rolled
             heading = m.heading or 0.0
@@ -1324,16 +1427,16 @@ class View:
                 if mm is m:
                     labels.append((max(0, row - 1 - rise // 2), int(round(x / self.sx - len(txt) / 2)), txt, r, z, False))
 
-    def draw_thing(self, px, pic, a, z, size, m, fx, labels, lift=0.0):
+    def draw_thing(self, px, pic, a, z, size, m, fx, labels, lift=0.0, ground=0.0):
         if pic is None:
             return
-        t = DECAY ** z
+        t = self.tz(z)
         s = t * self.K * size * (fx.lunge.get(m.id, 1.0) if m is not None else 1.0)
         target_h = pic.h * s
         pp = pic.pick(target_h)
         s = target_h / pp.h
         sw, sh = int(round(pp.w * s)), int(round(pp.h * s))
-        base = self.yh + self.FS * t
+        base = self.yh + (self.FS - ground * self.TALL) * t      # its feet: on the ground where it stands
         lift = (m.float * REF_H * t * self.K) if m is not None else lift * REF_H * t * self.K
         if m is not None and fx.rise.get(m.id):
             lift += fx.rise[m.id] * self.PH
@@ -1345,6 +1448,9 @@ class View:
                     if 0 <= xx < self.PW:
                         px[yy][xx] = shade(px[yy][xx], 0.6)
         fog = 0.5 + 0.5 * min(1.0, t * 1.6)
+        tone = self.toner(z, fog)
+        haze = self.air[0] if self.air is not None else None
+        hk = 1.0 - math.exp(-max(0.0, z) / self.air[1]) if haze else 0.0
         muzzle = pic.muzzle
         if m is not None and not m.dead:              # the frame for what it is doing
             if pic.attack is not None and (m.intent in ("aim", "windup", "spin") or m.id in fx.emuzzle):
@@ -1352,7 +1458,7 @@ class View:
             elif pic.walk and m.id in fx.pos and not m.float:
                 pp = pic.walk[getattr(m, "stride", 0) % len(pic.walk)].pick(target_h)
         if m is None:
-            self.blit(px, pp.rows, x0, y0, s, lambda c, i, j: shade(c, fog), z)
+            self.blit(px, pp.rows, x0, y0, s, tone, z)
             return
         flash = m.id in fx.flash
         tint = fx.tint.get(m.id)
@@ -1366,7 +1472,7 @@ class View:
                 return (255, 255, 255)
             if tint:
                 c = mix(c, tint, 0.6)
-            return shade(c, fog)
+            return shade(c, fog) if haze is None else mix(c, haze, hk)
         self.blit(px, pp.rows, x0, y0, s, fn, z)
         if m.intent == "windup" and not m.dead:                   # fire gathering in its hand
             fs = s * 0.8

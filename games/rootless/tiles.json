@@ -477,5 +477,48 @@
    "c": "#2e2a1e",
    "d": "#4a5a2c"
   }
+ },
+ "fence": {
+  "pixels": [
+   "ab..a.c.a...a...a.c.a...a...a.bd",
+   "dbddddddddddddddddddddddddddddbd",
+   "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "db.e.....e.....e.....e.....e..bd",
+   "dbc.c...c.c...c.c...c.c...c.c.bd",
+   "db...e.e...e.e...e.e...e.e...ebd",
+   "db....c.....c.....c.....c.....bd",
+   "db...e.e...e.e...e.e...e.e...ebd",
+   "dbc.c...c.c...c.c...c.c...c.c.bd",
+   "db.e.....e.....e.....e.....e..bd",
+   "dbc.c...c.c...c.c...c.c...c.c.bd",
+   "db...e.e...e.e...e.e...e.e...ebd",
+   "db....c.....c.....c.....c.....bd",
+   "db...e.e...e.e...e.e...e.e...ebd",
+   "dbc.c...c.c...c.c...c.c...c.c.bd",
+   "db.e.....e.....e.....e.....e..bd",
+   "dbc.c...c.c...c.c...c.c...c.c.bd",
+   "db...e.e...e.e...e.e...e.e...ebd",
+   "db....c.....c.....c.....c.....bd",
+   "db...e.e...e.e...e.e...e.e...ebd",
+   "dbc.c...c.c...c.c...c.c...c.c.bd",
+   "db.e.....e.....e.....e.....e..bd",
+   "dbc.c...c.c...c.c...c.c...c.c.bd",
+   "db...e.e...e.e...e.e...e.e...ebd",
+   "db....c.....c.....c.....c.....bd",
+   "db...e.e...e.e...e.e...e.e...ebd",
+   "dbc.c...c.c...c.c...c.c...c.c.bd",
+   "db.e.....e.....e.....e.....e..bd",
+   "dbc.c...c.c...c.c...c.c...c.c.bd",
+   "db...e.e...e.e...e.e...e.e...ebd",
+   "db....c.....c.....c.....c.....bd",
+   "db...e.e...e.e...e.e...e.e...ebd"
+  ],
+  "palette": {
+   "a": "#9a9a9a",
+   "b": "#4a4e54",
+   "c": "#6a6f74",
+   "d": "#6a6e74",
+   "e": "#8a8f94"
+  }
  }
 }

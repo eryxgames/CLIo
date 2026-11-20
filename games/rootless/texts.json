@@ -26,7 +26,11 @@
   "show_once": false
  },
  "e1m3_end": {
-  "text": "The hopper sinks into the warm swamp up to its fan pods. Out here the sim runs thin: the horizon flickers like a bad cable, and the planet over the ridges has a seam down its middle.\n\nThen the sky tears along that seam, and for a moment you see the inside of a pod's lid again - lit red - and hands on the release. \"Not yet,\" somebody says. \"He is still in there.\" The dark comes back.\n\nNext: User Space.",
+  "text": "The hopper sinks into the warm swamp up to its fan pods. Out here the sim runs thin: the horizon flickers like a bad cable, and the planet over the ridges has a seam down its middle.\n\nThen the sky tears along that seam, and for a moment you see the inside of a pod's lid again - lit red - and hands on the release. \"Not yet,\" somebody says. \"He is still in there.\" The dark comes back.\n\nIt lifts on a wider swamp. Fens to the horizon, lakes that smell of Xantrium, and far to the north-east a red light blinking on a mast.",
+  "show_once": false
+ },
+ "e1m4_end": {
+  "text": "The switch drops. The mast's lamp stops blinking and burns steady, and the fens go quiet - the drones settle where they hover, the water stops moving, the sky holds still like a picture.\n\n\"Relay reached,\" says the instructor bot, too calm. \"Evaluation complete. Uplink to User Space in three.\" Two. Nobody counts the one.\n\nNext: User Space.",
   "show_once": false
  }
 }

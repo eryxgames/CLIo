@@ -16,6 +16,7 @@
   "engine/game.py",
   "engine/gltf.py",
   "engine/keys.py",
+  "engine/land.py",
   "engine/level.py",
   "engine/levelbot.py",
   "engine/maze.py",

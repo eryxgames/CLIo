@@ -245,7 +245,20 @@ game, RØØTLESS, shows them.
   roll after you, drones in three sizes (scout, hornet swarm, warden) drawn as 3D models,
   three fuel cells, the launch controls - and the X-47B Swamp Hopper, flown out of the
   launch gate over a swamp under an alien dusk until its fuel runs out. Its own music, and
-  sounds for drones, balls and the hopper. E1M2's exit leads there; it ends the demo.
+  sounds for drones, balls and the hopper. E1M2's exit leads there.
+- **Open land** (`engine/land.py`, a level's `"land"`): hills, lakes and coasts made from a
+  seed, drawn in true perspective to the horizon, with the level's map (a camp, a compound)
+  set down on flattened ground. The ground is worked out from the coordinates, so it goes on
+  past the level as far as the picture reaches. Biomes by height colour it and grow props
+  (sprites or models; solid ones are in the way), landmarks stand far off and show on the
+  map, `things` and `scatter` put monsters and items about it the same way every time, and
+  far things fade into the haze. Deep water and cliffs stop a walker but not a drone that
+  floats or a machine that flies; hills hide what is behind them; a flying machine that runs
+  dry glides down to firm ground. `--check` checks a land, and the level bot crosses it.
+- **RØØTLESS E1M4 *Xantrium Fens***: open country past the refit plant. Fens and lakes of
+  toxic water, Xantrium crystals on the hills, a survey camp with a spare hopper and fuel
+  cells, a secret on the rocks, and a relay mast to the north-east whose compound holds the
+  switch that ends the simulation. Its own music. E1M3's ending leads there; it ends the demo.
 
 ### Changed
 

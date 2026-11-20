@@ -60,6 +60,24 @@
     "pause": true
    },
    {
+    "goto": "xantrium_fens"
+   }
+  ]
+ },
+ {
+  "id": "xantrium_fens",
+  "name": "Xantrium Fens",
+  "area": "Episode 1",
+  "description": "Open country past the refit plant: fens, lakes of toxic water, Xantrium on the hills, and a relay mast far off.",
+  "level": "e1m4",
+  "on_level_exit": [
+   {
+    "story": "e1m4_end"
+   },
+   {
+    "pause": true
+   },
+   {
     "win": "outro_demo"
    }
   ]

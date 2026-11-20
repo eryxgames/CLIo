@@ -20,6 +20,7 @@ class Bot(TextConsole):
         self.turns = 0
         self.last = None
         self.exit = None
+        self.fields = {}                                 # open land: the way to a goal from everywhere, by goal
 
     def out(self, text):
         self.lines.append(text)
@@ -61,6 +62,8 @@ class Bot(TextConsole):
         p = lv.player
         if (p.x, p.y) == (x, y):
             return None
+        if getattr(lv, "land", None) is not None:
+            return self.go_far(lv, x, y)
         for hot in (False, True):
             first = {(p.x, p.y): None}
             frontier = [(p.x, p.y)]
@@ -95,14 +98,76 @@ class Bot(TextConsole):
                 return self.face(lv, dx, dy) or "k"
         return None
 
-    def open_cell(self, lv, n, careful):
-        c = lv.cell(*n)
+    def go_far(self, lv, x, y):
+        """In open land: a step down the way to (x, y) worked out from the goal over the whole land (a search
+        from the player each beat is too slow there), kept a while and worked out again as things change."""
+        p = lv.player
+        flying = p.vehicle is not None and bool(p.vehicle.vehicle.get("fly"))
+        key = (x, y, flying, p.vehicle is not None)
+        got = self.fields.get(key)
+        if got is None or lv.beat - got[0] >= 25:
+            if len(self.fields) > 6:
+                self.fields.clear()
+            got = self.fields[key] = (lv.beat, self.field_to(lv, x, y))
+        field = got[1]
+        here = field.get((p.x, p.y))
+        best = None
+        for dx, dy in DIRS:
+            n = (p.x + dx, p.y + dy)
+            d = field.get(n)
+            if d is None or not self.open_cell(lv, n, True) or (here is not None and d >= here):
+                continue
+            if best is None or d < best[0]:
+                best = (d, dx, dy)
+        if best is None:
+            self.fields.pop(key, None)                   # the way is shut: work it out again next beat
+            return None
+        _, dx, dy = best
+        m = lv.monster_at(p.x + dx, p.y + dy)
+        if m is not None and not m.vehicle:             # blocked by a monster: face it and shoot
+            return self.face(lv, dx, dy) or "f"
+        return self.face(lv, dx, dy) or "k"
+
+    def field_to(self, lv, gx, gy):
+        """Steps to (gx, gy) from every cell (toxic ones count three), for go_far."""
+        import heapq
+        dist = {(gx, gy): 0}
+        heap = [(0, gx, gy)]
+        parked = {(m.x, m.y) for m in lv.monsters if not m.dead and not m.gone and (m.vehicle or m.barrel)}
+        parked.discard((gx, gy))                         # machines and barrels stay put: go round them
+        while heap:
+            d, cx, cy = heapq.heappop(heap)
+            if d > dist[(cx, cy)]:
+                continue
+            here = lv.cell(cx, cy)
+            cost = 3 if here.toxic else 1
+            for dx, dy in DIRS:
+                n = (cx + dx, cy + dy)
+                if not (0 <= n[0] < lv.w and 0 <= n[1] < lv.h) or n in parked or not self.open_ground(lv, lv.cell(*n)):
+                    continue
+                nd = d + cost
+                if nd < dist.get(n, 1 << 30):
+                    dist[n] = nd
+                    heapq.heappush(heap, (nd, n[0], n[1]))
+        return dist
+
+    def open_ground(self, lv, c):
+        """Can the player stand on (or fly over) this cell, things that move aside?"""
         if c.kind in ("wall", "panel", "exit", "switch") or c.crate or (c.kind == "door" and (c.sealed or c.open_while)):
             return False
         if c.kind == "door" and c.key and c.key not in lv.player.keys and c.open < 1:
             return False
-        if lv.player.vehicle is not None and (c.kind == "door" or c.teleport or c.lift):
+        v = lv.player.vehicle
+        if v is not None and (c.kind == "door" or c.teleport or c.lift):
             return False                                 # a machine goes through no doors
+        if (c.deep or c.steep) and not (v is not None and v.vehicle.get("fly")):
+            return False                                 # deep water, a cliff: only flying
+        return True
+
+    def open_cell(self, lv, n, careful):
+        c = lv.cell(*n)
+        if not self.open_ground(lv, c):
+            return False
         m = lv.monster_at(*n)
         if m is not None and m.vehicle:
             return bool(self.goals) and self.goals[0] == "board"
@@ -156,6 +221,8 @@ class Bot(TextConsole):
             self.goals.pop(0)
             if p.vehicle is not None:
                 return "out"
+        if p.vehicle is not None and "fuel" in p.vehicle.vehicle and p.vehicle.fuel <= 0 and not p.vehicle.started:
+            return "out"                                 # the tanks are dry: on foot from here
         if p.vehicle is not None:                      # riding: claw what is in reach (or shoot), else on to the goal
             ahead = lv.monster_at(p.x + DIRS[p.facing][0], p.y + DIRS[p.facing][1])
             if ahead is not None and not ahead.barrel:
@@ -229,6 +296,9 @@ class Bot(TextConsole):
         if weapon:
             return weapon
         cone = [m for m in lv.cone() if not m.barrel or self.barrel_worth(lv, m)]
+        w = lv.weapons.get(p.weapon) or {}
+        if w.get("kind") == "melee":                     # fists or a blade: only what is in reach
+            cone = [m for m in cone if lv.dist(m) <= 1]
         if cone:
             m = cone[0]
             return "f %s" % m.tag

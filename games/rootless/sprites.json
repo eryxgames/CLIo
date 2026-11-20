@@ -1538,5 +1538,118 @@
    "o": "#8a4220",
    "w": "#e8e4d8"
   }
+ },
+ "prop_reeds": {
+  "pixels": [
+   "..............",
+   "...a..........",
+   "a..a.a........",
+   "a...aa..a.....",
+   "a...ba..a.....",
+   "c...bc..aa....",
+   "c..abca.ba.aa.",
+   "c.a.bca.ba.aa.",
+   ".ca.cca.cc.aa.",
+   ".cb.ccb.cc.bc.",
+   ".cb.ccb.cc.bc.",
+   ".cb.ccb.cc.bc.",
+   ".bc.cbc.cb.cc.",
+   ".bc.cbc.cb.cc."
+  ],
+  "palette": {
+   "a": "#7a5a36",
+   "b": "#55603a",
+   "c": "#6d7646"
+  }
+ },
+ "prop_scrub": {
+  "pixels": [
+   "............",
+   "....a.......",
+   "....b..b.a..",
+   "...a.aaaaa..",
+   ".a.b.b.ab.bb",
+   "b.b.bb...aab",
+   "b.aabba.bba."
+  ],
+  "palette": {
+   "a": "#5a5a30",
+   "b": "#3c4a2a"
+  }
+ },
+ "prop_deadtree": {
+  "pixels": [
+   "..........aa....",
+   "..aa.....a......",
+   "....a...a...a...",
+   ".....a.....a....",
+   "......a...a.....",
+   ".........a......",
+   "..a.....a....a..",
+   "...aa.......a...",
+   ".....a.aa...a...",
+   "......aaa..a....",
+   ".......aa.a.....",
+   ".......aaa......",
+   ".......ab.......",
+   ".......ab.......",
+   ".......ab.......",
+   ".......ab.......",
+   ".......ab.......",
+   ".......ab.......",
+   ".......ab.......",
+   ".......ab.......",
+   ".......ab.......",
+   ".......ab.......",
+   ".......ab.......",
+   ".......ab.......",
+   ".......ab.......",
+   ".......ab......."
+  ],
+  "palette": {
+   "a": "#3a3028",
+   "b": "#4a3e32"
+  }
+ },
+ "prop_rock": {
+  "pixels": [
+   "............",
+   "...abbbbb...",
+   "..aacbbbb...",
+   "..acccbbbb..",
+   ".acccccbbbb.",
+   ".accccccbbb.",
+   "aacccccccbbb",
+   "aaccccccccbb"
+  ],
+  "palette": {
+   "a": "#45423e",
+   "b": "#7a746c",
+   "c": "#5c5852"
+  }
+ },
+ "prop_crystal": {
+  "pixels": [
+   "....aab.....",
+   "....aab.....",
+   "...aaabb....",
+   "...aacbb....",
+   "...cccbba...",
+   "..acccbbab..",
+   ".aacccbbab..",
+   ".aacccbbcbb.",
+   "aaacccbbcbb.",
+   "ccccccbbcbb.",
+   "ccccccbbcbb.",
+   "ccccccbbcbb.",
+   "ccccccbbcbb.",
+   "cdddddddddd."
+  ],
+  "palette": {
+   "a": "#7dffe6",
+   "b": "#2a8a80",
+   "c": "#43c9b9",
+   "d": "#3a3a36"
+  }
  }
 }

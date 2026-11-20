@@ -312,6 +312,27 @@ game, RØØTLESS, shows them.
 - The level bot steps out of the line of a gun that takes aim when it is hurt or the gun is
   far, keeps further from acid the more hurt it is, and looks further round when a lake is
   in its way.
+- **Tactics that pay.** Cover: a shot at someone beside a wall, crate or closed door that the
+  line of fire grazes hits the cover half the time - the player's shots and the monsters' alike;
+  walls along a corridor are no cover, the corner one leans out from is. Crossfire: a squad's
+  gun is surer for each other gun of the squad on him from another side. Monsters can carry
+  `"grenades"` (thrown at one in cover or out of sight, never on their own, three beats to get
+  out) and `"mines"` (laid unseen in doorways and by the cover they hold; a mine is an item with
+  `"pickup": {"mine": ...}`, seen only within 3 cells, never counted as an item found, set off
+  by blasts).
+- **Squads that fight as squads**: `assault` (the short guns and claws go in together while the
+  long guns pin him down), `sweep` (bounding overwatch: half move, half cover, by turns),
+  `ambush` (awake, still and silent until he comes close, then all fire at once) and `swarm` (a
+  pack circles until enough of it is near, comes in from every side, bites harder together, and
+  scatters when halved). Two more brains, `assault` and `swarm`. A monster's `"squad_tactic"`
+  says how it fights in a squad, and `"auto"` squads chain only monsters that fight alike.
+  Rooms of dungeons without end and of floors from a seed can hold packs.
+- RØØTLESS: **bugrats** (swarm bots: weak alone, a pack is another matter), **gc sweepers**
+  (sweep squad soldiers who mine what they hold) and **sigkill commandos** (assault, shotguns
+  and grenades); a training program, **SIM-4 Kill House** (`--level sim4`): a room for each kind
+  of squad. Bugrat packs roam SIM-1's fens; packs of all three come with depth in SIM-2 and SIM-3.
+- The level bot steps out of a grenade's blast, never steps on a mine it has seen, and leaves
+  alone items dropped where it cannot stand or under a parked machine.
 
 ### Changed
 

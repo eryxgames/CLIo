@@ -73,6 +73,8 @@ WEAPONS = {
           "burst": 2},
 }
 ACCURACY = (1.0, 0.95, 0.9, 0.82, 0.72, 0.62, 0.52, 0.44, 0.38)   # by distance in cells
+COVER = 0.5                  # a shot that would hit one standing in cover hits the cover instead, this often
+CROSSFIRE = 0.1              # a squad's gun is this much surer for each other gun of it on him from another side
 PELLET = (1.0, 1.0, 0.85, 0.6, 0.42, 0.3, 0.22, 0.16, 0.12)
 
 HELP = [
@@ -216,7 +218,7 @@ JOURNAL_KEEP = 20000         # lines of play a save keeps (a snapshot carries th
 class Monster:
     # what a monster's mind holds (engine/ai): an older save's monsters get these
     DEFAULTS = {"tactic": None, "role": None, "squad": None, "seen_at": None, "post": None, "side": 0, "goal": None,
-                "said": None}
+                "said": None, "spot": None, "grenades_left": 0, "mines_left": 0, "lobbed": None}
 
     def __init__(self, mid, kind, spec, x, y, tag):
         self.id, self.kind, self.spec = mid, kind, spec
@@ -265,6 +267,11 @@ class Monster:
         self.side = 0                                    # a flanker's side: -1 his left, 1 his right
         self.goal = None                                 # (x, y): where its tactic takes it (cover, a flank)
         self.said = None                                 # the tactic it last told the player about
+        self.spot = None                                 # (x, y): the cell its squad gave it (a swarm round him)
+        g, mn = spec.get("grenades"), spec.get("mines")
+        self.grenades_left = int(g.get("count", 1)) if isinstance(g, dict) else 0   # grenades it carries
+        self.mines_left = int(mn.get("count", 1)) if isinstance(mn, dict) else 0    # mines it can lay
+        self.lobbed = None                               # the beat it last threw a grenade
 
     @property
     def name(self):
@@ -287,6 +294,11 @@ class Item:
         self.size = float(self.pickup.get("size", 0.55))
         self.taken = False
         self.on_pickup = None
+
+    @property
+    def mine(self):
+        """A mine (``"pickup": {"mine": {...}}``): it goes off under the one who steps on it; not an item found."""
+        return isinstance(self.pickup.get("mine"), dict)
 
 
 class Grenade:
@@ -563,7 +575,7 @@ class Level:
         self.belts = [c for c in cells if c.conveyor is not None]
         self.fires = {}                                  # (x, y) -> beats it burns on
         self.total_kills = sum(1 for m in self.monsters if not m.barrel and not m.spec.get("boss"))
-        self.total_items = len(self.items)
+        self.total_items = sum(1 for it in self.items if not it.mine)
         self.total_secrets = sum(1 for row in self.grid for c in row if c.secret)
 
     def add_monster(self, kind, x, y):
@@ -790,6 +802,41 @@ class Level:
                 if self.ground(x, y) > h0 + (h1 - h0) * i / n + 0.05:
                     return False
         return True
+
+    def covered(self, sx, sy, tx, ty):
+        """Whether one at (tx, ty) is in cover from a shot from (sx, sy): a wall, a crate or a closed door right
+        beside it that the line of fire grazes (it passes within three quarters of a cell of the middle of
+        that cell, on the shooter's side), and the shooter two cells off or more. Walls along a corridor are
+        no cover; the corner one leans out from is."""
+        ux, uy = sx - tx, sy - ty
+        uu = ux * ux + uy * uy
+        if max(abs(ux), abs(uy)) < 2:
+            return False
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                cross = dx * uy - dy * ux
+                if (dx or dy) and dx * ux + dy * uy > 0 and 16 * cross * cross < 9 * uu \
+                        and self.cell(tx + dx, ty + dy).solid:
+                    return True
+        return False
+
+    def crossfire(self, m):
+        """How much surer a squad's gun is: others of its squad that see him from another side (60 degrees off)."""
+        sq = m.squad
+        if sq is None:
+            return 0.0
+        p = self.player
+        ux, uy = m.x - p.x, m.y - p.y
+        n = 0
+        for o in sq.members:
+            if o is m or o.dead or o.gone or not o.awake or o.attack.get("kind") not in ("hitscan", "projectile"):
+                continue
+            vx, vy = o.x - p.x, o.y - p.y
+            dot = ux * vx + uy * vy
+            if (dot <= 0 or 4 * dot * dot <= (ux * ux + uy * uy) * (vx * vx + vy * vy)) \
+                    and max(abs(vx), abs(vy)) <= int(o.attack.get("range", 8)) and self.line_of_sight(o.x, o.y, p.x, p.y):
+                n += 1
+        return min(2, n) * CROSSFIRE
 
     def eye_height(self, x, y):
         """How high one sees from at (x, y) in open land: the ground, and a head above it (higher flying)."""
@@ -1881,6 +1928,12 @@ class Level:
     def take(self, it):
         p, pk = self.player, it.pickup
         name = it.spec.get("name", it.iid)
+        if it.mine:                                      # stepped on a mine
+            it.taken = True
+            self.sfx("mine_click", "switch")
+            self.say("Click. %s" % (pk["mine"].get("text") or "A mine!"), "hurt")
+            self.blast(it.x, it.y, int(pk["mine"].get("blast", 40)), lead="The mine:")
+            return
         if "health" in pk:
             limit = int(pk.get("max", p.max_hp))
             if p.hp >= limit:
@@ -2160,6 +2213,8 @@ class Level:
             return False
         d = max(1, self.dist(target))
         hits = {}
+        stopped = 0
+        cover = not melee and self.covered(p.x, p.y, target.x, target.y)
         lo, hi = w.get("damage", [5, 10])
         if melee:
             if rng.random() < float(w.get("accuracy", 0.85)):
@@ -2169,6 +2224,9 @@ class Level:
                 for _ in range(int(w.get("pellets", 1))):
                     acc = (PELLET if w.get("pellets", 1) > 1 else ACCURACY)[min(d, 8)]
                     if rng.random() < acc:
+                        if cover and rng.random() < COVER:
+                            stopped += 1                 # into the wall or crate it stands behind
+                            continue
                         hits[target] = hits.get(target, 0) + rng.randint(lo, hi)
                     elif d <= 2 and w.get("spread") and rng.random() < w["spread"]:
                         near = [m for m in self.monsters if not m.dead and m is not target
@@ -2214,6 +2272,8 @@ class Level:
                     target.x, target.y = ox + fx_, oy + fy_
                     self.anim([FX(pos={target.id: (ox + fx_ * k, oy + fy_ * k)}) for k in (0.5, 0.85, 1.0)], 0.04)
                     self.say("%s is thrown back%s." % (target.tag, " into the acid" if self.cell(target.x, target.y).toxic else ""), "hit")
+        elif stopped:
+            self.say("Your shot hits the cover in front of %s." % target.tag, "dim")
         else:
             self.say("You miss %s." % target.tag, "dim")
         self.after_shot(w)
@@ -2383,6 +2443,10 @@ class Level:
             if g in self.grenades and not self.over:
                 self.grenades.remove(g)
                 self.blast(g.x, g.y, g.blast, lead="Another grenade:")
+        for it in [it for it in self.items if it.mine and not it.taken and max(abs(it.x - x), abs(it.y - y)) <= 1]:
+            if not it.taken and not self.over:           # and the mines
+                it.taken = True
+                self.blast(it.x, it.y, int(it.pickup["mine"].get("blast", 40)), lead="A mine goes up:")
 
     # ---- rockets, grenades, holes ------------------------------------------ #
     def line_ahead(self, target, n):
@@ -3088,12 +3152,21 @@ class Level:
             self.damage([(foe, total)], lead="%s shoots %s:" % (m.tag, foe.tag), source=m)
             return
         acc = a.get("accuracy") or [0.9, 0.85, 0.75, 0.62, 0.5, 0.42, 0.36, 0.3, 0.26]
-        total = 0
+        p = self.player
+        sure = acc[min(d, len(acc) - 1)] + self.crossfire(m)
+        cover = self.covered(m.x, m.y, p.x, p.y)
+        total = stopped = 0
         for _ in range(pellets):
-            if self.rng.random() < acc[min(d, len(acc) - 1)]:
+            if self.rng.random() < sure:
+                if cover and self.rng.random() < COVER:
+                    stopped += 1
+                    continue
                 total += self.rng.randint(lo, hi)
         if total:
             self.hurt(total, "%s shoots you." % m.tag, by=m)
+        elif stopped:
+            self.sfx("hit_wall")
+            self.say("%s's shot hits your cover." % m.tag, "dim")
         else:
             self.sfx("fly_by")
             self.say("%s's shot goes wide." % m.tag, "dim")
@@ -3156,6 +3229,41 @@ class Level:
             self.say("%s hurls fire%s!" % (m.tag, " at " + foe.tag if foe else ""), "wind")
         self.interrupt = self.interrupt or "fire coming"
 
+    def lob_at(self, m, x, y):
+        """A monster's grenade, thrown at (x, y) (``"grenades"`` in monsters.json): it lands there, its fuse
+        burning ``fuse`` beats (3: time to get out of it), and goes off for ``blast``."""
+        if m.dead or m.gone or m.grenades_left <= 0:
+            return
+        g = m.spec.get("grenades") or {}
+        m.grenades_left -= 1
+        m.lobbed = self.beat
+        p = self.player
+        way = bresenham(m.x, m.y, x, y)
+        n = max(3, 3 * (len(way) - 1))
+        self.sfx((m.spec.get("sounds") or {}).get("throw") or "throw")
+        self.anim([FX(missiles=[(gx, gy, 0.6 * (1 - k) + 1.1 * k * (1 - k), "grenade", None)])
+                   for gx, gy, k in [self.along(way, i / float(n)) + (i / float(n),) for i in range(1, n + 1)]], 0.035)
+        self.grenades.append(Grenade(x, y, int(g.get("fuse", 3)), int(g.get("blast", 30))))
+        dd = max(abs(x - p.x), abs(y - p.y))
+        where = "at your feet" if dd == 0 else "next to you" if dd == 1 else "%d cells away" % dd
+        self.say("%s throws a grenade - it lands %s!" % (m.tag if m.seen else "Someone", where), "alert")
+        self.sfx("bounce", "hit_wall")
+        self.interrupt = self.interrupt or "a grenade"
+
+    def lay_mine(self, m):
+        """A monster lays one of its mines (``"mines"`` in monsters.json) where it stands."""
+        spec = m.spec.get("mines") or {}
+        it = self.add_item(spec.get("item", "mine"), m.x, m.y)
+        if it is None or not it.mine:
+            if it is not None:
+                self.items.remove(it)
+            m.mines_left = 0
+            return None
+        m.mines_left -= 1
+        if m.seen:
+            self.say("%s kneels and sets something on the floor." % m.tag, "dim")
+        return it
+
     def bite(self, m, foe, dmg):
         if m.dead or m.gone:
             return
@@ -3167,7 +3275,13 @@ class Level:
         p = self.player
         if abs(p.x - m.x) + abs(p.y - m.y) == 1:
             self.sfx((m.spec.get("sounds") or {}).get("attack") or "hit")
-            self.hurt(self.rng.randint(lo, hi), (m.spec.get("bite") or "%s bites you.") % m.tag, by=m)
+            pack = 0                                     # the others of its squad at him too: worse together
+            if m.squad is not None:
+                pack = sum(1 for o in m.squad.members if o is not m and not o.dead and not o.gone
+                           and abs(p.x - o.x) + abs(p.y - o.y) == 1)
+            dmg = self.rng.randint(lo, hi) * (4 + min(3, pack)) // 4      # a quarter more for each other one
+            text = (m.spec.get("bite") or "%s bites you.") % m.tag
+            self.hurt(dmg, text if pack < 2 else text[:-1] + " - the pack is all over you.", by=m)
 
     def spawn(self, m, kind, count):
         made = []
@@ -3495,8 +3609,11 @@ class FrameConsole:
             if m is not None and m.seen:
                 return (240, 70, 60) if not m.barrel else (90, 170, 90)
             c = lv.cell(x, y)
-            if any(not it.taken and (it.x, it.y) == (x, y) for it in lv.items):
+            if any(not it.taken and (it.x, it.y) == (x, y) and not it.mine for it in lv.items):
                 return (240, 210, 90)
+            if any(not it.taken and (it.x, it.y) == (x, y) and it.mine for it in lv.items) \
+                    and max(abs(x - p.x), abs(y - p.y)) <= fp.MINE_SEEN:
+                return (255, 40, 30)
             if c.kind == "door":
                 return fp.KEY_COLOURS.get(c.key, (170, 140, 90)) if c.open < 1 else (90, 80, 60)
             if c.kind == "exit":
@@ -4017,6 +4134,21 @@ def validate(data):
                                         and len(gun["damage"]) == 2):
                 problems.append("monster '%s': its vehicle's gun should be a weapon with damage [least, most]" % kind)
         problems += ai.brain.problems(spec.get("brain"), "monster '%s'" % kind)
+        if spec.get("squad_tactic") is not None and spec["squad_tactic"] not in ai.squad.TACTICS:
+            problems.append("monster '%s': squad_tactic should be one of %s" % (kind, ", ".join(ai.squad.TACTICS)))
+        for gear, keys in (("grenades", ("count", "range", "fuse", "blast", "every")), ("mines", ("count",))):
+            g = spec.get(gear)
+            if g is None:
+                continue
+            if not isinstance(g, dict):
+                problems.append("monster '%s': %s should be an object" % (kind, gear))
+                continue
+            for k in keys:
+                if k in g and not (isinstance(g[k], int) and not isinstance(g[k], bool) and g[k] >= 0):
+                    problems.append("monster '%s': %s %s should be a whole number" % (kind, gear, k))
+            if gear == "mines" and not ((data.items or {}).get(g.get("item", "mine")) or {}).get("pickup", {}).get("mine"):
+                problems.append("monster '%s': its mines should be an item with \"pickup\": {\"mine\": ...} (\"%s\")"
+                                % (kind, g.get("item", "mine")))
         sp = spec.get("sprite") or kind
         models = getattr(data, "models", None) or {}
         if spec.get("model") and spec["model"] not in models:

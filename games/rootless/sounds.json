@@ -1034,5 +1034,165 @@
    "dur": 0.25,
    "vol": 0.18
   }
- ]
+ ],
+ "bugrat_sight": {
+  "notes": "e7:1 g7:1",
+  "tempo": 1400,
+  "wave": "square",
+  "vol": 0.14
+ },
+ "bugrat_bite": [
+  {
+   "wave": "noise",
+   "noise_rate": 7000,
+   "freq": 0,
+   "dur": 0.05,
+   "vol": 0.22,
+   "decay": 0.045,
+   "sustain": 0
+  },
+  {
+   "wave": "square",
+   "freq": [
+    1800,
+    900
+   ],
+   "dur": 0.05,
+   "vol": 0.12
+  }
+ ],
+ "bugrat_death": {
+  "wave": "square",
+  "freq": [
+   2400,
+   300
+  ],
+  "dur": 0.18,
+  "vol": 0.16
+ },
+ "sweeper_sight": [
+  {
+   "wave": "square",
+   "freq": [
+    880,
+    880
+   ],
+   "dur": 0.05,
+   "vol": 0.14
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 4000,
+   "freq": 0,
+   "dur": 0.12,
+   "vol": 0.12,
+   "decay": 0.1,
+   "sustain": 0
+  },
+  {
+   "wave": "square",
+   "freq": [
+    660,
+    660
+   ],
+   "dur": 0.06,
+   "vol": 0.14
+  }
+ ],
+ "sweeper_death": {
+  "wave": "triangle",
+  "freq": [
+   600,
+   80
+  ],
+  "dur": 0.4,
+  "vol": 0.22
+ },
+ "commando_sight": [
+  {
+   "wave": "saw",
+   "freq": [
+    140,
+    100
+   ],
+   "dur": 0.15,
+   "vol": 0.24
+  },
+  {
+   "wave": "saw",
+   "freq": [
+    180,
+    90
+   ],
+   "dur": 0.2,
+   "vol": 0.22
+  }
+ ],
+ "commando_death": {
+  "wave": "saw",
+  "freq": [
+   260,
+   30
+  ],
+  "dur": 0.55,
+  "vol": 0.26
+ },
+ "pin": [
+  {
+   "wave": "square",
+   "freq": [
+    2200,
+    2100
+   ],
+   "dur": 0.03,
+   "vol": 0.12
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 5000,
+   "freq": 0,
+   "dur": 0.1,
+   "vol": 0.14,
+   "decay": 0.08,
+   "sustain": 0
+  }
+ ],
+ "ambush": [
+  {
+   "wave": "square",
+   "freq": [
+    440,
+    440
+   ],
+   "dur": 0.08,
+   "vol": 0.2
+  },
+  {
+   "wave": "square",
+   "freq": [
+    330,
+    330
+   ],
+   "dur": 0.08,
+   "vol": 0.2
+  },
+  {
+   "wave": "square",
+   "freq": [
+    440,
+    440
+   ],
+   "dur": 0.12,
+   "vol": 0.2
+  }
+ ],
+ "mine_click": {
+  "wave": "square",
+  "freq": [
+   3000,
+   2800
+  ],
+  "dur": 0.025,
+  "vol": 0.2
+ }
 }

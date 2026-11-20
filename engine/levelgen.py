@@ -12,7 +12,7 @@ of them the deeper one is.
 """
 from __future__ import annotations
 
-from .chunks import _span, _weighted
+from .chunks import _span, _weighted, pack_cells, pack_problems
 
 POOL = "abcdfghijklmnopqrstuvyz0123456789!\"'()*-/<>?[]_{|}`"
 
@@ -201,6 +201,8 @@ def generate(spec, rng, depth, data, legend=None):
                     break
                 x, y = spots.pop()
                 g[y][x] = char_for(t["monster"])
+                for cx, cy in pack_cells(rng, t, (x, y), spots):     # a pack: the rest of it close by
+                    g[cy][cx] = char_for(t["monster"])
         for _ in range(rng.randint(ilo, ihi)):
             t = _weighted(rng, items) if items else None
             if t is None or not spots:
@@ -265,6 +267,8 @@ def problems(spec, data, where="generate"):
     for t in spec.get("monsters") or []:
         if not isinstance(t, dict) or t.get("monster") not in mons:
             out.append("%s: unknown monster %s" % (where, t.get("monster") if isinstance(t, dict) else t))
+        else:
+            out += pack_problems(t, where)
     for t in spec.get("items") or []:
         if not isinstance(t, dict) or t.get("item") not in items:
             out.append("%s: unknown item %s" % (where, t.get("item") if isinstance(t, dict) else t))

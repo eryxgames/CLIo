@@ -1319,6 +1319,19 @@
      ]
     },
     {
+     "monster": "bugrat",
+     "per_chunk": 0.04,
+     "on": [
+      "fen",
+      "mud"
+     ],
+     "away": 50,
+     "pack": [
+      4,
+      5
+     ]
+    },
+    {
      "monster": "warden",
      "per_chunk": 0.02,
      "on": [
@@ -1453,6 +1466,33 @@
      "monster": "spinlock",
      "weight": 1,
      "from": 4
+    },
+    {
+     "monster": "bugrat",
+     "weight": 1.5,
+     "from": 1,
+     "pack": [
+      3,
+      5
+     ]
+    },
+    {
+     "monster": "sweeper",
+     "weight": 1,
+     "from": 2,
+     "pack": [
+      2,
+      3
+     ]
+    },
+    {
+     "monster": "commando",
+     "weight": 0.7,
+     "from": 3,
+     "pack": [
+      2,
+      2
+     ]
     }
    ],
    "per_room": [
@@ -1591,6 +1631,33 @@
      "monster": "spinlock",
      "weight": 1,
      "from": 4
+    },
+    {
+     "monster": "bugrat",
+     "weight": 1.5,
+     "from": 1,
+     "pack": [
+      3,
+      5
+     ]
+    },
+    {
+     "monster": "sweeper",
+     "weight": 1,
+     "from": 2,
+     "pack": [
+      2,
+      3
+     ]
+    },
+    {
+     "monster": "commando",
+     "weight": 0.7,
+     "from": 3,
+     "pack": [
+      2,
+      2
+     ]
     }
    ],
    "per_room": [
@@ -1664,6 +1731,113 @@
    }
   },
   "bot": [
+   "E"
+  ]
+ },
+ "sim4": {
+  "name": "Kill House",
+  "title": "SIM-4: Kill House",
+  "intro": [
+   "A training program of the simulatron: combat tactics against squads.",
+   "A pack that circles before it bites, a sweep squad that bounds and marks its doorways,",
+   "an ambush that waits for you to walk in, and an assault on a bunker. Use the cover."
+  ],
+  "music": "swap_partition",
+  "death_text": "outro_lose",
+  "facing": "n",
+  "par": 260,
+  "map": [
+   "##E#####################################",
+   "#...............A..#...................#",
+   "#.....K............#..&..............h.#",
+   "#.......&......&...#......&............#",
+   "#..q....&..........+.....a&......b.....#",
+   "#.............r....#......&.....&......#",
+   "#...&.......&......#............&&&....#",
+   "#...........&......#...a&..............#",
+   "#.........K........#....&&.............#",
+   "#................m.#.................m.#",
+   "#..................#...................#",
+   "##############################+#########",
+   "#..................#..................m#",
+   "#.m......&.....uu..#..n......&......c..#",
+   "#..............u.u.#....&....&.........#",
+   "#.....&&........u..#....&.........&..c.#",
+   "#................u.#..............&....#",
+   "#..................+..............&....#",
+   "#...........&&.....#....&...........c..#",
+   "#..................#....&....&.........#",
+   "#.........h........#.C.......&.......c.#",
+   "#..................#...................#",
+   "#####+##################################",
+   "#..............#########################",
+   "#..sh...A..g...#########################",
+   "#..............#########################",
+   "#..............#########################",
+   "#..............#########################",
+   "#.n..@......m..#########################",
+   "#..............#########################",
+   "########################################"
+  ],
+  "legend": {
+   "u": {
+    "monster": "bugrat",
+    "squad": "pack"
+   },
+   "c": {
+    "monster": "sweeper",
+    "squad": "sweep"
+   },
+   "a": {
+    "monster": "sweeper",
+    "squad": "ambush"
+   },
+   "b": {
+    "monster": "commando",
+    "squad": "ambush"
+   },
+   "K": {
+    "monster": "commando",
+    "squad": "assault"
+   },
+   "q": {
+    "monster": "kworker",
+    "squad": "assault"
+   },
+   "r": {
+    "monster": "sweeper",
+    "squad": "assault"
+   },
+   "s": "shotgun",
+   "h": "shells",
+   "A": "armor",
+   "g": "grenades",
+   "m": "medkit",
+   "n": "clip",
+   "C": "chaingun"
+  },
+  "squads": {
+   "pack": {
+    "tactic": "swarm",
+    "gather": 3
+   },
+   "sweep": {
+    "tactic": "sweep",
+    "bound": 3
+   },
+   "ambush": {
+    "tactic": "ambush",
+    "guard": 3
+   },
+   "assault": {
+    "tactic": "assault"
+   }
+  },
+  "bot": [
+   "shotgun",
+   "armor",
+   "grenades",
+   "chaingun",
    "E"
   ]
  }

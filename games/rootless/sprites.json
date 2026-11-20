@@ -1651,5 +1651,171 @@
    "c": "#43c9b9",
    "d": "#3a3a36"
   }
+ },
+ "bugrat": {
+  "pixels": [
+   "..kk......kk..",
+   ".kGgk....kgGk.",
+   ".kGGGkkkkGGGk.",
+   "..kGggggggGk..",
+   "..kgEEggEEgk..",
+   "..kggggggggk..",
+   "...kgkwwkgk...",
+   "..kGGkkkkGGk..",
+   ".kGGrGGGGrGGk.",
+   ".kk.kk..kk.kk."
+  ],
+  "palette": {
+   "k": "#1c1a20",
+   "G": "#5a5560",
+   "g": "#9a94a0",
+   "E": "#ff3b2f",
+   "w": "#e8e4d8",
+   "r": "#8a4a2a"
+  },
+  "keep": "E",
+  "attack": [
+   "..kk......kk..",
+   ".kGgk....kgGk.",
+   ".kGGGkkkkGGGk.",
+   "..kGggggggGk..",
+   "..kgEEggEEgk..",
+   "..kggggggggk..",
+   "...kwkkkkwk...",
+   "..kGwkkkkwGk..",
+   ".kGGrGGGGrGGk.",
+   ".kk.kk..kk.kk."
+  ]
+ },
+ "sweeper": {
+  "pixels": [
+   "......kkkk......",
+   ".....kWWWWk.....",
+   "....kWVVVVWk....",
+   "....kwWWWWwk....",
+   ".....kkwwkk.....",
+   "...kkWWWWWWkk...",
+   "..kWWYYYYYYWWk..",
+   "..kWwWWWWWWwWk..",
+   ".kWwkGGGGGGGGGgk",
+   ".kWk.kwWWwk.kWk.",
+   ".kk..kWWWWk..kk.",
+   ".....kwwwwk.....",
+   ".....kWk.kWk....",
+   ".....kWk.kWk....",
+   ".....kwk.kwk....",
+   ".....kWk.kWk....",
+   "....kbbk.kbbk...",
+   "....kkkk.kkkk..."
+  ],
+  "palette": {
+   "k": "#24262a",
+   "W": "#c8ccd0",
+   "w": "#8c949c",
+   "V": "#40d0e0",
+   "Y": "#e8c040",
+   "G": "#4a4c50",
+   "g": "#6e7078",
+   "b": "#3a3c40",
+   "F": "#ffe08a"
+  },
+  "keep": "V",
+  "attack": [
+   "......kkkk......",
+   ".....kWWWWk.....",
+   "....kWVVVVWk....",
+   "....kwWWWWwk....",
+   ".....kkwwkk.....",
+   "...kkWWWWWWkk...",
+   "..kWWYYYYYYWWk..",
+   "..kWwWWWWWWwWk.F",
+   ".kWwkGGGGGGGGGgk",
+   ".kWk.kwWWwk.kWk.",
+   ".kk..kWWWWk..kk.",
+   ".....kwwwwk.....",
+   ".....kWk.kWk....",
+   ".....kWk.kWk....",
+   ".....kwk.kwk....",
+   ".....kWk.kWk....",
+   "....kbbk.kbbk...",
+   "....kkkk.kkkk..."
+  ],
+  "muzzle": [
+   15,
+   8
+  ]
+ },
+ "commando": {
+  "pixels": [
+   "......kkkk......",
+   ".....kBBBBk.....",
+   "....kBEbbEBk....",
+   "....kBbkkbBk....",
+   ".....kbsbbk.....",
+   "...kkRRRRRRkk...",
+   "..kRrROsOsORrk..",
+   "..kRBBRRRRBBRk..",
+   ".kRBkGGGGGGGGGGk",
+   ".kRk.kBBBBk.kRk.",
+   ".kk..kRrrRk..kk.",
+   ".....kBBBBk.....",
+   ".....kBk.kBk....",
+   ".....kRk.kRk....",
+   ".....kBk.kBk....",
+   ".....kBk.kBk....",
+   "....kbbk.kbbk...",
+   "....kkkk.kkkk..."
+  ],
+  "palette": {
+   "k": "#1a1416",
+   "B": "#2e2a2c",
+   "b": "#4a4446",
+   "E": "#ff5030",
+   "s": "#8a8070",
+   "R": "#7a1e22",
+   "r": "#b0343a",
+   "O": "#c8a040",
+   "G": "#5a5c60",
+   "F": "#ffe08a"
+  },
+  "keep": "E",
+  "attack": [
+   "......kkkk......",
+   ".....kBBBBk.....",
+   "....kBEbbEBk....",
+   "....kBbkkbBk....",
+   ".....kbsbbk.....",
+   "...kkRRRRRRkk...",
+   "..kRrROsOsORrk..",
+   "..kRBBRRRRBBRk.F",
+   ".kRBkGGGGGGGGGGk",
+   ".kRk.kBBBBk.kRk.",
+   ".kk..kRrrRk..kk.",
+   ".....kBBBBk.....",
+   ".....kBk.kBk....",
+   ".....kRk.kRk....",
+   ".....kBk.kBk....",
+   ".....kBk.kBk....",
+   "....kbbk.kbbk...",
+   "....kkkk.kkkk..."
+  ],
+  "muzzle": [
+   15,
+   8
+  ]
+ },
+ "mine": {
+  "pixels": [
+   "..kkkk..",
+   ".kgRRgk.",
+   "kGggggGk",
+   ".kkkkkk."
+  ],
+  "palette": {
+   "k": "#1c1c20",
+   "G": "#4a4e46",
+   "g": "#6a7060",
+   "R": "#ff3020"
+  }
  }
 }

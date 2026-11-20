@@ -1560,11 +1560,31 @@ The presets, by their weights (`close`, `keep`, `cover`, `flank`, `retreat`, `ho
 | `soldier` | takes cover, keeps its distance, works round your side |
 | `heavy` | keeps its distance, holds its ground, takes cover; flees late |
 | `coward` | falls back when hurt, takes cover, keeps its distance |
+| `assault` | comes at you, works round your side, takes cover now and then |
+| `swarm` | comes at you and round you; it fights to the end, unless its pack breaks |
 
 An object brain names a `"kind"` (a preset) and changes any of its weights, `"flee"` (0..1),
 `"memory"` (beats) and `"range"` ([near, far] cells; a gun's is its `keep`, a claw's is 1). Its
 manual page (`man kworker`) says how it fights. Barrels, vehicles, bosses and spawners have no
 brain.
+
+**What pays.** The choices are worth making because the rules reward them - for the player too:
+
+- **Cover.** A shot at someone standing beside a wall, a crate or a closed door that the line of
+  fire grazes hits the cover instead, half the time ("Your shot hits the cover in front of k2",
+  "k1's shot hits your cover"). Walls along a corridor are no cover, nor is anything at arm's
+  length; the corner a gunner leans out from is. Coming from another side takes it away.
+- **Crossfire.** A squad's gun is a tenth surer for each other gun of its squad that has him in
+  sight from another side (60 degrees off or more), two tenths at most.
+- **Grenades.** `"grenades": {"count": 2, "range": 5, "fuse": 3, "blast": 30, "every": 6}` on a
+  monster: it throws one at him (or next to him) when he is in cover from it, or out of its sight
+  where it knows he is - never where one of its own would be caught, never when it has a clear
+  shot. A fuse of 3 gives him two moves to get out of it.
+- **Mines.** `"mines": {"count": 1, "item": "mine"}`: it lays one where it stands - a doorway, a
+  corridor, or by the cover it holds - when he does not see it, and moves off. A mine is an item
+  with `"pickup": {"mine": {"blast": 40}}`: it goes off under the player, is seen only within 3
+  cells (6 in night goggles, a blinking red light), is never counted among the items found, and a
+  blast next to it sets it off. A level can lay mines in its map too.
 
 **Squads.** Monsters in a squad know what any of them knows: when one sees the player, all of
 them know where he is, and when one is woken it calls the others (`k1 calls the others`). The
@@ -1583,19 +1603,29 @@ land's `"things"`), and give it a tactic in the level's `"squads"`:
 | `fire_team` | half of those with guns pin him down from where they are; the rest flank |
 | `hold` | every member keeps by its post until he comes within `guard` cells of the squad (6), or hurts one of them; then a pincer |
 | `rush` | all of them at him |
+| `assault` | those that fight close (claws, short guns: a `keep` ending at 4 or less) go in together; the long guns pin him down; grenades flush him out |
+| `sweep` | bounding overwatch: two halves take turns every `bound` beats (3), one moving up while the other holds and covers it; they mine the doorways and cover they hold |
+| `ambush` | every member is awake but still and silent where it was put, even when it sees him, until he comes within `guard` cells of one (3, heard if not seen), hurts one, or looks one in the face within 4; then all that can see him fire at once ("Ambush!") and fight on as a pincer |
+| `swarm` | a pack keeps off and circles out of his eyes until `gather` of it (3) are near him, then all come in at once, each to its own side of him. Each one at him bites a quarter harder for every other one of the pack at him (up to three). When fewer than half are left the rest scatter |
 
 `"memory"` is how long the squad hunts where he was last seen (12 beats). The parts only weigh
 in each member's own choice: a hurt flanker still falls back. `"auto"` puts brainy monsters
 that stand near each other into squads by themselves: a chain of them, each within `"radius"`
-cells of the next (4); a lone one stays alone.
+cells of the next (4); a lone one stays alone. A monster's `"squad_tactic"` in monsters.json
+says how it fights in a squad (bugrats `swarm`, sweepers `sweep`): only monsters that fight
+alike chain together, and the squad fights that way (else by the `"auto"`'s own `"tactic"`).
 
 In a world without end, a site's legend squads and the `"auto"` squads are made a chunk at a
 time (a squad never reaches over a chunk's edge), and a spawn can come as a **pack**: so many
-together, one squad, with the pack's own tactic.
+together, one squad, with the pack's own tactic (or its monster's `"squad_tactic"`).
 
 ```json
 "spawns": [{"monster": "scout", "per_chunk": 0.07, "pack": [2, 3], "tactic": "fire_team"}]
 ```
+
+A room's monsters in a dungeon without end or a floor from a seed can come as packs too
+(`{"monster": "bugrat", "from": 1, "pack": [3, 5]}`): the rest of the pack stand next to the
+first, and the level's `"auto"` squads make them one.
 
 A squad that was never woken is forgotten with its chunk and made again, the same, when he comes
 back; a squad that fought is kept, asleep, with its chunk.

@@ -26,7 +26,9 @@ def beat(lv, heard=None):
 
 def group(lv, auto, members=None):
     """Brainy monsters put near each other (within ``radius`` cells, a chain of them) form squads: ``auto`` is a
-    level's ``"squads": {"auto": {...}}``."""
+    level's ``"squads": {"auto": {...}}``. Only monsters that fight alike in a squad (their monsters.json
+    ``"squad_tactic"``: bugrats swarm) chain together, and the squad fights that way, else by the ``"tactic"``
+    given (pincer)."""
     if not isinstance(auto, dict):
         return
     radius = int(auto.get("radius", 4))
@@ -43,11 +45,13 @@ def group(lv, auto, members=None):
         while i < len(group_):
             a = group_[i]
             for o in pool:
-                if o.id not in done and max(abs(o.x - a.x), abs(o.y - a.y)) <= radius:
+                if o.id not in done and max(abs(o.x - a.x), abs(o.y - a.y)) <= radius \
+                        and o.spec.get("squad_tactic") == m.spec.get("squad_tactic"):
                     done.add(o.id)
                     group_.append(o)
             i += 1
         if len(group_) >= 2:
             name = squad.free_name(lv, "auto")
+            spec = dict(auto, tactic=squad.tactic_of(group_, auto.get("tactic", "pincer")))
             for o in group_:
-                squad.join(lv, o, name, spec=auto)
+                squad.join(lv, o, name, spec=spec)

@@ -5,8 +5,8 @@
 It walks to its goals in order (the level's ``"bot"`` list: item ids or map
 characters; the exit ``E`` last; ``board`` climbs into the nearest vehicle and
 ``out`` climbs down), turns to face what it can see, shoots with the gun that suits
-the distance, sidesteps fire (and a gun that takes aim, when hurt or far off) and steps off a boss's marked
-floor. It is not clever:
+the distance, sidesteps fire (and a gun that takes aim, when hurt or far off), steps off a boss's marked
+floor and out of a grenade's blast, and never steps on a mine it has seen. It is not clever:
 if it can finish a level, a person can.
 """
 import math
@@ -24,6 +24,7 @@ class Bot(TextConsole):
         self.last = None
         self.exit = None
         self.fields = {}                                 # open land: the way to a goal from everywhere, by goal
+        self.mines = set()                               # mines it has seen: never stepped on
 
     def out(self, text):
         self.lines.append(text)
@@ -141,8 +142,10 @@ class Bot(TextConsole):
         if plan and plan[0] == (x, y) and lv.beat - plan[1] < 10 and plan[2] and plan[2][0] == (p.x, p.y):
             path = plan[2]
         else:
-            path = self.window_path(lv, x, y, R)
-            if len(path) < 2 and (p.x, p.y) != (x, y):       # stuck on a shore, at a wall: look further round
+            wide = getattr(self, "wide", None) == (x, y)     # this goal needed a wider look before: keep it
+            path = self.window_path(lv, x, y, R * 2 if wide else R)
+            if len(path) < 2 and (p.x, p.y) != (x, y) and not wide:   # stuck on a shore, at a wall: look further round
+                self.wide = (x, y)
                 path = self.window_path(lv, x, y, R * 2)
         if len(path) < 2:
             self.plan = None
@@ -241,7 +244,7 @@ class Bot(TextConsole):
             return False                                 # a machine goes through no doors
         if (c.deep or c.steep) and not (v is not None and v.vehicle.get("fly")):
             return False                                 # deep water, a cliff: only flying
-        return True
+        return not (self.mines and (c.x, c.y) in self.mines)
 
     def open_cell(self, lv, n, careful):
         c = lv.cell(*n)
@@ -252,6 +255,8 @@ class Bot(TextConsole):
             return bool(self.goals) and self.goals[0] == "board"
         if m is not None and m.barrel:
             return False
+        if careful is False and any(max(abs(g.x - n[0]), abs(g.y - n[1])) <= 1 for g in lv.grenades):
+            return False                                 # not into a grenade's blast
         return not (careful is False and n in getattr(lv, "fires", {}))
 
     def slide(self, lv, n, dx, dy):
@@ -294,7 +299,23 @@ class Bot(TextConsole):
         return None
 
     # ---- what to do ------------------------------------------------------ #
+    def look_for_mines(self, lv):
+        from .firstperson import MINE_SEEN
+        p = lv.player
+        r = MINE_SEEN * (2 if p.nightvision else 1)
+        for it in lv.items:
+            if it.mine and not it.taken and max(abs(it.x - p.x), abs(it.y - p.y)) <= r \
+                    and lv.line_of_sight(p.x, p.y, it.x, it.y):
+                if (it.x, it.y) not in self.mines:
+                    self.mines.add((it.x, it.y))
+                    self.fields.clear()
+                    self.plan = None
+        if self.mines:
+            gone = {(it.x, it.y) for it in lv.items if it.mine and not it.taken}
+            self.mines &= gone
+
     def decide(self, lv):
+        self.look_for_mines(lv)
         p = lv.player
         if self.goals and self.goals[0] == "out":
             self.goals.pop(0)
@@ -314,6 +335,17 @@ class Bot(TextConsole):
                 self.goals.pop(0)
                 return "w"
             return step or "w"
+        # out of a grenade's blast: a step that takes him furthest from it
+        live = [g for g in lv.grenades if g.fuse <= 3]
+        if live and min(max(abs(g.x - p.x), abs(g.y - p.y)) for g in live) <= 1:
+            def far(c):
+                return min(max(abs(g.x - c[0]), abs(g.y - c[1])) for g in live)
+            ways = [(dx, dy) for dx, dy in DIRS if lv.free(p.x + dx, p.y + dy)
+                    and not lv.cell(p.x + dx, p.y + dy).toxic and (p.x + dx, p.y + dy) not in self.mines]
+            if ways:
+                best = max(ways, key=lambda d: (far((p.x + d[0], p.y + d[1])), -DIRS.index(d)))
+                if far((p.x + best[0], p.y + best[1])) > far((p.x, p.y)):
+                    return self.step(lv, *best)
         # off the scheduled fire
         if (p.x, p.y) in lv.marks:
             for dx, dy in DIRS:
@@ -421,7 +453,8 @@ class Bot(TextConsole):
         """Where to go now: a known medkit when hurt, else the next goal."""
         p = lv.player
         if p.hp < 45:
-            meds = [it for it in lv.items if not it.taken and "health" in it.pickup and (it.x, it.y) in lv.seen_cells]
+            meds = [it for it in lv.items if not it.taken and "health" in it.pickup and (it.x, it.y) in lv.seen_cells
+                    and lv.monster_at(it.x, it.y) is None and self.open_ground(lv, lv.cell(it.x, it.y))]
             if meds:
                 it = min(meds, key=lambda it: abs(it.x - p.x) + abs(it.y - p.y))
                 return it.x, it.y
@@ -434,7 +467,9 @@ class Bot(TextConsole):
                     return True
                 return any(p.ammo.get(a, 0) < (12 if a == "shells" else 30) for a in (pk.get("ammo") or {}))
             near = [it for it in lv.items if not it.taken and (it.x, it.y) in lv.seen_cells
-                    and max(abs(it.x - p.x), abs(it.y - p.y)) <= 7 and helps(it)]
+                    and max(abs(it.x - p.x), abs(it.y - p.y)) <= 7 and helps(it)
+                    and lv.monster_at(it.x, it.y) is None          # not one under a parked machine,
+                    and self.open_ground(lv, lv.cell(it.x, it.y))]     # nor one dropped on a cliff
             if near:
                 it = min(near, key=lambda it: abs(it.x - p.x) + abs(it.y - p.y))
                 return it.x, it.y

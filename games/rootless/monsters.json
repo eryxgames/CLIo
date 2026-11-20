@@ -788,5 +788,146 @@
    "",
    "It flies over water and slopes until its fuel runs out, then glides down to the nearest firm, dry ground."
   ]
+ },
+ "bugrat": {
+  "name": "bugrat",
+  "role": "swarm bot",
+  "tag": "u",
+  "sprite": "bugrat",
+  "hp": 7,
+  "size": 0.5,
+  "sight": 8,
+  "attack": {
+   "kind": "melee",
+   "damage": [
+    1,
+    3
+   ],
+   "speed": 2
+  },
+  "brain": "swarm",
+  "squad_tactic": "swarm",
+  "bite": "%s gnaws at you.",
+  "sounds": {
+   "sight": "bugrat_sight",
+   "attack": "bugrat_bite",
+   "death": "bugrat_death"
+  },
+  "death": "%s pops and twitches.",
+  "man": [
+   "A scrap of a crawler, the size of a rat, built by the hundred.",
+   "",
+   "One goes down to a kick. They never come one at a time: a pack keeps off and circles until",
+   "enough of it is near, then comes at you from every side at once, and each one bites the",
+   "harder for the others at you. Kill half and the rest scatter. Stand with your back to a wall."
+  ]
+ },
+ "sweeper": {
+  "name": "gc sweeper",
+  "role": "sweep squad soldier",
+  "tag": "c",
+  "sprite": "sweeper",
+  "hp": 18,
+  "sight": 9,
+  "dodge": 0.15,
+  "attack": {
+   "kind": "hitscan",
+   "damage": [
+    3,
+    6
+   ],
+   "range": 8,
+   "keep": [
+    3,
+    6
+   ],
+   "eager": 0.5,
+   "accuracy": [
+    0.9,
+    0.85,
+    0.75,
+    0.62,
+    0.5,
+    0.4,
+    0.32,
+    0.26,
+    0.2
+   ]
+  },
+  "mines": {
+   "count": 1,
+   "item": "mine"
+  },
+  "brain": "soldier",
+  "squad_tactic": "sweep",
+  "drops": "clip",
+  "sounds": {
+   "sight": "sweeper_sight",
+   "attack": "pistol",
+   "death": "sweeper_death"
+  },
+  "death": "%s is collected.",
+  "man": [
+   "The garbage collector's sweep squads: mark, then sweep.",
+   "",
+   "Alone, a weak gun in a white suit. In a squad they bound: half of them move up while the",
+   "other half holds and covers them, turn and turn about, and shots from two sides at once",
+   "are surer. They mark the doorways they hold with mines - look at the floor."
+  ]
+ },
+ "commando": {
+  "name": "sigkill commando",
+  "role": "assault commando",
+  "tag": "K",
+  "sprite": "commando",
+  "hp": 26,
+  "sight": 9,
+  "dodge": 0.2,
+  "attack": {
+   "kind": "hitscan",
+   "damage": [
+    2,
+    5
+   ],
+   "pellets": 3,
+   "range": 5,
+   "keep": [
+    1,
+    4
+   ],
+   "eager": 0.6,
+   "accuracy": [
+    0.95,
+    0.9,
+    0.75,
+    0.55,
+    0.4,
+    0.3
+   ]
+  },
+  "grenades": {
+   "count": 2,
+   "range": 5,
+   "fuse": 3,
+   "blast": 30,
+   "every": 6
+  },
+  "brain": "assault",
+  "squad_tactic": "assault",
+  "drops": "shells",
+  "sounds": {
+   "sight": "commando_sight",
+   "attack": "shotgun",
+   "throw": "pin",
+   "death": "commando_death"
+  },
+  "death": "%s gets the signal it sends.",
+  "man": [
+   "Signal 9: it cannot be caught, blocked or ignored.",
+   "",
+   "A short gun and two grenades. Commandos come in close and together, while longer guns",
+   "pin you down; hide behind a corner and the grenade comes round it (three beats: move).",
+   "One alone goes down fast."
+  ]
  }
 }

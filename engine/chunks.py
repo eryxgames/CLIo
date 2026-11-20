@@ -44,6 +44,19 @@ def _hash(*parts):
 
 
 
+def pack_cells(rng, t, at, free):
+    """For a table entry with ``"pack": [fewest, most]``: the cells of ``free`` nearest ``at`` for the rest of the
+    pack (taken out of ``free``)."""
+    pack = t.get("pack")
+    if not (isinstance(pack, list) and len(pack) == 2):
+        return []
+    k = rng.randint(int(pack[0]), int(pack[1])) - 1
+    near = sorted(free, key=lambda c: (max(abs(c[0] - at[0]), abs(c[1] - at[1])), c[1], c[0]))[:max(0, k)]
+    for c in near:
+        free.remove(c)
+    return near
+
+
 def _weighted(rng, table):
     total = sum(max(0.0, float(t.get("weight", 1))) for t in table)
     if total <= 0:
@@ -162,7 +175,9 @@ class Chunks:
                         lv.total_kills += 1
                     sq = extra.get("squad")
                     if sq:                                   # a squad of the site's, or a pack: one per chunk
-                        spec = extra if extra.get("pack") else ai.squad.spec_of(lv, sq)
+                        spec = ai.squad.spec_of(lv, sq)
+                        if extra.get("pack"):
+                            spec = dict(extra, tactic=extra.get("tactic") or m.spec.get("squad_tactic") or "pincer")
                         ai.squad.join(lv, m, "%s@%d,%d" % (sq, key[0], key[1]), spec=spec)
                     made.append(m)
                 else:
@@ -171,7 +186,7 @@ class Chunks:
                         continue
                     it.home, it.spawned = key, (x, y)
                     it.on_pickup = extra.get("on_pickup")
-                    lv.total_items += 1
+                    lv.total_items += 0 if it.mine else 1
                 n += 1
             self.counted[key] = n
             auto = lv.spec.get("squads") if isinstance(lv.spec.get("squads"), dict) else {}
@@ -244,7 +259,7 @@ class Chunks:
                 del self.sleepers[key]                       # as it was made: made again when he comes back
                 self.spawned.discard(key)
                 lv.total_kills -= sum(1 for o in got if hasattr(o, "hp") and not o.barrel and not o.spec.get("boss"))
-                lv.total_items -= sum(1 for o in got if not hasattr(o, "hp"))
+                lv.total_items -= sum(1 for o in got if not hasattr(o, "hp") and not o.mine)
 
     def pristine(self, key, objs, seen):
         if key not in self.spawned or len(objs) != self.counted.get(key) or len(seen) != len(objs):
@@ -747,6 +762,8 @@ class DungeonMaker:
                 break
             x, y = free.pop()
             out.append(("monster", t["monster"], kx * N + x, ky * N + y, t))
+            for c in pack_cells(rng, t, (x, y), free):       # a pack: the rest of it close by
+                out.append(("monster", t["monster"], kx * N + c[0], ky * N + c[1], t))
         lo, hi = self.items_per_room
         items = [t for t in self.items if int(t.get("from", 0)) <= d]
         for _ in range(rng.randint(lo, hi)):
@@ -770,6 +787,20 @@ class DungeonMaker:
         return set(), set()
 
 
+def pack_problems(rule, where):
+    """What is wrong with a spawn or a room's monster that comes as a pack (``"pack": [fewest, most]``)."""
+    pack = rule.get("pack")
+    if pack is None:
+        return []
+    out = []
+    if not (isinstance(pack, list) and len(pack) == 2 and all(isinstance(v, int) and not isinstance(v, bool)
+                                                             for v in pack) and 1 <= pack[0] <= pack[1] <= 8):
+        out.append("%s: pack should be [fewest, most], 1 to 8 (for monster '%s')" % (where, rule.get("monster")))
+    if not rule.get("monster"):
+        out.append("%s: a pack is of monsters" % where)
+    return out + ai.squad.spec_problems(rule, "pack of %s" % rule.get("monster"), where)
+
+
 def problems(spec, data, where="world"):
     """What is wrong with a level's ``"world"`` (for --check)."""
     out = []
@@ -791,14 +822,7 @@ def problems(spec, data, where="world"):
             out.append("%s: unknown monster '%s'" % (where, rule["monster"]))
         if rule.get("item") and rule["item"] not in items:
             out.append("%s: unknown item '%s'" % (where, rule["item"]))
-        pack = rule.get("pack")
-        if pack is not None:
-            if not (isinstance(pack, list) and len(pack) == 2 and all(isinstance(v, int) and not isinstance(v, bool)
-                                                                     for v in pack) and 1 <= pack[0] <= pack[1] <= 8):
-                out.append("%s: pack should be [fewest, most], 1 to 8 (for monster '%s')" % (where, rule.get("monster")))
-            if not rule.get("monster") or rule in (spec.get("monsters") or []):
-                out.append("%s: a pack is for a monster in \"spawns\" on open land" % where)
-            out += ai.squad.spec_problems(rule, "pack of %s" % rule.get("monster"), where)
+        out += pack_problems(rule, where)
     for i, s in enumerate(spec.get("sites") or []):
         if not isinstance(s, dict) or not isinstance(s.get("map"), list):
             out.append("%s: site %d should have a map" % (where, i + 1))

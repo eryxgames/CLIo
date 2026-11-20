@@ -225,5 +225,16 @@
    "sound": "refuel",
    "text": "A Mandate supply drop - fuel! 12 more beats in the air."
   }
+ },
+ "mine": {
+  "name": "mine",
+  "description": "A pressure mine: it goes off under whoever steps on it.",
+  "pickup": {
+   "mine": {
+    "blast": 40
+   },
+   "sprite": "mine",
+   "size": 0.25
+  }
  }
 }

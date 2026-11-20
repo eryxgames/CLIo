@@ -20,7 +20,13 @@ he is looking at it (``exposed``), how many friends are near, its squad's role f
 - and a little for keeping to what it was doing, so it does not dither. A brainy monster only knows
 where the player is when it (or its squad) can see or hear him; it loses him after ``"memory"`` beats.
 
-``"brain"`` is a preset name (``brute``, ``skirmisher``, ``soldier``, ``heavy``, ``coward``) or an object:
+Beside its main attack, a brainy monster may carry ``"grenades"`` ({count, range, fuse, blast, every}): it
+throws one where he is (or next to him) when he is in cover from it, or out of its sight but known - never
+where one of its own would be caught - and ``"mines"`` ({count, item}): it lays one in a doorway, a
+corridor or by the cover it holds or falls back through, when he does not see it.
+
+``"brain"`` is a preset name (``brute``, ``skirmisher``, ``soldier``, ``heavy``, ``coward``, ``assault``,
+``swarm``) or an object:
 a ``"kind"`` (a preset) with any weight changed (``close``, ``keep``, ``cover``, ``flank``, ``retreat``,
 ``hold``), ``"flee"`` (0..1 of its health), ``"memory"`` (beats), ``"range"`` ([near, far] cells).
 
@@ -41,6 +47,10 @@ BRAINS = {
               "flee": 0.15, "memory": 14},
     "coward": {"close": 0.2, "keep": 0.8, "cover": 1.2, "flank": 0.3, "retreat": 1.6, "hold": 0.2,
                "flee": 0.6, "memory": 6},
+    "assault": {"close": 1.1, "keep": 0.5, "cover": 0.6, "flank": 1.0, "retreat": 0.3, "hold": 0.1,
+                "flee": 0.2, "memory": 12},
+    "swarm": {"close": 1.2, "keep": 0.0, "cover": 0.0, "flank": 0.9, "retreat": 0.2, "hold": 0.0,
+              "flee": 0.0, "memory": 10},
 }
 WEIGHTS = ("close", "keep", "cover", "flank", "retreat", "hold")
 MARK = {"cover": "D", "flank": "F", "retreat": "B", "hold": "H", "search": "?", "keep": "K"}
@@ -180,10 +190,17 @@ def flank_spot(lv, m, tx, ty, lo, hi, side):
 
 def think(lv, m, b, known, seen, d, los):
     """Its tactic for this beat."""
+    role = m.role
+    if role == "rout":
+        return "retreat"
     if known is None:
         if m.seen_at is not None:
             return "search"
         return "hold"
+    if role == "circle":
+        return "flank"                                   # a pack keeps off, round him, until it is together
+    if role == "swarm":
+        return "close"
     lo, hi = b["range"]
     ranged = b["ranged"]
     hpf = max(0.0, m.hp / float(max(1, m.max_hp)))
@@ -201,7 +218,6 @@ def think(lv, m, b, known, seen, d, los):
     s["flank"] = w["flank"] * (0.45 + 0.55 * nerve) * (1.0 if d >= 3 else 0.2) * (1.0 if open_ else 0.6) * (1 - fear)
     s["retreat"] = w["retreat"] * 2.0 * fear * (1 - 0.5 * nerve)
     s["hold"] = w["hold"] * (0.6 if (ranged and los and lo <= d <= hi) else 0.1)
-    role = m.role
     if role == "point":
         s["close"] += 0.3
         s["keep"] += 0.3
@@ -212,6 +228,12 @@ def think(lv, m, b, known, seen, d, los):
         s["hold"] += 0.5
     elif role == "guard":
         s["hold"] += 1.5
+    elif role == "advance":                              # a sweep's half that moves up
+        s["close"] += 0.5
+        s["flank"] += 0.4
+    elif role == "overwatch":                            # the half that covers it
+        s["hold"] += 0.8
+        s["keep"] += 0.4
     if m.tactic in s:
         s[m.tactic] += 0.15                              # keep to it: no dithering
     for k in s:
@@ -246,11 +268,21 @@ def act(lv, m):
     adjacent = abs(m.x - p.x) + abs(m.y - p.y) == 1
     los = lv.line_of_sight(m.x, m.y, p.x, p.y)
     reach = int(a.get("range", 8))
+    if m.role == "hide":                                 # an ambush: still and quiet, whatever it sees
+        m.tactic, m.intent = "hold", None
+        if m.post and (m.x, m.y) != tuple(m.post) and not m.seen:
+            toward(lv, m, m.post[0], m.post[1], bool(m.float) and lv.land is not None, limit=10)
+        return
     tactic = think(lv, m, b, known, seen, max(abs(m.x - tx), abs(m.y - ty)), los)
     if tactic != m.tactic:
         m.goal = None
     m.tactic = tactic
     tell(lv, m, tactic)
+    if m.grenades_left > 0 and known is not None and tactic != "retreat" and m.intent is None and not m.stun:
+        spot = throw_spot(lv, m, known, seen, los)
+        if spot is not None:
+            lv.queue.append(lambda: lv.lob_at(m, spot[0], spot[1]))
+            return
     every = int(a.get("move_every", 1) or 1)
     still = every > 1 and (lv.beat + m.id) % every != 0
     fl = bool(m.float) and lv.land is not None
@@ -300,7 +332,7 @@ def act(lv, m):
             return
         eager = float(a.get("eager", 0.55)) * {"keep": 1.0, "hold": 1.1, "cover": 1.3, "flank": 0.5,
                                                  "retreat": 0.35, "close": 1.0, "search": 0.0}[tactic]
-        if m.role == "suppress":
+        if m.role in ("suppress", "overwatch"):
             eager += 0.15
         if flanking(m):
             eager *= 0.4                                 # on its way round: it fires when it gets there
@@ -318,12 +350,69 @@ def act(lv, m):
             return
     if still:
         return
+    if m.mines_left > 0 and known is not None and mine_here(lv, m, known, tactic):
+        lv.lay_mine(m)
+        m.lobbed = lv.beat
+        toward(lv, m, known[0], known[1], fl, away=True)    # and off it
+        return
     move(lv, m, b, tactic, tx, ty, known, los, d, fl, kind)
     if kind == "melee" and known is not None and max(abs(m.x - p.x), abs(m.y - p.y)) <= 3 \
             and tactic == "close" and m.intent != "charge":
         m.intent = "charge"
         if m.seen:
             lv.say("%s charges!" % m.tag, "charge")
+
+
+def throw_spot(lv, m, known, seen, los):
+    """Where to throw a grenade: at him, or a cell next to him, when he is in cover from this one or out of its
+    sight (but known), within its ``range`` and two cells off at least, where none of its own would be caught,
+    and the throw has a clear way. None: not now."""
+    g = m.spec.get("grenades") or {}
+    if m.lobbed is not None and lv.beat - m.lobbed < int(g.get("every", 6)):
+        return None
+    kx, ky = known
+    if not 2 <= max(abs(m.x - kx), abs(m.y - ky)) <= int(g.get("range", 5)):
+        return None
+    p = lv.player
+    if seen and los and not lv.covered(m.x, m.y, p.x, p.y):
+        return None                                      # it has a clear shot: it shoots
+    best = None
+    for dy in (0, -1, 1):
+        for dx in (0, -1, 1):
+            x, y = kx + dx, ky + dy
+            if lv.cell(x, y).solid or not lv.line_of_sight(m.x, m.y, x, y) or max(abs(x - m.x), abs(y - m.y)) < 2:
+                continue
+            if any(not o.dead and not o.gone and not o.barrel and max(abs(o.x - x), abs(o.y - y)) <= 1
+                   for o in lv.monsters):
+                continue                                 # one of its own would be caught
+            key = (max(abs(dx), abs(dy)), abs(dx) + abs(dy))
+            if best is None or key < best[0]:
+                best = (key, (x, y))
+    return best[1] if best else None
+
+
+def narrow(lv, x, y):
+    """A doorway or a corridor: where a mine is hard to go round."""
+    c = lv.cell(x, y)
+    if c.kind == "door":
+        return True
+    s = lambda dx, dy: lv.cell(x + dx, y + dy).solid      # noqa: E731
+    return (s(1, 0) and s(-1, 0)) or (s(0, 1) and s(0, -1))
+
+
+def mine_here(lv, m, known, tactic):
+    """Whether it lays a mine where it stands: unseen, in a narrow place he would come through or by the cover
+    it holds, holding or falling back, a few cells from him, with no other thing there, and not too soon
+    after the last."""
+    if m.seen or not (m.role in ("overwatch", "suppress", "guard") or tactic in ("retreat", "hold", "cover")):
+        return False
+    if m.lobbed is not None and lv.beat - m.lobbed < 4:
+        return False
+    if max(abs(m.x - known[0]), abs(m.y - known[1])) < 3:
+        return False
+    if not narrow(lv, m.x, m.y) and not any(lv.cell(m.x + dx, m.y + dy).solid for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+        return False                                     # a doorway, a corridor, or the cover it held
+    return not any(not it.taken and (it.x, it.y) == (m.x, m.y) for it in lv.items)
 
 
 def flanking(m):
@@ -377,8 +466,13 @@ def move(lv, m, b, tactic, tx, ty, known, los, d, fl, kind):
                         m.goal = None                    # out of cover now: it finds new cover after the shot
                         return
             return
+    if tactic == "retreat" and m.role == "rout":
+        toward(lv, m, tx, ty, fl, away=True)
+        return
     if tactic == "flank":
         if m.goal is None or (m.x, m.y) == m.goal or (lv.beat + m.id) % 3 == 0:
+            if m.role == "circle":
+                lo, hi = 3, 5
             spot = flank_spot(lv, m, tx, ty, lo, hi, m.side)
             m.goal = spot
         if m.goal is not None and (m.x, m.y) != m.goal:
@@ -418,9 +512,12 @@ def move(lv, m, b, tactic, tx, ty, known, los, d, fl, kind):
             lv.move_mob(m, best[1], best[2])
         return
     for _ in range(steps):
-        if not toward(lv, m, tx, ty, fl):
-            break
         if abs(m.x - p.x) + abs(m.y - p.y) == 1:
+            break
+        if m.role == "swarm" and m.spot is not None and (m.x, m.y) != tuple(m.spot) and lv.free(m.spot[0], m.spot[1], skip=m):
+            if toward(lv, m, m.spot[0], m.spot[1], fl, limit=20):     # to its own side of him
+                continue
+        if not toward(lv, m, tx, ty, fl):
             break
 
 

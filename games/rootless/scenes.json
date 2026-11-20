@@ -157,5 +157,23 @@
     "win": "outro_demo"
    }
   ]
+ },
+ {
+  "id": "sim_kill_house",
+  "name": "Simulatron: Kill House",
+  "area": "Free programs",
+  "description": "A training program: four rooms, four kinds of squad.",
+  "level": "sim4",
+  "on_level_exit": [
+   {
+    "story": "sim4_end"
+   },
+   {
+    "pause": true
+   },
+   {
+    "win": "outro_demo"
+   }
+  ]
  }
 ]

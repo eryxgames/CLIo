@@ -550,6 +550,8 @@ def _drawn(rows, palette):
     return Picture([[palette.get(ch) for ch in row] for row in rows])
 
 
+MINE_SEEN = 3                # cells off a mine is seen from (twice that in the goggles)
+
 # a grenade on the floor or in the air, and a rocket seen flying away (a game's sprites "grenade" and "rocket"
 # come before these)
 GRENADE = _drawn([".kk..", ".kKg.", "gGggg", "gGgGg", "ggggg", ".ggg."],
@@ -1057,9 +1059,13 @@ class View:
             a, z = rel(x, y)
             if -0.3 < z <= sight:
                 items.append((z + 0.02, 1, 0, "decal", (a, pic)))
+        pl = getattr(lv, "player", None)
         for it in lv.items:
             if it.taken:
                 continue
+            if getattr(it, "mine", False) and pl is not None and \
+                    max(abs(it.x - pl.x), abs(it.y - pl.y)) > (MINE_SEEN * 2 if getattr(pl, "nightvision", False) else MINE_SEEN):
+                continue                                     # a mine is only seen close to (further in the goggles)
             a, z = rel(it.x, it.y)
             if -0.3 < z <= sight:
                 items.append((z, 2, 0, "itemmodel" if it.model and it.model in getattr(lv, "models", {}) else "item",
@@ -1174,6 +1180,10 @@ class View:
                 a, it = obj
                 self.draw_thing(px, lv.sprites.get(it.sprite), a, z, it.size, None, fx, labels=None,
                                 lift=fx.lift_items.get(it, 0.0), ground=gnd(a, z))
+                if getattr(it, "mine", False) and phase % 2 == 0:     # its light blinks
+                    t = self.tz(z)
+                    self.glow(px, self.X(a, z), foot(a, z, t) - 0.5 * REF_H * t * self.K * it.size,
+                              max(1.2, 2.4 * t * self.K), (255, 40, 30), 0.8)
             elif kind == "prop":
                 a, x, y, prop = obj
                 mdl = (getattr(lv, "models", None) or {}).get(prop.get("model"))

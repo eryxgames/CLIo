@@ -8,7 +8,7 @@
   "show_once": false
  },
  "outro_demo": {
-  "text": "SIMULATION PAUSED. End of the demo - Episode 1 goes on in the full game.\n\nFree programs of the simulatron, made new each run: --level sim1 (Long Fens, open land without end), sim2 (Deep Swap, floor after floor) and sim3 (Swap Sprawl, rooms without end).",
+  "text": "SIMULATION PAUSED. End of the demo - Episode 1 goes on in the full game.\n\nFree programs of the simulatron, made new each run: --level sim1 (Long Fens, open land without end), sim2 (Deep Swap, floor after floor) and sim3 (Swap Sprawl, rooms without end); and a training program, sim4 (Kill House: squads).",
   "show_once": false
  },
  "outro_lose": {
@@ -43,6 +43,10 @@
  },
  "sim3_end": {
   "text": "The exit takes you out of the sprawl. Behind you its rooms go on, made only when someone walks into them - and nobody will.",
+  "show_once": false
+ },
+ "sim4_end": {
+  "text": "UNIT EVALUATION: squad tactics. The instructor bot's voice is flat: \"Packs, sweeps, ambushes, assaults. Out there they will not be a program.\"",
   "show_once": false
  }
 }

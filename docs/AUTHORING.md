@@ -1522,6 +1522,89 @@ it says its lines, leaves, and sets off `event`. Its own `music` plays while it 
 When the level is left after a boss escaped, the flag `<monster id>_escaped` is set
 (`cron_escaped`), so a later level or ending can bring it back.
 
+### Brains and squads
+
+A monster with a `"brain"` chooses what to do each beat, instead of always coming at the
+player. Without one it hunts as monsters always have.
+
+```json
+"kworker": {"...": "...", "brain": "soldier"}
+"warden":  {"...": "...", "brain": {"kind": "heavy", "flank": 0.4, "flee": 0.1, "range": [3, 6]}}
+```
+
+It weighs its **tactics** and does the one that scores best:
+
+| Tactic | What it does | `ps` |
+| --- | --- | --- |
+| close | goes at the player | R |
+| keep | stays at its distance (`range`), where it can shoot | K |
+| cover | gets out of his sight, then leans out to shoot (a gun) or waits for him (a claw) | D |
+| flank | works round to his side or back, out of where he looks | F |
+| retreat | hurt and frightened: back to its squad's leader, or away from him | B |
+| hold | stays where it is (a guard by its post, a gunner with a good line) | H |
+| search | it has lost him: goes where he was last seen, then back to its post | ? |
+
+What weighs in: how hurt it is (below `flee`, a share of its health, it grows afraid), how far
+he is, whether it can see him, whether he is looking at it, how many friends are near, the part
+its squad gives it, and a little for keeping to what it was doing, so it does not dither. A
+brainy monster only knows where the player is while it (or its squad) sees or hears him; it
+goes on hunting where he was for `memory` beats, then searches, then gives up. It only shoots
+what it can see.
+
+The presets, by their weights (`close`, `keep`, `cover`, `flank`, `retreat`, `hold`):
+
+| Brain | Fights like |
+| --- | --- |
+| `brute` | comes at you, works round your side; flees late |
+| `skirmisher` | works round your side, keeps its distance, falls back when hurt |
+| `soldier` | takes cover, keeps its distance, works round your side |
+| `heavy` | keeps its distance, holds its ground, takes cover; flees late |
+| `coward` | falls back when hurt, takes cover, keeps its distance |
+
+An object brain names a `"kind"` (a preset) and changes any of its weights, `"flee"` (0..1),
+`"memory"` (beats) and `"range"` ([near, far] cells; a gun's is its `keep`, a claw's is 1). Its
+manual page (`man kworker`) says how it fights. Barrels, vehicles, bosses and spawners have no
+brain.
+
+**Squads.** Monsters in a squad know what any of them knows: when one sees the player, all of
+them know where he is, and when one is woken it calls the others (`k1 calls the others`). The
+strongest still standing leads. Put monsters in one with `"squad"` in the legend (or in a
+land's `"things"`), and give it a tactic in the level's `"squads"`:
+
+```json
+"legend": {"V": {"monster": "warden", "squad": "relay"}},
+"squads": {"relay": {"tactic": "hold", "guard": 8},
+           "auto": {"radius": 4}}
+```
+
+| Tactic | The parts it gives out |
+| --- | --- |
+| `pincer` (the default) | the leader holds the front; the rest work round both sides of him, by turns left and right |
+| `fire_team` | half of those with guns pin him down from where they are; the rest flank |
+| `hold` | every member keeps by its post until he comes within `guard` cells of the squad (6), or hurts one of them; then a pincer |
+| `rush` | all of them at him |
+
+`"memory"` is how long the squad hunts where he was last seen (12 beats). The parts only weigh
+in each member's own choice: a hurt flanker still falls back. `"auto"` puts brainy monsters
+that stand near each other into squads by themselves: a chain of them, each within `"radius"`
+cells of the next (4); a lone one stays alone.
+
+In a world without end, a site's legend squads and the `"auto"` squads are made a chunk at a
+time (a squad never reaches over a chunk's edge), and a spawn can come as a **pack**: so many
+together, one squad, with the pack's own tactic.
+
+```json
+"spawns": [{"monster": "scout", "per_chunk": 0.07, "pack": [2, 3], "tactic": "fire_team"}]
+```
+
+A squad that was never woken is forgotten with its chunk and made again, the same, when he comes
+back; a squad that fought is kept, asleep, with its chunk.
+
+Everything a brain or a squad does comes from the level's state, never from a clock, so a game
+played back (or on another machine) goes the same way. For games of moves and answers - a duel,
+cards - the engine has a search too (engine/ai/search.py): minimax with alpha-beta, and Monte
+Carlo tree search, both stopped by a budget of positions looked at, not by time.
+
 ### Pick-ups, weapons and the player
 
 Anything lying in a level is an ordinary item (items.json) with a `pickup` block, taken by

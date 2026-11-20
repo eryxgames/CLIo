@@ -10,13 +10,13 @@ level freshly built from the same seed gives the same level, exactly: what it do
 first one would have done.
 
 The snapshot is made without a list of what to keep: every attribute of the level is kept unless it is
-named in ``DERIVED`` (made again when a level is built, or only a cache). New state is saved by default;
+named in ``DERIVED`` (made again when a level is built) or begins with ``_`` (a cache; ``KEPT`` excepted). New state is saved by default;
 something that cannot be saved stops the save with the place where it is, and the tests do this for every
 level after a whole game.
 
 Values: ``None``, numbers, text and lists as they are; tuples, sets and dicts tagged (``$t``, ``$s``,
 ``$o`` for text keys, ``$m`` for others); the level's own objects (monsters, items, the player, shots,
-grenades) once each by ``$c`` and later by ``$r``; a cell by where it is (``$cell``); what comes from the
+grenades, squads: the kinds ``register``-ed) once each by ``$c`` and later by ``$r``; a cell by where it is (``$cell``); what comes from the
 game's data (a monster's spec, a sprite) by its path (``$p``); a random generator by its state (``$rng``).
 
 ``digest(state)`` sums a snapshot up: two machines playing the same lines must come to the same digest.
@@ -36,9 +36,20 @@ DERIVED = frozenset((
     "land_walls", "world", "cell", "_field", "_pad_links", "_pristine", "replaying", "loaded", "warp", "opening",
     "journal", "start_player", "seed", "depth", "w", "h", "map_w", "map_h", "name", "par", "weapons", "moved",
     "queue", "pending_save"))
+KEPT = frozenset(("_tags", "_ids"))   # names starting with _ are caches, but for these (the monsters' numbering)
+# what a level has that older snapshots do not: made fresh when a snapshot lacks it (not left as the
+# new level made it, which would point at things the snapshot has replaced)
+LEVEL_DEFAULTS = {"squads": dict}
 # only to look at: kept in a snapshot, left out of its digest (they may differ where nobody looks)
 LOOKS = frozenset(("vrng", "decals", "holes"))
-CLASSES = ("Monster", "Item", "Player", "Grenade", "Shot")
+KINDS = {}                   # name -> class: the kinds of object a snapshot can hold (``register``)
+
+
+def register(cls):
+    """Let a snapshot hold objects of this class (once each, by reference). A class may name ``DEFAULTS``:
+    values for fields a snapshot from an older engine does not have."""
+    KINDS[cls.__name__] = cls
+    return cls
 
 
 class SnapshotError(ValueError):
@@ -124,7 +135,7 @@ class Dumper:
         name = type(v).__name__
         if name == "Cell":
             return {"$cell": [v.x, v.y]}
-        if name in CLASSES:
+        if name in KINDS:
             n = self.ids.get(id(v))
             if n is not None:
                 return {"$r": n}
@@ -136,9 +147,9 @@ class Dumper:
 
 class Loader:
     def __init__(self, lv):
-        from . import level as level_mod
+        from . import level as level_mod  # noqa: F401  (registers the level's kinds)
         self.lv = lv
-        self.classes = {n: getattr(level_mod, n) for n in CLASSES}
+        self.classes = KINDS
         self.objs = {}
 
     def dec(self, v):
@@ -170,6 +181,8 @@ class Loader:
                 raise SnapshotError("unknown kind of thing '%s'" % v["$c"])
             obj = cls.__new__(cls)
             self.objs[v["$id"]] = obj                    # before its fields: they may point back at it
+            for k, x in getattr(cls, "DEFAULTS", {}).items():
+                setattr(obj, k, x)                       # fields an older snapshot does not have
             for k, x in v["f"].items():
                 setattr(obj, k, self.dec(x))
             return obj
@@ -196,7 +209,7 @@ def capture(lv):
     d = Dumper(lv)
     attrs = {}
     for k, v in vars(lv).items():
-        if k in DERIVED:
+        if k in DERIVED or (k.startswith("_") and k not in KEPT):
             continue
         attrs[k] = d.enc(v, k)
     out = {"v": VERSION, "id": lv.id, "beat": lv.beat}
@@ -257,14 +270,18 @@ def restore(lv, snap):
             for name, v in zip(CELL_STATE, state):
                 setattr(c, name, tuple(v) if isinstance(v, list) else v)
     ld = Loader(lv)
-    for k, v in snap.get("attrs", {}).items():
-        if k in DERIVED:
+    attrs = snap.get("attrs", {})
+    for k, v in attrs.items():
+        if k in DERIVED or (k.startswith("_") and k not in KEPT):
             continue
         setattr(lv, k, ld.dec(v))
+    for k, make in LEVEL_DEFAULTS.items():
+        if k not in attrs:
+            setattr(lv, k, make())                       # a snapshot from before the level had it
     if W is not None and snap.get("world_objects"):
         W.sleepers = ld.dec(snap["world_objects"])
-    if hasattr(lv, "_field"):
-        del lv._field                                    # the monsters' way to the player: worked out again
+    for k in ("_field", "_ai_fields"):
+        lv.__dict__.pop(k, None)                         # ways to the player, worked out again as needed
     return lv
 
 

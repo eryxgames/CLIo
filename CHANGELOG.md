@@ -290,6 +290,28 @@ game, RØØTLESS, shows them.
 - Saves are written whole (flushed to the disk, then put in place) and the one before is
   kept as `.bak`, which loading falls back on if a save is damaged. A rogue run's death
   removes both.
+- **Brains** (`engine/ai/brain.py`, a monster's `"brain"`): a monster that weighs, each beat,
+  coming at the player, keeping its distance, taking cover and leaning out to shoot, working
+  round to his side, falling back when hurt, holding, or searching where he was last seen -
+  by how hurt it is, whether he sees it, how far he is and how many friends are near. It only
+  knows where he is while it sees or hears him, and only shoots what it sees. Five presets
+  (`brute`, `skirmisher`, `soldier`, `heavy`, `coward`) and weights of one's own; `ps` shows
+  what each is doing and the manual page how it fights. Monsters without a brain play as before.
+- **Squads** (`engine/ai/squad.py`, a level's `"squads"`, `"squad"` in the legend): monsters
+  that share what they see, wake each other, follow the strongest, and take parts by the
+  squad's tactic - `pincer`, `fire_team`, `hold` (guards by their posts until he comes near)
+  and `rush`. `"auto"` squads the brainy monsters that stand near each other; in a world
+  without end squads are made a chunk at a time, and spawns can come in packs.
+- **A search for games of moves** (`engine/ai/search.py`): minimax with alpha-beta and Monte
+  Carlo tree search, stopped by a budget of positions, not by time, and rounding the same on
+  every machine - for duels and cards to come.
+- RØØTLESS's monsters have brains (kworkers take cover, scouts and orphans flank, wardens and
+  minigunners hold their lines, crawlers come at you); its levels make squads of those that
+  stand together, E1M4's two relay wardens guard their compound, and SIM-1's scouts and
+  kworkers come in pairs.
+- The level bot steps out of the line of a gun that takes aim when it is hurt or the gun is
+  far, keeps further from acid the more hurt it is, and looks further round when a lake is
+  in its way.
 
 ### Changed
 

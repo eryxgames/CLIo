@@ -93,7 +93,9 @@ class StateTests(unittest.TestCase):
         snap = snapshot.capture(played)
         kept = set(snap["attrs"])
         for name in vars(played):
-            self.assertTrue(name in kept or name in snapshot.DERIVED, name)
+            cache = name.startswith("_") and name not in snapshot.KEPT
+            self.assertTrue(name in kept or name in snapshot.DERIVED or cache, name)
+        self.assertIn("_tags", kept)
         self.assertIn("rng", kept)
         self.assertNotIn("data", kept)
 

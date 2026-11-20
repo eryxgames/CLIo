@@ -73,7 +73,8 @@
    "",
    "Three pellets at once; deadly up close, poor at a distance.",
    "Keep your distance, or get to it before it takes aim."
-  ]
+  ],
+  "brain": "soldier"
  },
  "orphan": {
   "name": "orphan",
@@ -112,7 +113,8 @@
    "Raises a burning hand (orange !), then throws fire at where you stand.",
    "The fire flies a cell a beat: step out of its way.",
    "It burns whatever it meets first - and that one will not forgive."
-  ]
+  ],
+  "brain": "skirmisher"
  },
  "daemon": {
   "name": "daemon",
@@ -142,7 +144,8 @@
    "",
    "Melee charger: a cell a beat, then teeth.",
    "Shotgun it up close, or back off and let something else hit it."
-  ]
+  ],
+  "brain": "brute"
  },
  "spawner": {
   "name": "spawner",
@@ -201,7 +204,8 @@
    "Fragments nobody claimed, burning with resentment.",
    "",
    "Flies two cells a beat and bites. Ten health: one good hit."
-  ]
+  ],
+  "brain": "brute"
  },
  "barrel": {
   "name": "barrel",
@@ -342,7 +346,8 @@
    "",
    "Dodges: it may sidestep a shot it sees coming, at two cells or more.",
    "Up close it cannot - and a shotgun's spread finds it anyway."
-  ]
+  ],
+  "brain": "soldier"
  },
  "kswapd": {
   "name": "kswapd",
@@ -388,7 +393,8 @@
    "Swaps you out of memory with a drum of slugs. Slow: it moves every other beat.",
    "",
    "Three shots a burst. When it takes aim (red !), break the line or close in."
-  ]
+  ],
+  "brain": "heavy"
  },
  "shred": {
   "name": "shred",
@@ -422,7 +428,8 @@
    "Sprays fire three cells along a row or a column - only when you are in line.",
    "When it levels its nozzle (orange !), step out of the line. The fire stays a few beats.",
    "Its tanks burst when it dies. Do not stand beside it, or on oil."
-  ]
+  ],
+  "brain": "brute"
  },
  "crawler": {
   "name": "crawler",
@@ -449,7 +456,8 @@
    "Indexes everything it can reach, three red eyes first.",
    "",
    "Fast: two cells a beat. Weak: one shotgun blast up close ends it."
-  ]
+  ],
+  "brain": "brute"
  },
  "spinlock": {
   "name": "spinlock",
@@ -495,7 +503,8 @@
    "",
    "Spins up for two beats (red !!), then fires every beat while it sees you.",
    "Break its line of sight - a wall, a crate - and the barrels wind down."
-  ]
+  ],
+  "brain": "heavy"
  },
  "loader": {
   "name": "cargo loader",
@@ -576,7 +585,8 @@
    "A refitted survey drone: two thrusters, one red eye, one small gun.",
    "",
    "Floats over acid and belts. Sidesteps a shot it sees coming, like a kworker."
-  ]
+  ],
+  "brain": "skirmisher"
  },
  "hornet": {
   "name": "hornet drone",
@@ -605,7 +615,8 @@
    "Two rotors and a cutting nose. They come in swarms, two cells a beat.",
    "",
    "Twelve health: anything kills one. Never all of them at once."
-  ]
+  ],
+  "brain": "brute"
  },
  "warden": {
   "name": "warden drone",
@@ -644,7 +655,8 @@
    "",
    "Slow: it moves every other beat. Its bolts fly a cell a beat - step aside.",
    "Rockets are what it respects."
-  ]
+  ],
+  "brain": "heavy"
  },
  "xantrium": {
   "name": "Xantrium ball",

@@ -23,6 +23,7 @@ import json
 import math
 import random
 
+from . import ai
 from .level import CELL_STATE as MUTABLE, cell_state as _state
 
 N = 16                       # a chunk is N x N cells
@@ -148,6 +149,7 @@ class Chunks:
         if key not in self.spawned:
             self.spawned.add(key)
             n = 0
+            made = []
             for what, name, x, y, extra in self.maker.spawns(*key):
                 if what == "monster":
                     m = lv.add_monster(name, x, y)
@@ -158,6 +160,11 @@ class Chunks:
                         m.awake = True
                     if not m.barrel and not m.spec.get("boss"):
                         lv.total_kills += 1
+                    sq = extra.get("squad")
+                    if sq:                                   # a squad of the site's, or a pack: one per chunk
+                        spec = extra if extra.get("pack") else ai.squad.spec_of(lv, sq)
+                        ai.squad.join(lv, m, "%s@%d,%d" % (sq, key[0], key[1]), spec=spec)
+                    made.append(m)
                 else:
                     it = lv.add_item(name, x, y)
                     if it is None:
@@ -167,6 +174,9 @@ class Chunks:
                     lv.total_items += 1
                 n += 1
             self.counted[key] = n
+            auto = lv.spec.get("squads") if isinstance(lv.spec.get("squads"), dict) else {}
+            if made and isinstance(auto.get("auto"), dict):  # the rest that were put near each other
+                ai.group(lv, auto["auto"], made)
         for obj in self.sleepers.pop(key, ()):
             (lv.monsters if hasattr(obj, "hp") else lv.items).append(obj)
         self.awake.add(key)
@@ -228,6 +238,9 @@ class Chunks:
             got = self.sleepers.setdefault(key, [])
             got.extend(objs)
             if self.pristine(key, got, going[key]):
+                for o in got:                                # its squads are made again with it
+                    if getattr(o, "squad", None) is not None:
+                        ai.squad.leave(o, lv)
                 del self.sleepers[key]                       # as it was made: made again when he comes back
                 self.spawned.discard(key)
                 lv.total_kills -= sum(1 for o in got if hasattr(o, "hp") and not o.barrel and not o.spec.get("boss"))
@@ -497,6 +510,7 @@ class LandMaker:
         taken = {(x, y) for _w, _n, x, y, _e in out}
         cx, cy = kx * N + 8, ky * N + 8
         dist = math.hypot(cx - sx, cy - sy)
+        packs = 0
         for rule in self.spawn_rules:
             what = "monster" if rule.get("monster") else "item" if rule.get("item") else None
             if what is None or dist < float(rule.get("away", 0)):
@@ -505,21 +519,38 @@ class LandMaker:
                                                           float(rule.get("most", 3.0)))
             n = int(per) + (1 if rng.random() < per - int(per) else 0)
             on = rule.get("on")
+            floats = what == "monster" and bool(((lv.data.monsters or {}).get(rule["monster"]) or {}).get("float"))
+
+            def fits(x, y):
+                if x >> 4 != kx or y >> 4 != ky or (x, y) in taken or (x, y) in land.stamp \
+                        or math.hypot(x - sx, y - sy) < float(rule.get("away", 0)):
+                    return False
+                k = land.at_cell(x, y)[2]
+                biome = ("deep water" if k == -2 else "water") if k < 0 else land.biomes[k].name
+                if on and biome not in on:
+                    return False
+                c = self.world.cell(x, y)
+                return not (c.solid or ((c.deep or c.steep) and not floats))
+            pack = rule.get("pack") if what == "monster" else None
             for _ in range(n):
                 for _try in range(10):
                     x, y = kx * N + rng.randrange(N), ky * N + rng.randrange(N)
-                    if (x, y) in taken or (x, y) in land.stamp or math.hypot(x - sx, y - sy) < float(rule.get("away", 0)):
-                        continue
-                    k = land.at_cell(x, y)[2]
-                    biome = ("deep water" if k == -2 else "water") if k < 0 else land.biomes[k].name
-                    if on and biome not in on:
-                        continue
-                    c = self.world.cell(x, y)
-                    floats = what == "monster" and bool(((lv.data.monsters or {}).get(rule["monster"]) or {}).get("float"))
-                    if c.solid or ((c.deep or c.steep) and not floats):
+                    if not fits(x, y):
                         continue
                     taken.add((x, y))
-                    out.append((what, rule[what], x, y, rule))
+                    if not pack:
+                        out.append((what, rule[what], x, y, rule))
+                        break
+                    packs += 1                               # a pack: more of them close by, one squad
+                    extra = dict(rule, squad="pack%d" % packs)
+                    out.append((what, rule[what], x, y, extra))
+                    for _more in range(rng.randint(int(pack[0]), int(pack[1])) - 1):
+                        for _try2 in range(8):
+                            px, py = x + rng.randint(-2, 2), y + rng.randint(-2, 2)
+                            if fits(px, py):
+                                taken.add((px, py))
+                                out.append((what, rule[what], px, py, extra))
+                                break
                     break
         return out
 
@@ -760,6 +791,14 @@ def problems(spec, data, where="world"):
             out.append("%s: unknown monster '%s'" % (where, rule["monster"]))
         if rule.get("item") and rule["item"] not in items:
             out.append("%s: unknown item '%s'" % (where, rule["item"]))
+        pack = rule.get("pack")
+        if pack is not None:
+            if not (isinstance(pack, list) and len(pack) == 2 and all(isinstance(v, int) and not isinstance(v, bool)
+                                                                     for v in pack) and 1 <= pack[0] <= pack[1] <= 8):
+                out.append("%s: pack should be [fewest, most], 1 to 8 (for monster '%s')" % (where, rule.get("monster")))
+            if not rule.get("monster") or rule in (spec.get("monsters") or []):
+                out.append("%s: a pack is for a monster in \"spawns\" on open land" % where)
+            out += ai.squad.spec_problems(rule, "pack of %s" % rule.get("monster"), where)
     for i, s in enumerate(spec.get("sites") or []):
         if not isinstance(s, dict) or not isinstance(s.get("map"), list):
             out.append("%s: site %d should have a map" % (where, i + 1))

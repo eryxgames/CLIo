@@ -63,6 +63,8 @@ python clio.py rootless   # first-person shooter in a terminal
       a boss on a schedule, an automap; arrow keys or typed commands, any window size;
       a game's own tiles for walls, floors and ceilings; crates, pressure plates, teleporters
       and lifts; debris and gibs; an end screen; a map painter in the editor
+- [x] Monsters with brains that take cover, flank, hold and fall back, in squads that share
+      what they see; open land and dungeons without end; saves that hold a level's state
 - [x] Save / load of the *whole* world, named slots
 - [x] Three demo games, a starter template, over two hundred automated tests
 - [x] Game editor in the browser: `python clio.py mygame --edit`, or
@@ -222,7 +224,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 412 tests, about a minute
+python -m unittest discover -s tests     # 439 tests, about a minute
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 python tests/levelbot.py 10              # an automatic player walks Rootless's E1M1 ten times

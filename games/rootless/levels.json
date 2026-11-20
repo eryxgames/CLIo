@@ -134,6 +134,11 @@
    },
    "y": "shovel"
   },
+  "squads": {
+   "auto": {
+    "radius": 4
+   }
+  },
   "events": {
    "keyroom": "The key room's walls grind open. They were waiting for you to touch it.",
    "arena": "The x door slams shut and locks behind you.",
@@ -229,6 +234,11 @@
    "f": "shred",
    "L": "spinlock",
    "b": "barrel"
+  },
+  "squads": {
+   "auto": {
+    "radius": 4
+   }
   },
   "events": {
    "coolant": "Clunk. The plate stays down, and a closet in the north wall slides open."
@@ -335,6 +345,11 @@
    },
    "b": {
     "monster": "barrel"
+   }
+  },
+  "squads": {
+   "auto": {
+    "radius": 4
    }
   },
   "bot": [
@@ -545,6 +560,11 @@
    "3": "shotgun",
    "4": "chaingun"
   },
+  "squads": {
+   "auto": {
+    "radius": 4
+   }
+  },
   "bot": [
    "shotgun",
    "key_x",
@@ -603,13 +623,20 @@
     "wall": "steel"
    },
    "V": {
-    "monster": "warden"
+    "monster": "warden",
+    "squad": "relay"
    },
    "$": {
     "savepoint": true
    },
    "m": "medkit",
    "q": "rockets"
+  },
+  "squads": {
+   "relay": {
+    "tactic": "hold",
+    "guard": 8
+   }
   },
   "land": {
    "size": [
@@ -1254,13 +1281,18 @@
     },
     {
      "monster": "scout",
-     "per_chunk": 0.12,
+     "per_chunk": 0.07,
      "on": [
       "fen",
       "heath"
      ],
      "away": 30,
-     "more": 0.003
+     "more": 0.003,
+     "pack": [
+      2,
+      2
+     ],
+     "tactic": "fire_team"
     },
     {
      "monster": "crawler",
@@ -1274,13 +1306,17 @@
     },
     {
      "monster": "kworker",
-     "per_chunk": 0.06,
+     "per_chunk": 0.035,
      "on": [
       "heath",
       "rock"
      ],
      "away": 60,
-     "more": 0.003
+     "more": 0.003,
+     "pack": [
+      2,
+      2
+     ]
     },
     {
      "monster": "warden",
@@ -1488,6 +1524,11 @@
     "wall": "racks"
    }
   },
+  "squads": {
+   "auto": {
+    "radius": 4
+   }
+  },
   "bot": [
    "key_w",
    "E"
@@ -1615,6 +1656,11 @@
    },
    "|": {
     "wall": "racks"
+   }
+  },
+  "squads": {
+   "auto": {
+    "radius": 4
    }
   },
   "bot": [

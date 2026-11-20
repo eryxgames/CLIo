@@ -34,8 +34,10 @@ import zlib
 import re
 import time
 
+from . import ai
 from . import conditions
 from . import firstperson as fp
+from . import snapshot
 from .firstperson import DIRS, FX, Bits, Picture, View, slide, vslide
 
 FACING = {"n": 0, "north": 0, "e": 1, "east": 1, "s": 2, "south": 2, "w": 3, "west": 3}
@@ -212,6 +214,10 @@ JOURNAL_KEEP = 20000         # lines of play a save keeps (a snapshot carries th
 
 
 class Monster:
+    # what a monster's mind holds (engine/ai): an older save's monsters get these
+    DEFAULTS = {"tactic": None, "role": None, "squad": None, "seen_at": None, "post": None, "side": 0, "goal": None,
+                "said": None}
+
     def __init__(self, mid, kind, spec, x, y, tag):
         self.id, self.kind, self.spec = mid, kind, spec
         self.x, self.y, self.tag = x, y, tag
@@ -251,6 +257,14 @@ class Monster:
         v = self.vehicle or {}
         self.fuel = int(v.get("fuel", 0) or 0)           # beats of fuel in its tanks (a vehicle with "fuel")
         self.started = False                             # its engines run: the fuel burns a beat at a time
+        self.tactic = None                               # what its brain chose this beat (engine/ai)
+        self.role = None                                 # its part in its squad's plan
+        self.squad = None                                # the Squad it belongs to
+        self.seen_at = None                              # (x, y, beat): where it last knew the player to be
+        self.post = (x, y)                               # where it was put: a guard goes back there
+        self.side = 0                                    # a flanker's side: -1 his left, 1 his right
+        self.goal = None                                 # (x, y): where its tactic takes it (cover, a flank)
+        self.said = None                                 # the tactic it last told the player about
 
     @property
     def name(self):
@@ -324,6 +338,10 @@ class Player:
         return {"health": self.hp, "max_health": self.max_hp, "armor": self.armor, "weapons": self.weapons,
                 "weapon": self.weapon, "ammo": dict(self.ammo), "max_ammo": dict(self.max_ammo),
                 "boots": self.boots}
+
+
+for _kind in (Monster, Item, Player, Grenade, Shot):
+    snapshot.register(_kind)                             # a save holds these, each once
 
 
 def bresenham(x0, y0, x1, y1):
@@ -406,6 +424,7 @@ class Level:
         self._tags = {}
         self._ids = 0
         self.world = None
+        self.squads = {}                                 # name -> Squad (engine/ai/squad.py)
         if isinstance(spec.get("world"), dict):
             self.start_world(spec["world"])
         else:
@@ -513,6 +532,8 @@ class Level:
                         m.roll_dir = FACING.get(str(spec.get("roll") or "").lower()[:1])
                         if spec.get("awake"):
                             m.awake = True
+                        if spec.get("squad"):
+                            ai.squad.join(self, m, spec["squad"])
                 if spec.get("item"):
                     it = self.add_item(spec["item"], x, y)
                     if it is not None:
@@ -520,6 +541,9 @@ class Level:
             self.grid.append(line)
         if self.land is not None:
             start = self.place_on_land(legend, start)
+        auto = (self.spec.get("squads") or {}).get("auto") if isinstance(self.spec.get("squads"), dict) else None
+        if auto:                                         # brainy monsters put near each other: squads
+            ai.group(self, auto)
         if start is None:
             start = next(((c.x, c.y) for row in self.grid for c in row if not c.solid), (1, 1))
         self.player.x, self.player.y = start
@@ -710,6 +734,8 @@ class Level:
                 m.wake_on = spec.get("wake_on")
                 if spec.get("awake"):
                     m.awake = True
+                if spec.get("squad"):
+                    ai.squad.join(self, m, spec["squad"])
         if spec.get("item"):
             it = self.add_item(spec["item"], x, y)
             if it is not None:
@@ -2667,7 +2693,8 @@ class Level:
         self.fly()
         if self.over:
             return
-        self.wake_up()
+        heard = self.wake_up()
+        ai.beat(self, heard)                             # squads share what they know, give out roles
         self.moved, self.queue = [], []
         for m in list(self.monsters):
             if not m.dead and not m.gone and m.awake and not m.barrel:
@@ -2852,6 +2879,7 @@ class Level:
             near = max(abs(m.x - p.x), abs(m.y - p.y)) <= int(m.spec.get("sight", 8))
             if (near and self.line_of_sight(m.x, m.y, p.x, p.y)) or (m.x, m.y) in heard:
                 self.wake(m)
+        return heard
 
     def fly(self):
         if not self.shots:
@@ -2927,6 +2955,8 @@ class Level:
             return
         if m.grudge is not None and (m.grudge.dead or m.grudge.gone):
             m.grudge = None
+        if ai.brain.has(self, m):                        # a brain: it weighs what to do (engine/ai)
+            return ai.brain.act(self, m)
         foe = m.grudge
         tx, ty = (foe.x, foe.y) if foe else (p.x, p.y)
         d = max(abs(m.x - tx), abs(m.y - ty))
@@ -3277,12 +3307,15 @@ class Level:
     def ps_lines(self):
         out = [("  PID  STAT   HP  DIST  CMD", "dim")]
         for m in self.visible():
-            stat = {"aim": "A", "windup": "W", "charge": "C"}.get(m.intent, "R" if m.awake else "S")
+            stat = {"aim": "A", "windup": "W", "charge": "C"}.get(m.intent) or (ai.brain.stat(m) if m.awake else None) \
+                or ("R" if m.awake else "S")
             out.append(("%5d  %-4s %4d  %4d  %s (%s)" % (100 + m.id, stat, max(0, m.hp), self.dist(m), m.name, m.tag),
                         STATE_ROLE.get(m.intent, "text")))
         if len(out) == 1:
             out.append(("(nothing in sight)", "dim"))
-        out += [("", "text"), ("STAT  A aiming  W winding up  C charging  R running  S sleeping", "dim")]
+        out += [("", "text"), ("STAT  A aiming  W winding up  C charging  R running  S sleeping", "dim"),
+                ("      D in cover  F flanking  K keeping away  H holding", "dim"),
+                ("      B falling back  ? searching", "dim")]
         return out
 
     def man_lines(self, what):
@@ -3298,6 +3331,9 @@ class Level:
         lines = [("%s(6)" % spec.get("name", kind).upper().replace(" ", "_"), "title")]
         if spec.get("role"):
             lines.append((spec["role"], "dim"))
+        mind = ai.brain.describe(spec.get("brain"))
+        if mind:
+            lines.append((mind, "dim"))
         lines.append(("", "text"))
         return lines + [(t, "text") for t in spec.get("man") or ["No description."]]
 
@@ -3980,6 +4016,7 @@ def validate(data):
             if gun is not None and not (isinstance(gun, dict) and isinstance(gun.get("damage"), list)
                                         and len(gun["damage"]) == 2):
                 problems.append("monster '%s': its vehicle's gun should be a weapon with damage [least, most]" % kind)
+        problems += ai.brain.problems(spec.get("brain"), "monster '%s'" % kind)
         sp = spec.get("sprite") or kind
         models = getattr(data, "models", None) or {}
         if spec.get("model") and spec["model"] not in models:
@@ -4040,6 +4077,8 @@ def validate(data):
         land = lv.get("land")
         if lv.get("death_text") and lv["death_text"] not in (getattr(data, "texts", None) or {}):
             problems.append("level '%s': death_text '%s' is not a text in texts.json" % (lid, lv["death_text"]))
+        if lv.get("squads") is not None:
+            problems.extend("level '%s': %s" % (lid, p) for p in ai.squad.problems(lv["squads"]))
         if lv.get("world") is not None or lv.get("generate") is not None:   # made as it goes, or from a seed
             problems.extend("level '%s': %s" % (lid, p) for p in made_problems(lv, data, sprites))
             continue

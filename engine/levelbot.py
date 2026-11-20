@@ -5,7 +5,8 @@
 It walks to its goals in order (the level's ``"bot"`` list: item ids or map
 characters; the exit ``E`` last; ``board`` climbs into the nearest vehicle and
 ``out`` climbs down), turns to face what it can see, shoots with the gun that suits
-the distance, sidesteps fire and steps off a boss's marked floor. It is not clever:
+the distance, sidesteps fire (and a gun that takes aim, when hurt or far off) and steps off a boss's marked
+floor. It is not clever:
 if it can finish a level, a person can.
 """
 import math
@@ -141,6 +142,8 @@ class Bot(TextConsole):
             path = plan[2]
         else:
             path = self.window_path(lv, x, y, R)
+            if len(path) < 2 and (p.x, p.y) != (x, y):       # stuck on a shore, at a wall: look further round
+                path = self.window_path(lv, x, y, R * 2)
         if len(path) < 2:
             self.plan = None
             return None
@@ -171,6 +174,7 @@ class Bot(TextConsole):
         parked = {(m.x, m.y) for m in lv.monsters if not m.dead and not m.gone and (m.vehicle or m.barrel)}
         parked.discard((gx, gy))
         safe = p.vehicle is not None or p.boots > 0           # acid does not hurt: no reason to go round it
+        acid = max(8, 800 // max(p.hp, 10))                   # it hurts more the less he has to lose
         cost = {start: 0}
         came = {start: None}
         heap = [(0, start)]
@@ -192,7 +196,7 @@ class Bot(TextConsole):
                 cell = lv.cell(*n)
                 if not self.open_ground(lv, cell):
                     continue
-                nd = d + (1 if safe or not cell.toxic else 8)
+                nd = d + (1 if safe or not cell.toxic else acid)
                 if nd < cost.get(n, 1 << 30):
                     cost[n], came[n] = nd, c
                     heapq.heappush(heap, (nd, n))
@@ -353,6 +357,13 @@ class Bot(TextConsole):
                 aside = [d for d in safe if p.x + d[0] != m.x and p.y + d[1] != m.y]
                 if aside:
                     return self.step(lv, *aside[0])
+        # out of the line of a gun that takes aim (its tell), when it is far or he is hurt: a step aside hides him
+        for m in lv.monsters:
+            if not m.dead and not m.gone and m.intent == "aim" and m.seen and (lv.dist(m) >= 4 or p.hp < 50) \
+                    and lv.line_of_sight(m.x, m.y, p.x, p.y):
+                hidden = [d for d in safe if not lv.line_of_sight(m.x, m.y, p.x + d[0], p.y + d[1])]
+                if hidden:
+                    return self.step(lv, *hidden[0])
         # out of sight of a gun that has spun up: it winds down, and comes to the door
         for m in lv.monsters:
             if not m.dead and not m.gone and m.spun and lv.line_of_sight(m.x, m.y, p.x, p.y):
@@ -398,11 +409,10 @@ class Bot(TextConsole):
         step = self.go(lv, *goal)
         if step is None:
             if self.goals:
-                g = self.goals[0]
                 if self.exit and lv.cell(*self.exit).kind in ("exit", "switch") and not lv.cell(*self.exit).pressed:
-                    t = self.face(lv, self.exit[0] - p.x, self.exit[1] - p.y) \
-                        if abs(self.exit[0] - p.x) + abs(self.exit[1] - p.y) == 1 else None
-                    return t or "use"
+                    if abs(self.exit[0] - p.x) + abs(self.exit[1] - p.y) == 1:
+                        return self.face(lv, self.exit[0] - p.x, self.exit[1] - p.y) or "use"
+                    return "w"                           # no way to it from here yet: wait, and look again
                 self.goals.pop(0)
             return "w"
         return step

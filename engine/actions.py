@@ -1261,15 +1261,20 @@ class Actions:
         cur = self.cfg.get("currency", "gold")
         if shop.get("greeting"):
             self.dialogue_box(ch["name"], shop["greeting"])
+        from . import cards
+        card_counter = cards.in_use(self) and (shop.get("cards") or shop.get("upgrade") or shop.get("remove"))
         while not self.over:
             stock = [i for i in shop.get("sells", []) if i in w.items]
             mine = [i for i in dict.fromkeys(w.inventory) if w.items[i].get("value", 0) > 0
                     and not w.items[i].get("quest_item")]
             self.say("You have %s %d %s." % (ui.g("coin"), w.player.get("gold", 0), cur), "quest")
-            options = ["Buy", "Sell"]
+            options = ["Buy", "Sell"] + (["Cards"] if card_counter else [])
             pick = ui.menu(options, cancel_label="Leave")
             if pick is None:
                 break
+            if pick == 2:
+                cards.shop_cards(self, shop)
+                continue
             if pick == 0:
                 if not stock:
                     self.say("Nothing left to buy.", "system")

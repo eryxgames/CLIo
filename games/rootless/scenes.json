@@ -210,5 +210,23 @@
   "area": "Free programs",
   "description": "A training program: a reactor through a shift.",
   "sim": "sim9"
+ },
+ {
+  "id": "sim_root_shell",
+  "name": "Simulatron: Root Shell",
+  "area": "Free programs",
+  "description": "A training program: card duels in the shell.",
+  "level": "sim10",
+  "on_level_exit": [
+   {
+    "story": "sim10_end"
+   },
+   {
+    "pause": true
+   },
+   {
+    "win": "outro_demo"
+   }
+  ]
  }
 ]

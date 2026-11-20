@@ -500,9 +500,13 @@ class Bot(TextConsole):
         return None
 
 
-def play(data, level, seed=1, verbose=False, goals=None):
-    """Play ``level`` of a loaded game once: ``("exit" | "dead" | "quit", the Level)``."""
+def play(data, level, seed=1, verbose=False, goals=None, host=None):
+    """Play ``level`` of a loaded game once: ``("exit" | "dead" | "quit", the Level)``. Card duels are fought
+    by ``host`` (a level.Host with a game) if given; without one the bot takes them as won."""
     lv = Level(data, level, seed=seed)
+    lv.host = host
+    if host is None:
+        lv._assume_duels = "won"                         # (not state: a leading _)
     bot = Bot(lv, goals if goals is not None else (lv.spec.get("bot") or ["E"]), verbose)
     return lv.run(bot), lv
 

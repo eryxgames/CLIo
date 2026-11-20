@@ -500,6 +500,12 @@ def _e_add_card(g, arg, eff, ctx):
                 g.say("%s goes into your deck." % cards.table(g.data)[cid].get("name", cid), "success")
 
 
+def _e_upgrade_card(g, arg, eff, ctx):
+    """Card battles: make a card in the deck better - "choose" (a menu), "random", or a card's id."""
+    from . import cards
+    cards.upgrade_card(g, arg if isinstance(arg, str) and arg else "choose", say=not eff.get("quiet"))
+
+
 def _e_remove_card(g, arg, eff, ctx):
     """Card battles: take one copy of a card out of the player's deck."""
     from . import cards
@@ -527,4 +533,5 @@ _EFFECTS = {
     "random": _e_random, "do": _e_do, "learn": _e_learn, "end_dialogue": _e_end_dialogue,
     "turns": _e_turns, "shop": _e_shop, "story": _e_story, "transition": _e_transition,
     "look": _e_look, "save": _e_save, "deepen": _e_deepen, "add_card": _e_add_card, "remove_card": _e_remove_card,
+    "upgrade_card": _e_upgrade_card,
 }

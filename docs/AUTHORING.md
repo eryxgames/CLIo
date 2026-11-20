@@ -418,6 +418,40 @@ The editor's *odds* for an enemy (and `python tests/bot.py 30 cards` for The Hol
 card battles too, the plain greedy way: block what is coming when it would hurt, hit the
 weakest.
 
+**Better cards.** Any card can be made better: in the deck it becomes `id+` (shown with a
++). What changes is the card's own `"upgrade"` (`{"cost": 1}`, or new `effects`, or a
+`name`), else three more damage, block or healing (one more draw, strength, energy or turn)
+on its first effect that has them, else one cheaper; `"upgrade": false` keeps a card as it
+is. The effect `{"upgrade_card": "choose"}` asks which (`"random"`, or a card's id, does not).
+
+**Card shops.** A shopkeeper's `shop` can keep a card counter beside its goods (shown when
+the game has a deck): `"cards"` (ids for sale, each once unless `"unlimited_cards"`; priced
+by `"price"` on the card, else by rarity - starter 25, common 45, uncommon 70, rare 110 -
+times `"card_rate"`), `"upgrade"` (the price of making a card better) and `"remove"` (of
+taking one out; never below `"least"` cards in game.json `cards`, 5):
+
+```json
+"shop": {"sells": ["healing_draught"], "cards": ["backstab", "riposte", "ember"],
+         "upgrade": 60, "remove": 50}
+```
+
+**Card duels in first-person levels.** A terminal - a switch with `"duel"` - is hacked with a
+card duel before it is thrown; a monster with `"duel"` is a challenger that waits to be
+faced (Enter) and dealt with (`"fights": true` and it fights as well):
+
+```json
+"t": {"switch": "ice_down", "label": "TERMINAL", "duel": "black_ice", "feedback": 20,
+      "duel_won": "The ICE melts."}
+```
+
+`duel` names a character (with `stats`, and a `deck` for a duellist). The player duels with
+his health in the level, and keeps what is left of it; a lost duel hurts him `feedback` (20),
+and the terminal stays shut; fled, nothing happens. A won challenger dies. The game needs a
+`"cards"` deck for it (game.json); won duels offer the opponent's `card_rewards`. The duel is
+fought off the level's screen and the level comes back after it; its outcome is written into
+the level's journal (`use =won:57`), so a load plays the level back without the duel being
+fought again. The level bot, with no game round it, takes duels as won.
+
 ## Text, colour and themes
 
 Inline markup works in every text:

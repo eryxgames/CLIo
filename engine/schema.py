@@ -86,6 +86,7 @@ EFFECTS = [
     V("random", "One of these at random", "json"), V("do", "A group of effects", "json"),
     V("add_card", "Put a card in the player's deck", {"ref": "cards"}),
     V("remove_card", "Take a card out of the player's deck", {"ref": "cards"}),
+    V("upgrade_card", "Make a card in the deck better: choose, random, or a card's id", "text"),
 ]
 
 CONDITIONS = [

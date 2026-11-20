@@ -393,6 +393,15 @@ game, RØØTLESS, shows them.
   (`G` and a digit; the digit again; twice to go there); groups that keep their shape and the
   slowest one's pace. The computer player puts workers on gas, researches, builds an airfield
   for an air mix, mends its buildings and attacks with what it has when its crystal is gone.
+- **Card duels in first-person levels**: a terminal (a switch with `"duel"`) is hacked by a card
+  duel before it opens; a monster with `"duel"` is a challenger that waits to be faced. The
+  player duels with his health in the level; a lost duel hurts (`feedback`). The duel is
+  fought off the level's screen and its outcome is kept in the level's journal, so loads play
+  it back without fighting again.
+- **Better cards**: `id+` in the deck - a card's own `"upgrade"`, else more of its first
+  effect, else cheaper; the effect `upgrade_card` (choose, random, or a card).
+- **Card shops**: a shop's card counter - `"cards"` for sale (priced by rarity or `"price"`),
+  `"upgrade"` and `"remove"` services. The Hollow's merchant has one.
 - **Simulators** (`sims.json`, a scene's `"sim"`, `engine/sim.py`): a vehicle over a map in real
   time - a car (grip, drift, terrain that slows, walls that hurt), a boat, a hover craft (thrust,
   lift, gentle sinking, soft or hard landings, falling when dry) and a plane (throttle, stalls,
@@ -412,6 +421,9 @@ game, RØØTLESS, shows them.
 - RØØTLESS: **SIM-8: Fen Hopper** (`--level sim8`), the hopper flown over the fens through five
   checkpoints to a landing, minding fuel and engine heat; **SIM-9: Coolant Loop** (`--level
   sim9`), a reactor through a shift - rods and pumps against a changing demand.
+- RØØTLESS: a hacking deck (ping, firewall, traceroute, fork bomb, kill -9, sudo, grep,
+  nohup, chmod 000, fsck, rm -rf, overclock), Black ICE and the Kernel Sentinel, and
+  **SIM-10: Root Shell** (`--level sim10`): hack a terminal, then out-deal a sentinel.
 
 ### Changed
 

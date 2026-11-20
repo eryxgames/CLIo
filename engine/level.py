@@ -95,6 +95,7 @@ HELP = [
 ]
 
 # lines about the game rather than in it: not kept in a level's journal (a save plays the journal back)
+DUELLED = re.compile(r" =((?:won|lost|fled)(?::\d+)?)$")   # a duel's outcome on the line that started it
 META = re.compile(r"(?:save|load|saves)(?:\s+[\w-]+)?|\*[\w-]*|realtime(?:\s+(?:off|on|\d+(?:\.\d+)?))?")
 
 DETAILS = ("auto", "high", "low")     # a level's picture: "low" draws the floor and ceiling at half width
@@ -118,7 +119,8 @@ class Cell:
                  "on_enter", "sealed", "pressed", "label", "label_role", "secret", "found", "floor", "ceiling",
                  "savepoint",
                  "crate", "plate", "down", "open_while", "teleport", "arrive_only", "pad_facing", "lift", "deck", "sunk",
-                 "oil", "slick", "conveyor", "scorched", "exit_kind", "heavy", "switch", "sky", "deep", "steep")
+                 "oil", "slick", "conveyor", "scorched", "exit_kind", "heavy", "switch", "sky", "deep", "steep",
+                 "duel")
 
     def __init__(self, x, y, ch, spec):
         self.x, self.y, self.ch = x, y, ch
@@ -152,6 +154,8 @@ class Cell:
         self.secret = bool(spec.get("secret")) or bool(self.panel)
         self.savepoint = bool(spec.get("savepoint"))    # a checkpoint: the game is saved when it is first reached
         self.switch = spec.get("switch")                # a switch in the wall: using it sets off this event
+        self.duel = {k: spec[k] for k in ("duel", "feedback", "feedback_text", "duel_won", "flee") if k in spec} \
+            if spec.get("duel") else None               # a terminal: a card duel before the switch is thrown
         self.sky = bool(spec.get("sky"))                # open to the sky: no ceiling over it
         self.deep = bool(spec.get("deep"))              # water too deep to wade: floaters and fliers only
         self.steep = bool(spec.get("steep"))            # too steep to climb (open land): floaters and fliers only
@@ -431,6 +435,7 @@ class Level:
         self.saves_left = int(saves) if isinstance(saves, int) and not isinstance(saves, bool) else None
         self.loaded = self.warp = None                   # a save to go on with, a level to jump to
         self.pending_save = []                           # (slot, how): saves to make when this line is done
+        self.duel_answer = None                          # a card duel's outcome, read back from the journal
         self.reached = set()                             # checkpoints passed
         self.opening = None                              # lines said in place of the title page (a loaded game)
         self.sprites = {}
@@ -1027,12 +1032,45 @@ class Level:
                 self.meta(line)
             return
         self.journal.append([self.beat, line])           # the beat it was typed on: [beat, line] (player 0)
+        m = DUELLED.search(line)
+        if m:                                            # "use =won:57": the duel it started, as it went
+            self.duel_answer, line = m.group(1), line[:m.start()]
         try:
             self.play_line(line)
         finally:
+            self.duel_answer = None
             if self.over in ("quit", "load", "warp") and self.journal and self.journal[-1][1] == line:
                 self.journal.pop()
         self.flush_save()
+
+    # ---- card duels ------------------------------------------------------ #
+    def duel(self, cid, spec):
+        """A card duel with character ``cid`` (engine/cards.py), fought with the player's health. Its outcome is
+        written into this line's journal entry (``use =won:57``), so a load plays it back without fighting
+        again. Returns "won", "lost", "fled", or None when nobody is there to fight it."""
+        p = self.player
+        answer = self.duel_answer
+        if answer is None and getattr(self, "_assume_duels", None) and self.host is None:
+            answer = self._assume_duels                  # the level bot, with no game to fight it in
+        if answer is None:
+            if self.replaying or self.host is None or not hasattr(self.host, "duel"):
+                if not self.replaying:
+                    self.say("The terminal does not answer.", "dim")
+                return None
+            res = self.host.duel(self, cid, spec)
+            if res is None:
+                return None
+            result, left = res
+            answer = {"win": "won", "lose": "lost"}.get(result, "fled") + (":%d" % left if result == "win" else "")
+            if self.journal:
+                self.journal[-1][1] += " =" + answer
+        result, _, left = answer.partition(":")
+        if result == "won" and left.isdigit():
+            p.hp = max(1, min(p.hp, int(left)))
+        elif result == "lost":
+            n = int(spec.get("feedback", 20))
+            self.hurt(n, spec.get("feedback_text") or "Feedback through the jack: %d." % n)
+        return result
 
     def flush_save(self):
         """A save asked for during a line (a checkpoint reached, "w; save") is made when the line is done,
@@ -2049,6 +2087,20 @@ class Level:
                     self.console.ride(self, old, None, ride == "down")
             self.over = "exit"
             return True
+        m = self.monster_at(x, y)
+        if m is not None and m.spec.get("duel") and not m.dead:          # a challenger: a card duel
+            got = self.duel(m.spec["duel"], m.spec)
+            if got == "won":
+                self.say(m.spec.get("duel_won") or "The %s folds its hand." % m.name, "good")
+                self.kill(m)
+            self.end_beat()
+            return got is not None
+        if cell.kind == "switch" and cell.duel and not cell.pressed:     # a terminal: hack it
+            got = self.duel(cell.duel["duel"], cell.duel)
+            if got != "won":
+                self.end_beat()
+                return got is not None
+            self.say(cell.duel.get("duel_won") or "Access granted.", "good")
         if cell.kind == "switch":
             if cell.pressed:
                 self.say("It is thrown already.", "dim")
@@ -3027,6 +3079,8 @@ class Level:
 
     def act(self, m):
         p, rng = self.player, self.rng
+        if m.spec.get("duel") and not m.spec.get("fights"):   # a challenger waits to be dealt with
+            return
         a = m.attack
         kind = a.get("kind", "melee")
         if kind == "cron":
@@ -3875,10 +3929,33 @@ class TextConsole:
 # --------------------------------------------------------------------------- #
 class Host:
     """The game round a level, as the level sees it: saves (the world as it was when the level began, and
-    the level's journal), loads, and finds the scene that plays a level."""
+    the level's journal), loads, card duels, and finds the scene that plays a level."""
 
-    def __init__(self, game):
+    def __init__(self, game, auto_duels=False):
         self.game = game
+        self.auto_duels = auto_duels
+
+    def duel(self, lv, cid, spec):
+        """Fight a card duel off the level's screen (the screen is given back after). ``(result, health
+        left)``, or None if the game has no such character."""
+        from . import cards
+        g = self.game
+        if cid not in g.world.characters:
+            lv.say("Nobody answers.", "dim")
+            return None
+        con = lv.console
+        frame = isinstance(con, FrameConsole)
+        if frame:
+            con.stop()
+            if getattr(g.term, "ansi", False):
+                g.term.out.write("\x1b[H\x1b[2J")            # the duel on a clear screen
+                g.term.out.flush()
+        try:
+            return cards.fight_duel(g, cid, lv.player.hp, 100, auto=self.auto_duels or not g.term.is_tty,
+                                    can_flee=spec.get("flee", True))
+        finally:
+            if frame:
+                con.start()
 
     def path(self, slot):
         from .world import slot_path
@@ -4141,6 +4218,23 @@ def made_problems(lv, data, sprites):
                     ends = True
         if not ends:
             out.append("there is no exit (E) in a site with an \"at\": a world without end needs one somewhere")
+    return out
+
+
+def duel_problems(data):
+    """Card duels in levels: each names a character the game has (one with stats to fight with)."""
+    out = []
+    chars = getattr(data, "characters", None) or {}
+    for mid, m in (data.monsters or {}).items():
+        if isinstance(m, dict) and m.get("duel") and m["duel"] not in chars:
+            out.append("monster '%s': its duel is with '%s', not a character" % (mid, m["duel"]))
+    for lid, spec in (data.levels or {}).items():
+        for ch, v in ((spec or {}).get("legend") or {}).items():
+            if isinstance(v, dict) and v.get("duel"):
+                if v["duel"] not in chars:
+                    out.append("level '%s' legend '%s': its duel is with '%s', not a character" % (lid, ch, v["duel"]))
+                if v.get("switch") is None:
+                    out.append("level '%s' legend '%s': a duel is on a switch (a terminal)" % (lid, ch))
     return out
 
 

@@ -48,7 +48,19 @@
       "buy_rate": 0.5,
       "unlimited": true,
       "greeting": "Everything fell off a wagon. Some of it fell quite a long way.",
-      "farewell": "Come back alive! Dead customers haggle terribly."
+      "farewell": "Come back alive! Dead customers haggle terribly.",
+      "cards": [
+        "backstab",
+        "riposte",
+        "iron_hide",
+        "sweeping_cut",
+        "war_cry",
+        "ember",
+        "ward",
+        "greatsword"
+      ],
+      "upgrade": 60,
+      "remove": 50
     }
   },
   "bone_rat": {

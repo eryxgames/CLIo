@@ -310,6 +310,7 @@ class GameData:
         if self.levels or self.monsters or self.tiles or self.weapons:
             from . import level
             problems += level.validate(self)
+            problems += level.duel_problems(self)
             for sid, sc in self.scenes.items():
                 if sc.get("level") and sc["level"] not in self.levels:
                     problems.append("scene '%s': unknown level '%s'" % (sid, sc["level"]))

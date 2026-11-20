@@ -1,0 +1,159 @@
+{
+ "ping": {
+  "name": "Ping",
+  "cost": 1,
+  "type": "attack",
+  "effects": [
+   {
+    "damage": 6
+   }
+  ],
+  "rarity": "starter",
+  "text": "Probe it, hard."
+ },
+ "firewall": {
+  "name": "Firewall",
+  "cost": 1,
+  "type": "skill",
+  "effects": [
+   {
+    "block": 5
+   }
+  ],
+  "rarity": "starter",
+  "text": "Drop what comes in."
+ },
+ "traceroute": {
+  "name": "Traceroute",
+  "cost": 1,
+  "type": "skill",
+  "effects": [
+   {
+    "status": "exposed",
+    "turns": 2
+   }
+  ],
+  "rarity": "starter",
+  "text": "Every hop to it, mapped: it takes more.",
+  "target": "enemy"
+ },
+ "fork_bomb": {
+  "name": "Fork Bomb",
+  "cost": 1,
+  "type": "attack",
+  "effects": [
+   {
+    "damage": 3,
+    "times": 3
+   }
+  ],
+  "rarity": "common",
+  "text": "Again, again, again."
+ },
+ "kill9": {
+  "name": "kill -9",
+  "cost": 2,
+  "type": "attack",
+  "effects": [
+   {
+    "damage": 15
+   }
+  ],
+  "rarity": "uncommon",
+  "text": "No signal handler catches it.",
+  "upgrade": {
+   "cost": 1
+  }
+ },
+ "sudo": {
+  "name": "sudo",
+  "cost": 1,
+  "type": "power",
+  "effects": [
+   {
+    "strength": 2
+   }
+  ],
+  "rarity": "uncommon",
+  "text": "Your hits count for more, from now on."
+ },
+ "grep": {
+  "name": "grep",
+  "cost": 0,
+  "type": "skill",
+  "effects": [
+   {
+    "draw": 2
+   }
+  ],
+  "rarity": "common",
+  "text": "Find what you need in the pile.",
+  "exhaust": true
+ },
+ "nohup": {
+  "name": "nohup",
+  "cost": 2,
+  "type": "skill",
+  "effects": [
+   {
+    "block": 12
+   }
+  ],
+  "rarity": "common",
+  "text": "Hang up on it: nothing reaches you."
+ },
+ "chmod": {
+  "name": "chmod 000",
+  "cost": 1,
+  "type": "skill",
+  "effects": [
+   {
+    "status": "weak",
+    "turns": 2
+   }
+  ],
+  "rarity": "common",
+  "text": "It can read nothing, write nothing: it hits softer.",
+  "target": "enemy"
+ },
+ "fsck": {
+  "name": "fsck",
+  "cost": 1,
+  "type": "skill",
+  "effects": [
+   {
+    "heal": 6
+   }
+  ],
+  "rarity": "uncommon",
+  "text": "Mend what the feedback burned.",
+  "exhaust": true
+ },
+ "rm_rf": {
+  "name": "rm -rf",
+  "cost": 2,
+  "type": "attack",
+  "effects": [
+   {
+    "damage": 9
+   }
+  ],
+  "rarity": "rare",
+  "text": "Everything here, recursively.",
+  "target": "all",
+  "exhaust": true
+ },
+ "overclock": {
+  "name": "Overclock",
+  "cost": 0,
+  "type": "skill",
+  "effects": [
+   {
+    "energy": 2
+   }
+  ],
+  "rarity": "rare",
+  "text": "Two more this turn.",
+  "exhaust": true
+ }
+}

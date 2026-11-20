@@ -929,5 +929,36 @@
    "pin you down; hide behind a corner and the grenade comes round it (three beats: move).",
    "One alone goes down fast."
   ]
+ },
+ "sentinel": {
+  "name": "kernel sentinel",
+  "role": "a challenger",
+  "tag": "S",
+  "sprite": "daemon",
+  "size": 1.1,
+  "hp": 240,
+  "attack": {
+   "kind": "melee",
+   "damage": [
+    10,
+    18
+   ],
+   "speed": 1
+  },
+  "sight": 6,
+  "duel": "kernel_sentinel",
+  "feedback": 25,
+  "duel_won": "The sentinel folds its hand and lets you through.",
+  "sounds": {
+   "sight": "daemon_sight",
+   "death": "daemon_death"
+  },
+  "death": "%s drops its cards and fades.",
+  "man": [
+   "A guard process. It does not attack.",
+   "",
+   "A challenger: face it and press Enter for a card duel.",
+   "Shooting it works too, if you have the ammunition."
+  ]
  }
 }

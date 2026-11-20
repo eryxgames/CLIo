@@ -661,5 +661,22 @@
    "water_dim": "#18280f",
    "crystal": "#60f0d0"
   }
+ },
+ "cards": {
+  "energy": 3,
+  "hand": 5,
+  "rewards": 3,
+  "deck": [
+   "ping",
+   "ping",
+   "ping",
+   "ping",
+   "ping",
+   "firewall",
+   "firewall",
+   "firewall",
+   "firewall",
+   "traceroute"
+  ]
  }
 }

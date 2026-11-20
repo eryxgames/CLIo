@@ -1,0 +1,47 @@
+{
+ "black_ice": {
+  "name": "Black ICE",
+  "description": "Intrusion countermeasures: a wall of cold, patient code.",
+  "stats": {
+   "health": 34,
+   "max_health": 34,
+   "attack": 7,
+   "defense": 2
+  },
+  "battle_intro": "The terminal frosts over. Something on the other side of the jack is watching.",
+  "card_rewards": [
+   "fork_bomb",
+   "chmod",
+   "grep",
+   "nohup"
+  ]
+ },
+ "kernel_sentinel": {
+  "name": "Kernel Sentinel",
+  "description": "A guard process. It does not shoot; it deals.",
+  "stats": {
+   "health": 48,
+   "max_health": 48,
+   "attack": 8,
+   "defense": 3
+  },
+  "deck": [
+   "ping",
+   "ping",
+   "ping",
+   "ping",
+   "firewall",
+   "firewall",
+   "fork_bomb",
+   "chmod"
+  ],
+  "energy": 3,
+  "hand": 4,
+  "battle_intro": "The sentinel fans a hand of processes. \"Credentials,\" it says, \"or cards.\"",
+  "card_rewards": [
+   "kill9",
+   "sudo",
+   "fsck"
+  ]
+ }
+}

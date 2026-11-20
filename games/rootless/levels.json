@@ -1840,5 +1840,49 @@
    "chaingun",
    "E"
   ]
+ },
+ "sim10": {
+  "name": "Root Shell",
+  "title": "SIM-10: Root Shell",
+  "intro": [
+   "A training program of the simulatron: the shell beneath the mainframe.",
+   "Jack into the terminal (face it, Enter) to open the door: a card duel against its ICE.",
+   "A sentinel guards the way out. It deals too."
+  ],
+  "par": 60,
+  "music": "swap_partition",
+  "facing": "s",
+  "death_text": "outro_lose",
+  "map": [
+   "###############",
+   "#@....#.......#",
+   "#..m..D.......#",
+   "#.....#.......#",
+   "###t######S####",
+   "#.............#",
+   "#.............#",
+   "#######E#######"
+  ],
+  "legend": {
+   "t": {
+    "switch": "ice_down",
+    "label": "TERMINAL",
+    "duel": "black_ice",
+    "feedback": 20,
+    "duel_won": "The ICE melts. A door unlocks somewhere."
+   },
+   "D": {
+    "wall": "gate",
+    "opens_on": "ice_down"
+   },
+   "S": {
+    "monster": "sentinel"
+   },
+   "m": "medkit"
+  },
+  "bot": [
+   "t",
+   "E"
+  ]
  }
 }

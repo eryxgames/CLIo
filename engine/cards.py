@@ -77,13 +77,217 @@ HURTS = ("poison", "burn", "bleed")
 # ---------------------------------------------------------------------- #
 # the game's cards and decks
 # ---------------------------------------------------------------------- #
+UPGRADE = (("damage", 3), ("block", 3), ("heal", 3), ("draw", 1), ("strength", 1), ("energy", 1), ("turns", 1))
+PRICES = {"starter": 25, "common": 45, "uncommon": 70, "rare": 110}
+
+
+def upgraded(card):
+    """A card made better: its own ``"upgrade"`` (what changes: cost, effects, name...), else three more
+    damage, block or healing (one more draw, strength, energy or turn) on its first effect that has them,
+    else one cheaper. Its name gets a +."""
+    c = dict(card)
+    up = card.get("upgrade")
+    c.pop("upgrade", None)
+    c["name"] = str(card.get("name", "?")) + "+"
+    if isinstance(up, dict):
+        c.update(up)
+    else:
+        effs, done = [], False
+        for e in card.get("effects") or []:
+            if isinstance(e, dict) and not done:
+                e = dict(e)
+                for k, more in UPGRADE:
+                    if isinstance(e.get(k), (int, float)) and not isinstance(e.get(k), bool):
+                        e[k] = e[k] + more
+                        done = True
+                        break
+            effs.append(e)
+        c["effects"] = effs
+        if not done and int(card.get("cost", 1)) > 0:
+            c["cost"] = int(card.get("cost", 1)) - 1
+    c["upgraded"] = True
+    return c
+
+
+class Cards(dict):
+    """The cards by id; ``"id+"`` is the card upgraded (made when asked for, not listed with the others)."""
+
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.better = {}
+
+    def can_upgrade(self, cid):
+        return isinstance(cid, str) and not cid.endswith("+") and dict.__contains__(self, cid) \
+            and dict.__getitem__(self, cid).get("upgrade", True) is not False
+
+    def __contains__(self, k):
+        return dict.__contains__(self, k) or (isinstance(k, str) and k.endswith("+") and self.can_upgrade(k[:-1]))
+
+    def __missing__(self, k):
+        if isinstance(k, str) and k.endswith("+") and self.can_upgrade(k[:-1]):
+            if k not in self.better:
+                self.better[k] = upgraded(dict.__getitem__(self, k[:-1]))
+            return self.better[k]
+        raise KeyError(k)
+
+    def get(self, k, default=None):
+        return self[k] if k in self else default
+
+
 def table(data):
     """Every card: the engine's, with the game's ``cards.json`` over them."""
-    out = {k: dict(v) for k, v in CARDS.items()}
+    out = Cards((k, dict(v)) for k, v in CARDS.items())
     for cid, c in (getattr(data, "cards", None) or {}).items():
         if isinstance(c, dict):
             out[cid] = dict(c)
     return out
+
+
+def in_use(game):
+    """Whether this game (in this mode) has a deck: card battles, or a deck already."""
+    how = game.mode_spec.get("battle") or game.cfg.get("battle")
+    return how == "cards" or isinstance(game.world.player.get("deck"), list) or bool(settings(game).get("deck"))
+
+
+def price(card, rate=1.0):
+    """What a shop asks for a card: its ``price``, else by its rarity."""
+    if isinstance(card.get("price"), (int, float)) and not isinstance(card.get("price"), bool):
+        return max(1, int(round(card["price"] * rate)))
+    return max(1, int(round(PRICES.get(card.get("rarity", "common"), 45) * rate)))
+
+
+def label(card):
+    return "%s (%d) %s" % (card.get("name", "?"), int(card.get("cost", 1)), describe(card))
+
+
+def upgrade_card(game, how="choose", say=True):
+    """Upgrade a card in the deck: ``"choose"`` (a menu), ``"random"``, or a card id (its first copy that is
+    not upgraded yet). Returns the new id, or None."""
+    cards = table(game.data)
+    deck = deck_of(game)
+    can = [i for i, c in enumerate(deck) if cards.can_upgrade(c)]
+    if how not in ("choose", "random"):
+        can = [i for i in can if deck[i] == how]
+    if not can:
+        if say:
+            game.say("No card in your deck can be made better.", "system")
+        return None
+    if how == "random":
+        i = can[game.world.rng.randrange(len(can))]
+    elif how == "choose":
+        ui = game.ui
+        seen, opts = set(), []
+        for i in can:
+            if deck[i] not in seen:
+                seen.add(deck[i])
+                opts.append(i)
+        labels = ["{item}%s{/} {hint}%s{/}  ->  {item}%s{/}" % (
+            label(cards[deck[i]]), "", label(cards[deck[i] + "+"])) for i in opts]
+        pick = ui.menu(labels, title="Make which card better?", cancel_label="None", prompt="Card> ")
+        if pick is None:
+            return None
+        i = opts[pick]
+    else:
+        i = can[0]
+    deck[i] = deck[i] + "+"
+    if say:
+        game.say("%s: %s." % (cards[deck[i]].get("name"), describe(cards[deck[i]])), "success")
+    return deck[i]
+
+
+def shop_cards(game, shop):
+    """A shop's card counter: buy cards for the deck, have one made better, have one taken out."""
+    cards, ui, w = table(game.data), game.ui, game.world
+    cur = game.cfg.get("currency", "gold")
+    rate = float(shop.get("card_rate", 1.0))
+    while not game.over:
+        stock = [c for c in shop.get("cards") or [] if c in cards]
+        opts, acts = [], []
+        if stock:
+            opts.append("Buy a card")
+            acts.append("buy")
+        if shop.get("upgrade"):
+            opts.append("Make a card better (%d)" % int(shop["upgrade"]))
+            acts.append("upgrade")
+        if shop.get("remove"):
+            opts.append("Take a card out (%d)" % int(shop["remove"]))
+            acts.append("remove")
+        if not opts:
+            game.say("No cards here.", "system")
+            return
+        game.say("Your deck: %d cards. You have %d %s." % (len(deck_of(game)), w.player.get("gold", 0), cur), "quest")
+        pick = ui.menu(opts, title="Cards:", cancel_label="Back")
+        if pick is None:
+            return
+        act = acts[pick]
+        if act == "buy":
+            labels = ["{item}%s{/} {quest}%d{/} {hint}%s{/}" % (cards[c].get("name", c), price(cards[c], rate),
+                                                              describe(cards[c])) for c in stock]
+            n = ui.menu(labels, title="For sale:", cancel_label="Back", prompt="Card> ")
+            if n is None:
+                continue
+            cid = stock[n]
+            cost = price(cards[cid], rate)
+            if w.player.get("gold", 0) < cost:
+                game.audio.sfx("error")
+                game.say("You can't afford that.", "error")
+                continue
+            w.player["gold"] -= cost
+            deck_of(game).append(cid)
+            if not shop.get("unlimited_cards"):
+                shop["cards"].remove(cid)
+            game.audio.sfx("coin")
+            game.say("%s goes into your deck (%d cards)." % (cards[cid].get("name"), len(deck_of(game))), "success")
+        else:
+            cost = int(shop[act])
+            if w.player.get("gold", 0) < cost:
+                game.audio.sfx("error")
+                game.say("You can't afford that.", "error")
+                continue
+            if act == "upgrade":
+                if upgrade_card(game, "choose") is None:
+                    continue
+            else:
+                deck = deck_of(game)
+                if len(deck) <= int(settings(game).get("least", 5)):
+                    game.say("Your deck is as small as it may be.", "system")
+                    continue
+                labels = ["{item}%s{/}" % label(cards[c]) for c in deck if c in cards]
+                n = ui.menu(labels, title="Take out which card?", cancel_label="None", prompt="Card> ")
+                if n is None:
+                    continue
+                gone = [c for c in deck if c in cards][n]
+                deck.remove(gone)
+                game.say("%s is gone from your deck." % cards[gone].get("name", gone), "system")
+            w.player["gold"] -= cost
+            game.audio.sfx("coin")
+
+
+def fight_duel(game, cid, hp, max_hp=None, auto=False, can_flee=True):
+    """A card duel with one character that is not one of the story's own fights - a terminal hacked, a
+    challenger met in a first-person level. The player fights with ``hp`` (the level's health); the world's
+    own health is as it was afterwards. ``auto``: the plain player plays it (tests, bots). Returns
+    ``(result, health left)``: "win", "lose" or "fled"."""
+    w = game.world
+    saved = dict(w.stats)
+    w.stats["health"] = int(hp)
+    w.stats["max_health"] = int(max_hp or max(hp, 100))
+    term = game.term
+    old = getattr(term, "inp", None)
+    battle = CardBattle(game, [cid], can_flee)
+    was = getattr(game, "battle", None)
+    game.battle = battle
+    if auto:
+        term.inp = lambda prompt: battle.auto_command() if "Play>" in prompt else "1"
+    try:
+        result = battle.run()
+        left = battle.player.hp
+    finally:
+        term.inp = old
+        game.battle = was
+        w.stats.clear()
+        w.stats.update(saved)
+    return result, left
 
 
 def settings(game):
@@ -155,6 +359,22 @@ def problems(data):
     """What is wrong with the game's cards and decks (for --check)."""
     out = []
     cards = table(data)
+    for cid, c in (getattr(data, "cards", None) or {}).items():
+        if isinstance(c, dict) and "upgrade" in c and c["upgrade"] is not False and not isinstance(c["upgrade"], dict):
+            out.append("card '%s': upgrade should be an object (what changes) or false" % cid)
+        elif isinstance(c, dict) and isinstance(c.get("upgrade"), dict):
+            up = c["upgrade"].get("cost", 0)
+            if not (isinstance(up, int) and not isinstance(up, bool) and 0 <= up <= 9):
+                out.append("card '%s': its upgrade's cost should be a whole number, 0 to 9" % cid)
+    for chid, ch in (getattr(data, "characters", None) or {}).items():
+        shop = ch.get("shop") if isinstance(ch, dict) else None
+        if isinstance(shop, dict):
+            for c in shop.get("cards") or []:
+                if c not in cards:
+                    out.append("character '%s': its shop sells card '%s', not a card" % (chid, c))
+            for k in ("upgrade", "remove"):
+                if k in shop and not (isinstance(shop[k], int) and not isinstance(shop[k], bool) and shop[k] >= 0):
+                    out.append("character '%s': its shop's %s price should be a whole number" % (chid, k))
     for cid, c in (getattr(data, "cards", None) or {}).items():
         where = "card '%s'" % cid
         if not isinstance(c, dict):

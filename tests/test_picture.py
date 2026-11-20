@@ -346,6 +346,94 @@ class SameAsPython(unittest.TestCase):
         land_mod._SHARED.clear()
 
     @with_library
+    def test_room_frames_are_the_same(self):
+        """The rooms' floor and ceiling in C: E1M1 (teleporter, lift, plates, fire and its marks), E1M9 (belts,
+        oil, slick), SIM-2 (floors made from a seed), from several places, in each style."""
+        from engine.data import GameData
+        from engine.firstperson import DIRS
+        from engine.level import Level
+        from test_levels import ROOTLESS, Quiet
+        wanted = ("plate", "teleport", "lift", "conveyor", "oil", "slick", "toxic")
+        for lvl, styles in (("e1m1", (("pixel", "high"), ("dots", "low"))), ("e1m9", (("dots-fill", "high"),)),
+                            ("sim2", (("pixel", "low"),))):
+            lv = Level(GameData(ROOTLESS), lvl, seed=1)
+            lv.console = Quiet()
+            p = lv.player
+            places = [(p.x, p.y, None), (p.x + 0.5, p.y, 1), (p.x, p.y - 0.25, 2)]
+            seen = set()
+            for y in range(getattr(lv, "h", 0) if not getattr(lv, "world", None) else 0):
+                for x in range(lv.w):
+                    c = lv.cell(x, y)
+                    for a in wanted:
+                        v = getattr(c, a, None)
+                        if a not in seen and c is not None and (v is not None if a == "conveyor" else v):
+                            seen.add(a)
+                            places += [(x - DIRS[f][0] * 1.5, y - DIRS[f][1] * 1.5, f) for f in (0, 1, 2, 3)]
+            if lvl == "e1m1":
+                lv.marks = {(p.x, p.y - 2): "warn", (p.x + 1, p.y - 3): "burn"}
+                lv.marks_version += 1
+                lv.fires = {(p.x - 1, p.y - 2): 3}
+            for style, detail in styles:
+                def frames():
+                    v = View(48, 12, style, detail)
+                    out = []
+                    for i, (x, y, face) in enumerate(places):
+                        fx = FX()
+                        fx.cam, fx.face = (x, y), face
+                        out.append(v.render(lv, fx, i * 3 + 1))
+                    return out
+                fast, slow = python_too(frames)
+                self.assertEqual(fast, slow, (lvl, style, detail))
+
+    @with_library
+    def test_every_floor_set_in_a_room_is_the_same(self):
+        """Plates up and down, a sunk crate, a lift, belts each way, oil, slick, scorch, acid, fire, marks."""
+        from engine.data import GameData
+        from engine.level import Level
+        from test_levels import ROOTLESS, Quiet
+
+        def frames():
+            lv = Level(GameData(ROOTLESS), "e1m9", seed=1)
+            lv.console = Quiet()
+            p = lv.player
+            kinds = [("sunk", True), ("scorched", True), ("plate", "a"), ("plate", "b"), ("lift", "l"),
+                     ("conveyor", 0), ("conveyor", 1), ("conveyor", 2), ("conveyor", 3), ("slick", True),
+                     ("oil", True), ("teleport", "t")]
+            for i, (a, v) in enumerate(kinds):
+                c = lv.cell(p.x + i % 3 - 1, p.y - 1 - i // 3)
+                setattr(c, a, v)
+                if a == "plate":
+                    c.down = v == "b"
+            lv.cell(p.x, p.y - 3).toxic = True
+            lv.fires = {(p.x - 1, p.y - 2): 2, (p.x + 1, p.y - 1): 1}
+            lv.marks = {(p.x, p.y - 1): "warn", (p.x + 1, p.y - 2): "burn"}
+            lv.marks_version += 1
+            out = []
+            for style, detail in (("dots", "high"), ("pixel", "low")):
+                v = View(60, 16, style, detail)
+                out += [v.render(lv, FX(), ph) for ph in range(4)]
+            return out
+        fast, slow = python_too(frames)
+        self.assertEqual(fast, slow)
+
+    @with_library
+    def test_a_belt_the_library_cannot_take_goes_to_the_python(self):
+        from engine.data import GameData
+        from engine.level import Level
+        from test_levels import ROOTLESS, Quiet
+
+        def frame():
+            lv = Level(GameData(ROOTLESS), "e1m9", seed=1)
+            lv.console = Quiet()
+            lv.cell(lv.player.x, lv.player.y - 1).conveyor = 7       # not a way: the Python's own error
+            try:
+                return View(40, 10, "pixel").render(lv, FX(), 1)
+            except IndexError as e:
+                return repr(e)
+        fast, slow = python_too(frame)
+        self.assertEqual(fast, slow)
+
+    @with_library
     def test_a_phase_that_is_not_whole_goes_to_the_python(self):
         from engine.firstperson import sky_spec
         self.assertIsNone(picture.sky(sky_spec({}), 20, 5, 0, 0.0, 1.5, [(0, 0, 0)] * 5, [(1, 1, 1)] * 2))

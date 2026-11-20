@@ -426,13 +426,16 @@ game, RØØTLESS, shows them.
   **SIM-10: Root Shell** (`--level sim10`): hack a terminal, then out-deal a sentinel.
 - **CLIo Picture** (`engine/picture/`, `--get-picture`): a C library, found and installed as
   Ballistic's is, for the inner loops of the pictures; `--get-picture` installs release 0.2.0
-  for Linux, macOS, Windows or Android (Termux), checked by its SHA-256. It draws the open land's ground (the
-  caster, `Land.cast`) and the sky over open cells (all but the sun's disc and glow, which
-  stay in Python), works out the land's heights a chunk at a time, and makes the braille of
-  the dots and dots-fill views. A frame of open land takes a fifth to a quarter of the time
-  (E1M4 at 150 columns: 52 -> 12 ms; in dots 137 -> 25 ms). It gives exactly the Python's
-  results, to the last bit, and is checked against the Python before it is used; without it
-  everything is drawn in Python as before.
+  for Linux, macOS, Windows or Android (Termux), checked by its SHA-256. It draws the open
+  land's ground (the caster, `Land.cast`) and the sky over open cells (all but the sun's disc
+  and glow, which stay in Python), and from release 0.3 the rooms' floor and ceiling (all but
+  the teleporters' rings); it works out the land's heights a chunk at a time and makes the
+  braille of the dots and dots-fill views. A frame of open land takes a fifth to a quarter of
+  the time (E1M4 at 150 columns: 52 -> 12 ms; in dots 137 -> 25 ms), a room two thirds, in
+  dots two fifths (E1M1: 8.5 -> 5.8 ms; in dots 33 -> 13 ms). It gives exactly the Python's
+  results, to the last bit, and is checked against the Python before it is used; an older
+  release does what it can and leaves the rest to the Python; without it everything is drawn
+  in Python as before.
 
 ### Changed
 

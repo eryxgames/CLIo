@@ -3,9 +3,10 @@
 """CLIo Picture: the inner loops of the pictures in C, when the library is installed - as Ballistic Engine is
 for sound.  A game never needs it: without it CLIo draws everything in Python, as before.
 
-What it does now (CLIo Picture 0.2): the land's heights for a chunk at once (``land_raw``), the open land's
-ground caster (``land_draw``), the sky over open cells but for the sun (``sky``), and the dots and dots-fill
-styles' braille cells from a frame's pixels (``dots``).  All give exactly what the Python gives - the same floats, to the last bit - so a game looks and
+What it does now (CLIo Picture 0.3): the land's heights for a chunk at once (``land_raw``), the open land's
+ground caster (``land_draw``), the sky over open cells but for the sun (``sky``), the rooms' floor and
+ceiling but for teleporters' rings (``room``), and the dots and dots-fill styles' braille cells from a
+frame's pixels (``dots``).  All give exactly what the Python gives - the same floats, to the last bit - so a game looks and
 plays the same with it or without it; only faster.  When the
 library is loaded it is checked against the Python on a few known values first, and not used if anything
 differs (``status()`` says why).
@@ -92,6 +93,25 @@ class _Sky(ctypes.Structure if ctypes else object):
                 ("sun_size", ctypes.c_double), ("sun_glow", ctypes.c_double)] if ctypes else []
 
 
+class _Room(ctypes.Structure if ctypes else object):
+    _fields_ = [("pw", ctypes.c_int), ("ph", ctypes.c_int), ("yh", ctypes.c_int), ("step", ctypes.c_int),
+                ("half", ctypes.c_double), ("cx", ctypes.c_double), ("cy", ctypes.c_double),
+                ("fx", ctypes.c_double), ("fy", ctypes.c_double), ("rx", ctypes.c_double), ("ry", ctypes.c_double),
+                ("phase", ctypes.c_int64), ("row_kind", ctypes.c_void_p), ("row_z", ctypes.c_void_p),
+                ("row_fog", ctypes.c_void_p), ("row_span", ctypes.c_void_p), ("sky", ctypes.c_void_p)] \
+        if ctypes else []
+
+
+class _RoomCell(ctypes.Structure if ctypes else object):
+    _fields_ = [("tex", ctypes.c_void_p), ("tex_w", ctypes.c_int32), ("tex_h", ctypes.c_int32),
+                ("kind", ctypes.c_int32), ("belt", ctypes.c_int32), ("toxic", ctypes.c_int32),
+                ("fire", ctypes.c_int32), ("mark", ctypes.c_int32), ("x", ctypes.c_int64), ("y", ctypes.c_int64)] \
+        if ctypes else []
+
+
+ROOM_CELL_FN = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_int, ctypes.c_int64, ctypes.c_int64,
+                                ctypes.POINTER(_RoomCell)) if ctypes else None
+CLEAR = 0xFFFFFFFF
 CHUNK_FN = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int64, ctypes.c_int64) if ctypes else None
 CHUNK_BYTES = 256 * 8 + 256 * 4 + 256 * 2                    # clio_chunk: heights, colours, kinds
 U32 = "I" if array("I").itemsize == 4 else "L"
@@ -114,6 +134,9 @@ def _open(path):
         lib.clio_land_draw.argtypes = [ctypes.POINTER(_Ground), CHUNK_FN, P, P, I, P, P]
         lib.clio_sky_draw.restype = I
         lib.clio_sky_draw.argtypes = [ctypes.POINTER(_Sky), P, P, P, ctypes.POINTER(I)]
+    if hasattr(lib, "clio_room_draw"):                  # 0.3 and later
+        lib.clio_room_draw.restype = I
+        lib.clio_room_draw.argtypes = [ctypes.POINTER(_Room), ROOM_CELL_FN, P, P, P, ctypes.POINTER(I)]
     return lib
 
 
@@ -465,3 +488,88 @@ def sky(spec, PW, yh, f, lateral, phase, base, ridge_rgb):
     get = _rgb.__getitem__
     rows = [list(map(get, rgb[y * PW:(y + 1) * PW])) for y in range(yh)]
     return rows, [hs[i * PW:(i + 1) * PW] for i in range(len(ridges))], spots[:count.value]
+
+
+# --------------------------------------------------------------------------- #
+# the rooms' floor and ceiling
+# --------------------------------------------------------------------------- #
+class Odd(Exception):
+    """What a cell or a tile holds is not what the library takes: the Python draws the picture."""
+
+
+_textures = {}                                        # id(rows) -> (rows, w, h, texels)
+
+
+def _texture(rows):
+    got = _textures.get(id(rows))
+    if got is None or got[0] is not rows:
+        if len(_textures) > 256:
+            _textures.clear()
+        w, h = len(rows[0]), len(rows)
+        if not w or any(len(r) != w for r in rows):
+            raise Odd("a tile of uneven rows")
+        texels = array(U32, [CLEAR if c is None else (c[0] << 16) | (c[1] << 8) | c[2] for r in rows for c in r])
+        got = _textures[id(rows)] = (rows, w, h, texels)
+    return got
+
+
+def room(PW, PH, yh, step, half, cam, phase, rows, sky_rows, info, held):
+    """``View._backdrop`` in C: (rows of colours, the pixels y * PW + x left for the caller - teleporters with
+    no tile over them, drawn as haze) - or None without the library, or for a picture it cannot take.
+    ``rows``: (kinds, distances, fogs, spans) for each pixel row; ``info(what, ix, iy)``: a cell's floor
+    (what 0) or ceiling (1) as (tile rows or None, kind, belt, toxic, fire, mark, x, y) - raising Odd for what
+    the library cannot draw. ``held`` keeps the tiles alive meanwhile."""
+    lib = load()
+    if lib is None or not hasattr(lib, "clio_room_draw") or not isinstance(phase, int):
+        return None
+    kinds, zs, fogs, spans = rows
+    sky = None
+    if sky_rows is not None:
+        try:
+            sky = bytes(itertools.chain.from_iterable(itertools.chain.from_iterable(sky_rows[:yh])))
+        except (TypeError, ValueError):
+            return None
+        if len(sky) != yh * PW * 3 or len(sky_rows) < yh:
+            return None
+    cx, cy, fx, fy, rx, ry = cam
+    try:
+        r = _Room(PW, PH, yh, step, float(half), float(cx), float(cy), float(fx), float(fy), float(rx),
+                  float(ry), phase, _ptr(kinds), _ptr(zs), _ptr(fogs), _ptr(spans), None)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    failed, odd = [], []
+
+    def ask(_user, what, ix, iy, out):
+        try:
+            tex, kind, belt, toxic, fire, mark, x, y = info(what, ix, iy)
+            o = out.contents
+            if tex is not None:
+                got = _texture(tex)
+                held.append(got)
+                o.tex, o.tex_w, o.tex_h = got[3].buffer_info()[0], got[1], got[2]
+            o.kind, o.belt, o.toxic, o.fire, o.mark, o.x, o.y = kind, belt, toxic, fire, mark, x, y
+            return 0
+        except (Odd, TypeError, ValueError, OverflowError, IndexError) as e:
+            odd.append(e)
+            return 1
+        except BaseException as e:                     # noqa: BLE001 - raised again below, as the Python would
+            failed.append(e)
+            return 1
+    fn = ROOM_CELL_FN(ask)
+    n = PW * PH
+    rgb = (ctypes.c_uint32 * n)()
+    later = (ctypes.c_int32 * n)()
+    count = ctypes.c_int(0)
+    skybuf = None
+    if sky is not None:
+        skybuf = ctypes.create_string_buffer(sky, len(sky))
+        r.sky = ctypes.addressof(skybuf)
+    res = lib.clio_room_draw(ctypes.byref(r), fn, None, rgb, later, ctypes.byref(count))
+    if failed:
+        raise failed[0]
+    if res != 0:
+        return None
+    if len(_rgb) > 200000:
+        _rgb.clear()
+    get = _rgb.__getitem__
+    return [list(map(get, rgb[y * PW:(y + 1) * PW])) for y in range(PH)], later[:count.value]

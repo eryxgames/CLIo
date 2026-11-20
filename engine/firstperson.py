@@ -24,6 +24,7 @@ attributes: ``cells`` (``cell(x, y)``), ``player``, ``monsters``, ``items``,
 from __future__ import annotations
 
 import math
+from array import array
 
 from . import model as model_mod
 from . import picture
@@ -748,6 +749,11 @@ class View:
             return (cell, drawing(tile) if tile else None, fixed, cell.toxic, (ix, iy) in fires,
                     marks.get((ix, iy)))
 
+        if picture.load() is not None:                    # in C with CLIo Picture; teleporters' rings here
+            fast = self._backdrop_c(lv, cx, cy, f, phase, sky, step, under, drawing, ceiling_tile, below)
+            if fast is not None:
+                return fast
+            below.clear()
         out = []
         for y in range(PH):
             if y >= self.yh:
@@ -836,6 +842,111 @@ class View:
             if step == 2:
                 row[1::2] = row[0:PW - 1:2]
             out.append(row)
+        return out
+
+    def _rows(self):
+        """For each pixel row of the backdrop: (0 floor, 1 ceiling, 2 too far), the distance, the fog, a cell's
+        width - as _backdrop works them out."""
+        key = (self.PH, self.yh, self.FS, self.CH, self.LW)
+        got = self.__dict__.get("_rows_c")
+        if got is None or got[0] != key:
+            kinds, zs, fogs, spans = array("b"), array("d"), array("d"), array("d")
+            for y in range(self.PH):
+                if y >= self.yh:
+                    t, kind = (y - self.yh + 0.5) / self.FS, 0
+                else:
+                    t, kind = (self.yh - y - 0.5) / self.CH, 1
+                z = math.log(t) / LN
+                if z > FAR + 0.5:
+                    kind = 2
+                kinds.append(kind)
+                zs.append(z)
+                fogs.append(0.18 + 0.82 * min(1.0, t) ** 0.75)
+                spans.append(self.LW * t)
+            got = self._rows_c = (key, (kinds, zs, fogs, spans))
+        return got[1]
+
+    def _backdrop_c(self, lv, cx, cy, f, phase, sky, step, under, drawing, ceiling_tile, below):
+        """_backdrop with CLIo Picture: the cells' floors and ceilings worked out here as there, in the same
+        order; None when the library cannot draw it."""
+        fx, fy = DIRS[f]
+        rx, ry = DIRS[(f + 1) % 4]
+        PW, PH = self.PW, self.PH
+        cell_at = lv.cell
+        held = []
+
+        def info(what, ix, iy):
+            if what == 0:
+                got = below[(ix, iy)] = under(ix, iy)
+                cell, tex, fixed, toxic, fire, mark = got
+                kind = belt = 0
+                if fixed:
+                    if getattr(cell, "plate", None):
+                        kind = 2 if cell.down else 1
+                    elif getattr(cell, "sunk", False):
+                        kind = 3
+                    elif getattr(cell, "teleport", None):
+                        kind = 4
+                    elif getattr(cell, "lift", None):
+                        kind = 5
+                    elif getattr(cell, "conveyor", None) is not None:
+                        kind, belt = 6, cell.conveyor
+                        if not isinstance(belt, int) or not 0 <= belt < 4:
+                            raise picture.Odd("a belt's way")
+                    elif getattr(cell, "oil", False):
+                        kind = 7
+                    elif getattr(cell, "slick", False):
+                        kind = 8
+                    elif getattr(cell, "scorched", False):
+                        kind = 9
+                x, y = (cell.x, cell.y) if kind in (7, 9) else (ix, iy)
+                return (tex, kind, belt, 1 if toxic else 0, 1 if fire else 0,
+                        1 if mark == "warn" else 2 if mark == "burn" else 0, x, y)
+            cell = cell_at(ix, iy)
+            if sky is not None and getattr(cell, "sky", False):
+                return None, 10, 0, 0, 0, 0, ix, iy
+            tile = (getattr(cell, "ceiling", None) if cell is not None else None) or ceiling_tile
+            return drawing(tile) if tile else None, 0, 0, 0, 0, 0, ix, iy
+
+        rows = self._rows()
+        got = picture.room(PW, PH, self.yh, step, self.half, (cx, cy, fx, fy, rx, ry), phase, rows, sky, info,
+                           held)
+        if got is None:
+            return None
+        out, later = got
+        kinds, zs, fogs, spans = rows
+        half = self.half
+        for p in later:                                  # a teleporter's rings, as _backdrop draws them
+            y, x = divmod(p, PW)
+            z, fog = zs[y], fogs[y]
+            a = (x + 0.5 * step - half) / spans[y]
+            wx, wy = cx + fx * z + rx * a, cy + fy * z + ry * a
+            ix, iy = int(math.floor(wx + 0.5)), int(math.floor(wy + 0.5))
+            ux, uy = wx - ix, wy - iy
+            cell, tex, fixed, toxic, fire, mark = below[(ix, iy)]
+            c = self.fixture(cell, ux, uy, phase)
+            if c is None and toxic:
+                v = shade(TOXIC_HI if noise(int(ux * 8) + ix * 8, int(uy * 8) + iy * 8, phase) < 0.07 else TOXIC,
+                          0.45 + 0.55 * fog)
+            else:
+                if c is None:
+                    c = FLOOR_A if (ix + iy) & 1 else FLOOR_B
+                    if abs(ux) > 0.46 or abs(uy) > 0.46:
+                        c = FLOOR_LINE
+                if fire:
+                    c = mix(c, (255, 120, 30), 0.3 + 0.25 * noise(int(ux * 6) + ix * 6, int(uy * 6) + iy * 6, phase))
+                if mark == "warn":
+                    hatch = int((ux + uy + 1.0) * 6) % 2 == 0
+                    v = shade(mix(c, (255, 90, 30) if hatch else (150, 30, 20), 0.55 + 0.2 * (phase % 2)),
+                              0.6 + 0.4 * fog)
+                elif mark == "burn":
+                    k = noise(int(ux * 10) + ix * 10, int(uy * 10) + iy * 10, phase + 5)
+                    v = (255, 230, 120) if k < 0.25 else (255, 140, 40) if k < 0.7 else (200, 50, 20)
+                else:
+                    v = shade(c, fog)
+            out[y][x] = v
+            if step == 2 and x + 1 < PW:
+                out[y][x + 1] = v
         return out
 
     @staticmethod

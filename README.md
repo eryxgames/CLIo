@@ -102,7 +102,8 @@ python clio.py [game] [options]
   --import-model F  bring a glTF model (.glb/.gltf, e.g. from Blender) into a game's models.json
   --no-color      plain text
   --ascii         no box-drawing or block characters
-  --glyphs MODE   full, safe (frames stay, symbols become plain) or ascii
+  --glyphs MODE   full, console (the old Windows console fonts; the default in that window),
+                  safe (frames stay, symbols become plain) or ascii
   --test-display  draw a test page: frames, symbols, colours, a sprite
   --no-art        hide ASCII art and sprites
   --fast          no text animation
@@ -155,6 +156,10 @@ python clio.py --test-display
 
 and follow what it says. If a symbol shows as a box or a little picture, add
 `--glyphs safe` (or `export CLIO_GLYPHS=safe` in `~/.bashrc`).
+
+On Windows, CLIo draws for the font it is given. In Windows' own console window
+(Consolas, Lucida Console) it keeps to the symbols those fonts have; Windows Terminal
+(Cascadia Mono) shows everything, including the braille of the dots view.
 
 ### Sound on other systems
 
@@ -243,7 +248,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 600 tests, about a minute
+python -m unittest discover -s tests     # 608 tests, about a minute
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 python tests/bot.py 30 cards             # the same with card battles (the Deck mode)

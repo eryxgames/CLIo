@@ -23,7 +23,7 @@ import shutil
 import sys
 import time
 
-from .term import rgb_to_16, rgb_to_256
+from .term import rgb_to_16, rgb_to_256, to_ascii
 
 ESC = "\x1b"
 CSI = ESC + "["
@@ -41,11 +41,13 @@ ROLE = {"text": (205, 205, 195), "dim": (130, 130, 124), "hurt": (255, 95, 85),
 # and of DOS before them): ♥ health and ♦ armour are there, where a shield (◈, ⛨, 🛡) is not.
 GLYPHS = {"heart": "♥", "armor": "♦", "ammo": "▪", "bar": "│", "dot": "·", "charge": "»",
           "rule": "─", "ell": "…", "fire": "●", "run": "»", "lr": "←→", "ud": "↑↓",
-          "facing": "▲►▼◄", "block": "█", "half": "▀"}
-SAFE_GLYPHS = dict(GLYPHS, armor="AR", ammo="=", heart="HP", facing="^>v<")
+          "facing": "▲►▼◄", "block": "█", "half": "▀", "heading": "↑↗→↘↓↙←↖"}
+# Windows Terminal's font has no diagonal arrows: eight triangles, which it has
+WINDOWS_GLYPHS = dict(GLYPHS, heading="▲◥►◢▼◣◄◤")
+SAFE_GLYPHS = dict(GLYPHS, armor="AR", ammo="=", heart="HP", facing="^>v<", heading="^/>\\v/<\\")
 ASCII_GLYPHS = {"heart": "HP", "armor": "AR", "ammo": "#", "bar": "|", "dot": ".", "charge": ">",
                 "rule": "-", "ell": "~", "fire": "*", "run": ">", "lr": "<>", "ud": "^v",
-                "facing": "^>v<", "block": "#", "half": "#"}
+                "facing": "^>v<", "block": "#", "half": "#", "heading": "^/>\\v/<\\"}
 
 
 def mix(a, b, k):
@@ -63,10 +65,13 @@ def lum(c):
 class Painter:
     """Colours as escape codes, at whatever depth the terminal has (0 none, 1 = 16, 2 = 256, 3 = 24-bit)."""
 
-    def __init__(self, depth):
+    def __init__(self, depth, subst=None):
         self.depth = depth
         self.cache = {}
         self.fgs, self.bgs = {}, {}
+        # what the font lacks, swapped (a str.translate table): the cells one by one, a text whole
+        self.subst = subst
+        self.swap = {chr(k): v for k, v in subst.items()} if subst else None
 
     def part(self, c, bg=False):
         """One colour's part of an escape code, as foreground or background; None is the terminal's own."""
@@ -122,8 +127,10 @@ class Painter:
             if used + len(text) > width:
                 text = text[:max(0, width - used - len(ell))] + ell
             colour = ROLE.get(role, ROLE["text"]) if isinstance(role, str) else role
-            out.append(self.sgr(colour, bg) + text)
             used += len(text)
+            if self.subst and not text.isascii():
+                text = text.translate(self.subst)
+            out.append(self.sgr(colour, bg) + text)
         return "".join(out) + (CSI + "0m" if self.depth else "")
 
     def cells(self, row, unicode=True):
@@ -135,6 +142,7 @@ class Painter:
         depth = self.depth
         cf = cb = None
         part = self.part
+        swap = self.swap
         for ch, fg, bg in row:
             if ch is None:
                 if depth == 0 or not unicode:
@@ -145,6 +153,8 @@ class Painter:
                     ch, fg = " ", None
                 else:
                     ch = "▀"
+            elif swap is not None and ch in swap:
+                ch = swap[ch]
             if depth == 0:
                 out.append(ch)
                 continue
@@ -172,10 +182,14 @@ class Screen:
     def __init__(self, term, keys=None, keymap=None, animate=True, speed=1.0, out=None):
         self.term = term
         self.out = out or term.out or sys.stdout
-        self.paint = Painter(term.color_depth)
+        self.subst = getattr(term, "subst", None) if term.unicode else None   # what the font lacks, swapped
+        self.paint = Painter(term.color_depth, self.subst)
         self.unicode = term.unicode
         mode = getattr(term, "glyph_mode", "full")
         self.glyphs = ASCII_GLYPHS if not term.unicode or mode == "ascii" else (SAFE_GLYPHS if mode == "safe" else GLYPHS)
+        if self.glyphs is GLYPHS and getattr(term, "font", "full") == "windows":
+            self.glyphs = WINDOWS_GLYPHS
+        self.plain = not term.unicode                                           # ASCII only
         self.keys = keys                  # a KeyReader, or None for typed lines only (input())
         self.keymap = dict(keymap or {})
         self.animate = animate
@@ -192,6 +206,8 @@ class Screen:
 
     # ---- the terminal --------------------------------------------------- #
     def write(self, s):
+        if self.plain and not s.isascii():
+            s = to_ascii(s)
         self.out.write(s)
         self.out.flush()
 
@@ -267,6 +283,8 @@ class Screen:
                 r = self.paint.cells(r, self.unicode)
             elif r == old:
                 continue
+            elif self.subst and not r.isascii():
+                r = r.translate(self.subst)
             buf.append("%s%d;1H%s%s0m%sK" % (CSI, i + 1, r, CSI, CSI))
         if prompt is not None:
             buf.append("%s%d;%dH%s?25h" % (CSI, self.prompt_row, min(W, len(prompt) + len(self.typed) + 1), CSI))

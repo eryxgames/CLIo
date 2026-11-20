@@ -312,6 +312,9 @@ _ASCII_FALLBACK = str.maketrans({
     "«": "<", "»": ">", "—": "-", "–": "-", "’": "'", "‘": "'", "“": '"', "”": '"',
     "▁": "_", "▂": "_", "▃": "_", "▅": "=", "▆": "=", "▇": "#", "▔": "-", "▏": "|",
     "▕": "|", "◢": "/", "◣": "\\", "◤": "/", "◥": "\\", "∆": "^", "∞": "8",
+    "←": "<", "↑": "^", "→": ">", "↓": "v", "↖": "\\", "↗": "/", "↘": "\\", "↙": "/", "▉": "#", "▊": "#",
+    "▋": "#", "▍": "|", "▎": "|", "▶": ">", "◀": "<", "◊": "o", "◎": "o", "◸": "/", "◹": "\\", "◺": "\\",
+    "◿": "/", "♡": "v", "♣": "T", "♦": "*", "✓": "+", "‾": "-",
 })
 
 
@@ -344,6 +347,77 @@ def to_ascii(s):
     # accented letters lose the accent (ř -> r), not become a letter and a '?'
     s = "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c))
     return s.encode("ascii", "replace").decode("ascii")
+
+
+# --------------------------------------------------------------------------- #
+# What a font can draw
+# --------------------------------------------------------------------------- #
+# A character a font lacks shows as '?' or an empty box. Windows' own console window draws with
+# Consolas or Lucida Console, which have only WGL4 (the Windows Glyph List, the set of DOS and old
+# Windows): no diagonal arrows, no fine eighths of a block, no braille. Windows Terminal draws with
+# Cascadia Mono, which has all of those but a few symbols. So the picture is drawn as usual and, where
+# the font cannot show a character, it is swapped for the nearest one it can, on the way out.
+
+def _codes(spans, singles=""):
+    out = set(ord(c) for c in singles)
+    for a, b in spans:
+        out.update(range(a, b + 1))
+    return frozenset(out)
+
+
+WGL4 = _codes(
+    [(0x20, 0x7E), (0xA0, 0x17F), (0x1FA, 0x1FF), (0x2D8, 0x2DD), (0x384, 0x38A), (0x38E, 0x3A1),
+     (0x3A3, 0x3CE), (0x401, 0x40C), (0x40E, 0x44F), (0x451, 0x45C), (0x1E80, 0x1E85), (0x2013, 0x2015),
+     (0x2017, 0x201E), (0x2020, 0x2022), (0x2190, 0x2195), (0x215B, 0x215E), (0x2550, 0x256C),
+     (0x2590, 0x2593), (0x263A, 0x263C)],
+    "ƒˆˇˉΌўџҐґỲỳ…‰′″‹›‼‾⁄ⁿ₣₤₧€℅ℓ№™Ω℮↨∂∆∏∑−∕∙√∞∟∩∫≈≠≡≤≥⌂⌐⌠⌡─│┌┐└┘├┤┬┴┼▀▄█▌■□▪▫▬▲►▼◄◊○●◘◙◦"
+    "♀♂♠♣♥♦♪♫")
+
+# Cascadia Mono (checked with its 2407.24 release): WGL4, all the box drawing, blocks and braille, and these
+TERMINAL_FONT = WGL4 | _codes([(0x2500, 0x259F), (0x2800, 0x28FF)], "▶◀▸◂◆◇◈◉◎◢◣◤◥◸◹◺◿✓")
+
+# for Windows Terminal: the few symbols the engine uses that Cascadia Mono lacks
+FONT_GAPS = str.maketrans({
+    "↖": "◤", "↗": "◥", "↘": "◢", "↙": "◣", "★": "*", "☆": "*", "♡": "♥", "⚑": "!", "✔": "✓",
+    "✘": "×", "‖": "║",
+})
+
+
+def _braille_shade(code):
+    """A braille cell as a shade of about the same weight: the console fonts have no braille."""
+    n = bin(code - 0x2800).count("1")
+    return " ·░░▒▒▓▓█"[n]
+
+
+# for the console fonts: everything the engine draws outside WGL4, as the nearest that is in it
+CONSOLE_FONT = str.maketrans({
+    "↖": "\\", "↗": "/", "↘": "\\", "↙": "/", "★": "*", "☆": "*", "♡": "♥", "⚑": "!", "✔": "√", "✓": "√",
+    "✘": "×", "‖": "║", "━": "═", "┃": "║", "┏": "╔", "┓": "╗", "┗": "╚", "┛": "╝", "╭": "┌", "╮": "┐",
+    "╯": "┘", "╰": "└", "╱": "/", "╲": "\\", "╳": "X", "╴": "─", "╶": "─", "╵": "│", "╷": "│",
+    "▁": "_", "▂": "_", "▃": "▄", "▅": "▄", "▆": "█", "▇": "█", "▔": "‾", "▏": "│", "▕": "│",
+    "▖": "▄", "▗": "▄", "▘": "▀", "▝": "▀", "▚": "▒", "▞": "▒", "▙": "█", "▛": "█", "▜": "█", "▟": "█",
+    "▸": "►", "◂": "◄", "▶": "►", "◀": "◄", "◆": "♦", "◇": "◊", "◈": "♦", "◉": "●", "◎": "○",
+    "◢": "/", "◣": "\\", "◤": "/", "◥": "\\", "◸": "/", "◹": "\\", "◺": "\\", "◿": "/",
+    "▉": "█", "▊": "█", "▋": "█", "▍": "▌", "▎": "▌",
+})
+CONSOLE_FONT.update({c: _braille_shade(c) for c in range(0x2800, 0x2900)})
+# box drawing outside WGL4 (light/heavy mixes, dashes): the light line of its direction
+for _c in range(0x2500, 0x2580):
+    if _c not in WGL4 and _c not in CONSOLE_FONT:
+        _n = unicodedata.name(chr(_c), "")
+        CONSOLE_FONT[_c] = ("┼" if "VERTICAL AND HORIZONTAL" in _n else "│" if "VERTICAL" in _n
+                            else "─" if "HORIZONTAL" in _n else "+")
+CONSOLE_FONT = {k: v for k, v in CONSOLE_FONT.items() if k not in WGL4}
+
+_WINDOWS = os.name == "nt"
+
+
+def windows_console(env=None):
+    """Windows' own console window, which draws with the WGL4 fonts - not Windows Terminal, VS Code's
+    terminal or another terminal program (they set one of these and draw with fallback fonts)."""
+    env = os.environ if env is None else env
+    return _WINDOWS and not any(env.get(k) for k in ("WT_SESSION", "TERM_PROGRAM", "TERM", "ConEmuANSI",
+                                                   "WEZTERM_EXECUTABLE", "ALACRITTY_WINDOW_ID"))
 
 
 # --------------------------------------------------------------------------- #
@@ -407,14 +481,21 @@ class Term:
                 unicode = False
         self.unicode = bool(unicode)
         self.limited_glyphs = env.get("TERM", "") == "linux"   # kernel console font
-        # symbol set: full | safe (frames and blocks stay, symbols become ASCII) | ascii
-        mode = (glyphs or env.get("CLIO_GLYPHS") or "full").lower()
+        # symbol set: full | console (what the Windows console's and Linux console's fonts have) |
+        # safe (frames and blocks stay, symbols become ASCII) | ascii
+        mode = (glyphs or env.get("CLIO_GLYPHS") or "").lower()
+        if not mode:
+            mode = "console" if windows_console(env) or self.limited_glyphs else "full"
         if not self.unicode or mode == "ascii":
             mode = "ascii"
-        elif mode != "safe":
+        elif mode not in ("safe", "console"):
             mode = "full"
         self.glyph_mode = mode
-        self.glyphs = {"full": GLYPHS_UNICODE, "safe": GLYPHS_SAFE, "ascii": GLYPHS_ASCII}[mode]
+        self.glyphs = {"full": GLYPHS_UNICODE, "console": GLYPHS_UNICODE, "safe": GLYPHS_SAFE,
+                       "ascii": GLYPHS_ASCII}[mode]
+        # the font: what it lacks is swapped on the way out (see CONSOLE_FONT)
+        self.font = "console" if mode == "console" else ("windows" if _WINDOWS and self.unicode else "full")
+        self.subst = {"console": CONSOLE_FONT, "windows": FONT_GAPS}.get(self.font)
 
         # ---- animation (typewriter, fades...) only on a real terminal
         if animate is None:
@@ -471,6 +552,8 @@ class Term:
             return
         if not self.unicode:
             s = to_ascii(s)
+        elif self.subst and not s.isascii():
+            s = s.translate(self.subst)
         try:
             self.out.write(s)
         except UnicodeEncodeError:
@@ -531,6 +614,8 @@ class Term:
         try:
             if not self.unicode:
                 prompt = to_ascii(prompt)
+            elif self.subst:
+                prompt = prompt.translate(self.subst)
             value = input(prompt)
         except EOFError:
             raise QuitGame()

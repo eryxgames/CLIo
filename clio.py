@@ -255,7 +255,16 @@ def display_test(term, logo_name=None):
         ui.line(l)
     ui.gap()
 
-    ui.say("{key}4. Colours{/} - a smooth run of colour, and readable roles:", "default")
+    ui.say("{key}4. Fine shapes{/} - bars rising, eight arrows turning, dots - no '?' or boxes:", "default")
+    from engine.frame import Screen
+    heading = Screen(term).glyphs["heading"]
+    ui.line("   " + "▁▂▃▄▅▆▇█" + "   " + " ".join(heading) + "   " + "".join(chr(0x2800 + b) for b in
+                                                                         (0x01, 0x09, 0x1B, 0x3F, 0x7F, 0xFF)))
+    if term.glyph_mode == "console":
+        ui.say("Drawn for the Windows console's fonts: fine bars, diagonal arrows and dots are swapped for "
+               "the nearest they have. Windows Terminal shows them all.", "dim")
+
+    ui.say("{key}5. Colours{/} - a smooth run of colour, and readable roles:", "default")
     if term.color_depth >= 2:
         ui.line(" " + "".join(term.paint(term.glyphs["block"], str(c)) for c in
                               ([196, 202, 208, 214, 220, 226, 190, 154, 118, 82, 46, 47, 48, 49, 50, 51, 45, 39,
@@ -263,7 +272,7 @@ def display_test(term, logo_name=None):
     ui.say("{item}item{/} {character}character{/} {exit}exit{/} {error}error{/} {success}success{/} "
            "{quest}quest{/} {hint}hint{/}", "default")
 
-    ui.say("{key}5. Pixel sprite and art{/} - a small creature with two eyes, and the CLIo logo:", "default")
+    ui.say("{key}6. Pixel sprite and art{/} - a small creature with two eyes, and the CLIo logo:", "default")
     for l in generate("display test", 12).render(term):
         ui.line("   " + l)
     from engine.art import load_logo
@@ -271,7 +280,8 @@ def display_test(term, logo_name=None):
     for l in (logo.render(term, w - 4) if logo else []):
         ui.line("   " + l)
     ui.gap()
-    ui.say("If symbols look wrong, run with {key}--glyphs safe{/} (or set CLIO_GLYPHS=safe). "
+    ui.say("If symbols look wrong, run with {key}--glyphs console{/} (the old Windows console fonts) or "
+           "{key}--glyphs safe{/} (or set CLIO_GLYPHS). "
            "If frames or the sprite look wrong, use {key}--ascii{/}. If colours look wrong, use {key}--no-color{/}. "
            "In a game, {key}art off{/} hides art and sprites.", "hint")
     return 0
@@ -420,8 +430,9 @@ def main(argv=None):
                     help="render the set's Ballistic sounds into the game as WAV files (needs Node.js) and exit")
     ap.add_argument("--no-color", action="store_true", help="plain text, no colours")
     ap.add_argument("--ascii", action="store_true", help="ASCII only (no box-drawing or block characters)")
-    ap.add_argument("--glyphs", choices=("full", "safe", "ascii"),
-                    help="symbol set: 'safe' keeps frames but uses plain symbols (for fonts that lack them)")
+    ap.add_argument("--glyphs", choices=("full", "console", "safe", "ascii"),
+                    help="symbol set: 'console' keeps to the old Windows console fonts (the default there); "
+                         "'safe' keeps frames but uses plain symbols (for fonts that lack them)")
     ap.add_argument("--test-display", action="store_true",
                     help="show a test page to check frames, symbols, colours and sprites on this terminal")
     ap.add_argument("--no-art", action="store_true", help="hide ASCII art and sprites")

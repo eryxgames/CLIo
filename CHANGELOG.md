@@ -461,6 +461,16 @@ game, RØØTLESS, shows them.
 
 ### Fixed
 
+- **Symbols the font lacks** no longer show as `?` or empty boxes. Windows' own console
+  window draws with Consolas or Lucida Console, which have only the old Windows glyph list:
+  there the hopper's diagonal heading arrows and the reactor's chart bars were question
+  marks. CLIo now finds what draws it and swaps what the font lacks for the nearest it has:
+  in the console window (and the Linux console) the new symbol set `console` (fine bars as
+  `_▄█`, diagonal arrows as `/` and `\`, the dots as shades, rounded corners as square), in
+  Windows Terminal the few symbols its Cascadia Mono lacks (the heading arrows become eight
+  triangles). `--glyphs full` turns it off; `--test-display` has a row for these shapes. A
+  test checks that every symbol the engine and its games show has a stand-in in both fonts
+  and in ASCII.
 - A first-person view no longer shows the floor and ceiling of the level before when the
   next one starts at the same place, facing the same way.
 - E1M3's title page showed its intro a letter to a line (a level's `intro` may now be one

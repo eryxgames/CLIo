@@ -838,8 +838,10 @@ GLYPHS = {"ground": (" ", "."), "grass": ("·", ","), "road": (" ", "="), "mud":
           "rock": ("▲", "#"), "trees": ("♣", "T"), "building": ("▓", "B"), "pad": ("H", "H"), "fuel": ("F", "F")}
 
 
-def map_cells(sim, cols, rows, color=True, unicode=True):
-    """The map round the vehicle (north up): rows of ``(char, fg, bg)``."""
+def map_cells(sim, cols, rows, color=True, unicode=True, arrows=None):
+    """The map round the vehicle (north up): rows of ``(char, fg, bg)``. ``arrows``: the eight headings
+    from north round to north-west (the font's own, as the screen has them)."""
+    arrows = arrows or (ARROWS if unicode else ASCII_ARROWS)
     C = {k: colour(v) for k, v in sim.colors.items()}
     cx = int(math.floor(sim.x)) - cols // 2
     cy = int(math.floor(sim.y)) - rows // 2
@@ -872,9 +874,9 @@ def map_cells(sim, cols, rows, color=True, unicode=True):
             d = int(((want + TURN / 16) % TURN) // (TURN / 8))
             ec, er = cols // 2 + int(sin_u(want) * (cols // 2 - 1)), rows // 2 - int(cos_u(want) * (rows // 2 - 1))
             ec, er = max(0, min(cols - 1, ec)), max(0, min(rows - 1, er))
-            out[er][ec] = ((ARROWS if unicode else ASCII_ARROWS)[d], C["next"] if color else None, out[er][ec][2])
+            out[er][ec] = (arrows[d], C["next"] if color else None, out[er][ec][2])
     d = int(((sim.heading + TURN / 16) % TURN) // (TURN / 8))
-    ch = (ARROWS if unicode else ASCII_ARROWS)[d]
+    ch = arrows[d]
     r, c = rows // 2, cols // 2
     if 0 <= r < rows and 0 <= c < cols:
         hi = sim.model in ("hover", "plane") and not sim.landed
@@ -1004,14 +1006,14 @@ class Runner:
                 except Exception:
                     pass
 
-    def rows(self, W, H, depth=3, unicode=True):
+    def rows(self, W, H, depth=3, unicode=True, arrows=None):
         from .frame import Painter
         sim = self.sim
         paint = self.screen.paint if self.screen is not None else Painter(depth)
         mh = max(4, H - 3)
         pw = min(40, max(26, W // 3)) if sim.mode == "vehicle" else min(W, 72)
         mw = W - pw - 1 if sim.mode == "vehicle" else 0
-        cells = map_cells(sim, mw, mh, color=bool(depth), unicode=unicode) if mw > 0 else []
+        cells = map_cells(sim, mw, mh, color=bool(depth), unicode=unicode, arrows=arrows) if mw > 0 else []
         lines = panel_lines(sim, pw - 1, unicode)[1:]          # (the name is on the line above)
         rows = []
         for r in range(mh):
@@ -1038,7 +1040,7 @@ class Runner:
         scr = self.screen
         W, H = scr.size()
         unicode = scr.unicode and scr.glyphs.get("half") == "▀"
-        rows = self.rows(W, H, scr.paint.depth, unicode)
+        rows = self.rows(W, H, scr.paint.depth, unicode, scr.glyphs.get("heading") if unicode else None)
         text, role, until = self.sim.note
         scr.frame(rows, status=text if text and self.sim.tick < until else "",
                   footer=scr.paint.text([(help_line(self.sim), "dim")], W))

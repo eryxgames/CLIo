@@ -442,7 +442,7 @@ class UI:
     def prompt(self, text=None):
         self._skip = False
         p = self.theme.ui.get("prompt", "> ") if text is None else text
-        if self.term.glyph_mode != "full" and any(ord(c) > 0xFF for c in p):
+        if self.term.glyph_mode in ("safe", "ascii") and any(ord(c) > 0xFF for c in p):
             p = "".join(c if ord(c) <= 0xFF else ">" for c in p)
         value = self.term.read(self.term.paint(p, self.theme.color("prompt")))
         self._last = "text"

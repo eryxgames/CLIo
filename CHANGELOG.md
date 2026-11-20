@@ -385,11 +385,20 @@ game, RØØTLESS, shows them.
   the terminal reports it. Piped, typed commands (`select workers; gather; wait 20`). Ten ticks
   a second in whole numbers: the orders kept by tick play a game back the same.
   `python -m engine.rts GAME` lets the computer play every side.
+- **Skirmishes, the rest**: gas, a second resource (`&`, a second cost); **upgrades** made at
+  buildings (`"upgrades"`: what they add to which kinds or roles; hit points to those there
+  already) and **tech** (`needs`: a building or an upgrade first); **fliers** (`air`: straight
+  over anything; `hits` ground, air or both) and **transports** (`carries`: board, ride, set
+  down, lost with it); **repair** (workers, for crystal) and **patrol**; **control groups**
+  (`G` and a digit; the digit again; twice to go there); groups that keep their shape and the
+  slowest one's pace. The computer player puts workers on gas, researches, builds an airfield
+  for an air mix, mends its buildings and attacks with what it has when its crystal is gone.
 - **Mouse reports** (`engine/keys.py`): an SGR mouse report is read as `mouse:B:X:Y` (and
   `mouseup:...`), and the real-time `Controls` carry each tick's events as they came.
 - RØØTLESS: **SIM-7: Xantrium Rush** (`--level sim7`), the TAM against the root process - mining
   rigs, troopers, drum gunners and cargo loaders against kworkers, daemons, drones and spinlocks,
-  across a toxic channel with three crossings.
+  across a toxic channel with three crossings; Xantrium and plasma, hoppers and landers from the
+  TAM's hangar, hornets from the root's hive, four upgrades a side.
 
 ### Changed
 

@@ -33,10 +33,14 @@ import math
 FP = 256
 RATE = 10                                            # simulation ticks a second
 INF = 1 << 30
-TERRAIN = {".": "ground", " ": "ground", "#": "rock", "~": "water", "T": "trees", "$": "crystal"}
+TERRAIN = {".": "ground", " ": "ground", "#": "rock", "~": "water", "T": "trees", "$": "crystal", "&": "gas"}
 OPEN = ("ground",)
-ROLES = ("worker", "melee", "ranged", "heavy", "hq", "barracks", "factory", "tower")
-ORDERS = ("move", "amove", "attack", "gather", "build", "train", "cancel", "stop", "hold", "rally")
+MINED = ("crystal", "gas")                          # what workers gather (each a tile that empties)
+ROLES = ("worker", "melee", "ranged", "heavy", "air", "transport", "hq", "barracks", "factory", "airfield",
+         "tower")
+ORDERS = ("move", "amove", "attack", "gather", "build", "train", "research", "cancel", "stop", "hold", "rally",
+          "patrol", "repair", "board", "unload")
+STATS = ("hp", "armor", "speed", "damage", "range", "cooldown", "sight", "splash", "carry")
 NEIGH = ((1, 0, 10), (-1, 0, 10), (0, 1, 10), (0, -1, 10), (1, 1, 14), (-1, 1, 14), (1, -1, 14), (-1, -1, 14))
 SIDE_COLORS = ["#40c8ff", "#ff5a4a", "#70e070", "#ffd040"]
 
@@ -57,12 +61,34 @@ KINDS = {
     "ranger": {"name": "Ranger", "role": "ranged", "hp": 50, "speed": 2.4, "damage": 6, "range": 4,
                "cooldown": 1.1, "sight": 7, "cost": 75, "time": 14, "char": "r"},
     "tank": {"name": "Tank", "role": "heavy", "hp": 220, "armor": 3, "speed": 1.7, "damage": 22, "range": 5,
-             "cooldown": 2.4, "splash": 1, "sight": 7, "cost": 160, "time": 24, "char": "t"},
+             "cooldown": 2.4, "splash": 1, "sight": 7, "cost": 160, "gas": 50, "time": 24, "char": "t",
+             "needs": "tracks"},
+    "airfield": {"name": "Airfield", "role": "airfield", "building": True, "size": [3, 2], "hp": 600, "armor": 1,
+                 "sight": 6, "cost": 200, "gas": 50, "time": 35, "char": "A", "produces": ["gunship", "lifter"],
+                 "needs": "factory"},
+    "gunship": {"name": "Gunship", "role": "air", "air": True, "hp": 110, "armor": 1, "speed": 3.2, "damage": 9,
+                "range": 3, "cooldown": 1.2, "sight": 8, "cost": 120, "gas": 60, "time": 20, "char": "g"},
+    "lifter": {"name": "Lifter", "role": "transport", "air": True, "hp": 140, "armor": 2, "speed": 3.0,
+               "damage": 0, "range": 1, "sight": 7, "cost": 100, "gas": 25, "time": 18, "char": "l", "carries": 6},
+}
+UPGRADES = {
+    "weapons": {"name": "Weapons", "at": "barracks", "cost": 150, "gas": 50, "time": 40,
+                "to": ["melee", "ranged", "heavy", "air"], "damage": 2},
+    "plating": {"name": "Plating", "at": "barracks", "cost": 150, "gas": 50, "time": 40,
+                "to": ["melee", "ranged", "heavy", "air"], "armor": 1, "hp": 10},
+    "drills": {"name": "Drills", "at": "hq", "cost": 100, "time": 30, "to": ["worker"], "carry": 2},
+    "tracks": {"name": "Tracks", "at": "factory", "cost": 100, "gas": 50, "time": 30, "to": ["heavy"],
+               "speed": 0.3},
+    "optics": {"name": "Optics", "at": "factory", "cost": 100, "gas": 25, "time": 25, "to": ["ranged", "tower"],
+               "range": 1, "sight": 1, "needs": "weapons"},
 }
 KIND = {"hp": 50, "armor": 0, "speed": 2.0, "damage": 0, "range": 1, "cooldown": 1.0, "sight": 5, "cost": 50,
         "time": 10, "splash": 0, "carry": 0, "gather": 2.5, "size": [1, 1], "produces": [], "needs": None,
-        "building": False, "dropoff": False, "faction": None}
+        "building": False, "dropoff": False, "faction": None, "gas": 0, "air": False, "carries": 0, "hits": None,
+        "research": []}
 AI = {"workers": 8,           # workers it keeps
+      "gas": 2,               # of them on gas, once it has barracks
+      "research": True,       # upgrades, when it has crystal to spare
       "wave": 5,              # army units in its first attack (two more each time)
       "most": 14,             # ... up to this many
       "first": 150,           # seconds before its first attack, at the soonest
@@ -70,7 +96,7 @@ AI = {"workers": 8,           # workers it keeps
       "mix": {"melee": 2, "ranged": 2, "heavy": 1},
       "every": 1.0}           # seconds between its decisions
 COLORS = {"ground": "#1b2418", "ground_dim": "#11160f", "rock": "#4a4a52", "rock_dim": "#2a2a30",
-          "water": "#173a5c", "water_dim": "#0e2236", "trees": "#3f8f3a", "crystal": "#4ae0e0",
+          "water": "#173a5c", "water_dim": "#0e2236", "trees": "#3f8f3a", "crystal": "#4ae0e0", "gas": "#d080ff",
           "fog": "#000000", "cursor": "#ffffff", "select": "#f0f0a0", "shot": "#ffffa0", "text": "#d0d0d0",
           "place_ok": "#60e060", "place_bad": "#e05050", "neutral": "#a0a0a0"}
 
@@ -111,6 +137,26 @@ def kinds_of(data=None, spec=None):
     return {k: dict(KIND, **v) for k, v in out.items()}
 
 
+def upgrades_of(data=None, spec=None, kinds=None):
+    """The engine's upgrades (with its kinds), a game's, a skirmish's: each ``{name, at (a building kind), cost,
+    gas, time, to (kinds or roles), needs, faction}`` and what it adds (``damage``, ``armor``, ``hp``...)."""
+    cfg = settings_of(data)
+    out = {} if cfg.get("engine_kinds") is False else {k: dict(v) for k, v in UPGRADES.items()}
+    for src in (cfg.get("upgrades"), (spec or {}).get("upgrades")):
+        for k, v in (src or {}).items():
+            if isinstance(v, dict):
+                out[k] = dict(out.get(k, {}), **v)
+    return out
+
+
+def names_of(data=None, spec=None):
+    """What the two things mined are called (``"names": {"crystal": "Xantrium", "gas": "Plasma"}``)."""
+    n = {"crystal": "Crystal", "gas": "Gas"}
+    n.update(settings_of(data).get("names") or {})
+    n.update((spec or {}).get("names") or {})
+    return n
+
+
 def map_rows(spec):
     m = spec.get("map")
     if isinstance(m, str):
@@ -125,6 +171,8 @@ class Side:
         self.control = spec.get("control") if spec.get("control") in ("player", "ai", "none") else "ai"
         self.color = colour(spec.get("color"), colour(SIDE_COLORS[i % len(SIDE_COLORS)]))
         self.credits = int(spec.get("credits", 200))
+        self.gas = int(spec.get("gas_start", 0))
+        self.upgrades = list(spec.get("upgrades") or [])
         self.faction = faction
         self.ai = dict(AI, **(spec.get("ai") or {}))
         self.wave = int(self.ai["wave"])
@@ -134,7 +182,7 @@ class Side:
         self.warned = -INF
 
     def key(self):
-        return (self.i, self.credits, self.wave, self.attacks, self.out)
+        return (self.i, self.credits, self.gas, tuple(self.upgrades), self.wave, self.attacks, self.out)
 
 
 class Thing:
@@ -159,11 +207,15 @@ class Thing:
         self.progress = 0
         self.rally = None
         self.shot = None                             # (x, y, tick): for the picture
+        self.load = "crystal"                        # what a worker carries
+        self.cargo = []                              # a transport's passengers (their ids)
+        self.inside = 0                              # the transport a unit is in
+        self.air = bool(spec.get("air"))
 
     def key(self):
         return (self.id, self.kind, self.side, self.hp, self.x, self.y, sorted(self.order.items(), key=str),
                 self.engage, self.post, self.cool, self.carry, self.done, self.built, tuple(self.queue),
-                self.progress, self.rally)
+                self.progress, self.rally, self.load, tuple(self.cargo), self.inside)
 
 
 class World:
@@ -173,6 +225,8 @@ class World:
         self.id, self.spec, self.rate = sid, spec, rate
         self.name = spec.get("title") or spec.get("name") or sid
         self.kinds = kinds_of(data, spec)
+        self.upgrades = upgrades_of(data, spec, self.kinds)
+        self.names = names_of(data, spec)
         cfg = settings_of(data)
         self.colors = {k: colour(v) for k, v in dict(COLORS, **(cfg.get("colors") or {}),
                                                      **(spec.get("colors") or {})).items()}
@@ -182,9 +236,9 @@ class World:
         rows = map_rows(spec)
         self.W = max([len(r) for r in rows] or [1])
         self.H = max(1, len(rows))
-        amount = int(spec.get("crystal", 600))
+        amount = {"crystal": int(spec.get("crystal", 600)), "gas": int(spec.get("gas", 1500))}
         self.terrain = []
-        self.crystal = {}
+        self.amount = {}                             # what is left in each tile of crystal or gas
         starts = {}
         legend = spec.get("legend") or {}
         placed = []
@@ -203,8 +257,8 @@ class World:
                     if ch.isdigit():
                         starts[int(ch) - 1] = (x, y)
                 self.terrain.append(t)
-                if t == "crystal":
-                    self.crystal[y * self.W + x] = amount
+                if t in MINED:
+                    self.amount[y * self.W + x] = amount[t]
         self.things = {}
         self.next_id = 1
         self.block = [0] * (self.W * self.H)         # a building's id on each tile it stands on
@@ -250,6 +304,46 @@ class World:
         self.visible = bytearray(self.W * self.H)
         self.see()
 
+    @property
+    def crystal(self):
+        """What is left in each crystal tile."""
+        return {i: a for i, a in self.amount.items() if self.terrain[i] == "crystal"}
+
+    def has(self, side, need):
+        """Whether a side has what something needs: a building of a kind (built), or an upgrade."""
+        if not need:
+            return True
+        if need in self.upgrades:
+            return need in self.sides[side].upgrades
+        return any(t.kind == need and t.side == side and t.done for t in self.things.values())
+
+    def applies(self, up, t):
+        to = up.get("to")
+        return to is None or t.kind in to or t.spec.get("role") in to
+
+    def stat(self, t, f):
+        """A thing's number with its side's upgrades added."""
+        v = t.spec.get(f) or 0
+        if t.side >= 0:
+            for u in self.sides[t.side].upgrades:
+                up = self.upgrades.get(u)
+                if up and f in up and self.applies(up, t):
+                    v = v + up[f]
+        return v
+
+    def afford(self, side, spec):
+        s = self.sides[side]
+        return s.credits >= int(spec.get("cost") or 0) and s.gas >= int(spec.get("gas") or 0)
+
+    def pay(self, side, spec, sign=1):
+        s = self.sides[side]
+        s.credits -= sign * int(spec.get("cost") or 0)
+        s.gas -= sign * int(spec.get("gas") or 0)
+
+    def price(self, spec):
+        g = int(spec.get("gas") or 0)
+        return "%d" % int(spec.get("cost") or 0) + ("/%d" % g if g else "")
+
     # ---- the map ----------------------------------------------------------- #
     def inside(self, x, y):
         return 0 <= x < self.W and 0 <= y < self.H
@@ -288,6 +382,8 @@ class World:
         """A thing; a building at tile ``x, y`` (top left), a unit at ``x, y`` (its middle, fixed point)."""
         t = Thing(self.next_id, kind, self.kinds[kind], side)
         self.next_id += 1
+        if side >= 0 and side < len(self.sides):
+            t.hp = t.max = int(self.stat(t, "hp"))
         if t.building:
             t.tx, t.ty = x, y
             t.x, t.y = x * FP + t.w * FP // 2, y * FP + t.h * FP // 2
@@ -326,13 +422,14 @@ class World:
         return out
 
     def unit_on(self, x, y):
-        return any(not t.building and t.x // FP == x and t.y // FP == y for t in self.things.values())
+        return any(not t.building and not t.air and not t.inside and t.x // FP == x and t.y // FP == y
+                   for t in self.things.values())
 
     def at(self, x, y, side=None, units_first=True):
         """What is on tile ``x, y``: a unit, else a building (of ``side``, if given)."""
         hit = None
         for t in self.things.values():
-            if side is not None and t.side != side:
+            if (side is not None and t.side != side) or t.inside:
                 continue
             if t.building:
                 if t.tx <= x < t.tx + t.w and t.ty <= y < t.ty + t.h and hit is None:
@@ -347,6 +444,8 @@ class World:
         if t.id not in self.things:
             return
         del self.things[t.id]
+        for i in t.cargo:                                 # a transport lost: its passengers with it
+            self.things.pop(i, None)
         if t.building:
             for y in range(t.ty, t.ty + t.h):
                 for x in range(t.tx, t.tx + t.w):
@@ -450,7 +549,7 @@ class World:
         n = math.isqrt(dx * dx + dy * dy)
         there = n <= sp
         nx, ny = (px, py) if there else (u.x + dx * sp // n, u.y + dy * sp // n)
-        if self._open_at(nx, ny) or not self._open_at(u.x, u.y):
+        if self._open_at(nx, ny) or not self._open_at(u.x, u.y) or (u.air and self.inside(nx // FP, ny // FP)):
             u.x, u.y = nx, ny
             return there
         if self._open_at(nx, u.y):
@@ -464,10 +563,14 @@ class World:
         return self.inside(tx, ty) and self.walkable(ty * self.W + tx)
 
     def speed(self, u):
-        return max(1, int(round(float(u.spec["speed"]) * FP / self.rate)))
+        sp = self.speed_of(u)
+        pace = u.order.get("pace")
+        return min(sp, pace) if pace else sp
 
     def advance(self, u, key, near=0):
         """A tick's walk toward a goal: True there (within ``near``), None if it cannot be reached."""
+        if u.air:
+            return self._fly(u, key, near)
         f = self.field(key)
         W = self.W
         tx, ty = u.x // FP, u.y // FP
@@ -496,6 +599,26 @@ class World:
         self.toward(u, best[0] * FP + FP // 2, best[1] * FP + FP // 2)
         return False
 
+    def _fly(self, u, key, near=0):
+        """Straight over anything: to a tile's middle, or beside a rectangle."""
+        if key[0] == "at":
+            px, py = key[1] * FP + FP // 2, key[2] * FP + FP // 2
+            if near and (u.x - px) ** 2 + (u.y - py) ** 2 <= (near * FP // 10) ** 2:
+                return True
+            return self.toward(u, px, py)
+        _, x0, y0, w, h = key
+        px = min(max(u.x, x0 * FP - FP // 2), (x0 + w) * FP + FP // 2)
+        py = min(max(u.y, y0 * FP - FP // 2), (y0 + h) * FP + FP // 2)
+        if (u.x - px) ** 2 + (u.y - py) ** 2 <= (FP // 4) ** 2:
+            return True
+        self.toward(u, px, py)
+        return False
+
+    def hits(self, a, b):
+        """Whether ``a`` can hit ``b``: fliers only by what hits the air (ranged, by default)."""
+        h = a.spec.get("hits") or ("both" if float(self.stat(a, "range")) >= 2 else "ground")
+        return h == "both" or (h == "air") == b.air
+
     # ---- orders ------------------------------------------------------------ #
     def order(self, side, order):
         """An order from a side, acted on at the next tick: ``{"do": ..., "units": [ids], ...}``."""
@@ -504,19 +627,14 @@ class World:
     def _apply(self, side, o):
         do = o.get("do")
         mine = [self.things[i] for i in o.get("units", []) if i in self.things and self.things[i].side == side]
-        units = [t for t in mine if not t.building]
-        s = self.sides[side]
-        if do in ("move", "amove"):
-            to = tuple(o["to"])
-            near = 0 if len(units) < 2 else 10 * (1 + math.isqrt(len(units)) // 2)
-            for u in units:
-                u.order = {"do": do, "to": to, "near": near}
-                u.engage = 0
+        units = [t for t in mine if not t.building and not t.inside]
+        if do in ("move", "amove", "patrol"):
+            self._group_move(units, do, tuple(o["to"]))
         elif do == "attack":
             t = self.things.get(o.get("target"))
             if t is not None:
                 for u in units:
-                    if u.spec["damage"]:
+                    if self.stat(u, "damage") and self.hits(u, t):
                         u.order = {"do": "attack", "target": t.id}
                         u.engage = 0
         elif do == "gather":
@@ -524,6 +642,22 @@ class World:
             for u in units:
                 if u.spec.get("role") == "worker":
                     u.order = {"do": "gather", "at": at, "phase": "back" if u.carry else "go", "t": 0}
+        elif do == "repair":
+            b = self.things.get(o.get("id"))
+            if b is not None and b.side == side and b.building and b.done:
+                for u in units:
+                    if u.spec.get("role") == "worker":
+                        u.order = {"do": "repair", "id": b.id, "hp": 0}
+        elif do == "board":
+            t = self.things.get(o.get("id"))
+            if t is not None and t.side == side and t.spec.get("carries"):
+                for u in units:
+                    if u is not t and not u.spec.get("carries") and not u.air:
+                        u.order = {"do": "board", "id": t.id}
+        elif do == "unload":
+            for u in units:
+                if u.cargo:
+                    u.order = {"do": "unload", "to": tuple(o["to"])}
         elif do == "build":
             kind, (tx, ty) = o.get("kind"), o.get("at", (0, 0))
             builders = [u for u in units if u.spec.get("role") == "worker"]
@@ -536,42 +670,48 @@ class World:
             if not builders or not self.allowed(side, kind) or not self.kinds[kind]["building"]:
                 return
             spec = self.kinds[kind]
-            need = spec.get("needs")
-            if need and not any(t.kind == need and t.side == side and t.done for t in self.things.values()):
-                return self.tell(side, "A %s needs a %s first." % (spec["name"].lower(),
-                                                                   self.kinds[need]["name"].lower()))
-            if s.credits < spec["cost"]:
-                return self.tell(side, "Not enough crystal (%d)." % spec["cost"])
+            if not self.has(side, spec.get("needs")):
+                return self.tell(side, "A %s needs %s first." % (spec["name"].lower(), self.what(spec["needs"])))
+            if not self.afford(side, spec):
+                return self.tell(side, "Not enough (%s)." % self.price(spec))
             if not self.fits(kind, tx, ty, side):
                 return self.tell(side, "It cannot stand there.")
-            s.credits -= spec["cost"]
+            self.pay(side, spec)
             u = builders[0]
-            u.order = {"do": "build", "kind": kind, "at": (tx, ty), "id": 0, "paid": spec["cost"]}
+            u.order = {"do": "build", "kind": kind, "at": (tx, ty), "id": 0, "paid": 1}
             for v in builders[1:]:
                 v.order = {"do": "build", "kind": kind, "at": (tx, ty), "id": 0, "paid": 0, "wait": u.id}
-        elif do == "train":
+        elif do in ("train", "research"):
             b = self.things.get(o.get("building"))
-            kind = o.get("kind")
-            if b is None or b.side != side or not b.building or not b.done:
+            if b is None or b.side != side or not b.building or not b.done or len(b.queue) >= 5:
                 return
-            if kind not in b.spec.get("produces", []) or not self.allowed(side, kind):
-                return
-            spec = self.kinds[kind]
-            count = sum(1 for t in self.things.values() if t.side == side and not t.building) + \
-                sum(len(t.queue) for t in self.things.values() if t.side == side and t.building)
-            if count >= self.limit:
-                return self.tell(side, "No more units (%d at most)." % self.limit)
-            if len(b.queue) >= 5:
-                return
-            if s.credits < spec["cost"]:
-                return self.tell(side, "Not enough crystal (%d)." % spec["cost"])
-            s.credits -= spec["cost"]
-            b.queue.append(kind)
+            if do == "train":
+                kind = o.get("kind")
+                if kind not in b.spec.get("produces", []) or not self.allowed(side, kind):
+                    return
+                spec, item = self.kinds[kind], kind
+                count = sum(1 for t in self.things.values() if t.side == side and not t.building) + \
+                    sum(sum(1 for q in t.queue if not q.startswith("up:"))
+                        for t in self.things.values() if t.side == side and t.building)
+                if count >= self.limit:
+                    return self.tell(side, "No more units (%d at most)." % self.limit)
+            else:
+                uid = o.get("upgrade")
+                spec = self.upgrades.get(uid)
+                if spec is None or uid not in self.researchable(b):
+                    return
+                item = "up:" + uid
+            if not self.has(side, spec.get("needs")):
+                return self.tell(side, "%s needs %s first." % (spec["name"], self.what(spec["needs"])))
+            if not self.afford(side, spec):
+                return self.tell(side, "Not enough (%s)." % self.price(spec))
+            self.pay(side, spec)
+            b.queue.append(item)
         elif do == "cancel":
             b = self.things.get(o.get("building"))
             if b is not None and b.side == side and b.queue:
-                kind = b.queue.pop()
-                s.credits += self.kinds[kind]["cost"]
+                item = b.queue.pop()
+                self.pay(side, self.upgrades[item[3:]] if item.startswith("up:") else self.kinds[item], -1)
                 if not b.queue:
                     b.progress = 0
         elif do == "rally":
@@ -583,6 +723,45 @@ class World:
                 u.order = {"do": "idle" if do == "stop" else "hold"}
                 u.post = (u.x, u.y)
                 u.engage = 0
+
+    def what(self, need):
+        if need in self.upgrades:
+            return "the %s upgrade" % self.upgrades[need]["name"]
+        return "a %s" % self.kinds[need]["name"].lower() if need in self.kinds else need
+
+    def researchable(self, b):
+        """The upgrades a building can still make for its side (not made, not being made)."""
+        side = self.sides[b.side]
+        doing = {q[3:] for t in self.things.values() if t.side == b.side and t.building for q in t.queue
+                 if q.startswith("up:")}
+        return [u for u, up in self.upgrades.items() if up.get("at") in (b.kind, b.spec.get("role"))
+                and up.get("faction") in (None, side.faction) and u not in side.upgrades and u not in doing]
+
+    def _group_move(self, units, do, to):
+        """Units sent together: each to its place in the group's shape round ``to`` (kept tight), all at the
+        slowest one's pace."""
+        if not units:
+            return
+        pace = min(self.speed_of(u) for u in units) if len(units) > 1 else 0
+        cx = sum(u.x for u in units) // len(units) // FP
+        cy = sum(u.y for u in units) // len(units) // FP
+        reach = 1 + math.isqrt(len(units)) // 2
+        for u in units:
+            dx = max(-reach, min(reach, u.x // FP - cx))
+            dy = max(-reach, min(reach, u.y // FP - cy))
+            x, y = to[0] + dx, to[1] + dy
+            spot, near = (x, y), 0
+            if len(units) < 2 or not self.inside(x, y) or not (u.air or self.walkable(y * self.W + x)):
+                spot, near = to, (0 if len(units) < 2 else 10 * reach)
+            u.order = {"do": do, "to": spot, "near": near}
+            if pace:
+                u.order["pace"] = pace
+            if do == "patrol":
+                u.order["back"] = (u.x // FP, u.y // FP)
+            u.engage = 0
+
+    def speed_of(self, u):
+        return max(1, int(round(float(self.stat(u, "speed")) * FP / self.rate)))
 
     def tell(self, side, text):
         if side == self.player:
@@ -608,7 +787,7 @@ class World:
             if s.control == "ai" and not s.out and (self.tick + s.i * 3) % ticks(s.ai["every"], self.rate) == 0:
                 plan(self, s)
         for t in list(self.things.values()):
-            if t.id not in self.things:
+            if t.id not in self.things or t.inside:
                 continue
             if t.building:
                 self._building(t)
@@ -655,25 +834,26 @@ class World:
         r = int(float(tiles) * FP) + FP // 2
         best, bd = None, r * r + 1
         for t in self.things.values():
-            if self.enemy(u, t):
-                d = self.dist2(u, t) + (FP * FP * 4 if t.building else 0)    # units before buildings
-                if d < bd or (d == bd and best is not None and t.id < best.id):
-                    best, bd = t, d
+            if t.inside or not self.enemy(u, t) or not self.hits(u, t):
+                continue
+            d = self.dist2(u, t) + (FP * FP * 4 if t.building else 0)    # units before buildings
+            if d < bd or (d == bd and best is not None and t.id < best.id):
+                best, bd = t, d
         return best
 
     def _fire(self, u, t):
         if u.cool > 0:
             return
-        dmg = max(1, int(u.spec["damage"]) - int(t.spec.get("armor", 0)))
-        u.cool = ticks(u.spec["cooldown"], self.rate)
+        dmg = max(1, int(self.stat(u, "damage")) - int(self.stat(t, "armor")))
+        u.cool = ticks(self.stat(u, "cooldown"), self.rate)
         u.shot = (t.x, t.y, self.tick)
         self._hurt(t, dmg, u)
-        splash = int(u.spec.get("splash") or 0)
+        splash = int(self.stat(u, "splash") or 0)
         if splash:
             r = splash * FP + FP // 2
             for o in list(self.things.values()):
-                if o is not t and self.enemy(u, o) and self.dist2(t, o) <= r * r:
-                    self._hurt(o, max(1, dmg // 2 - int(o.spec.get("armor", 0))), u)
+                if o is not t and not o.inside and o.air == t.air and self.enemy(u, o) and self.dist2(t, o) <= r * r:
+                    self._hurt(o, max(1, dmg // 2 - int(self.stat(o, "armor"))), u)
 
     def _hurt(self, t, dmg, by):
         t.hp -= dmg
@@ -682,18 +862,22 @@ class World:
             self.say("Under attack near %d,%d." % (t.x // FP, t.y // FP), "hurt")
         if t.hp <= 0:
             self.remove(t)
-        elif not t.building and t.order["do"] in ("idle", "hold") and not t.engage and t.spec["damage"] \
-                and t.spec.get("role") != "worker":
+        elif not t.building and t.order["do"] in ("idle", "hold") and not t.engage and self.stat(t, "damage") \
+                and t.spec.get("role") != "worker" and self.hits(t, by):
             t.engage = by.id                                 # hit back
 
     def _fight(self, u, t, chase=True):
         """Shoot ``t`` if in range, else (if it may) go for it; False when it cannot."""
-        if self.in_range(u, t, u.spec["range"]):
+        if not self.hits(u, t) or t.inside:
+            return False
+        if self.in_range(u, t, self.stat(u, "range")):
             self._fire(u, t)
             return True
         if not chase:
             return False
-        if self.dist2(u, t) <= (10 * FP) ** 2 and self.clear_line(u, t.x, t.y) and not t.building:
+        if u.air or (self.dist2(u, t) <= (10 * FP) ** 2 and self.clear_line(u, t.x, t.y) and not t.building):
+            if t.building:
+                return self._fly(u, ("by", t.tx, t.ty, t.w, t.h)) is not None
             self.toward(u, t.x, t.y)
             return True
         key = ("by", t.tx, t.ty, t.w, t.h) if t.building else ("at", t.x // FP, t.y // FP)
@@ -704,58 +888,62 @@ class World:
             u.cool -= 1
         o = u.order
         do = o["do"]
-        if do == "gather":
-            return self._gather(u, o)
-        if do == "build":
-            return self._build(u, o)
+        if do in ("gather", "build", "repair", "board", "unload"):
+            return getattr(self, "_" + do)(u, o)
         if do == "attack":
             t = self.things.get(o["target"])
             if t is None or not self._fight(u, t):
                 u.order, u.post = {"do": "idle"}, (u.x, u.y)
             return
-        fights = u.spec["damage"] and u.spec.get("role") != "worker"
+        fights = self.stat(u, "damage") and u.spec.get("role") != "worker"
         if u.engage:
             t = self.things.get(u.engage)
-            sight = int(u.spec["sight"]) + 2
+            sight = int(self.stat(u, "sight")) + 2
             if t is None or (do != "hold" and self.dist2(u, t) > (sight * FP) ** 2):
                 u.engage = 0
             elif not self._fight(u, t, chase=do != "hold"):
                 u.engage = 0
             else:
                 return
-        if fights and do in ("idle", "hold", "amove") and (self.tick + u.id) % 3 == 0:
-            t = self.acquire(u, u.spec["range"] if do == "hold" else u.spec["sight"])
+        if fights and do in ("idle", "hold", "amove", "patrol") and (self.tick + u.id) % 3 == 0:
+            t = self.acquire(u, self.stat(u, "range") if do == "hold" else self.stat(u, "sight"))
             if t is not None:
                 u.engage = t.id
                 self._fight(u, t, chase=do != "hold")
                 return
-        if do in ("move", "amove"):
+        if do in ("move", "amove", "patrol"):
             tx, ty = o["to"]
             got = self.advance(u, ("at", tx, ty), o.get("near", 0))
-            if got or got is None:
+            if do == "patrol" and got:
+                o["to"], o["back"] = o["back"], o["to"]      # and back again
+            elif got or got is None:
                 u.order, u.post = {"do": "idle"}, (u.x, u.y)
         elif do == "idle" and u.post and (abs(u.x - u.post[0]) > FP or abs(u.y - u.post[1]) > FP):
             if self.advance(u, ("at", u.post[0] // FP, u.post[1] // FP), 10) in (True, None):
                 u.post = (u.x, u.y)
+
+    def _idle(self, u):
+        u.order = {"do": "idle"}
+        u.post = (u.x, u.y)
 
     def _gather(self, u, o):
         side = self.sides[u.side]
         if o["phase"] == "go":
             cx, cy = o["at"]
             i = cy * self.W + cx
-            if not self.inside(cx, cy) or self.terrain[i] != "crystal":
-                more = self.nearest_crystal(cx, cy, 10)
+            kind = self.terrain[i] if self.inside(cx, cy) else None
+            if kind not in MINED:
+                more = self.nearest_crystal(cx, cy, 10, kind=o.get("kind", "crystal"))
                 if more is None:
-                    u.order = {"do": "idle"}
-                    u.post = (u.x, u.y)
-                    return
+                    return self._idle(u)
                 o["at"] = more
                 return
+            o["kind"] = kind
             got = self.advance(u, ("by", cx, cy, 1, 1))
             if got is None:
-                o["at"] = self.nearest_crystal(cx, cy, 10, skip=(cx, cy)) or o["at"]
+                o["at"] = self.nearest_crystal(cx, cy, 10, skip=(cx, cy), kind=kind) or o["at"]
                 if o["at"] == (cx, cy):
-                    u.order = {"do": "idle"}
+                    self._idle(u)
                 return
             if got:
                 o["phase"], o["t"] = "mine", ticks(u.spec["gather"], self.rate)
@@ -765,32 +953,37 @@ class World:
                 return
             cx, cy = o["at"]
             i = cy * self.W + cx
-            left = self.crystal.get(i, 0)
-            take = min(int(u.spec["carry"]) or 1, left)
+            left = self.amount.get(i, 0)
+            take = min(int(self.stat(u, "carry")) or 1, left)
             if take:
-                self.crystal[i] = left - take
-                u.carry += take
-                if self.crystal[i] <= 0:
-                    del self.crystal[i]
+                self.amount[i] = left - take
+                u.carry, u.load = u.carry + take, self.terrain[i]
+                if self.amount[i] <= 0:
+                    del self.amount[i]
                     self.terrain[i] = "ground"
                     self.version += 1
             o["phase"] = "back" if u.carry else "go"
         else:
             drop = self.dropoff(u)
             if drop is None:
-                u.order = {"do": "idle"}
-                return
+                return self._idle(u)
             got = self.advance(u, ("by", drop.tx, drop.ty, drop.w, drop.h))
             if got:
-                side.credits += u.carry
+                if u.load == "gas":
+                    side.gas += u.carry
+                else:
+                    side.credits += u.carry
                 u.carry = 0
                 o["phase"] = "go"
             elif got is None:
-                u.order = {"do": "idle"}
+                self._idle(u)
 
-    def nearest_crystal(self, cx, cy, r, skip=None):
+    def nearest_crystal(self, cx, cy, r, skip=None, kind="crystal"):
+        """The nearest tile of crystal (or ``kind``) within ``r`` of a tile."""
         best, bd = None, INF
-        for i in self.crystal:
+        for i in self.amount:
+            if self.terrain[i] != kind:
+                continue
             x, y = i % self.W, i // self.W
             d = (x - cx) ** 2 + (y - cy) ** 2
             if d <= r * r and (x, y) != skip and (d < bd or (d == bd and i < best[1] * self.W + best[0])):
@@ -807,47 +1000,43 @@ class World:
         return best
 
     def _build(self, u, o):
-        side = self.sides[u.side]
         spec = self.kinds[o["kind"]]
         tx, ty = o["at"]
         b = self.things.get(o.get("id")) if o.get("id") else None
         if o.get("id") and b is None:
-            u.order = {"do": "idle"}                     # it was destroyed
-            return
+            return self._idle(u)                         # it was destroyed
         if b is None and o.get("wait"):
             lead = self.things.get(o["wait"])
             if lead is not None and lead.order.get("do") == "build" and lead.order.get("id"):
                 o["id"], o["wait"] = lead.order["id"], None
             elif lead is None or lead.order.get("do") != "build":
-                u.order = {"do": "idle"}
+                self._idle(u)
             else:
                 self.advance(u, ("by", tx, ty, spec["size"][0], spec["size"][1]))
             return
-        key = ("by", tx, ty, spec["size"][0], spec["size"][1])
-        got = self.advance(u, key)
+        got = self.advance(u, ("by", tx, ty, spec["size"][0], spec["size"][1]))
         if got is None:
-            side.credits += o.get("paid", 0)
-            u.order = {"do": "idle"}
-            return
+            if o.get("paid"):
+                self.pay(u.side, spec, -1)
+            return self._idle(u)
         if not got:
             return
         if b is None:
             if not self.fits(o["kind"], tx, ty):
-                side.credits += o.get("paid", 0)
+                if o.get("paid"):
+                    self.pay(u.side, spec, -1)
                 self.tell(u.side, "Something stands in the way: the %s is not begun." % spec["name"].lower())
-                u.order = {"do": "idle"}
-                return
+                return self._idle(u)
             b = self.add(o["kind"], u.side, tx, ty, done=False)
             o["id"], o["paid"] = b.id, 0
             for t in self.things.values():                # anyone standing there steps out
-                if not t.building and tx <= t.x // FP < tx + b.w and ty <= t.y // FP < ty + b.h:
+                if not t.building and not t.air and not t.inside and tx <= t.x // FP < tx + b.w \
+                        and ty <= t.y // FP < ty + b.h:
                     out = self.free_round(t.x // FP, t.y // FP, 1)
                     if out:
                         t.x, t.y = out[0][0] * FP + FP // 2, out[0][1] * FP + FP // 2
         if b.done:
-            u.order = {"do": "idle"}
-            u.post = (u.x, u.y)
-            return
+            return self._idle(u)
         total = ticks(spec["time"], self.rate)
         b.built += 1
         b.hp = min(b.max, b.hp + b.max * b.built // total - b.max * (b.built - 1) // total)
@@ -855,27 +1044,92 @@ class World:
             b.done = True
             if b.side == self.player:
                 self.say("%s ready." % spec["name"], "good")
+            self._idle(u)
+
+    def _repair(self, u, o):
+        """Mend a building of its side: a tenth of its hit points every few seconds, for crystal (half its cost
+        for the whole of it)."""
+        b = self.things.get(o["id"])
+        if b is None or b.hp >= b.max:
+            return self._idle(u)
+        got = self.advance(u, ("by", b.tx, b.ty, b.w, b.h))
+        if got is None:
+            return self._idle(u)
+        if not got:
+            return
+        side = self.sides[u.side]
+        step = max(1, b.max // ticks(b.spec["time"], self.rate))
+        per = max(1, 2 * b.max // max(1, int(b.spec.get("cost") or 1)))   # hit points a crystal buys
+        o["hp"] += step
+        while o["hp"] >= per:
+            if side.credits <= 0:
+                self.tell(u.side, "No crystal left to repair with.")
+                return self._idle(u)
+            side.credits -= 1
+            o["hp"] -= per
+        b.hp = min(b.max, b.hp + step)
+
+    def _board(self, u, o):
+        t = self.things.get(o["id"])
+        if t is None or len(t.cargo) >= int(t.spec.get("carries") or 0):
+            return self._idle(u)
+        if self.dist2(u, t) <= (FP * 3 // 2) ** 2:
+            u.inside, u.engage = t.id, 0
+            t.cargo.append(u.id)
             u.order = {"do": "idle"}
-            u.post = (u.x, u.y)
+            return
+        if self.dist2(u, t) <= (3 * FP) ** 2 and self.clear_line(u, t.x, t.y):
+            self.toward(u, t.x, t.y)                        # the last steps, straight in
+        elif self.advance(u, ("at", t.x // FP, t.y // FP), 14) is None and not t.air:
+            self._idle(u)
+
+    def _unload(self, u, o):
+        x, y = o["to"]
+        if not u.cargo:
+            return self._idle(u)
+        got = self.advance(u, ("at", x, y), 14 if not u.air else 0)
+        if got is None:
+            return self._idle(u)
+        if not got:
+            return
+        here = (u.x // FP, u.y // FP)
+        spots = self.free_round(here[0], here[1], len(u.cargo), rmax=4)
+        while u.cargo and spots:
+            p = self.things.get(u.cargo.pop(0))
+            sx, sy = spots.pop(0)
+            if p is not None:
+                p.inside = 0
+                p.x, p.y = sx * FP + FP // 2, sy * FP + FP // 2
+                self._idle(p)
+        if u.cargo:
+            self.tell(u.side, "No room to set them all down here.")
+        self._idle(u)
 
     def _building(self, b):
         if not b.done:
             return
         if b.cool > 0:
             b.cool -= 1
-        if b.spec["damage"] and (self.tick + b.id) % 2 == 0:
+        if self.stat(b, "damage") and (self.tick + b.id) % 2 == 0:
             t = self.things.get(b.engage)
-            if t is None or not self.in_range(b, t, b.spec["range"]):
-                t = self.acquire(b, b.spec["range"])
+            if t is None or t.inside or not self.in_range(b, t, self.stat(b, "range")):
+                t = self.acquire(b, self.stat(b, "range"))
                 b.engage = t.id if t else 0
             if t is not None:
                 self._fire(b, t)
         if not b.queue:
             return
-        kind = b.queue[0]
+        item = b.queue[0]
+        spec = self.upgrades[item[3:]] if item.startswith("up:") else self.kinds[item]
         b.progress += 1
-        if b.progress < ticks(self.kinds[kind]["time"], self.rate):
+        if b.progress < ticks(spec["time"], self.rate):
             return
+        if item.startswith("up:"):
+            b.queue.pop(0)
+            b.progress = 0
+            self._upgraded(b.side, item[3:])
+            return
+        kind = item
         rx, ry = b.rally or (b.tx + b.w // 2, b.ty + b.h)
         spots = sorted(self.goals(("by", b.tx, b.ty, b.w, b.h)),
                        key=lambda i: ((i % self.W - rx) ** 2 + (i // self.W - ry) ** 2, i))
@@ -886,20 +1140,31 @@ class World:
         b.progress = 0
         u = self.add(kind, b.side, (spot % self.W) * FP + FP // 2, (spot // self.W) * FP + FP // 2)
         if b.rally:
-            if u.spec.get("role") == "worker" and self.inside(*b.rally) and \
-                    self.terrain[b.rally[1] * self.W + b.rally[0]] == "crystal":
+            rx, ry = b.rally
+            if u.spec.get("role") == "worker" and self.inside(rx, ry) and self.terrain[ry * self.W + rx] in MINED:
                 u.order = {"do": "gather", "at": b.rally, "phase": "go", "t": 0}
             else:
                 u.order = {"do": "amove", "to": b.rally, "near": 10}
 
+    def _upgraded(self, side, uid):
+        up = self.upgrades[uid]
+        self.sides[side].upgrades.append(uid)
+        if up.get("hp"):                                  # those there already get it too
+            for t in self.things.values():
+                if t.side == side and self.applies(up, t):
+                    t.max += int(up["hp"])
+                    t.hp += int(up["hp"])
+        if side == self.player:
+            self.say("%s upgraded." % up["name"], "good")
+
     def _apart(self):
-        """Units on one tile step apart a little (they never block each other)."""
+        """Units on one tile step apart a little (they never block each other); fliers among fliers."""
         by = {}
         for t in self.things.values():
-            if not t.building:
-                by.setdefault((t.x // FP, t.y // FP), []).append(t)
+            if not t.building and not t.inside:
+                by.setdefault((t.x // FP, t.y // FP, t.air), []).append(t)
         gap = FP * 3 // 8
-        for (tx, ty), us in by.items():
+        for key, us in by.items():
             if len(us) < 2:
                 continue
             us.sort(key=lambda t: t.id)
@@ -913,7 +1178,7 @@ class World:
                     sx, sy = (dx > 0) - (dx < 0), (dy > 0) - (dy < 0)
                     for t, k in ((a, -1), (b, 1)):
                         nx, ny = t.x + k * sx * 12, t.y + k * sy * 12
-                        if self.inside(nx // FP, ny // FP) and self.walkable((ny // FP) * self.W + nx // FP):
+                        if self.inside(nx // FP, ny // FP) and (t.air or self.walkable((ny // FP) * self.W + nx // FP)):
                             t.x, t.y = nx, ny
 
     def see(self):
@@ -924,9 +1189,9 @@ class World:
         exp = self.explored[self.player]
         W, H = self.W, self.H
         for t in self.things.values():
-            if t.side != self.player:
+            if t.side != self.player or t.inside:
                 continue
-            r = int(t.spec["sight"]) + (max(t.w, t.h) // 2 if t.building else 0)
+            r = int(self.stat(t, "sight")) + (max(t.w, t.h) // 2 if t.building else 0)
             cx, cy = t.x // FP, t.y // FP
             for y in range(max(0, cy - r), min(H, cy + r + 1)):
                 dy = y - cy
@@ -1006,73 +1271,100 @@ def place_near(w, kind, side, cx, cy, rmin=3, rmax=10):
 
 
 def plan(w, s):
-    """The computer's decisions for side ``s``: workers to the crystal, more workers, the buildings in
-    turn, an army in its mix, and an attack when the army is big enough (bigger each time)."""
+    """The computer's decisions for side ``s``: workers to the crystal (and some to gas), more workers, the
+    buildings in turn, upgrades with what is spare, an army in its mix, and an attack when the army is big
+    enough (bigger each time)."""
     ai = s.ai
     hq = next((b for b in w.buildings_of(s.i, "hq") if b.done), None)
     workers = w.units_of(s.i, "worker")
-    army = [u for u in w.units_of(s.i) if u.spec.get("role") != "worker"]
+    army = [u for u in w.units_of(s.i) if u.spec.get("role") not in ("worker", "transport") and not u.inside]
     base = (hq.tx + hq.w // 2, hq.ty + hq.h // 2) if hq else s.start
     if base is None:
         return
+    have = {}
+    for b in w.buildings_of(s.i):
+        have[b.spec.get("role")] = have.get(b.spec.get("role"), 0) + 1
+    on_gas = [u for u in workers if u.order["do"] == "gather" and u.order.get("kind") == "gas"]
+    want_gas = int(ai.get("gas", 2)) if have.get("barracks") and s.gas < 250 else 0
+    if s.gas > 400 and on_gas:                            # plenty: one back to the crystal
+        c = w.nearest_crystal(base[0], base[1], 14) or w.nearest_crystal(base[0], base[1], 60)
+        if c:
+            w.order(s.i, {"do": "gather", "units": [on_gas[-1].id], "at": list(c)})
     for u in workers:
         if u.order["do"] == "idle":
-            c = w.nearest_crystal(base[0], base[1], 14) or w.nearest_crystal(u.x // FP, u.y // FP, 60)
+            c = None
+            if len(on_gas) < want_gas:
+                c = w.nearest_crystal(base[0], base[1], 16, kind="gas")
+                if c:
+                    on_gas.append(u)
+            c = c or w.nearest_crystal(base[0], base[1], 14) or w.nearest_crystal(u.x // FP, u.y // FP, 60)
             if c:
                 w.order(s.i, {"do": "gather", "units": [u.id], "at": list(c)})
     if hq and len(workers) + len(hq.queue) < int(ai["workers"]) and len(hq.queue) < 1:
         k = w.of_role(s, "worker")
-        if k and s.credits >= w.kinds[k]["cost"]:
+        if k and w.afford(s.i, w.kinds[k]):
             w.order(s.i, {"do": "train", "building": hq.id, "kind": k})
     building = any(u.order["do"] == "build" for u in workers)
-    have = {}
-    for b in w.buildings_of(s.i):
-        have[b.spec.get("role")] = have.get(b.spec.get("role"), 0) + 1
+    mix = ai.get("mix") or {}
     want = [("barracks", 1), ("tower", int(ai["towers"])), ("factory", 1 if len(army) >= 4 else 0),
-            ("barracks", 2 if s.credits > 500 else 1)]
+            ("airfield", 1 if mix.get("air") and len(army) >= 6 else 0), ("barracks", 2 if s.credits > 500 else 1)]
     if not building and workers and len(workers) >= 3:
         for role, n in want:
             k = w.of_role(s, role)
             if not k or have.get(role, 0) >= n:
                 continue
             spec = w.kinds[k]
-            need = spec.get("needs")
-            if need and not any(b.kind == need and b.done for b in w.buildings_of(s.i)):
+            if not w.has(s.i, spec.get("needs")):
                 continue
-            if s.credits < spec["cost"]:
+            if not w.afford(s.i, spec):
                 break
             at = place_near(w, k, s.i, base[0], base[1], 2 if role == "tower" else 3)
             if at:
                 u = min((u for u in workers if u.carry == 0), key=lambda u: u.id, default=workers[0])
                 w.order(s.i, {"do": "build", "units": [u.id], "kind": k, "at": list(at)})
             break
-    mix = ai.get("mix") or {}
     count = {}
     for u in army:
         count[u.spec.get("role")] = count.get(u.spec.get("role"), 0) + 1
     for b in w.buildings_of(s.i):
-        if not b.done or b.spec.get("role") == "hq" or len(b.queue) >= 1:
+        if not b.done or len(b.queue) >= 1:
             continue
-        options = [k for k in b.spec.get("produces", []) if w.allowed(s.i, k)]
+        ups = [u for u in w.researchable(b) if w.has(s.i, w.upgrades[u].get("needs"))] if ai.get("research") else []
+        if ups and s.credits > 350 + int(w.upgrades[ups[0]].get("cost") or 0) and w.afford(s.i, w.upgrades[ups[0]]):
+            w.order(s.i, {"do": "research", "building": b.id, "upgrade": ups[0]})
+            continue
+        if b.spec.get("role") == "hq":
+            continue
+        options = [k for k in b.spec.get("produces", []) if w.allowed(s.i, k) and w.has(s.i, w.kinds[k].get("needs"))
+                   and mix.get(w.kinds[k]["role"], 1)]
         if not options:
             continue
         options.sort(key=lambda k: (count.get(w.kinds[k]["role"], 0) / float(mix.get(w.kinds[k]["role"], 1) or 1), k))
         k = options[0]
-        if s.credits >= w.kinds[k]["cost"] + (60 if len(workers) < int(ai["workers"]) else 0):
+        if s.credits >= w.kinds[k]["cost"] + (60 if len(workers) < int(ai["workers"]) else 0) \
+                and w.afford(s.i, w.kinds[k]):
             w.order(s.i, {"do": "train", "building": b.id, "kind": k})
             count[w.kinds[k]["role"]] = count.get(w.kinds[k]["role"], 0) + 1
+    for b in w.buildings_of(s.i):                         # mend what was hurt, when there is peace
+        if b.done and b.hp < b.max * 2 // 3 and s.credits > 150:
+            idle = [u for u in workers if u.order["do"] in ("idle", "gather") and u.carry == 0]
+            if idle and not any(u.order["do"] == "repair" for u in workers):
+                w.order(s.i, {"do": "repair", "units": [idle[0].id], "id": b.id})
+            break
     near = None
     mine = w.buildings_of(s.i)
     for t in w.things.values():
-        if t.side >= 0 and t.side != s.i and not t.building and any(w.dist2(t, b) <= (9 * FP) ** 2 for b in mine):
+        if t.side >= 0 and t.side != s.i and not t.building and not t.inside \
+                and any(w.dist2(t, b) <= (9 * FP) ** 2 for b in mine):
             near = t
             break
     home = [u for u in army if u.order["do"] in ("idle", "hold")]
     if near is not None and home:
-        w.order(s.i, {"do": "amove", "units": [u.id for u in home], "to": [near.x // FP, near.y // FP]})
+        w.order(s.i, {"do": "amove", "units": [u.id for u in home if w.hits(u, near)] or [u.id for u in home],
+                      "to": [near.x // FP, near.y // FP]})
         return
-    dry = not w.crystal or (s.credits < 50 and w.nearest_crystal(base[0], base[1], 20) is None)
-    if (len(home) >= min(s.wave, int(ai.get("most", 14))) or (dry and len(home) >= 3)) \
+    dry = s.credits < 100 and w.nearest_crystal(base[0], base[1], 30) is None     # nothing more coming
+    if (len(home) >= min(s.wave, int(ai.get("most", 14))) or (dry and home)) \
             and w.tick >= ticks(ai["first"], w.rate):
         target = target_for(w, s)
         if target:
@@ -1104,8 +1396,8 @@ def target_for(w, s):
 # --------------------------------------------------------------------------- #
 # The picture and the controls
 # --------------------------------------------------------------------------- #
-GLYPH = {"ground": ".", "rock": "#", "water": "~", "trees": '"', "crystal": "$"}
-UGLYPH = {"ground": " ", "rock": " ", "water": "≈", "trees": "♣", "crystal": "◆"}
+GLYPH = {"ground": ".", "rock": "#", "water": "~", "trees": '"', "crystal": "$", "gas": "&"}
+UGLYPH = {"ground": " ", "rock": " ", "water": "≈", "trees": "♣", "crystal": "◆", "gas": "◊"}
 PANEL = 26
 
 
@@ -1128,6 +1420,9 @@ class UI:
         self.drag = None
         self.paused = False
         self.map_top = 1
+        self.groups = {}                             # control groups: a digit -> ids
+        self.recalled = (None, -99)
+        self.clock = 0
 
     # -- the selection --
     def chosen(self):
@@ -1168,9 +1463,14 @@ class UI:
         w = self.w
         t = w.at(x, y)
         workers = [u.id for u in units if u.spec.get("role") == "worker"]
+        riders = [u.id for u in units if not u.air and not u.spec.get("carries")]
         if t is not None and w.enemy(units[0], t) and w.seen(t):
             self.give({"do": "attack", "units": ids, "target": t.id})
-        elif workers and w.inside(x, y) and w.terrain[y * w.W + x] == "crystal":
+        elif t is not None and t.side == self.side and t.spec.get("carries") and riders and t.id not in ids:
+            self.give({"do": "board", "units": riders, "id": t.id})
+        elif workers and t is not None and t.building and t.side == self.side and t.done and t.hp < t.max:
+            self.give({"do": "repair", "units": workers, "id": t.id})
+        elif workers and w.inside(x, y) and w.terrain[y * w.W + x] in MINED:
             self.give({"do": "gather", "units": workers, "at": [x, y]})
             rest = [i for i in ids if i not in workers]
             if rest:
@@ -1190,10 +1490,12 @@ class UI:
         return [(k, s) for k, s in self.w.kinds.items() if s["building"] and self.w.allowed(self.side, k)]
 
     def trainable(self):
+        """The chosen building and what it can make: kinds, and upgrades as ``"up:ID"``."""
         b = next((t for t in self.chosen() if t.building), None)
         if b is None or not b.done:
             return None, []
-        return b, [k for k in b.spec.get("produces", []) if self.w.allowed(self.side, k)]
+        return b, [k for k in b.spec.get("produces", []) if self.w.allowed(self.side, k)] + \
+            ["up:" + u for u in self.w.researchable(b)]
 
     def move_cursor(self, dx, dy):
         self.cursor[0] = max(0, min(self.w.W - 1, self.cursor[0] + dx))
@@ -1224,6 +1526,17 @@ class UI:
                 self.mode = ("place", opts[int(k) - 1][0])
             else:
                 self.mode = None
+            return True
+        if self.mode == "group":
+            self.mode = None
+            if k.isdigit():
+                self.groups[k] = list(self.selected)
+            return True
+        if k.startswith("ctrl-") and k[5:].isdigit():
+            self.groups[k[5:]] = list(self.selected)
+            return True
+        if k == "G":
+            self.mode = "group"
             return True
         if k in ("enter", "space"):
             own = w.at(x, y, self.side)
@@ -1279,10 +1592,25 @@ class UI:
             hq = next(iter(w.buildings_of(self.side, "hq")), None)
             if hq:
                 self.cursor = [hq.tx + hq.w // 2, hq.ty + hq.h // 2]
+        elif k == "o" and ids:
+            self.give({"do": "patrol", "units": ids, "to": [x, y]})
+        elif k == "d" and ids:
+            self.give({"do": "unload", "units": ids, "to": [x, y]})
         elif k.isdigit():
             b, opts = self.trainable()
-            if b is not None and 1 <= int(k) <= len(opts):
-                self.give({"do": "train", "building": b.id, "kind": opts[int(k) - 1]})
+            if b is not None and opts:
+                if 1 <= int(k) <= len(opts):
+                    item = opts[int(k) - 1]
+                    if item.startswith("up:"):
+                        self.give({"do": "research", "building": b.id, "upgrade": item[3:]})
+                    else:
+                        self.give({"do": "train", "building": b.id, "kind": item})
+            elif self.groups.get(k):
+                self.selected = [i for i in self.groups[k] if i in w.things]
+                if self.recalled[0] == k and self.clock - self.recalled[1] <= 8 and self.chosen():
+                    t = self.chosen()[0]
+                    self.cursor = [t.x // FP, t.y // FP]
+                self.recalled = (k, self.clock)
         elif k == "c":
             b, _ = self.trainable()
             if b is not None:
@@ -1330,6 +1658,7 @@ class UI:
 
     def controls(self, c):
         """A tick of keys (engine/realtime.py Controls): the arrows move the cursor, held they run on."""
+        self.clock += 1
         for name, kind in getattr(c, "events", ()):
             if name.startswith(("mouse:", "mouseup:")):
                 self.mouse(name)
@@ -1398,16 +1727,16 @@ class UI:
                 base = t if t in ("rock", "water") else "ground"
                 bg = C[base] if lit else C[base + "_dim"]
                 fg = C.get(t, C["text"])
-                if t == "crystal":
-                    fg = shade(fg, 0.5 + 0.5 * min(1.0, w.crystal.get(i, 0) / 400.0))
+                if t in MINED:
+                    fg = shade(fg, 0.5 + 0.5 * min(1.0, w.amount.get(i, 0) / 400.0))
                 if not lit:
                     fg = shade(fg, 0.5)
                 ch = glyph.get(t, " ")
                 row.append((ch, fg if color else None, bg if color else None))
             rows.append(row)
         sel = set(self.selected)
-        for t in sorted(w.things.values(), key=lambda t: (not t.building, t.id)):
-            if not w.seen(t):
+        for t in sorted(w.things.values(), key=lambda t: (not t.building, t.air, t.id)):
+            if t.inside or not w.seen(t):
                 continue
             side = w.sides[t.side].color if t.side >= 0 else C["neutral"]
             mine = t.side == self.side
@@ -1501,7 +1830,8 @@ class UI:
                     row.append((0, 0, 0))
                 else:
                     t = w.terrain[i]
-                    row.append(C["crystal"] if t == "crystal" else C["rock"] if t == "rock" else
+                    row.append(C["crystal"] if t == "crystal" else C["gas"] if t == "gas" else
+                               C["rock"] if t == "rock" else
                                C["water"] if t == "water" else C["trees"] if t == "trees" else C["ground"])
             buf.append(row)
         if self.cam:
@@ -1528,8 +1858,8 @@ class UI:
             who = "yours" if t.side == self.side else (w.sides[t.side].name if t.side >= 0 else "nobody's")
             return "%d,%d: %s (%s) %d/%d" % (x, y, t.spec["name"], who, max(0, t.hp), t.max)
         ter = w.terrain[i]
-        if ter == "crystal":
-            return "%d,%d: crystal, %d left" % (x, y, w.crystal.get(i, 0))
+        if ter in MINED:
+            return "%d,%d: %s, %d left" % (x, y, w.names[ter].lower(), w.amount.get(i, 0))
         return "%d,%d: %s" % (x, y, ter)
 
     def panel(self, height, unicode=True):
@@ -1537,7 +1867,7 @@ class UI:
         w = self.w
         s = w.sides[self.side]
         lines = [[(w.name, "title")],
-                 [("CRYSTAL %d" % s.credits, "ammo")],
+                 [("%s %d  %s %d" % (w.names["crystal"].upper(), s.credits, w.names["gas"].upper(), s.gas), "ammo")],
                  [("UNITS %d/%d" % (len(w.units_of(self.side)), w.limit), "text")]]
         if w.goal == "survive" and w.time_ticks:
             left = max(0, w.time_ticks - w.tick) // w.rate
@@ -1547,10 +1877,13 @@ class UI:
             lines.append([("TIME %d:%02d" % (sec // 60, sec % 60), "info")])
         lines.append([("", "text")])
         chosen = self.chosen()
-        if self.mode == "menu":
+        if self.mode == "group":
+            lines.append([("Group: a digit to keep", "title")])
+        elif self.mode == "menu":
             lines.append([("Build:", "title")])
             for n, (k, spec) in enumerate(self.buildable(), 1):
-                lines.append([("%d %s %d" % (n, spec["name"], spec["cost"]), "text")])
+                lines.append([("%d %s %s" % (n, spec["name"], w.price(spec)), "text" if w.has(self.side, spec.get(
+                    "needs")) else "dim")])
             lines.append([("Esc: none", "dim")])
         elif isinstance(self.mode, tuple):
             spec = w.kinds[self.mode[1]]
@@ -1567,20 +1900,27 @@ class UI:
                     lines.append([("Building %d%%" % (100 * t.built // total), "info")])
                 else:
                     b, opts = self.trainable()
+                    def spec_of(item):
+                        return w.upgrades[item[3:]] if item.startswith("up:") else w.kinds[item]
                     if t.queue:
-                        total = ticks(w.kinds[t.queue[0]]["time"], w.rate)
-                        lines.append([("Making %s %d%%" % (w.kinds[t.queue[0]]["name"], 100 * t.progress // total),
+                        total = ticks(spec_of(t.queue[0])["time"], w.rate)
+                        lines.append([("Making %s %d%%" % (spec_of(t.queue[0])["name"], 100 * t.progress // total),
                                        "info")])
                         if len(t.queue) > 1:
-                            lines.append([("then " + ", ".join(w.kinds[k]["name"] for k in t.queue[1:]), "dim")])
+                            lines.append([("then " + ", ".join(spec_of(k)["name"] for k in t.queue[1:]), "dim")])
                     for n, k in enumerate(opts, 1):
-                        lines.append([("%d %s %d" % (n, w.kinds[k]["name"], w.kinds[k]["cost"]), "text")])
+                        sp = spec_of(k)
+                        ok = w.has(self.side, sp.get("needs"))
+                        lines.append([("%d %s%s %s" % (n, "+" if k.startswith("up:") else "", sp["name"], w.price(sp)),
+                                       "text" if ok else "dim")])
                     if opts:
                         lines.append([("c cancel  r rally", "dim")])
             else:
                 lines.append([(doing(t), "info")])
                 if t.carry:
-                    lines.append([("carries %d" % t.carry, "ammo")])
+                    lines.append([("carries %d %s" % (t.carry, w.names[t.load].lower()), "ammo")])
+                if t.spec.get("carries"):
+                    lines.append([("aboard %d/%d" % (len(t.cargo), t.spec["carries"]), "text")])
         else:
             count = {}
             for t in chosen:
@@ -1589,8 +1929,11 @@ class UI:
             for name, n in sorted(count.items()):
                 lines.append([("%d %s" % (n, name), "text")])
         lines.append([("", "text")])
+        if self.groups:
+            lines.append([("groups " + " ".join(sorted(k for k, v in self.groups.items() if v)), "dim")])
         help_ = ["arrows cursor", "Space choose  Enter go", "v box   Tab idle worker", "a attack  m move",
-                 "s stop  h hold  g gather", "b build  u army  e alike", "p pause"]
+                 "s stop  h hold  g gather", "o patrol  d unload", "b build  u army  e alike", "G+digit group",
+                 "p pause"]
         lines += [[(h, "dim")] for h in help_]
         return lines[:height]
 
@@ -1603,6 +1946,7 @@ def bar(v, top, n, unicode=True):
 def doing(t):
     do = t.order["do"]
     return {"idle": "idle", "hold": "holding", "move": "moving", "amove": "attacking (on the way)",
+            "patrol": "patrolling", "repair": "repairing", "board": "boarding", "unload": "to set them down",
             "attack": "attacking", "build": "building", "gather": {"go": "to the crystal", "mine": "mining",
                                                                   "back": "carrying it home"}.get(
                 t.order.get("phase"), "gathering")}.get(do, do)
@@ -1646,7 +1990,8 @@ class Runner:
         ui.map_top = 1
         cells = ui.cells(mw, mh, color=bool(depth), unicode=unicode)
         s = w.sides[ui.side]
-        hud = [(w.name + "   ", "title"), ("CRYSTAL %d   " % s.credits, "ammo"),
+        hud = [(w.name + "   ", "title"), ("%s %d   " % (w.names["crystal"].upper(), s.credits), "ammo"),
+               ("%s %d   " % (w.names["gas"].upper(), s.gas), "ammo"),
                ("UNITS %d/%d" % (len(w.units_of(ui.side)), w.limit), "text")]
         rows = [paint.text(hud, W)]
         side_lines = ui.panel(mh, unicode) if panel else []
@@ -1750,7 +2095,8 @@ def play_frame(world, term, audio=None, keys=None, clock=None):
 # A line at a time
 # --------------------------------------------------------------------------- #
 TEXT_HELP = ("Commands (';' between them): select all|army|workers|idle|KIND|X,Y [X2,Y2]; move X,Y; "
-             "attack X,Y; gather [X,Y]; build KIND X,Y; train KIND [N]; stop; hold; rally X,Y; "
+             "attack X,Y; patrol X,Y; gather [X,Y]; build KIND X,Y; repair X,Y; train KIND [N]; research NAME; "
+             "board X,Y; unload X,Y; stop; hold; rally X,Y; group N; recall N; "
              "wait [SECONDS] (an empty line waits 5); look [X,Y]; map; status; quit.")
 
 
@@ -1772,8 +2118,11 @@ def text_map(world, ui, cx=None, cy=None, cols=48, rows=18):
 def status_lines(world, ui):
     s = world.sides[ui.side]
     sec = world.tick // world.rate
-    out = ["%s - %d:%02d - crystal %d - units %d/%d" % (world.name, sec // 60, sec % 60, s.credits,
-                                                       len(world.units_of(ui.side)), world.limit)]
+    out = ["%s - %d:%02d - %s %d - %s %d - units %d/%d" % (
+        world.name, sec // 60, sec % 60, world.names["crystal"].lower(), s.credits, world.names["gas"].lower(),
+        s.gas, len(world.units_of(ui.side)), world.limit)]
+    if s.upgrades:
+        out.append("Upgrades: " + ", ".join(world.upgrades[u]["name"] for u in s.upgrades))
     count = {}
     for t in world.things.values():
         if t.side == ui.side:
@@ -1838,11 +2187,36 @@ def command(world, ui, line):
         else:
             ui.selected = [t.id for t in mine if what in (t.kind, t.spec["name"].lower(), t.spec.get("role"))]
         say.append("%d chosen." % len(ui.chosen()))
-    elif verb in ("move", "attack", "rally") and rest and coords(rest[0]):
+    elif verb in ("group", "recall") and rest and rest[0].isdigit():
+        if verb == "group":
+            ui.groups[rest[0]] = list(ui.selected)
+        else:
+            ui.selected = [i for i in ui.groups.get(rest[0], []) if i in w.things]
+        say.append("%d chosen." % len(ui.chosen()))
+    elif verb == "research" and rest:
+        uid = next((u for u, up in w.upgrades.items() if rest[0].lower() in (u, up["name"].lower())), None)
+        b = next((t for t in w.buildings_of(ui.side) if t.done and uid in w.researchable(t)), None)
+        if uid is None or b is None:
+            say.append("Nothing of yours can make that upgrade now.")
+        else:
+            ui.give({"do": "research", "building": b.id, "upgrade": uid})
+    elif verb in ("board", "unload", "repair") and rest and coords(rest[0]):
+        x, y = coords(rest[0])
+        t = w.at(x, y, ui.side)
+        ids = [u.id for u in ui.units()]
+        if verb == "unload":
+            ui.give({"do": "unload", "units": ids, "to": [x, y]})
+        elif t is None:
+            say.append("Nothing of yours there.")
+        else:
+            ui.give({"do": verb, "units": ids, "id": t.id})
+    elif verb in ("move", "attack", "rally", "patrol") and rest and coords(rest[0]):
         x, y = coords(rest[0])
         ids = [t.id for t in ui.units()]
         t = w.at(x, y)
-        if verb == "rally":
+        if verb == "patrol":
+            ui.give({"do": "patrol", "units": ids, "to": [x, y]})
+        elif verb == "rally":
             ui.give({"do": "rally", "units": [b.id for b in ui.chosen() if b.building], "to": [x, y]})
         elif verb == "attack" and t is not None and ui.units() and w.enemy(ui.units()[0], t) and w.seen(t):
             ui.give({"do": "attack", "units": ids, "target": t.id})
@@ -1853,7 +2227,7 @@ def command(world, ui, line):
         units = ui.units()
         if at is None and units:
             at = w.nearest_crystal(units[0].x // FP, units[0].y // FP, 20)
-        elif at is not None and w.terrain[at[1] * w.W + at[0]] != "crystal":
+        elif at is not None and w.terrain[at[1] * w.W + at[0]] not in MINED:
             at = w.nearest_crystal(at[0], at[1], 12)
         if at:
             ui.give({"do": "gather", "units": [u.id for u in units], "at": list(at)})
@@ -1996,8 +2370,9 @@ def _num(v, lo=None):
     return not isinstance(v, bool) and isinstance(v, (int, float)) and (lo is None or v >= lo)
 
 
-def kind_problems(kinds, where):
+def kind_problems(kinds, where, upgrades=None):
     out = []
+    upgrades = upgrades or {}
     for k, s in kinds.items():
         if s.get("role") not in ROLES:
             out.append("%s kind '%s': role should be one of %s" % (where, k, ", ".join(ROLES)))
@@ -2007,8 +2382,10 @@ def kind_problems(kinds, where):
         for p in s.get("produces") or []:
             if p not in kinds:
                 out.append("%s kind '%s' makes '%s', not a kind" % (where, k, p))
-        if s.get("needs") and s["needs"] not in kinds:
-            out.append("%s kind '%s' needs '%s', not a kind" % (where, k, s["needs"]))
+        if s.get("needs") and s["needs"] not in kinds and s["needs"] not in upgrades:
+            out.append("%s kind '%s' needs '%s', not a kind or an upgrade" % (where, k, s["needs"]))
+        if s.get("hits") not in (None, "ground", "air", "both"):
+            out.append("%s kind '%s': hits should be ground, air or both" % (where, k))
         if s.get("building") and not (isinstance(s.get("size"), list) and len(s["size"]) == 2
                                       and all(isinstance(v, int) and 1 <= v <= 6 for v in s["size"])):
             out.append("%s kind '%s': size should be [w, h], 1-6 each" % (where, k))
@@ -2020,7 +2397,24 @@ def kind_problems(kinds, where):
 def problems(data):
     out = []
     sk = getattr(data, "skirmishes", None) or {}
-    out += kind_problems(kinds_of(data), "rts")
+    ups = upgrades_of(data)
+    out += kind_problems(kinds_of(data), "rts", ups)
+    allk = kinds_of(data)
+    for u, up in ups.items():
+        if not isinstance(up, dict):
+            continue
+        if up.get("at") not in allk and up.get("at") not in ROLES:
+            out.append("rts upgrade '%s': at should be a building kind or role, not '%s'" % (u, up.get("at")))
+        for f in ("cost", "time"):
+            if not _num(up.get(f), 0):
+                out.append("rts upgrade '%s': %s should be a number" % (u, f))
+        if not [f for f in STATS if f in up]:
+            out.append("rts upgrade '%s' adds nothing (%s)" % (u, ", ".join(STATS)))
+        for x in up.get("to") or []:
+            if x not in allk and x not in ROLES:
+                out.append("rts upgrade '%s': '%s' is not a kind or role" % (u, x))
+        if up.get("needs") and up["needs"] not in allk and up["needs"] not in ups:
+            out.append("rts upgrade '%s' needs '%s', not a kind or an upgrade" % (u, up["needs"]))
     for sid, spec in sk.items():
         where = "skirmish '%s'" % sid
         if not isinstance(spec, dict):
@@ -2032,7 +2426,8 @@ def problems(data):
             continue
         kinds = kinds_of(data, spec)
         if spec.get("kinds"):
-            out += kind_problems({k: kinds[k] for k in spec["kinds"] if k in kinds}, where)
+            out += kind_problems({k: kinds[k] for k in spec["kinds"] if k in kinds}, where,
+                                 upgrades_of(data, spec))
         sides = spec.get("sides") or []
         if not isinstance(sides, list) or not 1 <= len(sides) <= 4:
             out.append("%s: sides should be a list of 1 to 4" % where)

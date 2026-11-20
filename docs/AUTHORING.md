@@ -2183,7 +2183,8 @@ skirmish in `skirmishes.json`:
 ```
 
 The map: `.` ground, `#` rock, `~` water, `T` trees (none of them walked on), `$` crystal
-(`"crystal"`: how much in each, 600), and `1`-`4` where each side starts - its headquarters
+(`"crystal"`: how much in each, 600), `&` gas (`"gas"`, 1500; what the two are called:
+`"names": {"crystal": "Xantrium", "gas": "Plasma"}`), and `1`-`4` where each side starts - its headquarters
 there, its workers round it. A `legend` gives other characters a meaning: a terrain
 (`"r": "rock"`) or something standing there from the start
 (`"g": {"unit": "soldier", "side": 2}`, `{"building": "tower", "side": 1}`).
@@ -2193,7 +2194,10 @@ there, its workers round it. A `legend` gives other characters a meaning: a terr
   `faction` (the kinds it may have, below), `color`, and for the computer `ai`: `workers` it
   keeps (8), `wave` (army units in its first attack, 5; two more each time, up to `most`, 14),
   `first` (seconds before its first attack, 150), `towers` (1), `mix` (how many of each role,
-  `{"melee": 2, "ranged": 2, "heavy": 1}`), `every` (seconds between its decisions, 1).
+  `{"melee": 2, "ranged": 2, "heavy": 1}`; `"air": 1` and it builds an airfield too), `gas`
+  (workers it puts on gas, 2), `research` (upgrades with crystal to spare, true), `every`
+  (seconds between its decisions, 1). It mends what was hurt, and when its crystal runs out it
+  attacks with what it has.
 - `goal`: `destroy` (every other side out) or `survive` (`time` seconds). `limit`: units a
   side may have (40). `intro`, `music`.
 - When it ends, the scene's `on_skirmish_win` (or the skirmish's `on_win`) runs; lost,
@@ -2219,22 +2223,46 @@ what the computer player builds by), `char` (lower case for units, upper for bui
 custom), `hp`, `armor` (taken off each hit), `speed` (tiles a second), `damage`, `range`
 (tiles), `cooldown` (seconds between shots), `splash` (tiles round the target hit for half),
 `sight` (tiles), `cost`, `time` (seconds to train or build); workers `carry` and `gather`
-(seconds a load); buildings `building`, `size` [w, h], `produces`, `needs` (a building kind
-first), `dropoff` (crystal is brought here). A tower is a building with `damage`.
+(seconds a load); buildings `building`, `size` [w, h], `produces`, `dropoff` (crystal and gas
+are brought here); `gas` (a second cost, beside `cost`); `needs` (a building kind built, or an
+upgrade made, before it is built or trained). A tower is a building with `damage`. `air`: it
+flies, straight over anything, and only what hits the air hits it - `hits`: `ground`, `air` or
+`both` (ranged kinds, `range` 2 or more, hit both; the rest the ground). `carries`: a transport
+for that many (units board it, ride, and are set down; lost with it). The engine has an
+airfield, a gunship and a lifter (it carries 6).
+
+**Upgrades** (game.json `"rts": {"upgrades": ...}`, or a skirmish's): made at a building like a
+unit, once a side, and from then on adding to every kind (or role) in `to`:
+
+```json
+"rifles": {"name": "Rifles", "at": "barracks", "cost": 150, "gas": 50, "time": 40,
+           "to": ["trooper", "gunner"], "damage": 2}
+```
+
+An upgrade may add `hp` (those there already get it too), `armor`, `speed`, `damage`, `range`,
+`cooldown`, `sight`, `splash` or `carry`, and may `needs` a building or another upgrade first. The
+engine's: weapons, plating, drills, tracks (a tank needs it), optics.
 
 **Playing it.** The arrows move the cursor (held, they run on; Shift or Ctrl and an arrow,
 five at a time). Space chooses what is under it; Enter acts on it with what is chosen: an
 enemy is attacked, crystal gathered, a building of yours begun is helped along, else they go
-there. `v` starts and ends a box to choose by; Tab goes to an idle worker; `u` chooses the army,
-`e` everything like what is chosen. `a` attacks on the way to the cursor, `m` goes there (past
-enemies), `s` stops, `h` holds (fights only what comes in range), `g` gathers. `b` opens the
-build menu (a digit, then Enter where the cursor shows it fits); with a building chosen, digits
-train, `c` takes the last back (paid back), `r` sets where new units go. P or Esc pauses (Q then
-leaves). Where the terminal reports the mouse, a click chooses, a drag draws a box, and the
+there - Enter on a transport of yours boards it, on a hurt building of yours sends workers to
+repair it (for crystal: half its cost for the whole of it). `v` starts and ends a box to choose
+by; Tab goes to an idle worker; `u` chooses the army, `e` everything like what is chosen; `G`
+and a digit keep what is chosen as a group (Ctrl and the digit too, where the terminal sends
+it), the digit chooses it again, and twice goes to it. A group sent somewhere keeps its shape
+and goes at its slowest one's pace. `a` attacks on the way to the cursor, `m` goes there (past
+enemies), `o` patrols between here and there, `s` stops, `h` holds (fights only what comes in
+range), `g` gathers, `d` sets down what a transport carries. `b` opens the build menu (a digit,
+then Enter where the cursor shows it fits); with a building chosen, digits train or make an
+upgrade (shown with a +), `c` takes the last back (paid back), `r` sets where new units go. P
+or Esc pauses (Q then leaves). Where the terminal reports the mouse, a click chooses, a drag draws a box, and the
 right button acts. The panel shows crystal, units, the time, what is chosen and a map of the
 whole field with the view's frame on it. Piped, with `--lines` or on a screen under 40 x 14, a
 skirmish is played a typed line at a time: `select workers; gather; wait 20`,
-`build barracks 12,26`, `train trooper 2`, `look 30,10`, `map`, `status` (`help` lists them).
+`build barracks 12,26`, `train trooper 2`, `research rifles`, `patrol 30,10`, `board 14,20`,
+`unload 40,8`, `repair 8,28`, `group 1`, `recall 1`, `look 30,10`, `map`, `status` (`help`
+lists them).
 
 It runs at 10 ticks a second in whole numbers with nothing left to chance, and paths come from
 flow fields (one per place units are sent to, shared by all of them). The orders a player gives

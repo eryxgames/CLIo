@@ -312,8 +312,65 @@
     "splash": 1,
     "sight": 6,
     "cost": 180,
+    "gas": 40,
     "time": 26,
     "char": "l"
+   },
+   "hangar": {
+    "name": "Hangar",
+    "role": "airfield",
+    "building": true,
+    "faction": "tam",
+    "size": [
+     3,
+     2
+    ],
+    "hp": 650,
+    "armor": 1,
+    "sight": 6,
+    "cost": 200,
+    "gas": 50,
+    "time": 35,
+    "char": "H",
+    "produces": [
+     "hopper",
+     "lander"
+    ],
+    "needs": "motor_pool"
+   },
+   "hopper": {
+    "name": "Hopper",
+    "role": "air",
+    "air": true,
+    "faction": "tam",
+    "hp": 120,
+    "armor": 1,
+    "speed": 3.2,
+    "damage": 9,
+    "range": 3,
+    "cooldown": 1.2,
+    "sight": 8,
+    "cost": 130,
+    "gas": 60,
+    "time": 20,
+    "char": "h"
+   },
+   "lander": {
+    "name": "Lander",
+    "role": "transport",
+    "air": true,
+    "faction": "tam",
+    "hp": 160,
+    "armor": 2,
+    "speed": 3.0,
+    "damage": 0,
+    "range": 1,
+    "sight": 7,
+    "cost": 100,
+    "gas": 30,
+    "time": 18,
+    "char": "n",
+    "carries": 6
    },
    "kernel": {
     "name": "Kernel Node",
@@ -452,9 +509,150 @@
     "cooldown": 0.35,
     "sight": 7,
     "cost": 180,
+    "gas": 40,
     "time": 26,
     "char": "s"
+   },
+   "hive": {
+    "name": "Hive",
+    "role": "airfield",
+    "building": true,
+    "faction": "root",
+    "size": [
+     3,
+     2
+    ],
+    "hp": 600,
+    "armor": 1,
+    "sight": 6,
+    "cost": 200,
+    "gas": 50,
+    "time": 35,
+    "char": "V",
+    "produces": [
+     "hornet"
+    ],
+    "needs": "forge"
+   },
+   "hornet": {
+    "name": "Hornet",
+    "role": "air",
+    "air": true,
+    "faction": "root",
+    "hp": 70,
+    "speed": 3.6,
+    "damage": 7,
+    "range": 1,
+    "cooldown": 0.8,
+    "sight": 7,
+    "cost": 90,
+    "gas": 30,
+    "time": 14,
+    "char": "y"
    }
+  },
+  "upgrades": {
+   "rifles": {
+    "name": "Rifles",
+    "at": "barracks",
+    "cost": 150,
+    "time": 40,
+    "to": [
+     "trooper",
+     "gunner",
+     "hopper"
+    ],
+    "damage": 2,
+    "gas": 50
+   },
+   "armour": {
+    "name": "Armour",
+    "at": "barracks",
+    "cost": 150,
+    "time": 40,
+    "to": [
+     "trooper",
+     "gunner",
+     "loader"
+    ],
+    "armor": 1,
+    "hp": 10,
+    "gas": 50
+   },
+   "drills": {
+    "name": "Drills",
+    "at": "command",
+    "cost": 100,
+    "time": 30,
+    "to": [
+     "rig"
+    ],
+    "carry": 2
+   },
+   "hydraulics": {
+    "name": "Hydraulics",
+    "at": "motor_pool",
+    "cost": 120,
+    "time": 30,
+    "to": [
+     "loader"
+    ],
+    "speed": 0.3,
+    "hp": 40,
+    "gas": 40
+   },
+   "overclock": {
+    "name": "Overclock",
+    "at": "spawner",
+    "cost": 150,
+    "time": 40,
+    "to": [
+     "daemon",
+     "drone",
+     "hornet"
+    ],
+    "damage": 2,
+    "gas": 50
+   },
+   "shells": {
+    "name": "Shells",
+    "at": "spawner",
+    "cost": 150,
+    "time": 40,
+    "to": [
+     "daemon",
+     "drone",
+     "spinlock"
+    ],
+    "armor": 1,
+    "hp": 10,
+    "gas": 50
+   },
+   "threads": {
+    "name": "Threads",
+    "at": "kernel",
+    "cost": 100,
+    "time": 30,
+    "to": [
+     "kworker"
+    ],
+    "carry": 2
+   },
+   "spin": {
+    "name": "Spin-up",
+    "at": "forge",
+    "cost": 120,
+    "time": 30,
+    "to": [
+     "spinlock"
+    ],
+    "range": 1,
+    "gas": 40
+   }
+  },
+  "names": {
+   "crystal": "Xantrium",
+   "gas": "Plasma"
   },
   "colors": {
    "ground": "#1c2416",

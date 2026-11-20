@@ -71,9 +71,10 @@ python clio.py rootless   # first-person shooter in a terminal
 - [x] Arcade stages in real time: platformers (jumps, platforms, ladders, doors and keys,
       checkpoints) and top-down chases, enemies that walk, hop, fly, hunt and shoot, drawn in
       half-block pixels; a bot that proves each stage can be cleared
-- [x] Real-time strategy: skirmishes with workers, crystal, buildings, training, armies on flow
-      fields, fog of war, a computer player that builds and attacks in waves; keys and the mouse;
-      orders kept by tick, so a game plays back (the base for lockstep multiplayer)
+- [x] Real-time strategy: skirmishes with workers, two resources, buildings, training, upgrades
+      and tech, armies on flow fields, fliers and transports, control groups, fog of war, a
+      computer player that builds, researches and attacks in waves; keys and the mouse; orders
+      kept by tick, so a game plays back (the base for lockstep multiplayer)
 - [x] Save / load of the *whole* world, named slots
 - [x] Three demo games, a starter template, over two hundred automated tests
 - [x] Game editor in the browser: `python clio.py mygame --edit`, or
@@ -237,7 +238,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 536 tests, about a minute
+python -m unittest discover -s tests     # 543 tests, about a minute
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 python tests/bot.py 30 cards             # the same with card battles (the Deck mode)

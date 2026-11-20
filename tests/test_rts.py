@@ -391,5 +391,150 @@ class TextTests(unittest.TestCase):
         self.assertEqual(g.world.vars["skirmishes"]["sim7"]["result"], "won")
 
 
+class MoreTests(unittest.TestCase):
+    """Control groups, groups that keep their shape and pace, gas, upgrades and tech, fliers, transports,
+    repair and patrol."""
+
+    def test_control_groups_and_a_group_keeps_its_shape_at_the_slowest_pace(self):
+        w = world()
+        ui = UI(w)
+        ws = w.units_of(0, "worker")
+        ui.selected = [ws[0].id, ws[1].id]
+        ui.key("G")
+        ui.key("1")
+        ui.selected = []
+        ui.key("1")
+        self.assertEqual(ui.selected, [ws[0].id, ws[1].id])
+        ui.clock += 3
+        ui.key("1")                                            # twice: to the group
+        self.assertEqual(ui.cursor, list(tile(ws[0])))
+        t = w.add("tank", 0, 3 * FP + 128, 6 * FP + 128)
+        s = w.add("soldier", 0, 9 * FP + 128, 6 * FP + 128)
+        w.order(0, {"do": "move", "units": [t.id, s.id], "to": [20, 6]})
+        run(w, 1)
+        self.assertEqual(s.order["pace"], w.speed_of(t))        # the soldier keeps to the tank's pace
+        self.assertNotEqual(t.order["to"], s.order["to"])
+        run(w, 25)
+        self.assertLess(t.x, s.x)                              # the shape kept: the tank still on the left
+        self.assertLessEqual(abs(s.x - t.x), 4 * FP)
+
+    def test_gas_upgrades_and_what_needs_what(self):
+        rows = list(MAP)
+        rows[6] = "#.&&.........................#"
+        w = world(rows)
+        side = w.sides[0]
+        side.credits = 2000
+        u = w.units_of(0, "worker")[0]
+        w.order(0, {"do": "gather", "units": [u.id], "at": [2, 6]})
+        run(w, 20)
+        self.assertGreater(side.gas, 0)
+        self.assertEqual(u.load, "gas")
+        w.order(0, {"do": "stop", "units": [u.id]})
+        run(w, 1)
+        side.gas = 500
+        b = w.add("barracks", 0, 10, 2)
+        f = w.add("factory", 0, 20, 5)
+        w.order(0, {"do": "train", "building": f.id, "kind": "tank"})
+        run(w, 1)
+        self.assertEqual(f.queue, [])                          # a tank needs the tracks
+        self.assertIn("Tracks", w.messages[-1][1])
+        w.order(0, {"do": "research", "building": f.id, "upgrade": "tracks"})
+        w.order(0, {"do": "research", "building": b.id, "upgrade": "plating"})
+        run(w, 1)
+        self.assertEqual((f.queue, side.gas), (["up:tracks"], 400))
+        self.assertNotIn("tracks", w.researchable(f))          # not twice
+        soldier = w.add("soldier", 0, 12 * FP + 128, 6 * FP + 128)
+        run(w, 41)
+        self.assertEqual(side.upgrades, ["tracks", "plating"])
+        self.assertEqual((soldier.max, w.stat(soldier, "armor")), (90, 2))   # those there already, too
+        w.order(0, {"do": "train", "building": f.id, "kind": "tank"})
+        w.order(0, {"do": "train", "building": f.id, "kind": "tank"})
+        w.order(0, {"do": "cancel", "building": f.id})
+        run(w, 1)
+        self.assertEqual((f.queue, side.gas), (["tank"], 350))  # one back, gas and all
+        tank = w.add("tank", 0, 3 * FP, 3 * FP)
+        self.assertGreater(w.speed_of(tank), int(round(1.7 * FP / w.rate)))
+
+    def test_fliers_cross_anything_and_only_what_hits_the_air_hits_them(self):
+        w = world()
+        g = w.add("gunship", 0, 3 * FP + 128, 6 * FP + 128)
+        w.order(0, {"do": "move", "units": [g.id], "to": [3, 8]})  # over water to the rock's edge... onto it
+        run(w, 3)
+        self.assertEqual(tile(g), (3, 8))
+        s = w.add("soldier", 1, 4 * FP + 128, 8 * FP)
+        r = w.add("ranger", 1, 6 * FP + 128, 6 * FP + 128)
+        self.assertFalse(w.hits(s, g))
+        self.assertTrue(w.hits(r, g))
+        self.assertTrue(w.hits(g, s))
+        w.sides[1].control = "ai"
+        w.order(1, {"do": "attack", "units": [s.id], "target": g.id})
+        run(w, 1)
+        self.assertNotEqual(s.order["do"], "attack")            # it cannot
+        self.assertIsNot(w.acquire(s, 6), g)
+
+    def test_a_transport_carries_units_over_water_and_its_loss_is_theirs(self):
+        rows = ["##############", "#............#", "#.1..~~~~....#", "#....~~~~....#", "#....~~~~....#",
+                "#....~~~~....#", "##############"]
+        w = world(rows, sides=[{"control": "player", "workers": 0}])
+        lf = w.add("lifter", 0, 4 * FP + 128, 4 * FP + 128)
+        a = w.add("soldier", 0, 2 * FP + 128, 5 * FP + 128)
+        b = w.add("soldier", 0, 3 * FP + 128, 5 * FP + 128)
+        w.order(0, {"do": "board", "units": [a.id, b.id], "id": lf.id})
+        run(w, 3)
+        self.assertEqual(sorted(lf.cargo), [a.id, b.id])
+        self.assertNotIn(w.at(2, 5), (a, b))                    # aboard: off the map
+        w.order(0, {"do": "unload", "units": [lf.id], "to": [11, 3]})
+        run(w, 6)
+        self.assertEqual((lf.cargo, a.inside, b.inside), ([], 0, 0))
+        self.assertTrue(all(tile(t)[0] >= 9 for t in (a, b)))   # across the water
+        w.order(0, {"do": "board", "units": [a.id], "id": lf.id})
+        run(w, 3)
+        w.remove(lf)
+        self.assertNotIn(a.id, w.things)                       # gone with it
+
+    def test_workers_repair_for_crystal_and_a_patrol_goes_back_and_forth(self):
+        w = world()
+        hq = w.buildings_of(0, "hq")[0]
+        hq.hp = 600
+        u = w.units_of(0, "worker")[0]
+        w.order(0, {"do": "repair", "units": [u.id], "id": hq.id})
+        run(w, 20)
+        self.assertGreater(hq.hp, 600)
+        self.assertLess(w.sides[0].credits, 200)
+        s = w.add("soldier", 0, 10 * FP + 128, 5 * FP + 128)
+        w.order(0, {"do": "patrol", "units": [s.id], "to": [14, 5]})
+        xs = []
+        for _ in range(60):
+            run(w, 0.5)
+            xs.append(tile(s)[0])
+        self.assertIn(14, xs)
+        self.assertIn(10, xs[xs.index(14):])                    # and back
+
+    def test_typed_research_groups_and_patrol(self):
+        w = world()
+        w.sides[0].credits = 1000
+        w.sides[0].gas = 200
+        w.add("barracks", 0, 10, 2)
+        said = []
+        lines = iter(["research weapons", "select workers; group 2; select army", "recall 2", "patrol 12,6",
+                      "wait 45", "status", "quit"])
+        rts.play_text(w, said.append, lambda p: next(lines, None))
+        text = "\n".join(said)
+        self.assertIn("Upgrades: Weapons", text)
+        self.assertIn("4 chosen.", text)
+        self.assertTrue(all(t.order["do"] == "patrol" for t in w.units_of(0, "worker")))
+
+    def test_upgrade_problems_are_said(self):
+        class D:
+            config = {"rts": {"upgrades": {"x": {"at": "pub", "to": ["elves"], "cost": "a", "time": 3},
+                                           "y": {"at": "barracks", "cost": 1, "time": 1, "needs": "z", "hp": 1}}}}
+            skirmishes = {}
+            scenes = {}
+        text = "\n".join(rts.problems(D()))
+        for bit in ("upgrade 'x': at should be", "'elves' is not a kind or role", "upgrade 'x': cost should be",
+                    "upgrade 'x' adds nothing", "upgrade 'y' needs 'z'"):
+            self.assertIn(bit, text)
+
+
 if __name__ == "__main__":
     unittest.main()

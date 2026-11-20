@@ -1762,8 +1762,9 @@ hurts the player for `beats`; the picture inverts), `power: "boots"` (toxic floo
 hurt for `beats` spent on it - they wear down only there, show under the picture, and go
 on to the next level), `power: "goggles"` (the level is drawn in braille dots, in green,
 and secret walls show, for `beats` - F2 or `goggles` takes them off and puts them on again,
-and the battery runs down only while they are on). `size` is the picture's size on the
-floor (0.55 if not said).
+and the battery runs down only while they are on), `power: "magboots"` (kept; F3 or `mag`
+switches them) and `power: "jetpack"` with `beats` of fuel (and `"jet": n`, a can of jet fuel):
+see Getting about, below. `size` is the picture's size on the floor (0.55 if not said).
 
 The weapons are in weapons.json, by the key that picks them (`"weapons"` in game.json's
 `first_person` works too; weapons.json comes over it):
@@ -1842,6 +1843,45 @@ any differs - so a game plays and looks the same, only faster, and never needs i
 off), then `engine/picture/lib/` (a build of your own: `make` in its folder), then your data
 folder (`~/.local/share/clio/picture/`, `%APPDATA%\clio\picture\` on Windows). Where no
 release is listed for your machine, `--get-picture` says how to build it.
+
+### Getting about: stairs, magnetic plating, the jetpack, the water
+
+The levels are flat: a floor above another is another part of the map, and these take the
+player from one to the other.
+
+```json
+"U": {"stairs": "deck", "deck": 0, "label": "UP"},  "D": {"stairs": "deck", "deck": 1, "facing": "w"},
+"M": {"mag": "shaft", "deck": 1},                    "N": {"mag": "shaft", "deck": 2},
+"o": {"pit": true, "floor": "pit"},  "w": {"deep": true, "floor": "water"},  "|": {"bulkhead": true}
+```
+
+- **Stairs** (`"stairs": name`) are a wall with steps in it (tile `stairs`): walked into, they
+  take the player to the other end of the same name, up or down by their `deck`s, and he steps
+  off on its open side (or the side its `"facing"` names). The view climbs past.
+- **Magnetic plating** (`"mag": name`, tile `magwall`) is the same, walked up (or down) in
+  **magboots**: the world tips on its side as the boots clamp, goes by, and tips back. Magboots
+  also grip a slick floor (no sliding) and hold the player on a belt; F3 or `mag on|off`
+  switches them, for a slide that is wanted.
+- **A drop** (`"pit": true`) stops whoever walks: only fliers cross it, and monsters that float.
+- **The jetpack** (F4 or `jet on|off`): up in the air with the gun in hand, over drops, acid,
+  deep water and fire, a beat of fuel a beat. Down again only where there is something to stand
+  on; when the fuel runs out it glides to the nearest edge within 4 cells - or he falls.
+  `first_person` `"jet_eye"` (0.86) is how high the eye goes in rooms, `"jet_altitude"` on land.
+- **Deep water** (`"deep": true`, tile `water`) is swum where the level (or `first_person`) says
+  `"swim": true`; elsewhere it is too deep to wade. F6 or `dive` goes under, `surface` comes up:
+  under water the picture takes the water's colour, the bottom (tile `seabed`) is below and the
+  surface (tile `surface`) above, and the breath runs down - `"breath"` (20) beats, then it hurts
+  (`"drown_damage"`, 8 a beat). **A bulkhead** (`"bulkhead": true`, tile `bulkhead`) is a wall
+  down into the water: only a diver passes under it, to the water on its other side.
+- **A submarine** is a vehicle with `"swim": true` (and `"dive": true`): boarded from the dock
+  (walk into it), it goes where the water goes, dives and surfaces with F6, passes under
+  bulkheads dived, has its own air, and is left by a dock (Enter or `out`, surfaced). Give it a
+  `"gun"` of kind `rocket` for torpedoes, a `"canopy"` for the porthole frame, and `"float": true`
+  so it sits on the water.
+
+The level bot takes `jet`, `land`, `dive`, `surface`, `mag` and `unmag` among its goals, and
+stairs and plating as map characters (it walks into them). RØØTLESS's **SIM-11: Deep Works**
+(`--level sim11`) has all of these.
 
 ### 3D models
 
@@ -2033,6 +2073,7 @@ with Enter.
 | Tab | `map` | the map of what has been seen |
 | 1-7 | `1`-`7`, `shovel` | weapons (a key pressed again: the next weapon on it) |
 | `]` | `next` | the next weapon (round to the first) |
+| F3, F4, F6 | `mag`, `jet`, `dive` / `surface` | magboots, the jetpack, under the water and up |
 | numpad 5 or Delete | `w`, `w 3` | wait a beat (or three) |
 | | `t z1` | keep aiming at z1 |
 | | `ps`, `man orphan`, `history`, `keys`, `whoami`, `help` | |

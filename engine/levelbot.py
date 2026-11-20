@@ -14,6 +14,10 @@ import math
 from .firstperson import DIRS
 from .level import Level, TextConsole
 
+# goals that are commands: the jetpack up and down, under the water and up, the magboots on and off
+COMMANDS = {"jet": "jet on", "land": "jet off", "dive": "dive", "surface": "surface", "mag": "mag on",
+            "unmag": "mag off"}
+
 
 class Bot(TextConsole):
     def __init__(self, lv, goals, verbose=False):
@@ -235,6 +239,8 @@ class Bot(TextConsole):
 
     def open_ground(self, lv, c):
         """Can the player stand on (or fly over) this cell, things that move aside?"""
+        if c.bulkhead and lv.player.diving:
+            return True                                  # under it, under water
         if c.kind in ("wall", "panel", "exit", "switch") or c.crate or (c.kind == "door" and (c.sealed or c.open_while)):
             return False
         if c.kind == "door" and c.key and c.key not in lv.player.keys and c.open < 1:
@@ -242,8 +248,15 @@ class Bot(TextConsole):
         v = lv.player.vehicle
         if v is not None and (c.kind == "door" or c.teleport or c.lift):
             return False                                 # a machine goes through no doors
-        if (c.deep or c.steep) and not (v is not None and v.vehicle.get("fly")):
-            return False                                 # deep water, a cliff: only flying
+        flying = lv.airborne() if hasattr(lv, "airborne") else (v is not None and v.vehicle.get("fly"))
+        if v is not None and v.vehicle.get("swim"):
+            return bool(c.deep)                          # a submarine: water only
+        if c.pit and not flying:
+            return False                                 # a drop: only flying
+        if c.steep and not flying:
+            return False
+        if c.deep and not flying and not (v is None and lv.swims()):
+            return False                                 # deep water: flying, or swimming where one can
         return not (self.mines and (c.x, c.y) in self.mines)
 
     def open_cell(self, lv, n, careful):
@@ -263,6 +276,9 @@ class Bot(TextConsole):
         """Where a slide from ``n`` would go, walls and crates only (the bot plans ahead, monsters move)."""
         out = []
         x, y = n
+        p = lv.player
+        if (getattr(p, "mag_on", False) and p.vehicle is None) or (hasattr(lv, "airborne") and lv.airborne()):
+            return out                                   # the magboots grip, or he is in the air: no slide
         while lv.cell(x, y).slick and len(out) < 40 and self.open_cell(lv, (x + dx, y + dy), True):
             x, y = x + dx, y + dy
             out.append((x, y))
@@ -281,13 +297,15 @@ class Bot(TextConsole):
                 continue
             if g == "out":
                 return lv.player.x, lv.player.y
+            if g in COMMANDS:
+                return None                              # a command: done by decide, next
             for it in lv.items:
                 if it.iid == g and not it.taken:
                     return it.x, it.y
             for row in lv.grid:
                 for c in row:
                     if c.ch == g and (c.kind not in ("exit", "switch") or not c.pressed):
-                        if c.kind in ("exit", "switch"):
+                        if c.kind in ("exit", "switch") or c.stairs or c.mag:
                             self.exit = (c.x, c.y)
                             for dx, dy in DIRS:              # stand in front of it
                                 if lv.cell(c.x + dx, c.y + dy).kind == "floor":
@@ -317,6 +335,10 @@ class Bot(TextConsole):
     def decide(self, lv):
         self.look_for_mines(lv)
         p = lv.player
+        if self.goals and self.goals[0] in COMMANDS:     # a goal that is a command: the jetpack, a dive, the boots
+            self.fields.clear()
+            self.plan = None
+            return COMMANDS[self.goals.pop(0)]
         if self.goals and self.goals[0] == "out":
             self.goals.pop(0)
             if p.vehicle is not None:
@@ -330,6 +352,8 @@ class Bot(TextConsole):
             if p.vehicle.vehicle.get("gun") and any(not m.barrel for m in lv.cone()):
                 return "f"
             goal = self.goal_cell(lv)
+            if goal is None and self.goals and self.goals[0] in COMMANDS:
+                return COMMANDS[self.goals.pop(0)]
             step = self.go(lv, *goal) if goal is not None else None
             if step is None and self.goals:
                 self.goals.pop(0)
@@ -437,10 +461,24 @@ class Bot(TextConsole):
                 return step
         goal = self.goal_cell(lv)
         if goal is None:
+            if self.goals and self.goals[0] in COMMANDS:
+                self.fields.clear()
+                self.plan = None
+                return COMMANDS[self.goals.pop(0)]
             return "w"
         step = self.go(lv, *goal)
         if step is None:
             if self.goals:
+                rides = self.exit and (lv.cell(*self.exit).stairs or lv.cell(*self.exit).mag)
+                if rides and abs(self.exit[0] - p.x) + abs(self.exit[1] - p.y) == 1:
+                    turn = self.face(lv, self.exit[0] - p.x, self.exit[1] - p.y)
+                    if turn:
+                        return turn
+                    self.goals.pop(0)                    # stairs or plating: up (or down) it, and on
+                    self.exit = None
+                    self.fields.clear()
+                    self.plan = None
+                    return "use"
                 if self.exit and lv.cell(*self.exit).kind in ("exit", "switch") and not lv.cell(*self.exit).pressed:
                     if abs(self.exit[0] - p.x) + abs(self.exit[1] - p.y) == 1:
                         return self.face(lv, self.exit[0] - p.x, self.exit[1] - p.y) or "use"

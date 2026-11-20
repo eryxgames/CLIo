@@ -1884,5 +1884,167 @@
    "t",
    "E"
   ]
+ },
+ "sim11": {
+  "name": "Deep Works",
+  "title": "SIM-11: Deep Works",
+  "intro": [
+   "A training program of the simulatron: the pumping station under the facility.",
+   "Magboots for the coolant deck, stairs and a magnetic shaft, a jetpack for the drop,",
+   "and the flooded vault - swim it, dive under its bulkhead, and take the bathyscaphe."
+  ],
+  "par": 220,
+  "music": "swap_partition",
+  "facing": "n",
+  "death_text": "outro_lose",
+  "swim": true,
+  "map": [
+   "############################################",
+   "#..............##.....oooooooooo.........###",
+   "#.s............##..f..oooooooooo....c....###",
+   "#..........k...##.....oooohooooo.........###",
+   "#..............MN.....oooooooooo.Q......+###",
+   "#...%%.........##.....oooooooooo.........###",
+   "#...%%.........##.j...oooooohooo.........###",
+   "#...%%.........##.....oooooooooo......c..###",
+   "#...%%.........##.....oooooooooo.........###",
+   "#...%%.........#####################V#######",
+   "#..............#####Y#######################",
+   "#..k...........##=======#===C===wwwwwwwwwww#",
+   "#............A.##wwwwwww|wwww===Bwwwwwwwwww#",
+   "#..............##wwwwwww|wwww===wwwwwwwwwhw#",
+   "#..............##wwwwwwa|ewwwwwwwwwmwwwwwww#",
+   "########D########wwwwwww|wwwwwwwwwwwwwwwwww#",
+   "########U########wwKwwww|wwwwwwwwwwwwwwmwww#",
+   "#>>>>>>>>>>>>~~##wwwwwww|wwwwwwwwwwwwwwwwww#",
+   "#..............###############|||||||||||||#",
+   "#.;;;;;;;;;;;~~###############wwwwwwwwwwwww#",
+   "#.;;;;;;;;;;;~~###############wwwwwwhwwwwww#",
+   "#.;;;;;;;;;;;~~###############wwwmwwwwww===#",
+   "#.............u###############wwwwwwwwww===#",
+   "#.@..g.....b.u.###############wwwwwwwmwd===E",
+   "#...........+..###############wwwwwwwwww===#",
+   "############################################"
+  ],
+  "legend": {
+   ">": {
+    "conveyor": "e"
+   },
+   "g": "magboots",
+   "j": "jetpack",
+   "f": "jet_can",
+   "+": "medkit",
+   "s": "shells",
+   "A": "armor",
+   "b": {
+    "monster": "barrel"
+   },
+   "u": {
+    "monster": "bugrat"
+   },
+   "k": {
+    "monster": "kworker"
+   },
+   "h": {
+    "monster": "hornet"
+   },
+   "c": {
+    "monster": "scout"
+   },
+   "m": {
+    "monster": "seamine",
+    "floor": "water",
+    "deep": true
+   },
+   "B": {
+    "monster": "minisub",
+    "floor": "water",
+    "deep": true
+   },
+   "U": {
+    "stairs": "deck",
+    "deck": 0,
+    "label": "UP"
+   },
+   "D": {
+    "stairs": "deck",
+    "deck": 1
+   },
+   "M": {
+    "mag": "shaft",
+    "deck": 1,
+    "label": "MAG"
+   },
+   "N": {
+    "mag": "shaft",
+    "deck": 2
+   },
+   "V": {
+    "stairs": "vault",
+    "deck": 2,
+    "label": "DOWN"
+   },
+   "Y": {
+    "stairs": "vault",
+    "deck": 0
+   },
+   "o": {
+    "pit": true,
+    "floor": "pit"
+   },
+   "w": {
+    "deep": true,
+    "floor": "water"
+   },
+   "a": {
+    "deep": true,
+    "floor": "water"
+   },
+   "e": {
+    "deep": true,
+    "floor": "water"
+   },
+   "d": {
+    "deep": true,
+    "floor": "water"
+   },
+   "K": {
+    "item": "armor",
+    "secret": true,
+    "deep": true,
+    "floor": "water"
+   },
+   "|": {
+    "bulkhead": true
+   },
+   "=": {
+    "floor": "dock"
+   },
+   "C": {
+    "floor": "dock"
+   },
+   "Q": {}
+  },
+  "bot": [
+   "magboots",
+   "U",
+   "M",
+   "jetpack",
+   "jet",
+   "Q",
+   "land",
+   "V",
+   "a",
+   "dive",
+   "e",
+   "surface",
+   "C",
+   "board",
+   "dive",
+   "d",
+   "surface",
+   "out",
+   "E"
+  ]
  }
 }

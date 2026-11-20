@@ -1817,5 +1817,93 @@
    "g": "#6a7060",
    "R": "#ff3020"
   }
+ },
+ "magboots": {
+  "pixels": [
+   "..bbb.....bbb..",
+   "..bBb.....bBb..",
+   "..bbb.....bbb..",
+   "..bBb.....bBb..",
+   ".bbbbb...bbbbb.",
+   ".bLLbb...bLLbb.",
+   "bbbbbbb.bbbbbbb",
+   "kkkkkkk.kkkkkkk"
+  ],
+  "palette": {
+   "b": "#4a5866",
+   "B": "#7a8a98",
+   "L": "#7ec8ff",
+   "k": "#1c2128"
+  }
+ },
+ "jetpack": {
+  "pixels": [
+   "..gg.....gg..",
+   ".gGGg...gGGg.",
+   ".gGGgsssgGGg.",
+   ".gGGgsSsgGGg.",
+   ".gGGgsssgGGg.",
+   ".gGGg...gGGg.",
+   ".gggg...gggg.",
+   "..kk.....kk..",
+   "..oo.....oo..",
+   "...o......o.."
+  ],
+  "palette": {
+   "g": "#5a6048",
+   "G": "#8a9068",
+   "s": "#2c2c2c",
+   "S": "#e0603a",
+   "k": "#1c1c1a",
+   "o": "#ffb340"
+  }
+ },
+ "jet_can": {
+  "pixels": [
+   "..kk..",
+   ".oooo.",
+   ".oOOo.",
+   ".oooo.",
+   ".oOOo.",
+   ".oooo."
+  ],
+  "palette": {
+   "k": "#2c2c2c",
+   "o": "#d86a2a",
+   "O": "#ffd040"
+  }
+ },
+ "seamine": {
+  "pixels": [
+   "...s...",
+   ".s.k.s.",
+   "..kKk..",
+   "skKRKks",
+   "..kKk..",
+   ".s.k.s.",
+   "...s..."
+  ],
+  "palette": {
+   "s": "#9aa0a6",
+   "k": "#2a2e34",
+   "K": "#3c424a",
+   "R": "#e83020"
+  }
+ },
+ "minisub": {
+  "pixels": [
+   "....yy....",
+   "...yYYy...",
+   ".yyyyyyyy.",
+   "yYYyLLyYYy",
+   "yyyyyyyyyy",
+   ".kkkkkkkk."
+  ],
+  "palette": {
+   "y": "#d8a830",
+   "Y": "#f0c850",
+   "L": "#7ec8ff",
+   "k": "#3a3020"
+  }
  }
 }

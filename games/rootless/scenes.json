@@ -228,5 +228,23 @@
     "win": "outro_demo"
    }
   ]
+ },
+ {
+  "id": "sim_deep_works",
+  "name": "Simulatron: Deep Works",
+  "area": "Free programs",
+  "description": "A training program: magboots, stairs, a jetpack, the water and a submarine.",
+  "level": "sim11",
+  "on_level_exit": [
+   {
+    "story": "sim11_end"
+   },
+   {
+    "pause": true
+   },
+   {
+    "win": "outro_demo"
+   }
+  ]
  }
 ]

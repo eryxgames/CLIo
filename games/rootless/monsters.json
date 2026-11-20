@@ -960,5 +960,66 @@
    "A challenger: face it and press Enter for a card duel.",
    "Shooting it works too, if you have the ammunition."
   ]
+ },
+ "minisub": {
+  "name": "Bathyscaphe",
+  "tag": "B",
+  "model": "minisub",
+  "sprite": "minisub",
+  "hp": 200,
+  "size": 1.0,
+  "float": true,
+  "kind": "barrel",
+  "attack": {
+   "kind": "barrel",
+   "damage": 30
+  },
+  "vehicle": {
+   "swim": true,
+   "dive": true,
+   "canopy": "#3a3020",
+   "gun": {
+    "name": "torpedo",
+    "kind": "rocket",
+    "damage": [
+     30,
+     50
+    ],
+    "blast": 40,
+    "sound": "torpedo",
+    "text": "Fsssh - a torpedo."
+   },
+   "board": "You drop through the hatch of the bathyscaphe and dog it shut. F6: dive (and up), Space: torpedoes. It goes where the water goes.",
+   "leave": "You open the hatch and climb out on to the dock.",
+   "wreck": "The hull cracks and the sea comes in. You are spat out in a cloud of bubbles.",
+   "sounds": {
+    "step": "sub_move",
+    "board": "loader_board"
+   }
+  },
+  "man": [
+   "DS-9 Bathyscaphe: a two-seat survey submarine, yellow, of course.",
+   "",
+   "Walk into it from the dock to climb in; Enter or `out` beside a dock climbs out.",
+   "F6 dives and surfaces - under water it passes under bulkheads. Space fires a torpedo."
+  ]
+ },
+ "seamine": {
+  "name": "sea mine",
+  "tag": "m",
+  "model": "seamine",
+  "sprite": "seamine",
+  "hp": 1,
+  "float": true,
+  "kind": "barrel",
+  "attack": {
+   "kind": "barrel",
+   "damage": 45
+  },
+  "man": [
+   "A contact mine, anchored, bobbing.",
+   "",
+   "Bursts for 45 at everything next to it. A torpedo sets it off from a safe distance."
+  ]
  }
 }

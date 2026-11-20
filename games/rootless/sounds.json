@@ -1194,5 +1194,232 @@
   ],
   "dur": 0.025,
   "vol": 0.2
- }
+ },
+ "swim": [
+  {
+   "wave": "noise",
+   "noise_rate": 1800,
+   "freq": 0,
+   "dur": 0.22,
+   "vol": 0.25,
+   "decay": 0.2,
+   "sustain": 0
+  }
+ ],
+ "dive": [
+  {
+   "wave": "noise",
+   "noise_rate": 900,
+   "freq": 0,
+   "dur": 0.4,
+   "vol": 0.35,
+   "decay": 0.38,
+   "sustain": 0
+  },
+  {
+   "wave": "sine",
+   "freq": [
+    420,
+    160
+   ],
+   "dur": 0.35,
+   "vol": 0.15
+  }
+ ],
+ "surface": [
+  {
+   "wave": "noise",
+   "noise_rate": 2600,
+   "freq": 0,
+   "dur": 0.25,
+   "vol": 0.3,
+   "decay": 0.24,
+   "sustain": 0
+  },
+  {
+   "wave": "sine",
+   "freq": [
+    180,
+    480
+   ],
+   "dur": 0.25,
+   "vol": 0.15
+  }
+ ],
+ "jet_on": [
+  {
+   "wave": "noise",
+   "noise_rate": 3000,
+   "freq": 0,
+   "dur": 0.6,
+   "vol": 0.45,
+   "decay": 0.3,
+   "sustain": 0.4
+  },
+  {
+   "wave": "square",
+   "freq": [
+    90,
+    160
+   ],
+   "dur": 0.5,
+   "vol": 0.15
+  }
+ ],
+ "jet": [
+  {
+   "wave": "noise",
+   "noise_rate": 3200,
+   "freq": 0,
+   "dur": 0.2,
+   "vol": 0.3,
+   "decay": 0.18,
+   "sustain": 0.5
+  }
+ ],
+ "land": [
+  {
+   "wave": "triangle",
+   "freq": [
+    120,
+    50
+   ],
+   "dur": 0.15,
+   "vol": 0.4
+  }
+ ],
+ "mag_on": [
+  {
+   "wave": "square",
+   "freq": [
+    200,
+    600
+   ],
+   "dur": 0.08,
+   "vol": 0.2
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 6000,
+   "freq": 0,
+   "dur": 0.05,
+   "vol": 0.4,
+   "decay": 0.05,
+   "sustain": 0,
+   "delay": 0.08
+  }
+ ],
+ "mag_off": [
+  {
+   "wave": "square",
+   "freq": [
+    600,
+    200
+   ],
+   "dur": 0.1,
+   "vol": 0.18
+  }
+ ],
+ "magwalk": [
+  {
+   "wave": "noise",
+   "noise_rate": 6000,
+   "freq": 0,
+   "dur": 0.05,
+   "vol": 0.4,
+   "decay": 0.05,
+   "sustain": 0
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 6000,
+   "freq": 0,
+   "dur": 0.05,
+   "vol": 0.4,
+   "decay": 0.05,
+   "sustain": 0,
+   "delay": 0.25
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 6000,
+   "freq": 0,
+   "dur": 0.05,
+   "vol": 0.4,
+   "decay": 0.05,
+   "sustain": 0,
+   "delay": 0.5
+  }
+ ],
+ "stairs": [
+  {
+   "wave": "triangle",
+   "freq": [
+    160,
+    110
+   ],
+   "dur": 0.07,
+   "vol": 0.35
+  },
+  {
+   "wave": "triangle",
+   "freq": [
+    170,
+    115
+   ],
+   "dur": 0.07,
+   "vol": 0.35,
+   "delay": 0.2
+  },
+  {
+   "wave": "triangle",
+   "freq": [
+    180,
+    120
+   ],
+   "dur": 0.07,
+   "vol": 0.35,
+   "delay": 0.4
+  }
+ ],
+ "sub_move": [
+  {
+   "wave": "sine",
+   "freq": [
+    70,
+    60
+   ],
+   "dur": 0.3,
+   "vol": 0.3
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 800,
+   "freq": 0,
+   "dur": 0.3,
+   "vol": 0.15,
+   "decay": 0.28,
+   "sustain": 0
+  }
+ ],
+ "torpedo": [
+  {
+   "wave": "noise",
+   "noise_rate": 1200,
+   "freq": 0,
+   "dur": 0.5,
+   "vol": 0.45,
+   "decay": 0.45,
+   "sustain": 0
+  },
+  {
+   "wave": "sine",
+   "freq": [
+    300,
+    90
+   ],
+   "dur": 0.45,
+   "vol": 0.25
+  }
+ ]
 }

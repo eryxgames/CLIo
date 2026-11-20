@@ -461,6 +461,24 @@ game, RØØTLESS, shows them.
   back. `--demo` plays one once, `--attract` over and over; `--check` checks demo.json. The
   caption says how long each picture took, with CLIo Picture or in Python.
 
+- **Getting about in first-person levels**: **stairs** (`"stairs"`, walked into: to the other
+  end of the same name, the view climbing past), **magnetic plating** (`"mag"`, walked up in
+  **magboots** while the world tips on its side; magboots also stop a slide on slick floor and
+  hold the player on a belt; F3), **drops** (`"pit"`: fliers only), the **jetpack** (F4: in the
+  air with the gun in hand over drops, acid, water and fire, a beat of fuel a beat, gliding to
+  an edge when it runs dry), **swimming and diving** (`"swim": true` on a level: deep water is
+  swum, F6 dives - the bottom below, the surface above, the picture in the water's colour,
+  `"breath"` beats of air - and a diver passes under a `"bulkhead"`), and **submarines**
+  (vehicles with `"swim"` and `"dive"`: through the water and under bulkheads, torpedoes as a
+  rocket gun). The level bot knows them all (goals `jet`, `land`, `dive`, `surface`, `mag`,
+  `unmag`; stairs and plating by their map characters); the editor's map painter has them;
+  `--check` wants stairs and plating in pairs. RØØTLESS: **SIM-11: Deep Works**
+  (`--level sim11`): a coolant deck of slick floor and a belt into acid, stairs, a magnetic
+  shaft, a drop crossed by jetpack under hornets, a flooded vault with a bulkhead to dive under,
+  and the DS-9 Bathyscaphe through a hall of sea mines; magboots, a jetpack, jet fuel, the
+  bathyscaphe and sea mines as 3D models, tiles for water, the bottom, the surface, drops,
+  stairs, plating, bulkheads and docks, and 12 sounds. The bot finishes it in 138-156 beats.
+
 ### Changed
 
 - RØØTLESS's first episode is called **Roasted in the Shell**.

@@ -618,6 +618,8 @@ def _drawn(rows, palette):
 
 
 MINE_SEEN = 3                # cells off a mine is seen from (twice that in the goggles)
+UNDERWATER = (14, 58, 66)    # the colour things take under water, and how far they take it
+UNDERWATER_K = 0.5
 
 # a grenade on the floor or in the air, and a rocket seen flying away (a game's sprites "grenade" and "rocket"
 # come before these)
@@ -684,9 +686,17 @@ class View:
     @staticmethod
     def eye_of(lv):
         """How high the player's eye is above the ground: a flying machine's ``"eye"`` (0.74) once it is up -
-        in open land its ``"altitude"`` (the land's, 2.6) - with a little sway. None: standing."""
-        v = getattr(lv.player, "vehicle", None)
+        in open land its ``"altitude"`` (the land's, 2.6) - with a little sway; on the jetpack the level's
+        jet eye; swimming, just over the water (under it, diving). None: standing."""
+        p = lv.player
+        v = getattr(p, "vehicle", None)
         spec = getattr(v, "vehicle", None) or {}
+        if getattr(p, "jet_on", False) and hasattr(lv, "jet_eye"):
+            return lv.jet_eye() + 0.02 * math.sin(lv.beat * 2.3)
+        if (v is None and getattr(p, "diving", False)) or (spec.get("swim") and getattr(v, "dived", False)):
+            return 0.24 + 0.01 * math.sin(lv.beat * 1.3)
+        if (v is None and hasattr(lv, "swimming") and lv.swimming()) or spec.get("swim"):
+            return 0.31 + 0.015 * math.sin(lv.beat * 1.9)
         if v is None or not spec.get("fly") or not getattr(v, "started", False):
             return None
         land = getattr(lv, "land", None)
@@ -720,7 +730,8 @@ class View:
 
     # ---- the room ------------------------------------------------------- #
     def backdrop(self, lv, cx, cy, f, phase):
-        key = (id(lv), round(cx, 3), round(cy, 3), f, phase, lv.marks_version, round(self.FS, 2))
+        key = (id(lv), round(cx, 3), round(cy, 3), f, phase, lv.marks_version, round(self.FS, 2),
+               getattr(getattr(lv, "player", None), "diving", False))
         rows = self.cache.get(key)
         if rows is None:
             if len(self.cache) > 40:
@@ -778,11 +789,16 @@ class View:
                 tex = drawings[name] = self.texture(lv, name, phase)
             return tex
 
+        tiles = getattr(lv, "tiles", None) or {}
+        wet = getattr(getattr(lv, "player", None), "diving", False) and "seabed" in tiles   # under water
+
         def under(ix, iy):                                   # how a cell's floor is drawn
             cell = cell_at(ix, iy)
             if cell is None:
                 return None, None, False, False, False, marks.get((ix, iy))
             tile = getattr(cell, "floor", None) or (None if cell.toxic else floor_tile)
+            if wet and getattr(cell, "deep", False):         # under water: the bottom, not the surface
+                tile = "seabed"
             fixed = bool(getattr(cell, "plate", None) or getattr(cell, "sunk", False) or getattr(cell, "teleport", None)
                          or getattr(cell, "lift", None) or getattr(cell, "conveyor", None) is not None
                          or getattr(cell, "oil", False) or getattr(cell, "slick", False)
@@ -861,7 +877,8 @@ class View:
                             if sky is not None and getattr(cell, "sky", False):
                                 tex = above[(ix, iy)] = "sky"
                             else:
-                                tile = (getattr(cell, "ceiling", None) if cell is not None else None) or ceiling_tile
+                                tile = ("surface" if wet and getattr(cell, "deep", False) and "surface" in tiles else
+                                        (getattr(cell, "ceiling", None) if cell is not None else None)) or ceiling_tile
                                 tex = above[(ix, iy)] = drawing(tile) if tile else None
                     if tex == "sky":
                         row[x] = sky[y][x]
@@ -914,6 +931,8 @@ class View:
         rx, ry = DIRS[(f + 1) % 4]
         PW, PH = self.PW, self.PH
         cell_at = lv.cell
+        tiles = getattr(lv, "tiles", None) or {}
+        wet = getattr(getattr(lv, "player", None), "diving", False) and "seabed" in tiles
         held = []
 
         def info(what, ix, iy):
@@ -946,7 +965,8 @@ class View:
             cell = cell_at(ix, iy)
             if sky is not None and getattr(cell, "sky", False):
                 return None, 10, 0, 0, 0, 0, ix, iy
-            tile = (getattr(cell, "ceiling", None) if cell is not None else None) or ceiling_tile
+            tile = ("surface" if wet and getattr(cell, "deep", False) and "surface" in tiles else
+                    (getattr(cell, "ceiling", None) if cell is not None else None)) or ceiling_tile
             return drawing(tile) if tile else None, 0, 0, 0, 0, 0, ix, iy
 
         rows = self._rows()
@@ -1505,6 +1525,8 @@ class View:
             px = self.recolour(px, 2, 0.0, None, lambda c: mix(c, (255 - int(lum(c)),) * 3, 0.85))
         if getattr(lv.player, "nightvision", False):
             px = self.recolour(px, 3, 0.0, None, _goggled)
+        if getattr(lv.player, "diving", False):            # under water: all of it through the water's green
+            px = self.recolour(px, 4, UNDERWATER_K, UNDERWATER, lambda c: mix(c, UNDERWATER, UNDERWATER_K))
         if fx.hurt:
             fr = getattr(px, "frame", None)
             if fr is not None:
@@ -2044,6 +2066,43 @@ class View:
                     out.append((chr(0x2800 + bits), fg, None))
             cells.append(out)
         return cells
+
+
+def tilt(cells, degrees, dark=(10, 10, 14)):
+    """A pixel-style picture (rows of cells; char None = two pixels) turned ``degrees`` about its middle, as
+    the world tips when magboots walk up a wall. Each cell is two pixels high, so the pixels are about
+    square and the turn keeps its shape."""
+    if not cells:
+        return cells
+    H, W = len(cells), len(cells[0])
+    px = []
+    for row in cells:
+        top, bot = [], []
+        for ch, fg, bg in row:
+            if ch is None:
+                top.append(fg or dark)
+                bot.append(bg or dark)
+            else:
+                c = bg or fg or dark
+                top.append(c)
+                bot.append(c)
+        px += [top, bot]
+    a = math.radians(degrees)
+    ca, sa = math.cos(a), math.sin(a)
+    cx, cy = (W - 1) / 2.0, (2 * H - 1) / 2.0
+    out = []
+    for y in range(H):
+        row = []
+        for yy in (2 * y, 2 * y + 1):
+            line = []
+            dy = yy - cy
+            for x in range(W):
+                dx = x - cx
+                sx, sy = int(round(cx + dx * ca + dy * sa)), int(round(cy - dx * sa + dy * ca))
+                line.append(px[sy][sx] if 0 <= sx < W and 0 <= sy < 2 * H else dark)
+            row.append(line)
+        out.append([(None, t, b) for t, b in zip(row[0], row[1])])
+    return out
 
 
 def slide(old, new, k, direction):

@@ -62,6 +62,7 @@ KEYMAP = {
     "space": "f", "insert": "f", "enter": "use", "tab": "map", "center": "w", "delete": "w",
     "1": "1", "2": "2", "3": "3", "4": "4", "5": "5", "6": "6", "7": "7",
     "?": "help", "f1": "help", "f2": "goggles", "f5": "save", "f9": "load", "]": "next",
+    "f3": "mag", "f4": "jet", "f6": "dive",
 }
 
 WEAPONS = {
@@ -83,10 +84,12 @@ HELP = [
     ("Ctrl+← →  or  , .  strafe     space  fire", "text"),
     ("Enter  open, press   Tab  map   1-7 ]  weapons", "text"),
     ("F2  TTY goggles on/off (the battery lasts while off)", "text"),
+    ("F3 magboots  F4 jetpack  F6 dive / surface", "text"),
     ("F5  save   F9  load the last save", "text"),
     ("", "text"),
     ("Typed: k j h l, turn left/right/around, use,", "dim"),
     ("f [x], kill [-9] x, t x, w [n], next, map, ps, man x,", "dim"),
+    ("mag [on|off], jet [on|off], dive, surface,", "dim"),
     ("goggles [on|off], out (of a vehicle), history,", "dim"),
     ("alias n='...', keys, whoami, sound, q", "dim"),
     ("save [name], load [name], saves, realtime [off|s]", "dim"),
@@ -131,11 +134,15 @@ class Cell:
                  "savepoint",
                  "crate", "plate", "down", "open_while", "teleport", "arrive_only", "pad_facing", "lift", "deck", "sunk",
                  "oil", "slick", "conveyor", "scorched", "exit_kind", "heavy", "switch", "sky", "deep", "steep",
-                 "duel")
+                 "duel", "stairs", "mag", "pit", "bulkhead")
 
     def __init__(self, x, y, ch, spec):
         self.x, self.y, self.ch = x, y, ch
-        self.tex = spec.get("wall") or spec.get("texture") or "steel"
+        self.stairs = spec.get("stairs")                # stairs: walked into, they lead to the other of their name
+        self.mag = spec.get("mag")                      # magnetic plating: magboots walk up it to the other of its name
+        self.bulkhead = bool(spec.get("bulkhead"))      # a wall down into the water: a diver passes under it
+        self.tex = spec.get("wall") or spec.get("texture") or (
+            "stairs" if self.stairs else "magwall" if self.mag else "bulkhead" if self.bulkhead else "steel")
         self.floor = spec.get("floor")                  # tiles under and over this cell, else the level's
         self.ceiling = spec.get("ceiling")
         self.crate = bool(spec.get("crate"))            # a crate stands here: it can be pushed
@@ -170,6 +177,7 @@ class Cell:
         self.sky = bool(spec.get("sky"))                # open to the sky: no ceiling over it
         self.deep = bool(spec.get("deep"))              # water too deep to wade: floaters and fliers only
         self.steep = bool(spec.get("steep"))            # too steep to climb (open land): floaters and fliers only
+        self.pit = bool(spec.get("pit"))                # a drop: fliers and floaters only
         self.found = False
         self.open = 0.0
         self.exit_kind = "secret" if spec.get("exit") == "secret" else "exit"
@@ -182,7 +190,8 @@ class Cell:
             self.kind = "panel"
         elif self.switch:
             self.kind = "switch"
-        elif spec.get("wall") or ((spec.get("opens_on") or spec.get("open_while")) and not spec.get("door")):
+        elif spec.get("wall") or self.stairs or self.mag or self.bulkhead \
+                or ((spec.get("opens_on") or spec.get("open_while")) and not spec.get("door")):
             self.kind = "wall"
         else:
             self.kind = "floor"
@@ -193,6 +202,8 @@ class Cell:
         elif self.kind == "exit":
             self.label, self.label_role = "EXIT", "good"
         elif self.kind == "switch" and spec.get("label"):
+            self.label, self.label_role = str(spec["label"])[:8], "info"
+        elif (self.stairs or self.mag) and spec.get("label"):
             self.label, self.label_role = str(spec["label"])[:8], "info"
 
     @property
@@ -234,11 +245,12 @@ JOURNAL_KEEP = 20000         # lines of play a save keeps (a snapshot carries th
 class Monster:
     # what a monster's mind holds (engine/ai): an older save's monsters get these
     DEFAULTS = {"tactic": None, "role": None, "squad": None, "seen_at": None, "post": None, "side": 0, "goal": None,
-                "said": None, "spot": None, "grenades_left": 0, "mines_left": 0, "lobbed": None}
+                "said": None, "spot": None, "grenades_left": 0, "mines_left": 0, "lobbed": None, "dived": False}
 
     def __init__(self, mid, kind, spec, x, y, tag):
         self.id, self.kind, self.spec = mid, kind, spec
         self.x, self.y, self.tag = x, y, tag
+        self.dived = False                               # a submarine under the water
         self.hp = self.max_hp = int(spec.get("hp", 20))
         self.spin = 0                                   # beats spent spinning up (a gun that must spin first)
         self.spun = False
@@ -355,6 +367,14 @@ class Player:
         self.goggles_on = False                      # worn: the battery runs down only while they are on
         self.had_goggles = False
         self.fuel = 0                                # beats of fuel carried in cans, for a machine that needs it
+        self.magboots = bool(start.get("magboots"))  # worn: they grip steel (no sliding, belts do not carry him)
+        self.mag_on = self.magboots
+        self.jet = int(start.get("jet", 0))          # beats of fuel in the jetpack
+        self.jet_on = False                          # in the air on it
+        self.diving = False                          # under the water (swimming, or in a submarine that dived)
+        self.air = int(cfg.get("breath", 20))        # beats of breath left under water
+
+    DEFAULTS = {"magboots": False, "mag_on": False, "jet": 0, "jet_on": False, "diving": False, "air": 20}
 
     @property
     def nightvision(self):
@@ -365,11 +385,12 @@ class Player:
         """What goes on to the next level (keys and root do not; boots do)."""
         return {"health": self.hp, "max_health": self.max_hp, "armor": self.armor, "weapons": self.weapons,
                 "weapon": self.weapon, "ammo": dict(self.ammo), "max_ammo": dict(self.max_ammo),
-                "boots": self.boots}
+                "boots": self.boots, "magboots": self.magboots, "jet": self.jet}
 
 
 for _kind in (Monster, Item, Player, Grenade, Shot):
     snapshot.register(_kind)                             # a save holds these, each once
+snapshot.LEVEL_DEFAULTS.setdefault("rides", list)
 
 
 def bresenham(x0, y0, x1, y1):
@@ -483,7 +504,7 @@ class Level:
         self.land = None
         self.w = self.h = SIZE
         self.map_w = self.map_h = 0
-        self.plate_cells, self.held_cells, self.pads, self.lifts, self.belts = [], [], [], [], []
+        self.plate_cells, self.held_cells, self.pads, self.lifts, self.belts, self.rides = [], [], [], [], [], []
         self.fires = {}
         self.total_kills = self.total_items = self.total_secrets = 0
         self.world = Chunks(self, wspec)
@@ -589,6 +610,7 @@ class Level:
         self.held_cells = [c for c in cells if c.open_while]
         self.pads = [c for c in cells if c.teleport]
         self.lifts = [c for c in cells if c.lift]
+        self.rides = [c for c in cells if c.stairs or c.mag]
         self.belts = [c for c in cells if c.conveyor is not None]
         self.fires = {}                                  # (x, y) -> beats it burns on
         self.total_kills = sum(1 for m in self.monsters if not m.barrel and not m.spec.get("boss"))
@@ -799,7 +821,7 @@ class Level:
         c = self.cell(x, y)
         if c.solid:
             return False
-        if c.deep or c.steep:
+        if c.deep or c.steep or c.pit:
             return floats or bool(getattr(who, "float", 0))
         return True
 
@@ -1235,6 +1257,14 @@ class Level:
         m = re.fullmatch(r"(?:goggles|nv)(?:\s+(on|off))?", t)
         if m:
             return self.goggles(m.group(1))
+        m = re.fullmatch(r"(?:mag|magboots)(?:\s+(on|off))?", t)
+        if m:
+            return self.magswitch(m.group(1))
+        m = re.fullmatch(r"(?:jet|jetpack)(?:\s+(on|off))?", t)
+        if m:
+            return self.jetpack(m.group(1))
+        if t in ("dive", "surface"):
+            return self.dive(None if t == "dive" and self.player.diving else ("down" if t == "dive" else "up"))
         if t == "whoami":
             self.say("rootless   (uid 1000; root was revoked)" if not self.player.sudo else "root   (for now)", "dim")
             if self.player.boots:
@@ -1374,6 +1404,7 @@ class Level:
         self.anim([FX(cam=(ox + (m.x - ox) * ease(i / 5.0), oy + (m.y - oy) * ease(i / 5.0)), recoil=6 - i)
                    for i in range(1, 6)], 0.04)
         self.say(spec.get("board") or "You climb into the %s." % m.name, "good")
+        p.diving = bool(getattr(m, "dived", False))
         if "fuel" in spec:
             if p.fuel:
                 self.refuel(m)
@@ -1464,6 +1495,9 @@ class Level:
         v = p.vehicle
         if v is None:
             self.say("You are on your own two feet already.", "dim")
+            return False
+        if getattr(v, "dived", False):
+            self.say("Not under water: surface first (F6).", "dim")
             return False
         fx, fy = DIRS[p.facing]
         rx, ry = DIRS[(p.facing + 1) % 4]
@@ -1628,7 +1662,36 @@ class Level:
         if cell.crate and v is not None and v.vehicle.get("fly"):
             self.say("The %s bumps the %s and hovers back." % (v.name, "container" if cell.heavy else "crate"), "dim")
             return False
-        if (cell.deep or cell.steep) and not cell.solid and not (v is not None and v.vehicle.get("fly")):
+        if v is not None and v.vehicle.get("swim"):        # a submarine: in the water, and under its bulkheads
+            if cell.bulkhead and p.diving:
+                return self.under(nx, ny)
+            if not cell.deep or cell.solid:
+                if cell.bulkhead:
+                    self.say("A bulkhead down into the water: dive (F6) to pass under it.", "dim")
+                elif not cell.solid:
+                    self.say("The %s stays in the water. (Enter or `out` beside a dock: climb out)" % v.name, "dim")
+                else:
+                    self.say("The hull grinds on the wall.", "dim")
+                self.sfx("locked")
+                return False
+        flying = self.airborne()
+        if v is None:
+            boat = self.monster_at(nx, ny)
+            if boat is not None and boat.vehicle and (cell.deep or cell.pit) and not flying and not p.diving:
+                return self.board(boat)                      # a boat at the quay: step aboard
+            if p.diving:                                     # under water: on through the water, or under a bulkhead
+                if cell.bulkhead:
+                    return self.under(nx, ny)
+                if not cell.deep:
+                    self.say("You are under water: surface first (F6, or surface).", "dim")
+                    return False
+        if cell.pit and not cell.solid and not flying:
+            self.say("A sheer drop. Without wings you would not climb out.", "dim")
+            self.sfx("locked")
+            return False
+        swim = cell.deep and v is None and self.swims()
+        if (cell.deep or cell.steep) and not cell.solid and not flying and not swim \
+                and not (v is not None and v.vehicle.get("swim")):
             self.say("Too deep to wade." if cell.deep else "Too steep to climb.", "dim")
             self.sfx("locked")
             return False
@@ -1654,8 +1717,13 @@ class Level:
             self.say("%s is in the way." % m.tag, "dim")
             return False
         ox, oy = p.x, p.y
+        was_wet = self.cell(ox, oy).deep
         p.x, p.y = nx, ny
         slid = self.slide_path(nx, ny, nx - ox, ny - oy)
+        if slid and (flying or (p.mag_on and v is None)):  # in the air, or the magboots grip: no slide
+            if not flying:
+                self.say("Your magboots clamp to the slick deck.", "dim")
+            slid = []
         if slid:                                       # slick floor: on, until something stops it
             for (x, y) in slid:
                 p.x, p.y = x, y
@@ -1672,11 +1740,19 @@ class Level:
             self.end_beat()
             return True
         # silent unless the game or its sound set has them; a step into acid is "wade", or else a footstep
-        wet = self.cell(nx, ny).toxic
+        wet = self.cell(nx, ny).toxic and not flying
         if v is not None:
             self.sfx((v.vehicle.get("sounds") or {}).get("step") or "footstep", "footstep")
+        elif flying:
+            self.sfx("jet", "power")
+        elif cell.deep:
+            self.sfx("swim", "footstep")
+            if not was_wet:
+                self.say("You swim. (F6: dive)", "info")
         else:
             self.sfx("wade", "footstep") if wet else self.sfx("footstep")
+            if was_wet:
+                self.say("You climb out of the water.", "dim")
         drops = (Bits(self.vrng).burst(nx + (nx - ox) * 0.45, ny + (ny - oy) * 0.45, 0.0,
                                       [(90, 230, 70), (150, 255, 110), (40, 150, 40)], n=10, speed=0.6, up=1.4,
                                       size=0.8).frames(4, 0.05) if wet else [()] * 4)
@@ -1996,6 +2072,253 @@ class Level:
         self.end_beat()
         return True
 
+    # ---- stairs, magnetic plating, the jetpack, the water ------------------ #
+    def airborne(self):
+        """In the air: on the jetpack, or in a flying machine that has lifted."""
+        p = self.player
+        v = p.vehicle
+        return bool(p.jet_on) or (v is not None and bool(v.vehicle.get("fly")) and bool(getattr(v, "started", False)))
+
+    def swims(self):
+        """Deep water can be swum here: the level's (or the game's first_person) ``"swim"``."""
+        return bool(self.spec.get("swim", self.cfg.get("swim", False)))
+
+    def swimming(self):
+        """On foot in deep water (at the top, or under it)."""
+        p = self.player
+        return p.vehicle is None and not p.jet_on and self.cell(p.x, p.y).deep
+
+    def breath(self):
+        return int(self.cfg.get("breath", 20))
+
+    def landing_of(self, cell):
+        """Where one steps off stairs or plating: the side its ``"facing"`` names, else the first open floor
+        beside it - and the way out from it."""
+        want = FACING.get(str(cell.pad_facing or "")[:1].lower())
+        for dx, dy in ([DIRS[want]] if want is not None else []) + list(DIRS):
+            c = self.cell(cell.x + dx, cell.y + dy)
+            if not c.solid and not c.deep and not c.pit and not c.toxic and not c.crate \
+                    and self.monster_at(c.x, c.y) is None:
+                return (c.x, c.y), DIRS.index((dx, dy))
+        return None, None
+
+    def climb(self, cell):
+        """Stairs (walked into) or magnetic plating (walked up, in magboots): to the other end of the same name,
+        stepping off it facing away. The stairs climb past; on the plating the world tips on its side."""
+        p = self.player
+        mag = bool(cell.mag)
+        if mag and not p.mag_on:
+            self.say("Magnetic plating, ribbed for boots that grip it." +
+                     (" (F3: magboots on)" if p.magboots else ""), "dim")
+            return False
+        if self.swimming():
+            self.say("Not from the water.", "dim")
+            return False
+        name = cell.mag if mag else cell.stairs
+        dest = next((c for c in self.rides if (c.mag if mag else c.stairs) == name and c is not cell), None)
+        if dest is None:
+            self.say("It leads nowhere." if mag else "The stairs lead nowhere.", "dim")
+            return False
+        (lx, ly), face = self.landing_of(dest)
+        if face is None:
+            self.say("Something blocks the way at the other end.", "dim")
+            return False
+        up = dest.deck >= cell.deck
+        console = self.console
+        if mag:
+            old = console.snapshot(self, style="pixel") if console else None
+            p.x, p.y, p.facing = lx, ly, face
+            self.update_seen()
+            new = console.snapshot(self, style="pixel") if console else None
+            self.sfx("magwalk", "footstep")
+            if console is not None and old is not None:
+                console.tilt(self, old, new, up)
+            self.say("The magboots clamp; the world tips on its side; you walk %s the plating." % ("up" if up else "down"),
+                     "info")
+        else:
+            d = 1 if up else -1
+            self.anim([FX(eye=0.52 + d * 0.06 * i, shake=(1 if i % 2 else -1)) for i in range(1, 5)], 0.07)
+            old = console.snapshot(self) if console else None
+            p.x, p.y, p.facing = lx, ly, face
+            self.update_seen()
+            new = console.snapshot(self) if console else None
+            self.sfx("stairs", "footstep")
+            if console is not None and old is not None:
+                console.ride(self, old, new, not up)
+            self.anim([FX(eye=0.52 - d * 0.05 * (3 - i), shake=(1 if i % 2 else -1) if i < 3 else 0)
+                       for i in range(1, 4)], 0.07)
+            self.say("You climb the stairs %s." % ("up" if up else "down"), "info")
+        self.arrive()
+        self.end_beat()
+        return True
+
+    def under(self, nx, ny):
+        """Under a bulkhead, under water: out the other side of it, a beat."""
+        p = self.player
+        dx, dy = nx - p.x, ny - p.y
+        bx, by = nx + dx, ny + dy
+        beyond = self.cell(bx, by)
+        if not beyond.deep or beyond.solid or (self.monster_at(bx, by) is not None):
+            self.say("The water under the bulkhead is blocked.", "dim")
+            return False
+        ox, oy = p.x, p.y
+        p.x, p.y = bx, by
+        self.sfx("swim", "footstep")
+        dark = [FX(cam=(ox + 2 * dx * k, oy + 2 * dy * k), fade=f) for k, f in ((0.25, 0.5), (0.5, 0.85), (0.75, 0.5), (1.0, 0.0))]
+        self.anim(dark, 0.05)
+        self.say("You pass under the bulkhead." if p.vehicle is None else "The %s noses under the bulkhead." % p.vehicle.name,
+                 "info")
+        self.update_seen()
+        self.arrive()
+        self.end_beat()
+        return True
+
+    def magswitch(self, how=None):
+        """Magboots on (they grip: no sliding, belts do not carry him, the plating can be walked) or off."""
+        p = self.player
+        if not p.magboots:
+            self.say("You have no magboots.", "dim")
+            return False
+        want = (not p.mag_on) if how is None else how == "on"
+        if want == p.mag_on:
+            self.say("Your magboots are %s already." % ("on" if want else "off"), "dim")
+            return True
+        p.mag_on = want
+        self.sfx("mag_on" if want else "mag_off", "switch")
+        self.say("Magboots on: they grip the deck." if want else "Magboots off: your feet are your own again.", "info")
+        return True
+
+    def jetpack(self, how=None):
+        """Up on the jetpack (a beat of fuel a beat in the air, hands free) or down again."""
+        p = self.player
+        want = (not p.jet_on) if how is None else how == "on"
+        if want == p.jet_on:
+            self.say("You are in the air already." if want else "You are on the ground already.", "dim")
+            return True
+        if not want:
+            return self.jet_land()
+        if p.vehicle is not None:
+            self.say("Not in the %s." % p.vehicle.name, "dim")
+            return False
+        if p.jet <= 0:
+            self.say("The jetpack is dry." if self.jet_known else "You have no jetpack.", "dim")
+            return False
+        if p.diving:
+            self.say("Not under water.", "dim")
+            return False
+        p.jet_on = True
+        self.sfx("jet_on", "power")
+        up = self.jet_eye()
+        self.anim([FX(eye=0.52 + (up - 0.52) * k, shake=sh) for k, sh in ((0.15, 1), (0.4, -1), (0.7, 1), (0.9, 0), (1.0, 0))],
+                  0.06)
+        self.say("The jetpack roars and you are up. (%d beats of fuel; F4: land)" % p.jet, "good")
+        self.end_beat()
+        return True
+
+    @property
+    def jet_known(self):
+        return any(it.taken and it.pickup.get("power") == "jetpack" for it in self.items)
+
+    def jet_eye(self):
+        if self.land is not None:
+            return float(self.cfg.get("jet_altitude", self.land.altitude * 0.6))
+        return float(self.cfg.get("jet_eye", 0.86))
+
+    def jet_land(self, dry=False):
+        """Down from the jetpack: here if it can be stood on (or swum, where swimming is), else - out of fuel -
+        gliding to the nearest place that can; a drop with nowhere near is a fall."""
+        p = self.player
+        here = self.cell(p.x, p.y)
+        ok = lambda c: not c.solid and not c.pit and not c.steep and not c.crate and (not c.deep or self.swims())  # noqa: E731
+        spot = (p.x, p.y) if ok(here) and self.monster_at(p.x, p.y) is None else None
+        if spot is None and not dry:
+            self.say("Not here: there is nothing to land on.", "dim")
+            return False
+        if spot is None:                                 # dry over a drop: glide to the nearest edge
+            seen, ring = {(p.x, p.y)}, [(p.x, p.y)]
+            for _ in range(4):
+                nxt = []
+                for x, y in ring:
+                    for dx, dy in DIRS:
+                        n = (x + dx, y + dy)
+                        if n not in seen and not self.cell(*n).solid:
+                            seen.add(n)
+                            nxt.append(n)
+                spot = next((n for n in nxt if ok(self.cell(*n)) and self.monster_at(*n) is None), None)
+                if spot or not nxt:
+                    break
+                ring = nxt
+        p.jet_on = False
+        if spot is None:
+            self.say("The jetpack coughs and dies. You fall.", "hurt")
+            self.anim([FX(eye=0.52 - 0.12 * i, fade=0.2 * i) for i in range(1, 5)], 0.06)
+            p.hp = 0
+            self.over = "dead"
+            return True
+        ox, oy = p.x, p.y
+        p.x, p.y = spot
+        eye = self.jet_eye()
+        self.anim([FX(cam=(ox + (spot[0] - ox) * k, oy + (spot[1] - oy) * k), eye=eye - (eye - 0.52) * k)
+                   for k in (0.25, 0.5, 0.75, 1.0)], 0.06)
+        self.sfx("land", "footstep")
+        self.say("The jetpack sputters out: you glide down." if dry else "You touch down.", "alert" if dry else "dim")
+        self.update_seen()
+        self.arrive()
+        if not dry:
+            self.end_beat()
+        return True
+
+    def dive(self, how=None):
+        """Under the water and up again: swimming (breath runs down under it), or in a submarine."""
+        p = self.player
+        v = p.vehicle
+        want = (not p.diving) if how is None else how == "down"
+        if v is not None:
+            if not v.vehicle.get("dive"):
+                self.say("The %s cannot dive." % v.name, "dim")
+                return False
+        elif not self.swimming():
+            self.say("You are not in deep water." if want else "You are not under water.", "dim")
+            return False
+        if want == p.diving:
+            self.say("Under water already." if want else "At the top already.", "dim")
+            return True
+        p.diving = want
+        if v is not None:
+            v.dived = want
+        if not want and v is None:
+            p.air = self.breath()
+        bubbles = Bits(self.vrng).burst(p.x + DIRS[p.facing][0] * 0.6, p.y + DIRS[p.facing][1] * 0.6, 0.1,
+                                        [(200, 230, 255), (150, 200, 230)], n=12, speed=0.2, up=1.6, size=0.5).frames(4, 0.05)
+        self.anim([FX(parts=bubbles[i]) for i in range(4)], 0.05)
+        self.sfx("dive" if want else "surface", "footstep")
+        if v is not None:
+            self.say("The %s %s." % (v.name, "dives" if want else "surfaces"), "info")
+        else:
+            self.say("You dive. (%d beats of breath; F6: up)" % p.air if want else "You come up for air.", "info")
+        self.end_beat()
+        return True
+
+    def air_beat(self):
+        """A beat of the jetpack's fuel, and of breath under water."""
+        p = self.player
+        if p.jet_on:
+            p.jet -= 1
+            if p.jet == 5:
+                self.say("The jetpack's gauge: 5 beats of fuel.", "alert")
+            if p.jet <= 0:
+                p.jet = 0
+                self.jet_land(dry=True)
+        if p.diving and p.vehicle is None:
+            p.air -= 1
+            if p.air == 5:
+                self.say("Your lungs burn: 5 beats of air. (F6: up)", "alert")
+            if p.air <= 0:
+                p.air = 0
+                self.hurt(int(self.cfg.get("drown_damage", 8)), "You are drowning.")
+        elif p.air < self.breath() and not p.diving:
+            p.air = self.breath()
+
     def take(self, it):
         p, pk = self.player, it.pickup
         name = it.spec.get("name", it.iid)
@@ -2040,6 +2363,12 @@ class Level:
             p.goggles_on = p.had_goggles = True
         if pk.get("fuel"):
             p.fuel += int(pk["fuel"])
+        if pk.get("power") == "magboots":
+            p.magboots = p.mag_on = True
+        if pk.get("power") == "jetpack":
+            p.jet += int(pk.get("beats", 30))
+        elif pk.get("jet"):
+            p.jet += int(pk["jet"])
         it.taken = True
         self.stats["items"] += 1
         self.say(pk.get("text") or "You pick up the %s." % name, "root" if pk.get("power") else "good")
@@ -2065,6 +2394,12 @@ class Level:
         here = self.cell(p.x, p.y)
         if here.lift and not (cell.kind in ("door", "exit") and not cell.pressed and cell.open < 1.0):
             return self.ride(here)
+        if cell.stairs or cell.mag:
+            return self.climb(cell)
+        if cell.bulkhead:
+            self.say("A bulkhead, down into the water. Dive (F6) to pass under it." if self.swimming()
+                     else "A bulkhead, down into the water.", "dim")
+            return False
         if cell.kind == "door" and cell.open < 1.0 and cell.open_while:
             self.say("It will not open: something holds it shut. A plate somewhere keeps it.", "dim")
             self.sfx("locked")
@@ -2898,8 +3233,11 @@ class Level:
         if burning and not self.over:
             self.damage(burning, lead="The acid:")
         cell = self.cell(p.x, p.y)
-        if cell.toxic and not self.over:
+        if cell.toxic and not self.over and not p.jet_on:
             self.acid()
+        self.air_beat()
+        if self.over:
+            return
         if p.nightvision:
             p.goggles -= 1
             if not p.goggles:
@@ -2950,7 +3288,7 @@ class Level:
             return
         p = self.player
         dmg = int(self.cfg.get("fire_damage", 6))
-        if (p.x, p.y) in self.fires:
+        if (p.x, p.y) in self.fires and not p.jet_on:
             self.sfx("fire_burn", "hurt")
             self.hurt(dmg, "You are standing in fire!", by=None)
             if self.over:
@@ -2995,7 +3333,9 @@ class Level:
             tx, ty = c.x + dx, c.y + dy
             m = self.monster_at(c.x, c.y)
             if (p.x, p.y) == (c.x, c.y):
-                if self.room(tx, ty):
+                if p.mag_on and p.vehicle is None and not self.airborne():
+                    self.say("Your magboots hold you to the belt.", "dim")
+                elif not self.airborne() and self.room(tx, ty):
                     cam = ((p.x, p.y), (tx, ty))
                     p.x, p.y = tx, ty
             elif c.crate:
@@ -3721,6 +4061,13 @@ class FrameConsole:
         if lv.player.goggles:
             segs.append(("  goggles: %d" % lv.player.goggles, "secret") if lv.player.goggles_on else
                         ("  goggles off: %d" % lv.player.goggles, "dim"))
+        p = lv.player
+        if p.magboots:
+            segs.append(("  mag" if p.mag_on else "  mag off", "info" if p.mag_on else "dim"))
+        if p.jet or p.jet_on:
+            segs.append(("  jet%s: %d" % (" up" if p.jet_on else "", p.jet), "alert" if p.jet_on and p.jet <= 5 else "ammo"))
+        if p.diving and p.vehicle is None:
+            segs.append(("  air: %d" % p.air, "hurt" if p.air <= 5 else "info"))
         return sc.paint.text(segs, W, g["ell"])
 
     def page_rows(self, lv, lines, W, VR, automap):
@@ -3851,6 +4198,14 @@ class FrameConsole:
         frames = [vslide(old, new, k, down) for k in (0.08, 0.18, 0.3, 0.42, 0.52, 0.62, 0.72, 0.82, 0.92, 1.0)]
         self.screen.play(frames, lambda cells: self.draw(lv, prompt=None, cells=cells), 0.11)
 
+    def tilt(self, lv, old, new, up):
+        """Magboots up (or down) a wall: the world tips on its side, goes by, and tips back at the other end."""
+        from .firstperson import tilt
+        frames = [tilt(old, a) for a in (10, 28, 52, 76, 90)]
+        frames += [vslide(tilt(old, 90), tilt(new, 90), k, not up) for k in (0.2, 0.45, 0.7, 0.9, 1.0)]
+        frames += [tilt(new, a) for a in (72, 46, 22, 6, 0)]
+        self.screen.play(frames, lambda cells: self.draw(lv, prompt=None, cells=cells), 0.06)
+
     def ending(self, lv):
         if lv.over == "dead":
             self.screen.play([FX(hurt=0.6, fade=k) for k in (0.15, 0.3, 0.45, 0.6, 0.72)],
@@ -3890,6 +4245,9 @@ class TextConsole:
         pass
 
     def ride(self, lv, old, new, down):
+        pass
+
+    def tilt(self, lv, old, new, up):
         pass
 
     def ending(self, lv):
@@ -3980,7 +4338,11 @@ class TextConsole:
         elif p.fuel:
             ammo += " | fuel cans %d" % p.fuel
         power = "".join(" | %s %d" % (n, v) for n, v in (("root", p.sudo), ("boots", p.boots),
-                                                          ("goggles" if p.goggles_on else "goggles off", p.goggles)) if v)
+                                                          ("goggles" if p.goggles_on else "goggles off", p.goggles),
+                                                          ("jet up" if p.jet_on else "jet", p.jet),
+                                                          ("air", p.air if p.diving and p.vehicle is None else 0)) if v)
+        if p.magboots:
+            power += " | mag %s" % ("on" if p.mag_on else "off")
         self.write("-- hp %d  armour %d | %s%s | keys %s%s | facing %s | beat %d --" % (
             p.hp, p.armor, w.get("name", "?"), ammo, "".join(sorted(p.keys)) or "-", power, FACE_NAMES[p.facing],
             lv.beat))
@@ -4489,11 +4851,14 @@ def validate(data):
         for ch in used:
             sp = legend.get(ch)
             if isinstance(sp, dict):
-                for key in ("teleport", "lift", "plate", "open_while"):
+                for key in ("teleport", "lift", "plate", "open_while", "stairs", "mag"):
                     if sp.get(key):
                         counts.setdefault((key, sp[key]), 0)
                         counts[(key, sp[key])] += sum(r.count(ch) for r in rows)
         for (key, name), n in sorted(counts.items()):
+            if key in ("stairs", "mag") and n != 2:
+                problems.append("level '%s': the %s '%s' should have two ends, it has %d"
+                                % (lid, "stairs" if key == "stairs" else "magnetic plating", name, n))
             if key == "teleport" and n < 2:
                 problems.append("level '%s': the teleporter '%s' has one pad; it needs another to lead to" % (lid, name))
             if key == "lift" and n != 2:

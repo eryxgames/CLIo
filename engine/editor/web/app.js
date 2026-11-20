@@ -1612,6 +1612,11 @@ function sortOf(spec) {
   if (spec.plate) return "plate";
   if (spec.teleport) return "pad";
   if (spec.lift) return "lift";
+  if (spec.stairs) return "stairs";
+  if (spec.mag) return "mag";
+  if (spec.bulkhead) return "bulkhead";
+  if (spec.pit) return "pit";
+  if (spec.deep) return "water";
   if (spec.door) return "door";
   if (spec.panel) return "panel";
   if (spec.toxic) return "toxic";
@@ -1620,8 +1625,10 @@ function sortOf(spec) {
 }
 const SORTS = [["floor", "Floor"], ["toxic", "Toxic floor"], ["wall", "Wall"], ["door", "Door"], ["panel", "Secret wall"],
   ["monster", "Monster"], ["item", "Item"], ["start", "Start"], ["exit", "Exit switch"], ["switch", "Switch (sets off an event)"],
-  ["crate", "Crate (pushed)"], ["plate", "Pressure plate"], ["pad", "Teleporter pad"], ["lift", "Lift"]];
-const solidSort = (k) => ["wall", "panel", "exit", "switch", "unknown"].includes(k);
+  ["crate", "Crate (pushed)"], ["plate", "Pressure plate"], ["pad", "Teleporter pad"], ["lift", "Lift"],
+  ["stairs", "Stairs (walked into)"], ["mag", "Magnetic plating (magboots walk up it)"], ["water", "Deep water"],
+  ["bulkhead", "Bulkhead (dive under it)"], ["pit", "A drop (fliers only)"]];
+const solidSort = (k) => ["wall", "panel", "exit", "switch", "unknown", "stairs", "mag", "bulkhead"].includes(k);
 const blocksWalk = (k) => solidSort(k) || k === "crate";
 
 function tileOf(spec) {                                        // the tile a wall-like cell is drawn with
@@ -1631,6 +1638,9 @@ function tileOf(spec) {                                        // the tile a wal
   if (k === "exit") return "exit";
   if (k === "switch") return "switch";
   if (k === "wall") return spec.wall || spec.texture || "steel";
+  if (k === "stairs") return spec.wall || "stairs";
+  if (k === "mag") return spec.wall || "magwall";
+  if (k === "bulkhead") return spec.wall || "bulkhead";
   return null;
 }
 
@@ -1649,6 +1659,11 @@ function describe(spec, info) {
     plate: () => `pressure plate "${spec.plate}"`,
     pad: () => `teleporter pad "${spec.teleport}"` + (spec.arrive ? ", arrivals only" : "") + (spec.facing ? `, facing ${spec.facing}` : ""),
     lift: () => `lift "${spec.lift}", deck ${spec.deck || 0}`,
+    stairs: () => `stairs "${spec.stairs}", deck ${spec.deck || 0}: walked into, to the other end`,
+    mag: () => `magnetic plating "${spec.mag}", deck ${spec.deck || 0}: magboots walk it to the other end`,
+    water: () => "deep water: swum (where the level allows), flown over",
+    bulkhead: () => "a bulkhead down into the water: a diver passes under it",
+    pit: () => "a drop: only fliers cross it",
   }[k]();
   const more = [];
   if (spec.on_enter) more.push(`sets off ${spec.on_enter}`);
@@ -1913,6 +1928,11 @@ function levelEditor(kind, thing, id) {
       if (k === "plate") s.plate = "plate";
       if (k === "pad") s.teleport = "pad";
       if (k === "lift") { s.lift = "lift"; s.deck = 0; }
+      if (k === "stairs") { s.stairs = "stairs"; s.deck = 0; }
+      if (k === "mag") { s.mag = "plating"; s.deck = 0; }
+      if (k === "water") { s.deep = true; s.floor = s.floor || "water"; }
+      if (k === "bulkhead") s.bulkhead = true;
+      if (k === "pit") { s.pit = true; s.floor = s.floor || "pit"; }
       write(); edit();
     };
     const rows = [field("Is", el("select", { onchange: (e) => setSort(e.target.value) }, ...SORTS.map(([k, label]) => el("option", { value: k, selected: k === sort }, label))))];
@@ -1955,9 +1975,17 @@ function levelEditor(kind, thing, id) {
         oninput: (e) => { s.lift = e.target.value.trim() || "lift"; write(); } })));
       rows.push(field("Deck (the lower end rides down to it)", el("input", { type: "number", value: String(s.deck || 0), oninput: (e) => { s.deck = Number(e.target.value) || 0; write(); } })));
     }
+    if (sort === "stairs" || sort === "mag") {
+      const key = sort === "stairs" ? "stairs" : "mag";
+      rows.push(field("Its name (the two ends of one name lead to each other)", el("input", { type: "text", class: "code short", value: s[key] || "",
+        oninput: (e) => { s[key] = e.target.value.trim() || key; write(); } })));
+      rows.push(field("Deck (from a lower deck it goes up)", el("input", { type: "number", value: String(s.deck || 0), oninput: (e) => { s.deck = Number(e.target.value) || 0; write(); } })));
+      rows.push(field("Label on it (a few letters)", el("input", { type: "text", class: "code short", maxlength: "8", value: s.label || "",
+        oninput: (e) => { s.label = e.target.value.trim(); write(); } })));
+    }
     if (sort === "exit") rows.push(field("The secret exit (the scene's \"on_secret_exit\" runs)", el("input", { type: "checkbox", checked: s.exit === "secret",
       onchange: (e) => { s.exit = e.target.checked ? "secret" : true; write(); } })));
-    if (!solidSort(sort) && !["door", "plate", "pad", "lift", "toxic"].includes(sort)) {
+    if (!solidSort(sort) && !["door", "plate", "pad", "lift", "toxic", "water", "pit"].includes(sort)) {
       const now = s.conveyor ? "belt " + String(s.conveyor)[0] : s.oil ? "oil" : s.slick ? "slick" : "";
       rows.push(field("Floor surface", el("select", { onchange: (e) => {
         delete s.oil; delete s.slick; delete s.conveyor;

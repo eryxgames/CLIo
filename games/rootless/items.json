@@ -236,5 +236,39 @@
    "sprite": "mine",
    "size": 0.25
   }
+ },
+ "magboots": {
+  "name": "magboots",
+  "description": "Grey boots with blue clamp lights in the soles. They grip steel.",
+  "pickup": {
+   "power": "magboots",
+   "sprite": "magboots",
+   "size": 0.55,
+   "sound": "mag_on",
+   "text": "Magboots! They grip steel: no sliding, belts cannot carry you, and magnetic plating can be walked up. (F3: on and off)"
+  }
+ },
+ "jetpack": {
+  "name": "jetpack",
+  "description": "Twin nozzles, a scorched harness, a fuel gauge.",
+  "pickup": {
+   "power": "jetpack",
+   "beats": 40,
+   "sprite": "jetpack",
+   "size": 0.6,
+   "sound": "jet_on",
+   "text": "A jetpack, 40 beats of fuel: over drops, acid and water, guns in hand. (F4: up, and down again)"
+  }
+ },
+ "jet_can": {
+  "name": "jet fuel",
+  "description": "A can of jetpack fuel.",
+  "pickup": {
+   "jet": 10,
+   "sprite": "jet_can",
+   "size": 0.4,
+   "sound": "refuel",
+   "text": "Jet fuel: 10 more beats in the air."
+  }
  }
 }

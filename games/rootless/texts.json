@@ -8,7 +8,7 @@
   "show_once": false
  },
  "outro_demo": {
-  "text": "SIMULATION PAUSED. End of the demo - Episode 1 goes on in the full game.\n\nFree programs of the simulatron, made new each run: --level sim1 (Long Fens, open land without end), sim2 (Deep Swap, floor after floor) and sim3 (Swap Sprawl, rooms without end); and training programs: sim4 (Kill House: squads), sim5 (Bus Run, side on, in real time) and sim6 (Purge, from above, in real time) sim7 (Xantrium Rush, real-time strategy), sim8 (Fen Hopper, flight) sim9 (Coolant Loop, a reactor's systems) and sim10 (Root Shell, card duels).",
+  "text": "SIMULATION PAUSED. End of the demo - Episode 1 goes on in the full game.\n\nFree programs of the simulatron, made new each run: --level sim1 (Long Fens, open land without end), sim2 (Deep Swap, floor after floor) and sim3 (Swap Sprawl, rooms without end); and training programs: sim4 (Kill House: squads), sim5 (Bus Run, side on, in real time) and sim6 (Purge, from above, in real time) sim7 (Xantrium Rush, real-time strategy), sim8 (Fen Hopper, flight) sim9 (Coolant Loop, a reactor's systems), sim10 (Root Shell, card duels) and sim11 (Deep Works: magboots, stairs, a jetpack, the water and a submarine).",
   "show_once": false
  },
  "outro_lose": {
@@ -71,6 +71,10 @@
  },
  "sim10_end": {
   "text": "UNIT EVALUATION: intrusion. \"You did not need the gun,\" says the instructor bot. \"In the real root, you will not have one.\"",
+  "show_once": false
+ },
+ "sim11_end": {
+  "text": "UNIT EVALUATION: mobility. \"Boots, stairs, a jetpack, a submarine,\" says the instructor bot. \"The real station has all of them. It also has what flooded it.\"",
   "show_once": false
  }
 }

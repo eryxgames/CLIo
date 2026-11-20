@@ -1219,7 +1219,7 @@ so it can be tested and played anywhere.
 ```json
 "e1m1": {
   "name": "Boot Sector", "title": "E1M1   BOOT SECTOR",
-  "intro": ["Episode 1: Knee-Deep in the Shell."],
+  "intro": ["Episode 1: Roasted in the Shell."],
   "par": 140, "music": "boot_sector", "facing": "n",
   "map": ["#####E#####",
           "#...C.....#",
@@ -1946,7 +1946,7 @@ alone lists the levels). `--level ID` starts a new game straight in that level.
 enough for a level:
 
 ```json
-"end_screen": {"heading": "EPISODE 1: KNEE-DEEP IN THE SHELL",
+"end_screen": {"heading": "EPISODE 1: ROASTED IN THE SHELL",
                "picture": ["helmet_recruit", "helmet_hazmat"], "picture_every": 4,
                "next": "Next: User Space", "credits": ["RØØTLESS - a game by ..."],
                "tick": "*/3 * * * *  cron  rain --on rootless"}

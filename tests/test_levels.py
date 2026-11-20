@@ -1100,7 +1100,7 @@ class EndScreenTests(unittest.TestCase):
         spec = Game.cfg["end_screen"]
         rows = ending.rows_of(Game, spec, "The end text.", t, 1.0, 0.0, 80, 30, Painter(3))
         text = "\n".join(strip_ansi(r) for r in rows)
-        for words in ("RØØTLESS", "KNEE-DEEP", "5 / 6", "par 90", "The end text.", "Next: User Space"):
+        for words in ("RØØTLESS", "ROASTED IN THE SHELL", "5 / 6", "par 90", "The end text.", "Next: User Space"):
             self.assertIn(words, text)
         self.assertNotIn("items", text)                        # nothing to count: no line
         self.assertTrue(all(visible_len(r) <= 80 for r in rows))

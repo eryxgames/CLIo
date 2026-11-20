@@ -1,7 +1,7 @@
 {
  "id": "rootless",
  "title": "RØØTLESS",
- "subtitle": "Episode 1: Knee-Deep in the Shell",
+ "subtitle": "Episode 1: Roasted in the Shell",
  "description": "First-person action in the terminal. A recruit of the Terran Ascendancy Mandate plugs in for his first battle simulation: root was revoked, the daemons came. A demo.",
  "author": "Daniel Sandner",
  "version": "0.1",
@@ -62,7 +62,7 @@
  "website": "eryxian.com",
  "license": "All rights reserved - see LICENSE.md in this game's folder",
  "end_screen": {
-  "heading": "EPISODE 1: KNEE-DEEP IN THE SHELL",
+  "heading": "EPISODE 1: ROASTED IN THE SHELL",
   "picture": [
    "helmet_recruit",
    "helmet_hazmat"

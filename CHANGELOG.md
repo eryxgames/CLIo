@@ -444,6 +444,7 @@ game, RØØTLESS, shows them.
 
 ### Changed
 
+- RØØTLESS's first episode is called **Roasted in the Shell**.
 - The banner font has `Ø`, `ø`, `Æ`, `æ`; in plain ASCII they become `0`, `o`, `AE`, `ae`.
 - **The far end of a room**: walls are drawn 10 cells ahead (monsters and items are still
   seen, aimed at and shot at within 7), and wide rooms are drawn to the edges of the

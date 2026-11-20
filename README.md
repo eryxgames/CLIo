@@ -68,6 +68,9 @@ python clio.py rootless   # first-person shooter in a terminal
 - [x] Monsters with brains that take cover, flank, hold and fall back, throw grenades and lay
       mines, in squads that share what they see - packs that swarm, sweeps, ambushes, assaults;
       open land and dungeons without end; saves that hold a level's state
+- [x] Arcade stages in real time: platformers (jumps, platforms, ladders, doors and keys,
+      checkpoints) and top-down chases, enemies that walk, hop, fly, hunt and shoot, drawn in
+      half-block pixels; a bot that proves each stage can be cleared
 - [x] Save / load of the *whole* world, named slots
 - [x] Three demo games, a starter template, over two hundred automated tests
 - [x] Game editor in the browser: `python clio.py mygame --edit`, or
@@ -103,7 +106,8 @@ python clio.py [game] [options]
   --lines         in a level, every command is typed and ended with Enter (no single keys)
   --realtime [S]  levels in real time: a beat passes every S seconds (0.8) when no key acts
   --keys          show how your terminal reports keys to games in real time (held, let go)
-  --level ID      start a new game in first-person level ID (rootless: e1m1, e1m2, e1m3, e1m4, e1m9, sim1, sim2, sim3, sim4)
+  --level ID      start a new game in first-person level (or arcade stage) ID
+                  (rootless: e1m1, e1m2, e1m3, e1m4, e1m9, sim1, sim2, sim3, sim4; stages sim5, sim6)
   --dev           for making games: *ID in a level jumps to level ID, saves are not counted
   --scroll        play levels in scrolling text instead of a redrawn picture
   --check         validate a game's data files and exit
@@ -229,7 +233,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 492 tests, about a minute
+python -m unittest discover -s tests     # 518 tests, about a minute
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 python tests/bot.py 30 cards             # the same with card battles (the Deck mode)

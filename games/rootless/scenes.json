@@ -175,5 +175,19 @@
     "win": "outro_demo"
    }
   ]
+ },
+ {
+  "id": "sim_bus_run",
+  "name": "Simulatron: Bus Run",
+  "area": "Free programs",
+  "description": "A training program, played in real time.",
+  "stage": "sim5"
+ },
+ {
+  "id": "sim_purge",
+  "name": "Simulatron: Purge",
+  "area": "Free programs",
+  "description": "A training program, played in real time.",
+  "stage": "sim6"
  }
 ]

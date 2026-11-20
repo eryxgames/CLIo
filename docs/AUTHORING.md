@@ -21,6 +21,7 @@ to have the engine look for broken references.
 - [Sound and music](#sound-and-music)
 - [Generated dungeons](#generated-dungeons)
 - [First-person levels](#first-person-levels)
+- [Arcade stages](#arcade-stages)
 - [Coming from CLIo 1](#coming-from-clio-1)
 
 ## A complete tiny game
@@ -2062,6 +2063,99 @@ has no problems:
 ```
 python clio.py rootless --import-sheet rootless-monsters.png    # with rootless-monsters.json beside it
 ```
+
+## Arcade stages
+
+A scene can hold a stage played in real time: a platformer seen from the side, or a chase
+seen from above. `"stage": "id"` in the scene; the stage in `stages.json`:
+
+```json
+{
+  "run": {
+    "title": "The Long Run",
+    "mode": "platformer",
+    "goal": "exit",
+    "need": 3,
+    "intro": ["Three chips, then the exit."],
+    "map": ["###################",
+            "#.................#",
+            "#..*.....===*..E..#",
+            "#.====.......H.####",
+            "#@..*..w..^^.H....#",
+            "###################"],
+    "on_clear": [{"say": "You made it."}, {"goto": "after_the_run"}]
+  }
+}
+```
+
+The map, a line a row:
+
+| | | | |
+| --- | --- | --- | --- |
+| `#` wall | `=` platform (stood on from above, jumped up through; down and jump drop through it) | `H` ladder | `^` spikes (a hit) |
+| `~` a pit (lava, the void: a life) | `D` door (a key opens it, and is used up) | `E` exit | `!` checkpoint (lives come back here) |
+| `*` chip | `+` heart (taken when it is needed) | `k` key | `@` the start |
+
+and enemies by their letter: `w` walker (turns at walls and at the edge of what it walks on),
+`h` hopper (and jumps), `f` flyer (comes for the player it sees, through the air), `c` chaser
+(walks at the player it sees, and waits at an edge), `t` turret (still, and shoots when the
+player is in sight - from the side only along its row). Jumping on an enemy beats it; touching
+it otherwise hurts. A hit leaves the player safe for a moment.
+
+- `mode`: `platformer` (gravity, jumps, ladders) or `topdown` (any way and the diagonals; a
+  platform is a low wall there).
+- `goal`: `exit` (reach it, with `need` chips if said - `"all"` for every one), `chips` (take
+  them all), `clear` (no enemy left) or `survive` (`time` seconds). For the others `time` is a
+  limit.
+- `lives` (3), `health` (3, hits a life takes), `gun` (the fire key shoots where the player
+  faces), `music`, `intro` (shown before it starts).
+- `physics`: `speed` (tiles a second, 5), `jump` (tiles high, 3.5 - a jump let go early is
+  lower), `gravity` (1), `fall` (12), `climb` (4), `shot` (12), `range` (12), `every` (seconds
+  between shots, 0.3).
+- `legend` gives characters a meaning: a tile (`"B": "wall"`), a pickup, or an enemy, with
+  anything of its own: `"G": {"enemy": "walker", "speed": 4, "dir": "left"}`; top-down,
+  `"axis": "y"` walks it up and down.
+- `colors` (`sky`, `wall`, `wall_top`, `platform`, `ladder`, `spikes`, `pit`, `door`, `exit`,
+  `chip`, `player`... as `"#rrggbb"`) and `sounds` (`jump`, `chip`, `stomp`, `kill`, `hurt`,
+  `die`, `shoot`, `door_open`, `checkpoint`, `clear`: the game's sound for each).
+
+`"arcade"` in game.json holds the same for every stage - `enemies`, `colors`, `physics`,
+`sounds` - and is where a game's own enemies go:
+
+```json
+"arcade": {"enemies": {"bugrat": {"move": "walk", "char": "r", "speed": 3, "score": 40,
+                                  "color": "#b08858", "color2": "#f0d8b0", "sound_death": "bugrat_death"}}}
+```
+
+An enemy has `move` (`walk`, `hop`, `fly`, `chase`, `still`), `char`, `speed` (tiles a second),
+`hp`, `damage`, `score`, `sight` (tiles), `stomp` (false: it cannot be jumped on), `edges`
+(`fall`: it walks off them), `shoots`, `every` (seconds between shots, or hops), `shot` (its
+shots' speed), `aim` (`level` or `any`), `hop` (tiles high), `color` and `color2` (body and top),
+`glyph` (in plain text), `sound_death`.
+
+When it ends, the scene's `on_stage_clear` (or the stage's `on_clear`) runs; failed,
+`on_stage_fail` (or `on_fail`), and without one the game is lost (`death_text`); left,
+`on_stage_quit`, and without one the game ends. The flag `<stage>_cleared` is set, and the
+variable `stages` keeps each one's result, score, chips, kills, deaths and seconds.
+
+**Playing it.** The arrows (or WASD, or hjkl) run and climb; Space, Z or Up jumps; Down and
+Space drop through a platform; X or F fires; P or Esc pauses (Q then leaves). It runs at 20
+ticks a second, and is drawn in half-block pixels - a tile two by two - with the camera
+following, or a character a tile in plain text. A terminal that says when keys are let go
+(kitty, the Windows console; try `--keys`) holds a key exactly as long as it is held; any
+other is guessed from its repeats. Piped, with `--lines` or on a screen under 30 x 12, a stage
+is played a typed line at a time: `right 10, jump right 8, wait 5` holds keys for ticks.
+
+Everything is in whole numbers and nothing is left to chance, so the same keys at the same
+ticks play a stage the same way. That is how **the stage bot** checks a stage: it tries moves
+on copies of it until it finds a way through without losing a life, and plays its keys back
+on the stage to be sure:
+
+```
+python -m engine.stagebot rootless          # sim5: cleared in 34.6 seconds of play (...)
+```
+
+`--level ID` starts a game at the scene that plays stage ID, as for levels.
 
 ## Coming from CLIo 1
 

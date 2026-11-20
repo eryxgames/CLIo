@@ -359,6 +359,21 @@ game, RØØTLESS, shows them.
   `first_person`, `--realtime [SECONDS]`, and the `realtime [off|SECONDS]` command. A beat
   passes when no key acts in time; typing a line holds the clock; the beats that pass are
   journaled (`.`), so saves play back the same. The footer says REAL TIME.
+- **Arcade stages** (`stages.json`, a scene's `"stage"`, `engine/arcade.py`): platformers and
+  top-down stages in real time, built from a map of characters - walls, platforms that are
+  jumped through from below and dropped through, ladders, spikes, pits, doors and keys,
+  checkpoints, chips, hearts, the exit - with runs that speed up and slow down, jumps that are
+  lower when let go early, a moment after an edge to still jump and a jump pressed just before
+  landing kept. Enemies walk, hop, fly, chase and shoot; jumped on, they are beaten. Goals:
+  the exit (with chips), all the chips, every enemy, or lasting out the time; lives, health
+  and a time limit. Drawn in half-block pixels with a camera that follows, or a character a
+  tile in plain text; piped, a stage is played a typed line at a time. Whole numbers only, so
+  a stage's keys play it back the same. `"arcade"` in game.json for a game's own enemies,
+  colours, physics and sounds; `on_stage_clear`, `on_stage_fail`, `on_stage_quit` in the scene.
+- **The stage bot** (`engine/stagebot.py`, `python -m engine.stagebot GAME`): finds a way
+  through a stage without losing a life, and the keys that play its run back.
+- RØØTLESS: two arcade sims - **SIM-5: Bus Run**, side on (`--level sim5`), and **SIM-6:
+  Purge**, from above with a gun (`--level sim6`).
 
 ### Changed
 

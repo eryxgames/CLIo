@@ -88,7 +88,7 @@ class GameData:
                     "triggers": "triggers.json", "music": "music.json", "sounds": "sounds.json",
                     "sprites": "sprites.json", "dungeon": "dungeon.json", "levels": "levels.json",
                     "monsters": "monsters.json", "tiles": "tiles.json", "weapons": "weapons.json",
-                    "models": "models.json", "cards": "cards.json"}
+                    "models": "models.json", "cards": "cards.json", "stages": "stages.json"}
 
         def load(key, required=False):
             name = files.get(key, defaults[key])
@@ -119,6 +119,7 @@ class GameData:
         self.weapons = load("weapons") or {}           # weapons in levels, over game.json's first_person ones
         self.models = load("models") or {}             # low-poly 3D models for levels (engine/model.py)
         self.cards = load("cards") or {}               # cards for card battles (engine/cards.py)
+        self.stages = load("stages") or {}             # arcade stages played in real time (engine/arcade.py)
         self.art_dir = os.path.join(self.dir, cfg.get("art_dir", "art"))
 
         self.theme = cfg.get("style") or cfg.get("style_config") or "default"
@@ -314,6 +315,9 @@ class GameData:
                 or any(isinstance(c, dict) and (c.get("deck") or c.get("battle")) for c in self.characters.values()):
             from . import cards
             problems += cards.problems(self)
+        if self.stages or self.config.get("arcade") or any(sc.get("stage") for sc in self.scenes.values()):
+            from . import arcade
+            problems += arcade.problems(self)
         return problems
 
     def _validate_looks(self):

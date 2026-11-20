@@ -74,5 +74,100 @@
    "made with CLIo"
   ],
   "tick": "*/3 * * * *  cron  rain --on rootless"
+ },
+ "arcade": {
+  "enemies": {
+   "bugrat": {
+    "move": "walk",
+    "char": "r",
+    "speed": 3,
+    "color": "#b08858",
+    "color2": "#f0d8b0",
+    "score": 40,
+    "sound_death": "bugrat_death"
+   },
+   "crawler": {
+    "move": "hop",
+    "char": "v",
+    "speed": 2,
+    "hop": 2.5,
+    "every": 1.4,
+    "color": "#78b040",
+    "color2": "#d0f0a0",
+    "score": 60,
+    "sound_death": "crawler_death"
+   },
+   "drone": {
+    "move": "fly",
+    "char": "d",
+    "speed": 2.5,
+    "sight": 6,
+    "color": "#3cb4e6",
+    "color2": "#c8f0ff",
+    "score": 80,
+    "sound_death": "drone_death"
+   },
+   "sentry": {
+    "move": "still",
+    "char": "s",
+    "shoots": true,
+    "every": 1.6,
+    "sight": 10,
+    "hp": 2,
+    "shot": 6,
+    "color": "#9098a8",
+    "color2": "#ff4040",
+    "score": 120,
+    "sound_death": "sweeper_death"
+   },
+   "hunter": {
+    "move": "chase",
+    "char": "n",
+    "speed": 2.8,
+    "sight": 7,
+    "hp": 2,
+    "color": "#e09030",
+    "color2": "#ffe0a0",
+    "score": 100,
+    "sound_death": "drone_death"
+   },
+   "warden": {
+    "move": "chase",
+    "char": "x",
+    "speed": 2,
+    "sight": 9,
+    "hp": 6,
+    "shoots": true,
+    "every": 1.2,
+    "shot": 6,
+    "aim": "any",
+    "color": "#c040c0",
+    "color2": "#ffa0ff",
+    "score": 400,
+    "sound_death": "warden_death"
+   }
+  },
+  "colors": {
+   "sky": "#08100c",
+   "star": "#14261c",
+   "wall": "#2c4a3a",
+   "wall_top": "#5cc890",
+   "wall_dark": "#203a2c",
+   "platform": "#48d0a0",
+   "ladder": "#b8c860",
+   "chip": "#f0f070",
+   "player": "#40e0ff",
+   "player2": "#e0fff8"
+  },
+  "sounds": {
+   "jump": "bounce",
+   "chip": "pin",
+   "stomp": "punch",
+   "shoot": "pistol",
+   "enemy_shoot": "drone_zap",
+   "door_open": "switch",
+   "checkpoint": "clack",
+   "key": "clack"
+  }
  }
 }

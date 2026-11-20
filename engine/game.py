@@ -692,6 +692,10 @@ class Game(Actions):
             from . import level                          # a first-person level takes over the screen
             level.play_scene(self, sc)
             return True
+        if sc.get("stage") and not self.over and w.scene_id == sid:
+            from . import arcade                         # so does an arcade stage, in real time
+            arcade.play_scene(self, sc)
+            return True
         if sc.get("on_enter") and not self.over and w.scene_id == sid:
             conditions.run(sc["on_enter"], self)
         # followers come along
@@ -961,9 +965,9 @@ class Game(Actions):
         cfg = self.cfg
         jump = self.settings.get("start_level")
         if jump:                                         # --level ID: straight to the scene that plays it
-            sid = next((k for k, sc in self.world.scenes.items() if sc.get("level") == jump), None)
+            sid = next((k for k, sc in self.world.scenes.items() if jump in (sc.get("level"), sc.get("stage"))), None)
             if sid is None:
-                self.say("No scene plays level '%s'." % jump, "error")
+                self.say("No scene plays level or stage '%s'." % jump, "error")
             else:
                 self.started = True
                 self.world.scene_id = sid
@@ -1188,6 +1192,10 @@ class Game(Actions):
         if self.world.scene.get("level"):                # saved in a first-person level: it plays on from there
             from . import level
             level.play_scene(self, self.world.scene, resume_from=blob.get("level"))
+            return True
+        if self.world.scene.get("stage"):                # saved at a stage: it starts again
+            from . import arcade
+            arcade.play_scene(self, self.world.scene)
             return True
         self.say("Game loaded.", "success")
         self.resume_music()

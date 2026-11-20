@@ -436,7 +436,7 @@ def main(argv=None):
                     help="show how this terminal reports keys to a game in real time (held, let go) and exit")
     ap.add_argument("--dev", action="store_true",
                     help="for making a game: in levels *ID jumps to a level and saves are not counted (also CLIO_DEV=1)")
-    ap.add_argument("--level", metavar="ID", help="start a new game in the scene that plays level ID (implies --dev)")
+    ap.add_argument("--level", metavar="ID", help="start a new game in the scene that plays level (or stage) ID (implies --dev)")
     ap.add_argument("--scroll", action="store_true", help="play first-person levels in scrolling text")
     ap.add_argument("--fast", action="store_true", help="no text animation")
     ap.add_argument("--width", type=int, help="force the layout width in columns")

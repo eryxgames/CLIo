@@ -8,7 +8,7 @@
   "show_once": false
  },
  "outro_demo": {
-  "text": "SIMULATION PAUSED. End of the demo - Episode 1 goes on in the full game.\n\nFree programs of the simulatron, made new each run: --level sim1 (Long Fens, open land without end), sim2 (Deep Swap, floor after floor) and sim3 (Swap Sprawl, rooms without end); and a training program, sim4 (Kill House: squads).",
+  "text": "SIMULATION PAUSED. End of the demo - Episode 1 goes on in the full game.\n\nFree programs of the simulatron, made new each run: --level sim1 (Long Fens, open land without end), sim2 (Deep Swap, floor after floor) and sim3 (Swap Sprawl, rooms without end); and training programs: sim4 (Kill House: squads), sim5 (Bus Run, side on, in real time) and sim6 (Purge, from above, in real time).",
   "show_once": false
  },
  "outro_lose": {
@@ -47,6 +47,14 @@
  },
  "sim4_end": {
   "text": "UNIT EVALUATION: squad tactics. The instructor bot's voice is flat: \"Packs, sweeps, ambushes, assaults. Out there they will not be a program.\"",
+  "show_once": false
+ },
+ "sim5_end": {
+  "text": "UNIT EVALUATION: movement. \"Sixteen chips and the bus is yours,\" says the instructor bot. \"Out there the floor will not wait for you to jump.\"",
+  "show_once": false
+ },
+ "sim6_end": {
+  "text": "UNIT EVALUATION: sector purge. The last sentry goes dark and the map fades to its grid. \"Clean,\" says the instructor bot. \"Now do it without seeing it from above.\"",
   "show_once": false
  }
 }

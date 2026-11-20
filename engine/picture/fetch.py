@@ -22,7 +22,15 @@ import zipfile
 RELEASE = "0.2.0"
 URL = "https://github.com/eryxgames/clio-picture/releases/download/v{v}/clio-picture-{v}-{p}.zip"
 SOURCE = "https://github.com/eryxgames/clio-picture"
-SHA256 = {                      # filled in from the release's checksums.txt once it is published
+SHA256 = {                      # from the release's checksums.txt
+    "android-arm64-v8a": "50ed2defc5e12eeb4a35ebd2465c1aa23e0db96661c4e81c890e5052c8e9fb68",
+    "android-armeabi-v7a": "c5fa47341a000cbf3c151bcfa4193034505374e41cb25d3a936715589573e8ab",
+    "android-x86_64": "3ec26e0a45cde6af9d9b0f14eb0a78968856ec6821658960c8dfecfb690c50ee",
+    "linux-arm64": "e134e9a4ebb3650ea2d51043eed9496c6670e2e843de5791a7af80589bbad517",
+    "linux-x64": "c6e0d67554e77d871d74200e26c1c20085a2cd49ee6213b792ceaf06f45fdd7d",
+    "macos-universal": "eccdc72d23b93a0b837cca315bb393ce9a41e240961019a673c30578f7ea0ad9",
+    "windows-arm64": "d5bd2f476dc3783a9cb707696d83692d348608243955673335c3111a203177ab",
+    "windows-x64": "7d083b483e4838b04aacf23faef9440f55bfd4a2e027586bf772d441815b4def",
 }
 
 

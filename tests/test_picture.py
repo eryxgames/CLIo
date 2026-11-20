@@ -141,6 +141,13 @@ class Download(unittest.TestCase):
         self.assertEqual(fetch.platform_name("linux", "aarch64", False), "linux-arm64")
         self.assertEqual(fetch.home(self.env), os.path.join(self.dir, "picture"))
 
+    def test_every_machine_has_its_checksum(self):
+        from engine.audio.ballistic import fetch as ballistic_fetch
+        self.assertEqual(set(fetch.SHA256), set(ballistic_fetch.SHA256))       # the same machines as Ballistic
+        for plat, digest in fetch.SHA256.items():
+            self.assertRegex(digest, r"^[0-9a-f]{64}$", plat)
+        self.assertEqual(len(set(fetch.SHA256.values())), len(fetch.SHA256))
+
     def test_no_release_listed_says_how_to_build_it(self):
         said = []
         with mock.patch.dict(fetch.SHA256, {}, clear=True):

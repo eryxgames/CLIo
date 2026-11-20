@@ -1,0 +1,39 @@
+{
+ "title": "CLIo: a tech demo",
+ "game": "rootless",
+ "clips": [
+  {"logo": true, "seconds": 6,
+   "text": ["the stylish command-line game engine", "Python and its standard library: nothing else to install",
+            "a tech demo - any key goes back"]},
+
+  {"card": "PHYSICS", "style": "chrome", "palette": "ice", "seconds": 3,
+   "text": ["real time, a tick at a time: the same keys always make the same game"]},
+  {"stage": "sim5", "seconds": 16, "caption": "A platformer: gravity, jumps, platforms that move (engine/arcade.py)"},
+  {"sim": "sim8", "seconds": 16, "caption": "A hopper: thrust, drag and lift, in whole-number sines (engine/sim.py)"},
+  {"level": "e1m4", "skip": 175, "seconds": 14, "caption": "Debris and gibs fly, bounce and settle"},
+
+  {"card": "MODELS", "style": "shadow", "palette": "sunset", "seconds": 3,
+   "text": ["low-poly 3D models: lit, shaded and drawn in character cells"]},
+  {"models": ["drone_scout", "drone_hornet", "drone_warden", "hopper", "xantrium_ball", "fuel_cell", "relay_mast"],
+   "seconds": 3.5, "views": ["pixel", "dots"], "caption": "models.json:"},
+
+  {"card": "PICTURES", "style": "synthwave", "seconds": 3,
+   "text": ["walls, floors, land and sky in perspective - three ways to draw them"]},
+  {"level": "e1m3", "skip": 300, "seconds": 16, "views": ["pixel", "dots", "dots-fill"],
+   "caption": "Open land and sky: half blocks, braille dots, filled dots"},
+  {"level": "e1m9", "seconds": 14, "views": ["pixel", "dots"], "caption": "Rooms: textured walls, floor and ceiling"},
+
+  {"card": "GENRES", "style": "glitch", "seconds": 3,
+   "text": ["one engine, many kinds of game - each a folder of JSON files"]},
+  {"adventure": "derelict", "commands": "walkthrough", "seconds": 24, "caption": "A text adventure: Derelict"},
+  {"level": "e1m1", "seconds": 14, "caption": "A first-person shooter: RØØTLESS"},
+  {"skirmish": "sim7", "seconds": 16, "caption": "Real-time strategy"},
+  {"stage": "sim6", "seconds": 14, "caption": "An arcade shooter"},
+  {"sim": "sim9", "seconds": 12, "caption": "A systems sim: keep a reactor in bounds"},
+
+  {"card": "MAKE YOURS", "style": "pixel", "palette": "gold", "seconds": 7,
+   "text": ["a game is a folder of JSON files: docs/AUTHORING.md",
+            "python clio.py GAME --edit opens the editor in your browser",
+            "github.com/eryxgames/CLIo"]}
+ ]
+}

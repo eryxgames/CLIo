@@ -450,6 +450,17 @@ game, RØØTLESS, shows them.
   readies the next weapon. `--termux-keys` prints a row of extra keys for Termux's keyboard
   (fire, strafe, use, map, goggles, save and load) and how to install it.
 
+- **Demos** (`engine/demo.py`, a game's `demo.json`): playlists of clips that play
+  themselves with a caption line - levels played by their bot, sims flown by the
+  autopilot, stages and skirmishes played by the computer (on every side), models turning
+  in a showroom, a text adventure typed out, title cards between them. **CLIo's tech demo**
+  (`engine/demos/clio.json`: physics, models, pictures in three views, six kinds of game) is
+  on the launcher's menu, and **RØØTLESS's** (`games/rootless/demo.json`: the action of
+  every level, the sims, the arcade, the skirmish) on its title screen (`d`). Either plays
+  by itself after 45 seconds with no key (`CLIO_DEMO_IDLE`, 0: never), and any key goes
+  back. `--demo` plays one once, `--attract` over and over; `--check` checks demo.json. The
+  caption says how long each picture took, with CLIo Picture or in Python.
+
 ### Changed
 
 - RØØTLESS's first episode is called **Roasted in the Shell**.

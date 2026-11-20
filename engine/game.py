@@ -921,8 +921,24 @@ class Game(Actions):
         if self.term.interactive and not self.settings.get("start_level") and self.offer_continue():
             return
         if self.term.interactive:
-            ui.pause("[Enter to begin]" if not ui.narrow else "[Enter]")
+            self.title_pause()
         self.begin_story()
+
+    def title_pause(self):
+        """Enter begins. A game with a demo (demo.json) plays it on "d", or after a while with no key."""
+        from . import demo
+        ui = self.ui
+        spec = demo.of_game(self.data.dir) if self.term.is_tty and self.term.ansi and self.term.inp is None \
+            and not self.settings.get("start_level") else None
+        if spec is None:
+            ui.pause("[Enter to begin]" if not ui.narrow else "[Enter]")
+            return
+        idle = demo.idle_play(self.term, spec)
+        while True:
+            line = ui.pause("[Enter to begin, d: the demo]" if not ui.narrow else "[Enter; d: demo]", idle=idle)
+            if line.strip().lower() not in ("d", "demo"):
+                return
+            demo.play(self.term, spec)
 
     def resumable(self):
         """Saved games the title screen can offer: ``[(slot, label), ...]``."""

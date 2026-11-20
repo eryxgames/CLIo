@@ -18,6 +18,7 @@ python clio.py derelict   # sci-fi adventure
 python clio.py depths     # dungeon crawler
 python clio.py depths --mode rogue    # ...with one life and no bottom
 python clio.py rootless   # first-person shooter in a terminal
+python clio.py --demo     # CLIo's tech demo: physics, models, pictures, kinds of game
 ```
 
 ## The demo games
@@ -100,6 +101,8 @@ python clio.py [game] [options]
   --get-ballistic install Ballistic's C engine for this machine in your data folder (renders without Node.js)
   --get-picture   install CLIo Picture, a C library that draws the land, the sky, rooms and dots faster
   --import-model F  bring a glTF model (.glb/.gltf, e.g. from Blender) into a game's models.json
+  --demo          play the game's demo (or, with no game named, CLIo's tech demo) and exit
+  --attract       the same, over and over until a key
   --touch on|off  taps and swipes in first-person levels (on in Termux)
   --termux-keys   print a row of extra keys for Termux that plays the levels
   --no-color      plain text
@@ -258,7 +261,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 610 tests, about a minute
+python -m unittest discover -s tests     # 628 tests, about a minute
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 python tests/bot.py 30 cards             # the same with card battles (the Deck mode)

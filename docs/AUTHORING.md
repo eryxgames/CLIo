@@ -2032,11 +2032,17 @@ with Enter.
 | Enter | `use` | open, press what is ahead |
 | Tab | `map` | the map of what has been seen |
 | 1-7 | `1`-`7`, `shovel` | weapons (a key pressed again: the next weapon on it) |
+| `]` | `next` | the next weapon (round to the first) |
 | numpad 5 or Delete | `w`, `w 3` | wait a beat (or three) |
 | | `t z1` | keep aiming at z1 |
 | | `ps`, `man orphan`, `history`, `keys`, `whoami`, `help` | |
 
 The numpad works with NumLock off: 8 2 step, 4 6 turn, 7 9 strafe, 0 fires, 1 turns round.
+**Taps** (on by default in Termux, `--touch on` elsewhere): the picture's left and right thirds
+turn, their bottom corners strafe, the top of the middle steps forward, the centre fires, the
+bottom uses; a swipe up or down steps forward or back; the status line readies the next weapon
+and the lines under the picture show the map. `--termux-keys` prints a row of extra keys for
+Termux's keyboard.
 Lines are joined as in a shell: `a; b`, `a && b` (b only if a hit or moved), `a || b`
 (b only if a missed or was blocked); `!!` repeats the last line, `!3` the third, `!f` the
 last that began with f; `alias dodge='h || l'` names a line. Anything new - a hit, a
@@ -2414,6 +2420,40 @@ copies) and its keys play the run back:
 ```
 python -m engine.sim rootless       # sim8: won (done) at 33.7 seconds, damage 0, fuel 22
 ```
+
+## Demos
+
+`demo.json` in a game's folder is a demo: clips that play themselves, each with a caption
+line under it. The title screen offers it (`[Enter to begin, d: the demo]`) and plays it by
+itself after 45 seconds with no key (`CLIO_DEMO_IDLE=SECONDS` changes that, `0` turns it
+off); `python clio.py GAME --demo` plays it once, `--attract` over and over. Any key goes
+back. CLIo's own tech demo (`engine/demos/clio.json`) is on the launcher's menu, and plays
+there the same way.
+
+```json
+{"title": "RØØTLESS: a demo", "game": "rootless", "clips": [
+  {"card": "RØØTLESS", "palette": "toxic", "text": ["Episode 1"], "seconds": 4},
+  {"level": "e1m1", "seconds": 24, "caption": "Boot Sector: the shotgun"},
+  {"level": "e1m4", "skip": 120, "views": ["pixel", "dots"]},
+  {"sim": "sim8"}, {"stage": "sim6"}, {"skirmish": "sim7"},
+  {"models": ["drone_hornet", "hopper"], "seconds": 3.5, "views": ["pixel", "dots"]},
+  {"adventure": "derelict", "commands": "walkthrough", "seconds": 24}]}
+```
+
+| Clip | What plays |
+| --- | --- |
+| `card` | big letters (a banner: `style`, `palette`, `effect`) and `text` lines under them |
+| `logo` | the CLIo logo (or the one named) and `text` |
+| `level` | the level, played by its bot (the level's `"bot"` goals, or `goals`). `skip` beats, or `skip_until` `"vehicle"` or `"fight"`, go by unseen first; `views` take turns (`view_every` seconds); `beat` is the seconds between moves (0.16) |
+| `sim` | the sim, flown by its autopilot |
+| `stage` | the stage, played by its bot (it looks for the way first: a second or more) |
+| `skirmish` | the skirmish, with the computer on every side; the view follows the fighting |
+| `models` | each model turning in a yard under the sky, `seconds` each, scaled to about one size (`size`) |
+| `adventure` | a game (a folder under games/) played by typed `commands`, or its `"walkthrough"` |
+
+A clip plays its `seconds` (or less, if its game ends); `game` names another game's folder.
+The caption shows the clip's `caption`, the view, and how long a picture took (with CLIo
+Picture or in Python). `--check` checks demo.json; a clip that cannot play is passed over.
 
 ## Coming from CLIo 1
 

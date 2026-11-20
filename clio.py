@@ -164,8 +164,17 @@ def choose_game(term, logo=None, effect=None):
     labels = []
     for _path, title, desc in games:
         labels.append("{key}%s{/}%s" % (title, (" {hint}%s %s{/}" % (ui.g("dot"), desc)) if desc else ""))
-    pick = ui.menu(labels, title="Choose a game:", cancel_label="Quit")
-    return games[pick][0] if pick is not None else None
+    from engine import demo
+    tech = demo.tech() if term.is_tty and term.ansi and term.inp is None else None
+    if tech:                                      # the tech demo: chosen, or after a while with no key
+        labels.append("{key}Tech demo{/} {hint}%s CLIo shows what it can do{/}" % ui.g("dot"))
+    idle = demo.idle_play(term, tech)
+    while True:
+        pick = ui.menu(labels, title="Choose a game:", cancel_label="Quit", idle=idle)
+        if pick is not None and tech and pick == len(games):
+            demo.play(term, tech)
+            continue
+        return games[pick][0] if pick is not None else None
 
 
 def looks():
@@ -220,6 +229,26 @@ def draw_banner(term, text, style=None, palette=None, effect=None, export=None):
     lines = art.render(term)
     frames, reveals = art.animation(term, ui.width - 4, None, None, seed=text) if ui.animated else ([], False)
     ui.play_art(lines, frames, reveals)
+    return 0
+
+
+def play_demo(term, game=None, loop=False):
+    """--demo: a game's own demo, or CLIo's tech demo."""
+    from engine import demo
+    if game:
+        game_dir = resolve_game(game)
+        if not game_dir:
+            print("No game called '%s'. Try --list." % game)
+            return 2
+        spec = demo.of_game(game_dir)
+        if spec is None:
+            print("This game has no demo yet (demo.json; see docs/AUTHORING.md).")
+            return 2
+    else:
+        spec = demo.tech()
+    if demo.play(term, spec, loop=loop) is None:
+        print("A demo needs a terminal it can draw on (not a pipe, not TERM=dumb).")
+        return 2
     return 0
 
 
@@ -455,6 +484,11 @@ def main(argv=None):
     ap.add_argument("--touch", choices=("on", "off"),
                     help="first-person levels: taps on the picture turn, step, fire and use, swipes step "
                          "(on by default in Termux; it takes the mouse, so text cannot be selected)")
+    ap.add_argument("--demo", action="store_true",
+                    help="play a demo and exit: the game's own (its demo.json), or CLIo's tech demo when no game "
+                         "is named")
+    ap.add_argument("--attract", action="store_true",
+                    help="like --demo, but over and over until a key is pressed (a kiosk, a shop window)")
     ap.add_argument("--termux-keys", action="store_true",
                     help="print a row of extra keys for Termux's keyboard that plays first-person levels, and exit")
     ap.add_argument("--realtime", nargs="?", type=float, const=0.8, metavar="SECONDS",
@@ -530,6 +564,8 @@ def main(argv=None):
             return 2
         key_test()
         return 0
+    if args.demo or args.attract:
+        return play_demo(term, args.game, args.attract)
     try:
         game_dir = resolve_game(args.game) if args.game else choose_game(term, args.logo, args.effect)
     except QuitGame:

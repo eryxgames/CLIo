@@ -439,12 +439,13 @@ class UI:
         self.term.line(s)
         self._last = "text"
 
-    def prompt(self, text=None):
+    def prompt(self, text=None, idle=None):
         self._skip = False
         p = self.theme.ui.get("prompt", "> ") if text is None else text
         if self.term.glyph_mode in ("safe", "ascii") and any(ord(c) > 0xFF for c in p):
             p = "".join(c if ord(c) <= 0xFF else ">" for c in p)
-        value = self.term.read(self.term.paint(p, self.theme.color("prompt")))
+        painted = self.term.paint(p, self.theme.color("prompt"))
+        value = self.term.read(painted, idle=idle) if idle else self.term.read(painted)
         self._last = "text"
         return value
 
@@ -468,22 +469,25 @@ class UI:
             return default
         return ans in ("y", "yes", "yep", "yeah", "sure", "ok", "1")
 
-    def pause(self, text=None):
-        """Wait for Enter - only when a person is actually at the keyboard."""
+    def pause(self, text=None, idle=None):
+        """Wait for Enter - only when a person is actually at the keyboard. The line typed is returned
+        ("" for none). ``idle``: ``(seconds, fn)``, called when nothing is typed for that long."""
         if not self.term.interactive:
-            return
+            return ""
         self._skip = False
         msg = text or ("[Enter]" if self.narrow else "[press Enter]")
-        self.term.read(" " + self.c(msg, "hint"))
+        line = self.term.read(" " + self.c(msg, "hint"), idle=idle) if idle else self.term.read(" " + self.c(msg, "hint"))
         self._last = "blank"
+        return line or ""
 
     def menu(self, options, title=None, role="menu", cancel=True, prompt=None,
-             cancel_label=None, aliases=None, compact=False, numbered=False):
+             cancel_label=None, aliases=None, compact=False, numbered=False, idle=None):
         """Numbered menu. Returns the chosen index, or None if cancelled.
 
         The player may type the number, or any distinctive part of an option.
         With ``numbered`` a trailing number is accepted as well ("strike 2",
-        "s2") and left in ``self.menu_number`` for the caller.
+        "s2") and left in ``self.menu_number`` for the caller. ``idle``: ``(seconds, fn)``, called
+        when nothing is typed for that long (a demo plays), and then the menu waits again.
         """
         options = list(options)
         self.menu_number = None
@@ -532,7 +536,7 @@ class UI:
             return None
 
         for _ in range(6):
-            raw = self.prompt(margin + ptxt).strip().lower()
+            raw = self.prompt(margin + ptxt, idle=idle).strip().lower()
             if aliases and raw in aliases:
                 return aliases[raw]
             if raw in CANCEL_WORDS:

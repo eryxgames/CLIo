@@ -11,6 +11,7 @@
   "engine/combat.py",
   "engine/conditions.py",
   "engine/data.py",
+  "engine/demo.py",
   "engine/dialogue.py",
   "engine/ending.py",
   "engine/firstperson.py",

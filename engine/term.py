@@ -597,8 +597,36 @@ class Term:
             self.write("%s]0;%s\x07" % (ESC, title))
 
     # -- input ------------------------------------------------------------- #
-    def read(self, prompt=""):
-        """Read one line from the player. Raises QuitGame on end of input."""
+    def wait_key(self, seconds):
+        """Wait up to ``seconds`` for the player to type: False if nothing came, True as soon as something
+        did - and at once where that cannot be told (not a terminal, scripted input)."""
+        if self.inp is not None or not self.is_tty:
+            return True
+        try:
+            if not sys.stdin.isatty():
+                return True
+            if os.name == "nt":
+                import msvcrt
+                end = time.monotonic() + seconds
+                while time.monotonic() < end:
+                    if msvcrt.kbhit():
+                        return True
+                    time.sleep(0.05)
+                return False
+            import select
+            return bool(select.select([sys.stdin], [], [], seconds)[0])
+        except Exception:
+            return True
+
+    def read(self, prompt="", idle=None):
+        """Read one line from the player. Raises QuitGame on end of input. ``idle``: ``(seconds, fn)`` -
+        when nothing is typed for that long, ``fn()`` is called (a demo plays) and the wait goes on."""
+        if idle and self.inp is None and self.is_tty:
+            self.write(prompt)
+            self.flush()
+            while not self.wait_key(idle[0]):
+                idle[1]()
+            prompt = ""
         if self.inp is not None:
             self.write(prompt)
             self.flush()

@@ -425,7 +425,7 @@ game, RØØTLESS, shows them.
   nohup, chmod 000, fsck, rm -rf, overclock), Black ICE and the Kernel Sentinel, and
   **SIM-10: Root Shell** (`--level sim10`): hack a terminal, then out-deal a sentinel.
 - **CLIo Picture** (`engine/picture/`, `--get-picture`): a C library, found and installed as
-  Ballistic's is, for the inner loops of the pictures; `--get-picture` installs release 0.2.0
+  Ballistic's is, for the inner loops of the pictures; `--get-picture` installs release 0.3.0
   for Linux, macOS, Windows or Android (Termux), checked by its SHA-256. It draws the open
   land's ground (the caster, `Land.cast`) and the sky over open cells (all but the sun's disc
   and glow, which stay in Python), and from release 0.3 the rooms' floor and ceiling (all but

@@ -19,18 +19,18 @@ import sys
 import urllib.request
 import zipfile
 
-RELEASE = "0.2.0"
+RELEASE = "0.3.0"
 URL = "https://github.com/eryxgames/clio-picture/releases/download/v{v}/clio-picture-{v}-{p}.zip"
 SOURCE = "https://github.com/eryxgames/clio-picture"
 SHA256 = {                      # from the release's checksums.txt
-    "android-arm64-v8a": "50ed2defc5e12eeb4a35ebd2465c1aa23e0db96661c4e81c890e5052c8e9fb68",
-    "android-armeabi-v7a": "c5fa47341a000cbf3c151bcfa4193034505374e41cb25d3a936715589573e8ab",
-    "android-x86_64": "3ec26e0a45cde6af9d9b0f14eb0a78968856ec6821658960c8dfecfb690c50ee",
-    "linux-arm64": "e134e9a4ebb3650ea2d51043eed9496c6670e2e843de5791a7af80589bbad517",
-    "linux-x64": "c6e0d67554e77d871d74200e26c1c20085a2cd49ee6213b792ceaf06f45fdd7d",
-    "macos-universal": "eccdc72d23b93a0b837cca315bb393ce9a41e240961019a673c30578f7ea0ad9",
-    "windows-arm64": "d5bd2f476dc3783a9cb707696d83692d348608243955673335c3111a203177ab",
-    "windows-x64": "7d083b483e4838b04aacf23faef9440f55bfd4a2e027586bf772d441815b4def",
+    "android-arm64-v8a": "65d9727db288acdc0e5875b8df2739c5353d7fe2227060bb5455bab06b810c13",
+    "android-armeabi-v7a": "d275628116a68fd986abde1ab746cc81abab9d394828404944192b1ae523cc62",
+    "android-x86_64": "67cda3eb15764fa24e3aeac89d4bb0c2faacee9ea1df3cabd0c35e66ec0ea562",
+    "linux-arm64": "d3089998aa5a7beec9153e7e57cf57ece143812cc3ea4c93f361ecc261997e6a",
+    "linux-x64": "ecf9d05a77c192dd59a6d67667d19732d634bb22f6d0a42178c30cfa6aadcc0a",
+    "macos-universal": "619a4f285a98a0170cdff93e792b7fa2f72e9cd4751acffa51ba3bfc08bbca75",
+    "windows-arm64": "7f87ff3cebc221c3fa1e5bece4a8229ed0c3575bbbcb4633574c58eafeee4556",
+    "windows-x64": "94b731117406152522eb70f053077131966cfb7e2336856bba2218281a6ac510",
 }
 
 
@@ -111,6 +111,6 @@ def get(out=print, env=None, plat=None, opener=None):
     if got is None:
         out("It is not used: %s" % why)
         return 1
-    out("It loads and agrees with CLIo's Python: CLIo Picture %s. The open land, its sky and the dots styles "
-        "are now drawn by it." % got.clio_picture_version().decode("ascii", "replace"))
+    out("It loads and agrees with CLIo's Python: CLIo Picture %s. The open land, its sky, the rooms' floors "
+        "and the dots styles are now drawn by it." % got.clio_picture_version().decode("ascii", "replace"))
     return 0

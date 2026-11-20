@@ -175,6 +175,14 @@ class Frame:
                 cols[0], cols[1], cols[2] = c
             self.lib.clio_frame_triangle(self.ref, pts, cols, 1 if smooth else 0)
 
+    def model_draw(self, m, held):
+        """A model (clio_model_draw ``m``; ``held`` keeps its arrays alive): [shown, top, x min, x max], or False."""
+        self.sync()
+        out = (ctypes.c_double * 4)()
+        if self.lib.clio_frame_model_draw(self.ref, ctypes.byref(m), out) != 0:
+            return False
+        return list(out)
+
     def recolour(self, how, k=0.0, colour=(0, 0, 0)):
         self.lib.clio_frame_recolour(self.ref, how, float(k), (colour[0] << 16) | (colour[1] << 8) | colour[2])
 

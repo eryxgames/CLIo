@@ -3,10 +3,11 @@
 """CLIo Picture: the inner loops of the pictures in C, when the library is installed - as Ballistic Engine is
 for sound.  A game never needs it: without it CLIo draws everything in Python, as before.
 
-What it does now (CLIo Picture 0.3): the land's heights for a chunk at once (``land_raw``), the open land's
+What it does now (CLIo Picture 0.5): the land's heights for a chunk at once (``land_raw``), the open land's
 ground caster (``land_draw``), the sky over open cells but for the sun (``sky``), the rooms' floor and
-ceiling but for teleporters' rings (``room``), and the dots and dots-fill styles' braille cells from a
-frame's pixels (``dots``).  All give exactly what the Python gives - the same floats, to the last bit - so a game looks and
+ceiling but for teleporters' rings (``room``), the dots and dots-fill styles' braille cells (``dots``), from
+0.4 the whole picture kept in the library (``frame.py``), and from 0.5 the models projected and shaded there
+(``model_draw``: with this Python's own pow and exp, checked against model.pbr first, ``models_agree``).  All give exactly what the Python gives - the same floats, to the last bit - so a game looks and
 plays the same with it or without it; only faster.  When the
 library is loaded it is checked against the Python on a few known values first, and not used if anything
 differs (``status()`` says why).
@@ -119,6 +120,23 @@ class _Frame(ctypes.Structure if ctypes else object):
                 ("gen", ctypes.c_uint32)] if ctypes else []
 
 
+class _Material(ctypes.Structure if ctypes else object):
+    _fields_ = [("r", ctypes.c_double), ("g", ctypes.c_double), ("b", ctypes.c_double), ("metal", ctypes.c_double),
+                ("rough", ctypes.c_double), ("glow", ctypes.c_double)] if ctypes else []
+
+
+class _ModelDraw(ctypes.Structure if ctypes else object):
+    _fields_ = [("ntri", ctypes.c_int), ("pts", ctypes.c_void_p), ("corner", ctypes.c_void_p),
+                ("mat", ctypes.c_void_p), ("own", ctypes.c_void_p), ("colour", ctypes.c_void_p),
+                ("nverts", ctypes.c_int), ("mats", ctypes.c_void_p), ("nmats", ctypes.c_int),
+                ("cull", ctypes.c_int), ("smooth", ctypes.c_int)] + \
+               [(n, ctypes.c_double) for n in ("cx", "cy", "fx", "fy", "rx", "ry", "half", "lw", "yh", "fs", "ch",
+                                               "persp", "flat", "zm", "eye")] + \
+               [("light", ctypes.c_double * 3), ("air", ctypes.c_int), ("haze", ctypes.c_uint32),
+                ("vis", ctypes.c_double), ("flash", ctypes.c_int), ("tinted", ctypes.c_int),
+                ("tint", ctypes.c_uint32)] if ctypes else []
+
+
 class _Tone(ctypes.Structure if ctypes else object):
     _fields_ = [("kind", ctypes.c_int), ("fog", ctypes.c_double), ("haze", ctypes.c_uint32), ("k", ctypes.c_double),
                 ("gone", ctypes.c_double), ("step", ctypes.c_double), ("id", ctypes.c_int64),
@@ -178,6 +196,17 @@ def _open(path):
         lib.clio_frame_cage.argtypes = [F]
         lib.clio_dots32.restype = I
         lib.clio_dots32.argtypes = [P, I, I, ctypes.POINTER(_Dots), P]
+    if hasattr(lib, "clio_frame_model_draw"):           # 0.5 and later
+        lib.clio_maths.restype = None
+        lib.clio_maths.argtypes = [P, P]
+        lib.clio_frame_model_draw.restype = I
+        lib.clio_frame_model_draw.argtypes = [ctypes.POINTER(_Frame), ctypes.POINTER(_ModelDraw), P]
+        lib.clio_shade.restype = None
+        lib.clio_shade.argtypes = [ctypes.POINTER(_Material), P, P, P, P, P]
+        lib.clio_room_scale.restype = D
+        lib.clio_room_scale.argtypes = [D]
+        lib.clio_haze.restype = D
+        lib.clio_haze.argtypes = [D, D]
     if hasattr(lib, "clio_room_draw"):                  # 0.3 and later
         lib.clio_room_draw.restype = I
         lib.clio_room_draw.argtypes = [ctypes.POINTER(_Room), ROOM_CELL_FN, P, P, P, ctypes.POINTER(I)]
@@ -237,8 +266,9 @@ def load(env=None):
 
 def use(on=True, env=None):
     """Turn the library off (``use(False)``: everything in Python), or look for it again."""
-    global _lib, _why
+    global _lib, _why, _models_ok
     _lib = None
+    _models_ok = None
     if not on:
         _lib, _why = False, "turned off"
     else:
@@ -629,3 +659,142 @@ def room(PW, PH, yh, step, half, cam, phase, rows, sky_rows, info, held, out=Non
         _rgb.clear()
     get = _rgb.__getitem__
     return [list(map(get, rgb[y * PW:(y + 1) * PW])) for y in range(PH)], later[:count.value]
+
+
+# --------------------------------------------------------------------------- #
+# models (0.5)
+# --------------------------------------------------------------------------- #
+_models_ok = None
+_why_models = "not checked yet"
+
+
+def _python_maths():
+    """The pow and exp this Python uses, as C functions: the process's own (the system's maths library), on
+    Windows the Universal C Runtime's."""
+    names = ["ucrtbase"] if sys.platform == "win32" else [None]
+    if sys.platform != "win32":
+        found = ctypes.util.find_library("m")
+        if found:
+            names.append(found)
+    for name in names:
+        try:
+            crt = ctypes.CDLL(name)
+            return ctypes.cast(crt.pow, ctypes.c_void_p), ctypes.cast(crt.exp, ctypes.c_void_p)
+        except (OSError, AttributeError):
+            continue
+    return None
+
+
+def models_agree():
+    """Whether the library may draw models: it has them (0.5), it has this Python's pow and exp, and its shading
+    gives model.pbr's numbers, its rooms' scale 0.64 ** z and its haze 1 - e^(-d/vis) exactly, on a few hundred
+    values. Worked out once."""
+    global _models_ok, _why_models
+    lib = load()
+    if lib is None or not hasattr(lib, "clio_frame_model_draw"):
+        return False
+    if _models_ok is None:
+        _models_ok = False
+        maths = _python_maths()
+        if maths is None:
+            _why_models = "no pow and exp of this Python's to give it"
+            return False
+        lib.clio_maths(maths[0], maths[1])
+        import math
+        import random
+        from .. import model as model_mod
+
+        class Mat:
+            pass
+        rng = random.Random(20261120)
+
+        def unit():
+            while True:
+                v = (rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-1, 1))
+                n = math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
+                if n > 1e-3:
+                    return v[0] / n, v[1] / n, v[2] / n
+        out = (ctypes.c_int * 3)()
+        for i in range(400):
+            m = Mat()
+            m.metal, m.rough = rng.choice([0.0, 1.0, rng.random()]), max(0.04, rng.random())
+            m.glow = rng.choice([0.0, 0.0, rng.uniform(0, 4)])
+            rgb = (rng.random(), rng.random(), rng.random())
+            n, light, view = unit(), unit(), unit()
+            if i % 7 == 0:
+                view = n                                  # straight on: 1 - ndv is 0 or a hair below
+            want = model_mod.pbr(m, rgb, n, light, view)
+            lib.clio_shade(ctypes.byref(_Material(rgb[0], rgb[1], rgb[2], m.metal, m.rough, m.glow)),
+                           (ctypes.c_double * 3)(*rgb), (ctypes.c_double * 3)(*n), (ctypes.c_double * 3)(*light),
+                           (ctypes.c_double * 3)(*view), out)
+            if list(out) != list(want):
+                _why_models = "its shading differs from CLIo's (another maths library?)"
+                return False
+            z, d, vis = rng.uniform(-0.5, 12.0), rng.uniform(0, 200), rng.uniform(10, 120)
+            if lib.clio_room_scale(z) != 0.64 ** z or lib.clio_haze(d, vis) != 1.0 - math.exp(-d / vis):
+                _why_models = "its powers differ from CLIo's (another maths library?)"
+                return False
+        _models_ok, _why_models = True, "the models too"
+    return _models_ok
+
+
+def models_status():
+    models_agree()
+    return _why_models
+
+
+_materials = {}
+
+
+def model_draw(frame, mdl, tris, cull, smooth, nverts, cam, view, flat, zm, light, flash, tint):
+    """``View.draw_model``'s triangles in C: (top, middle x) of what showed, or None if none did - or False when
+    the library cannot draw it (then the Python does)."""
+    if not getattr(frame, "record", False) and not models_agree():
+        return False
+    try:
+        got = _materials.get(id(mdl))
+        if got is None or got[0] is not mdl:
+            if len(_materials) > 64:
+                _materials.clear()
+            mats = mdl.materials
+            arr = (_Material * len(mats))(*[_Material(m.rgb[0], m.rgb[1], m.rgb[2], m.metal, m.rough, m.glow)
+                                            for m in mats])
+            got = _materials[id(mdl)] = (mdl, arr, len(mats))
+        pts, corner, mat, own, colour = array("d"), array("i"), array("i"), array("b"), array("d")
+        for (p0, p1, p2), f in tris:
+            pts.extend(p0)
+            pts.extend(p1)
+            pts.extend(p2)
+            if smooth:
+                corner.extend(f[:3])
+            mat.append(f[3])
+            if f[4]:
+                own.append(1)
+                colour.extend(f[4][:3])
+            else:
+                own.append(0)
+                colour.extend((0.0, 0.0, 0.0))
+        if len(pts) != 9 * len(mat):
+            return False
+        cx, cy, fx, fy, rx, ry = cam
+        air = view.air
+        m = _ModelDraw()
+        m.ntri, m.pts, m.corner, m.mat, m.own, m.colour = (len(mat), _ptr(pts), _ptr(corner), _ptr(mat), _ptr(own),
+                                                          _ptr(colour))
+        m.nverts, m.mats, m.nmats, m.cull, m.smooth = nverts, ctypes.addressof(got[1]), got[2], int(cull), int(smooth)
+        m.cx, m.cy, m.fx, m.fy, m.rx, m.ry = float(cx), float(cy), float(fx), float(fy), float(rx), float(ry)
+        m.half, m.lw, m.yh, m.fs, m.ch = float(view.half), float(view.LW), float(view.yh), float(view.FS), float(view.CH)
+        m.persp = float(view.persp) if view.persp is not None else 0.0
+        m.flat, m.zm, m.eye = float(flat), float(zm), float(view.EYE)
+        m.light[0], m.light[1], m.light[2] = light
+        if air is not None:
+            m.air, m.haze, m.vis = 1, (air[0][0] << 16) | (air[0][1] << 8) | air[0][2], float(air[1])
+        m.flash = 1 if flash else 0
+        if tint:
+            m.tinted, m.tint = 1, (tint[0] << 16) | (tint[1] << 8) | tint[2]
+    except (TypeError, ValueError, OverflowError, IndexError):
+        return False
+    out = frame.model_draw(m, (pts, corner, mat, own, colour, got[1]))
+    if out is False or not out[0]:
+        return out if out is False else None
+    return out[1], (out[2] + out[3]) / 2

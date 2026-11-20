@@ -1596,6 +1596,12 @@ class View:
         light = _unit3((cam[2] * lb + cam[4] * ll, cam[3] * lb + cam[5] * ll, lu))
         ex, ey = cam[0], cam[1]
         smooth = mdl.smooth and gone <= 0
+        fr = getattr(px, "frame", None)
+        if fr is not None:                                # CLIo Picture 0.5: all of it in C
+            got = picture.model_draw(fr, mdl, tris, cull, smooth, len(world), cam, self,
+                                     flat if flat > 0 and gone <= 0 else 0.0, max(0.3, zc), light, flash, tint)
+            if got is not False:
+                return got
         normals = {}
         if smooth:                                        # a corner's normal: its triangles' together
             for (p0, p1, p2), f in tris:

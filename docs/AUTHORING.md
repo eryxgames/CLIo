@@ -1832,9 +1832,11 @@ and shots count within 7.
 land's ground and the sky over open cells, the rooms' floor and ceiling, and from release 0.4
 keeps the whole picture in C from the floor to the cells - walls, pictures, shadows, the
 triangles of models, colour changes, the cockpit - while CLIo still decides what is drawn
-where. Along the bot's own games at 150 x 34: a room frame takes 4-5 ms instead of 10 (in the
-dots view 6 instead of 40), open land 9-16 ms instead of 65-75 (in dots 12-21 instead of
-130-140); models are the part still in Python. It gives exactly what the Python gives - every pixel, height and dot the
+where; from 0.5 the models are projected and shaded there too, with the very `pow` and `exp`
+your Python uses (CLIo hands them over and checks the shading against its own before it lets
+the library draw models). Along the bot's own games at 150 x 34: a room frame takes 4-5 ms
+instead of 10-12 (in the dots view 6-7 instead of 40), open land and the hall of drones 7-8 ms
+instead of 35-80 (in dots 10-15 instead of 95-140). It gives exactly what the Python gives - every pixel, height and dot the
 same, to the last bit; CLIo checks some before it uses the library and keeps to the Python if
 any differs - so a game plays and looks the same, only faster, and never needs it. It is found as Ballistic's library is: `CLIO_PICTURE_LIB` (`none` turns it
 off), then `engine/picture/lib/` (a build of your own: `make` in its folder), then your data

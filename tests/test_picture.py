@@ -520,6 +520,62 @@ class SameAsPython(unittest.TestCase):
             self.assertTrue(fast)
             self.assertEqual(fast, slow, lvl)
 
+    @with_library
+    def test_models_drawn_in_the_library_are_the_same(self):
+        """0.5: models projected, shaded and drawn in C - whole, near, breaking apart, flashing, tinted - in
+        rooms and open land, against the Python."""
+        if not hasattr(picture.load(), "clio_frame_model_draw"):
+            self.skipTest("this library has no models (0.5)")
+        self.assertTrue(picture.models_agree(), picture.models_status())
+        from engine.data import GameData
+        from engine.firstperson import DIRS
+        from engine.level import Level
+        from test_levels import ROOTLESS, Quiet
+
+        def frames():
+            out = []
+            for lvl in ("e1m3", "e1m4"):
+                lv = Level(GameData(ROOTLESS), lvl, seed=1)
+                lv.console = Quiet()
+                for style in ("pixel", "dots"):
+                    v = View(44, 12, style)
+                    for m in [m for m in lv.monsters if m.model][:3]:
+                        for k, gone in enumerate((0.0, 0.3, 0.0, 0.9)):
+                            fx = FX()
+                            dx, dy = DIRS[k]
+                            fx.cam, fx.face = (m.x - dx * (1.2 + k), m.y - dy * (1.2 + k)), k
+                            if gone:
+                                fx.dissolve = {m.id: gone}
+                            fx.flash = {m.id} if k == 2 else ()
+                            fx.tint = {m.id: (40, 200, 255)} if k == 3 else {}
+                            out.append(v.render(lv, fx, k))
+            return out
+        fast, slow = python_too(frames)
+        self.assertEqual(fast, slow)
+
+    @with_library
+    def test_without_this_pythons_maths_the_models_stay_in_python(self):
+        if not hasattr(picture.load(), "clio_frame_model_draw"):
+            self.skipTest("this library has no models (0.5)")
+        from engine.data import GameData
+        from engine.level import Level
+        from test_levels import ROOTLESS, Quiet
+        saved = picture._models_ok
+        try:
+            picture._models_ok = None
+            with mock.patch.object(picture, "_python_maths", lambda: None):
+                self.assertFalse(picture.models_agree())
+                self.assertIn("pow", picture.models_status())
+
+                def frames():
+                    lv = Level(GameData(ROOTLESS), "e1m3", seed=1)
+                    lv.console = Quiet()
+                    return [View(40, 10, "pixel").render(lv, FX(), k) for k in range(2)]
+                fast, slow = python_too(frames)
+                self.assertEqual(fast, slow)
+        finally:
+            picture._models_ok = saved
+
     def test_frame_rows_behave_as_the_rows_did(self):
         if picture.load() is None or not hasattr(picture.load(), "clio_frame_blit"):
             self.skipTest("this library has no frames (0.4)")

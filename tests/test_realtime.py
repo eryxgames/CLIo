@@ -10,6 +10,11 @@ import sys
 import time
 import unittest
 
+try:
+    import pyte                                                # not in the standard library: only some test runs have it
+except ImportError:
+    pyte = None
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
@@ -165,12 +170,12 @@ class LoopTests(unittest.TestCase):
         self.assertEqual(again.ticks, game.ticks)
 
     @unittest.skipIf(os.name == "nt", "a pseudo-terminal is a POSIX thing")
+    @unittest.skipIf(pyte is None, "reads the terminal's screen with pyte (pip install pyte)")
     def test_the_key_test_in_a_terminal_that_speaks_kitty(self):
         import pty
         pid, fd = pty.fork()
         if pid == 0:                                           # the child: CLIo's key test
             os.execvp(sys.executable, [sys.executable, os.path.join(ROOT, "clio.py"), "--keys"])
-        import pyte
         screen = pyte.Screen(80, 24)
         stream = pyte.ByteStream(screen)
 

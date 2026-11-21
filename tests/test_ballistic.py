@@ -251,7 +251,6 @@ class WithoutNodeTests(unittest.TestCase):
         self.assertEqual(len(files), 2)
 
 
-@unittest.skipUnless(NODE, "Node.js is not installed")
 class SayWhatIsMissingTests(unittest.TestCase):
     """What the sound set command and the sound command say when Ballistic's sounds cannot all be made."""
 
@@ -286,6 +285,7 @@ class SayWhatIsMissingTests(unittest.TestCase):
         self.assertTrue(any("makes 1 of 2; the rest need Node.js, pkg install nodejs" in l for l in a.status()))
 
 
+@unittest.skipUnless(NODE, "Node.js is not installed")
 class RenderTests(unittest.TestCase):
     def test_takes_render_vary_and_are_kept(self):
         cache = folder()

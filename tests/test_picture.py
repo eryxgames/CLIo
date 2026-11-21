@@ -554,6 +554,70 @@ class SameAsPython(unittest.TestCase):
         self.assertEqual(fast, slow)
 
     @with_library
+    def test_models_kept_as_meshes_are_the_same(self):
+        """0.6: each model's faces handed over once and kept; a frame hands over only the posed corners and
+        where it stands. The same pictures as 0.5's way and as the Python, and the mesh is made once."""
+        if not hasattr(picture.load(), "clio_frame_mesh_draw"):
+            self.skipTest("this library keeps no meshes (0.6)")
+        from engine.data import GameData
+        from engine.firstperson import DIRS
+        from engine.level import Level
+        from engine.picture.frame import Frame
+        from test_levels import ROOTLESS, Quiet
+
+        def frames():
+            out = []
+            for lvl in ("e1m3", "e1m4"):
+                lv = Level(GameData(ROOTLESS), lvl, seed=1)
+                lv.console = Quiet()
+                v = View(44, 12, "pixel")
+                for m in [m for m in lv.monsters if m.model][:3]:
+                    for k, gone in enumerate((0.0, 0.3, 0.0, 0.0)):
+                        fx = FX()
+                        dx, dy = DIRS[k]
+                        fx.cam, fx.face = (m.x - dx * (1.2 + k), m.y - dy * (1.2 + k)), k
+                        if gone:
+                            fx.dissolve = {m.id: gone}
+                        fx.flash = {m.id} if k == 2 else ()
+                        fx.tint = {m.id: (40, 200, 255)} if k == 3 else {}
+                        out.append(v.render(lv, fx, k))
+            return out
+        drawn = []
+        real = Frame.mesh_draw
+
+        def counted(fr, mesh, inst, m, held):
+            drawn.append(mesh)
+            return real(fr, mesh, inst, m, held)
+        picture._meshes.clear()
+        with mock.patch.object(Frame, "mesh_draw", counted):
+            kept = frames()
+        self.assertTrue(drawn, "no model went the 0.6 way")
+        self.assertLess(len({id(m) for m in drawn}), len(drawn))       # the same mesh drawn again, not made again
+        with mock.patch.object(Frame, "meshes", False):
+            handed = frames()
+        picture.use(False)
+        try:
+            slow = frames()
+        finally:
+            picture.use(True)
+        self.assertEqual(kept, handed)
+        self.assertEqual(kept, slow)
+
+    @with_library
+    def test_a_library_without_meshes_draws_models_as_before(self):
+        if not hasattr(picture.load(), "clio_frame_model_draw"):
+            self.skipTest("this library has no models (0.5)")
+
+        class Old:
+            lib = type("Lib", (), {})()                  # a 0.5 library: no clio_frame_mesh_draw
+            meshes = True
+
+            def mesh_draw(self, *a):
+                raise AssertionError("not for a library without meshes")
+        self.assertIs(picture.mesh_draw(Old(), None, [], 0, 0, 1, 0, 0, None, None, 0, 1, (0, 0, 1), False, None,
+                                        False), False)
+
+    @with_library
     def test_without_this_pythons_maths_the_models_stay_in_python(self):
         if not hasattr(picture.load(), "clio_frame_model_draw"):
             self.skipTest("this library has no models (0.5)")

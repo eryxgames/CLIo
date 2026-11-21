@@ -23,6 +23,7 @@ import os
 import struct
 import sys
 from array import array
+from itertools import chain
 
 try:                                    # not in every Python (the editor's in a browser has none)
     import ctypes
@@ -125,6 +126,11 @@ class _Material(ctypes.Structure if ctypes else object):
                 ("rough", ctypes.c_double), ("glow", ctypes.c_double)] if ctypes else []
 
 
+class _Instance(ctypes.Structure if ctypes else object):
+    _fields_ = [("verts", ctypes.c_void_p), ("wx", ctypes.c_double), ("wy", ctypes.c_double), ("fx", ctypes.c_double),
+                ("fy", ctypes.c_double), ("lift", ctypes.c_double)] if ctypes else []
+
+
 class _ModelDraw(ctypes.Structure if ctypes else object):
     _fields_ = [("ntri", ctypes.c_int), ("pts", ctypes.c_void_p), ("corner", ctypes.c_void_p),
                 ("mat", ctypes.c_void_p), ("own", ctypes.c_void_p), ("colour", ctypes.c_void_p),
@@ -207,6 +213,14 @@ def _open(path):
         lib.clio_room_scale.argtypes = [D]
         lib.clio_haze.restype = D
         lib.clio_haze.argtypes = [D, D]
+    if hasattr(lib, "clio_mesh_new"):                   # 0.6 and later
+        lib.clio_mesh_new.restype = P
+        lib.clio_mesh_new.argtypes = [I, I, P, P, P, P, P, I]
+        lib.clio_mesh_free.restype = None
+        lib.clio_mesh_free.argtypes = [P]
+        lib.clio_frame_mesh_draw.restype = I
+        lib.clio_frame_mesh_draw.argtypes = [ctypes.POINTER(_Frame), P, ctypes.POINTER(_Instance),
+                                             ctypes.POINTER(_ModelDraw), P]
     if hasattr(lib, "clio_room_draw"):                  # 0.3 and later
         lib.clio_room_draw.restype = I
         lib.clio_room_draw.argtypes = [ctypes.POINTER(_Room), ROOM_CELL_FN, P, P, P, ctypes.POINTER(I)]
@@ -744,6 +758,120 @@ def models_status():
 
 
 _materials = {}
+
+
+class _Mesh:
+    """A model's faces kept in the library (0.6): handed over once, freed when the model is forgotten (without a
+    library - a recording frame - just the numbers)."""
+
+    def __init__(self, lib, mdl, nverts):
+        self.lib, self.model, self.nverts, self.ref = lib, mdl, nverts, None
+        faces, mat, own, colour = array("i"), array("i"), array("b"), array("d")
+        for f in mdl.faces:
+            faces.extend(f[:3])
+            mat.append(f[3])
+            if f[4]:
+                own.append(1)
+                colour.extend(f[4][:3])
+            else:
+                own.append(0)
+                colour.extend((0.0, 0.0, 0.0))
+        mats = mdl.materials
+        self.mats = (_Material * len(mats))(*[_Material(m.rgb[0], m.rgb[1], m.rgb[2], m.metal, m.rough, m.glow)
+                                              for m in mats])
+        self.ntri = len(mat)
+        self.faces, self.mat, self.own, self.colour = faces, mat, own, colour
+        if lib:
+            self.ref = lib.clio_mesh_new(nverts, self.ntri, _ptr(faces), _ptr(mat), _ptr(own), _ptr(colour),
+                                         ctypes.addressof(self.mats), len(mats))
+
+    def __del__(self):
+        ref, self.ref = self.ref, None
+        if ref and self.lib:
+            try:
+                self.lib.clio_mesh_free(ref)
+            except Exception:                           # the interpreter closing: the memory goes with it
+                pass
+
+
+_meshes = {}
+
+
+def mesh_of(lib, mdl, nverts):
+    """The library's copy of ``mdl``'s faces, made the first time it is drawn (None: it cannot be made)."""
+    got = _meshes.get(id(mdl))
+    if got is not None and got.model is mdl and got.nverts == nverts and got.lib is lib:
+        return got
+    if len(_meshes) > 128:
+        _meshes.clear()
+    got = _Mesh(lib, mdl, nverts)
+    if not lib:
+        return got                                      # a recording frame's: kept nowhere
+    if not got.ref:
+        return None
+    _meshes[id(mdl)] = got
+    return got
+
+
+def mesh_draw(frame, mdl, verts, wx, wy, fxw, fyw, lift, cam, view, flat, zm, light, flash, tint, smooth):
+    """CLIo Picture 0.6: a model drawn from its kept mesh - only its posed corners and where it stands are handed
+    over - (top, middle x) of what showed, None if none did, or False when this library cannot (then
+    ``model_draw`` does, with the triangles)."""
+    if not getattr(frame, "meshes", False) or not hasattr(frame, "mesh_draw"):
+        return False
+    lib = getattr(frame, "lib", None)
+    if getattr(frame, "record", False):
+        lib = None                                      # the library's tests keep the numbers handed over
+    elif not lib or not hasattr(lib, "clio_frame_mesh_draw") or not models_agree():
+        return False
+    try:
+        mesh = mesh_of(lib, mdl, len(verts))
+        if mesh is None:
+            return False
+        flat_v = array("d", chain.from_iterable(verts))
+        if len(flat_v) != 3 * mesh.nverts:
+            return False
+        inst = _Instance(_ptr(flat_v), float(wx), float(wy), float(fxw), float(fyw), float(lift))
+        m = _template(view, cam, light)
+        m.cull, m.smooth = 1, int(bool(smooth))
+        m.flat, m.zm = float(flat), float(zm)
+        m.flash = 1 if flash else 0
+        if tint:
+            m.tinted, m.tint = 1, (tint[0] << 16) | (tint[1] << 8) | tint[2]
+        else:
+            m.tinted, m.tint = 0, 0
+    except (TypeError, ValueError, OverflowError, IndexError):
+        return False
+    out = frame.mesh_draw(mesh, inst, m, flat_v)
+    if out is False or not out[0]:
+        return out if out is False else None
+    return out[1], (out[2] + out[3]) / 2
+
+
+_tpl = {}
+
+
+def _template(view, cam, light):
+    """The numbers every model of a picture shares (the camera, the View's, the light), set once a picture."""
+    air = view.air
+    key = (id(view), tuple(cam), tuple(light), view.half, view.LW, view.yh, view.FS, view.CH, view.persp, view.EYE,
+           None if air is None else (air[0], air[1]))
+    m = _tpl.get(key)
+    if m is not None:
+        return m
+    if len(_tpl) > 16:
+        _tpl.clear()
+    cx, cy, fx, fy, rx, ry = cam
+    m = _ModelDraw()
+    m.cx, m.cy, m.fx, m.fy, m.rx, m.ry = float(cx), float(cy), float(fx), float(fy), float(rx), float(ry)
+    m.half, m.lw, m.yh, m.fs, m.ch = float(view.half), float(view.LW), float(view.yh), float(view.FS), float(view.CH)
+    m.persp = float(view.persp) if view.persp is not None else 0.0
+    m.eye = float(view.EYE)
+    m.light[0], m.light[1], m.light[2] = light
+    if air is not None:
+        m.air, m.haze, m.vis = 1, (air[0][0] << 16) | (air[0][1] << 8) | air[0][2], float(air[1])
+    _tpl[key] = m
+    return m
 
 
 def model_draw(frame, mdl, tris, cull, smooth, nverts, cam, view, flat, zm, light, flash, tint):

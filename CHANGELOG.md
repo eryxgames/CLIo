@@ -434,7 +434,10 @@ game, RØØTLESS, shows them.
   changes, hurt, shaking, the cockpit; what has no call there - a glow, a blast - is drawn
   through rows that read and write the frame), and from 0.5 it projects and shades the models
   (with the `pow` and `exp` of the Python running CLIo, handed over by ctypes and checked
-  against `model.pbr` before models are drawn there); it works out the land's heights a chunk
+  against `model.pbr` before models are drawn there), and from 0.6 it keeps each model's
+  faces (`clio_mesh_new`) and is handed only the posed corners and where the model stands
+  (`clio_frame_mesh_draw`, used when the library has it): with 100 drones in sight on E1M4 a
+  frame takes 15 ms instead of 32; it works out the land's heights a chunk
   at a time and makes the braille of the dots and dots-fill views. Along the bot's games at
   150 x 34, a room frame takes 4-5 ms instead of 10-12 (dots: 6-7 instead of 40), E1M3, E1M4
   and SIM-1 7-8 ms instead of 35-80 (dots: 10-15 instead of 95-140). It gives exactly the Python's

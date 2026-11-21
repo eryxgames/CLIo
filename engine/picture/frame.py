@@ -183,6 +183,17 @@ class Frame:
             return False
         return list(out)
 
+    meshes = True                         # models from kept meshes (CLIo Picture 0.6), where the library has them
+
+    def mesh_draw(self, mesh, inst, m, held):
+        """A model from its kept mesh (``inst``: its posed corners and where it stands; ``held`` keeps the corners'
+        array alive): [shown, top, x min, x max], or False."""
+        self.sync()
+        out = (ctypes.c_double * 4)()
+        if self.lib.clio_frame_mesh_draw(self.ref, mesh.ref, ctypes.byref(inst), ctypes.byref(m), out) != 0:
+            return False
+        return list(out)
+
     def recolour(self, how, k=0.0, colour=(0, 0, 0)):
         self.lib.clio_frame_recolour(self.ref, how, float(k), (colour[0] << 16) | (colour[1] << 8) | colour[2])
 

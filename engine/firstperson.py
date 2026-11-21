@@ -1592,9 +1592,17 @@ class View:
             verts = [(x * size, y * size, z * size) for x, y, z in verts]
         fxw, fyw = math.cos(heading), math.sin(heading)
         rxw, ryw = -fyw, fxw
-        world = [(wx + x * rxw + y * fxw, wy + x * ryw + y * fyw, z + lift) for x, y, z in verts]
         zc = (wx - cam[0]) * cam[2] + (wy - cam[1]) * cam[3]     # how far off it stands
         flat = max(0.0, min(1.0, 1.3 - zc))                      # close by, depth is the middle's: no bulging
+        fr = getattr(px, "frame", None)
+        if fr is not None and gone <= 0:                  # CLIo Picture 0.6: the mesh is kept there; only this
+            lb, ll, lu = self.LIGHT
+            got = picture.mesh_draw(fr, mdl, verts, wx, wy, fxw, fyw, lift, cam, self, flat, max(0.3, zc),
+                                    _unit3((cam[2] * lb + cam[4] * ll, cam[3] * lb + cam[5] * ll, lu)), flash, tint,
+                                    mdl.smooth)
+            if got is not False:
+                return got
+        world = [(wx + x * rxw + y * fxw, wy + x * ryw + y * fyw, z + lift) for x, y, z in verts]
         if flat > 0 and gone <= 0:
             cx_, cy_, fx_, fy_, rx_, ry_ = cam
             zm = max(0.3, zc)

@@ -49,6 +49,43 @@ def picture_of(lv, v=None):
     return rgb, zbuf, v, labels
 
 
+FEATURES = ["#############",
+            "#BBBBBBBBBBB#",
+            "#BBB###BBBBB#",
+            "#..321...SSS#",
+            "#.TXCOKP.SSS#",
+            "#..f.....GD.#",
+            "#LLLLL......#",
+            "#...........#",
+            "#...........#",
+            "#.....@.....#",
+            "#############"]
+FEATURE_LEGEND = {"1": {"height": 0.12, "ceiling_height": 1.6}, "2": {"height": 0.24, "ceiling_height": 1.6},
+                  "3": {"height": 0.36, "ceiling_height": 1.6}, "B": {"height": 0.48, "ceiling_height": 1.48},
+                  "S": {"sky": True}, "T": {"teleport": "t"}, "X": {"toxic": True}, "C": {"conveyor": "e"},
+                  "O": {"oil": True}, "K": {"slick": True}, "P": {"plate": "p"}, "f": {"floor": "grate"},
+                  "G": {"gate": True}, "D": {"door": True}, "L": {"ceiling_height": 0.8}}
+
+
+def features_room():
+    """A room with every kind of face and floor the mesh view draws: stairs up to a balcony, a lintel, cells open
+    to the sky, a teleporter, toxic water, a belt, oil, slick floor, a plate, a tiled floor, bars, a half-open door,
+    fire to come and fire now, a scorched floor, a sunk crate."""
+    lv = room(FEATURES, FEATURE_LEGEND)
+    lv.marks[(5, 7)] = "warn"
+    lv.marks[(4, 7)] = "burn"
+    lv.fires = {(7, 7): 3}
+    lv.cell(8, 8).scorched = True
+    lv.cell(3, 8).sunk = True
+    lv.cell(10, 5).open = 0.4
+    return lv
+
+
+FEATURE_VIEWS = [  # where from, facing, the camera between cells (None: at the player), beat
+    ((6, 9), 0, None, 0), ((6, 9), 0, (6.0, 8.6), 3), ((9, 7), 3, None, 1), ((2, 8), 1, None, 2), ((4, 4), 2, None, 5),
+    ((11, 7), 0, None, 2)]                                    # the east wall runs on past the camera: clipped near it
+
+
 class PictureTests(unittest.TestCase):
     def test_the_wall_ahead_stands_where_open_lands_perspective_puts_it(self):
         lv = room(HALL)
@@ -139,6 +176,42 @@ class PictureTests(unittest.TestCase):
             a = view(80, 24, frame=False, render="mesh").render(lv, FX(), 1)
             b = view(80, 24, frame=True, render="mesh").render(lv, FX(), 1)
             self.assertEqual(a, b, lid)
+
+    def test_clio_picture_draws_every_face_and_floor_as_the_python_does(self):
+        lib = picture.load()
+        if lib is None or not hasattr(lib, "clio_frame_rooms"):
+            self.skipTest("CLIo Picture 0.7 is not installed")
+        from engine import mesh as mesh_mod
+        drawn = []
+        real = mesh_mod.Mesh.draw_frame
+
+        def spy(self_, *a, **k):
+            got = real(self_, *a, **k)
+            drawn.append(got is not None)
+            return got
+        mesh_mod.Mesh.draw_frame = spy
+        try:
+            for (x, y), f, cam, phase in FEATURE_VIEWS:
+                for style in ("pixel", "dots"):
+                    pics = []
+                    for frame in (False, True):
+                        lv = features_room()
+                        put(lv, x, y, f)
+                        fx = FX()
+                        fx.cam = cam
+                        pics.append(view(64, 20, frame=frame, render="mesh").render(lv, fx, phase))
+                    self.assertEqual(pics[0], pics[1], (x, y, f, cam, style))
+        finally:
+            mesh_mod.Mesh.draw_frame = real
+        self.assertTrue(drawn and all(drawn))                 # the library drew them all, not the Python
+
+    def test_the_features_room_has_its_features_in_sight(self):
+        lv = features_room()
+        put(lv, 6, 9, 0)
+        rgb, zbuf, v, labels = picture_of(lv)
+        self.assertTrue(lv.sky_look is not None)
+        colours = {c for row in rgb for c in row}
+        self.assertGreater(len(colours), 150)
 
     def test_every_rootless_room_level_draws_as_a_mesh(self):
         data = GameData(ROOTLESS)

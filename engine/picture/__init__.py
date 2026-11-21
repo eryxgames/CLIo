@@ -143,6 +143,15 @@ class _ModelDraw(ctypes.Structure if ctypes else object):
                 ("tint", ctypes.c_uint32)] if ctypes else []
 
 
+class _Rooms(ctypes.Structure if ctypes else object):
+    D_, P_ = (ctypes.c_double, ctypes.c_void_p) if ctypes else (None, None)
+    _fields_ = [("pw", ctypes.c_int), ("ph", ctypes.c_int), ("half", D_), ("yh", D_), ("lx", D_), ("ly", D_),
+                ("cx", D_), ("cy", D_), ("fx", D_), ("fy", D_), ("rx", D_), ("ry", D_), ("z0", D_), ("eye", D_),
+                ("far", D_), ("fade", D_), ("near", D_), ("side", D_), ("none", D_), ("phase", ctypes.c_int64),
+                ("sky", P_), ("sky_rows", ctypes.c_int), ("nfaces", ctypes.c_int), ("ints", P_), ("geo", P_),
+                ("xy", P_), ("ntex", ctypes.c_int), ("texels", P_), ("tw", P_), ("th", P_)] if ctypes else []
+
+
 class _Tone(ctypes.Structure if ctypes else object):
     _fields_ = [("kind", ctypes.c_int), ("fog", ctypes.c_double), ("haze", ctypes.c_uint32), ("k", ctypes.c_double),
                 ("gone", ctypes.c_double), ("step", ctypes.c_double), ("id", ctypes.c_int64),
@@ -221,6 +230,9 @@ def _open(path):
         lib.clio_frame_mesh_draw.restype = I
         lib.clio_frame_mesh_draw.argtypes = [ctypes.POINTER(_Frame), P, ctypes.POINTER(_Instance),
                                              ctypes.POINTER(_ModelDraw), P]
+    if hasattr(lib, "clio_frame_rooms"):                # 0.7 and later
+        lib.clio_frame_rooms.restype = I
+        lib.clio_frame_rooms.argtypes = [ctypes.POINTER(_Frame), ctypes.POINTER(_Rooms), P, ctypes.POINTER(I)]
     if hasattr(lib, "clio_room_draw"):                  # 0.3 and later
         lib.clio_room_draw.restype = I
         lib.clio_room_draw.argtypes = [ctypes.POINTER(_Room), ROOM_CELL_FN, P, P, P, ctypes.POINTER(I)]
@@ -926,3 +938,105 @@ def model_draw(frame, mdl, tris, cull, smooth, nverts, cam, view, flat, zm, ligh
     if out is False or not out[0]:
         return out if out is False else None
     return out[1], (out[2] + out[3]) / 2
+
+
+# ---- 0.7: rooms as faces (engine/mesh.py's mesh view) ------------------------------------------------------- #
+_skies = {}                                           # id(sky rows) -> (rows, bytes)
+
+
+def _sky_bytes(rows):
+    got = _skies.get(id(rows))
+    if got is None or got[0] is not rows:
+        if len(_skies) > 16:
+            _skies.clear()
+        got = _skies[id(rows)] = (rows, bytes(v for row in rows for c in row for v in c))
+    return got[1]
+
+
+def floor_kind(cell):
+    """A floor's clio_room_cell kind and belt, as View._backdrop_c works them out."""
+    kind = belt = 0
+    if getattr(cell, "plate", None):
+        kind = 2 if cell.down else 1
+    elif getattr(cell, "sunk", False):
+        kind = 3
+    elif getattr(cell, "teleport", None):
+        kind = 4
+    elif getattr(cell, "lift", None):
+        kind = 5
+    elif getattr(cell, "conveyor", None) is not None:
+        kind, belt = 6, cell.conveyor
+        if not isinstance(belt, int) or not 0 <= belt < 4:
+            raise Odd("a belt's way")
+    elif getattr(cell, "oil", False):
+        kind = 7
+    elif getattr(cell, "slick", False):
+        kind = 8
+    elif getattr(cell, "scorched", False):
+        kind = 9
+    return kind, belt
+
+
+def pack_rooms(faces, mesh_mod):
+    """The faces as clio_rooms takes them: ints, geo, xy, and the tiles (each once). Raises Odd for what the library
+    does not take."""
+    ints, geo, xy = array("i"), array("d"), array("q")
+    tiles, index = [], {}
+
+    def tile(rows):
+        if rows is None:
+            return -1
+        i = index.get(id(rows))
+        if i is None:
+            i = index[id(rows)] = len(tiles)
+            tiles.append(_texture(rows))
+        return i
+
+    FLOOR, CEILING = mesh_mod.FLOOR, mesh_mod.CEILING
+    for f in faces:
+        kind = f.kind
+        if kind == FLOOR:
+            cell, tex, fixed, toxic, fire, mark = f.info
+            k, belt = floor_kind(cell) if fixed else (0, 0)
+            px, py = (cell.x, cell.y) if k in (7, 9) else (f.ix, f.iy)
+            ints.extend((kind, 0, tile(tex), 0, k, belt, 1 if toxic else 0, 1 if fire else 0,
+                         1 if mark == "warn" else 2 if mark == "burn" else 0))
+            xy.extend((f.ix, f.iy, px, py))
+        elif kind == CEILING:
+            sky = f.info == "sky"
+            ints.extend((kind, 0, -1 if sky else tile(f.info), 0, 10 if sky else 0, 0, 0, 0, 0))
+            xy.extend((f.ix, f.iy, f.ix, f.iy))
+        else:
+            ints.extend((kind, f.side, tile(f.tex), 1 if f.wall else 0, 0, 0, 0, 0, 0))
+            xy.extend((0, 0, 0, 0))
+        geo.extend((float(f.at), float(f.lo), float(f.hi), float(f.h0), float(f.h1), float(f.top), float(f.opened)))
+    return ints, geo, xy, tiles
+
+
+def rooms(frame, view, mesh_mod, faces, cam, eye, phase, sky_rows):
+    """The mesh view's faces drawn into the frame by the library (0.7): the (pixel, face) pairs left to the caller,
+    or None when the library cannot draw them (then the Python does)."""
+    lib = load()
+    if lib is None or not hasattr(lib, "clio_frame_rooms") or not isinstance(phase, int) or not models_agree():
+        return None
+    try:
+        ints, geo, xy, tiles = pack_rooms(faces, mesh_mod)
+    except (Odd, TypeError, ValueError, OverflowError, IndexError):
+        return None
+    n = len(tiles)
+    texels = (ctypes.c_void_p * max(1, n))(*[t[3].buffer_info()[0] for t in tiles])
+    tw = array("i", [t[1] for t in tiles] or [0])
+    th = array("i", [t[2] for t in tiles] or [0])
+    sky = ctypes.c_char_p(_sky_bytes(sky_rows)) if sky_rows else None
+    cx, cy, fx, fy, rx, ry = cam
+    r = _Rooms(view.PW, view.PH, view.half, float(view.yh), view.LW * mesh_mod.Z0, view.TALL * mesh_mod.Z0,
+               float(cx), float(cy), float(fx), float(fy), float(rx), float(ry), mesh_mod.Z0, float(eye),
+               float(mesh_mod.FAR), mesh_mod.FADE, mesh_mod.NEAR, mesh_mod.SIDE, mesh_mod.NONE, phase,
+               ctypes.cast(sky, ctypes.c_void_p) if sky else None, len(sky_rows) if sky_rows else 0, len(faces),
+               _ptr(ints) if len(ints) else None, _ptr(geo) if len(geo) else None, _ptr(xy) if len(xy) else None, n,
+               ctypes.addressof(texels), _ptr(tw), _ptr(th))
+    later = (ctypes.c_int32 * (2 * view.PW * view.PH))()
+    count = ctypes.c_int(0)
+    if lib.clio_frame_rooms(frame.ref, ctypes.byref(r), later, ctypes.byref(count)) != 0:
+        return None
+    return [(later[2 * k], later[2 * k + 1]) for k in range(count.value)]

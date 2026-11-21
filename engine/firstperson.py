@@ -1737,6 +1737,12 @@ class View:
         from . import mesh as mesh_mod
         if self._mesh is None:
             self._mesh = mesh_mod.Mesh(self)
+        if frame is not None:                                 # CLIo Picture 0.7 draws it, where it can
+            px = frame.start(True)
+            labels = self._mesh.draw_frame(lv, cam, self.EYE, phase, fx.doors, sky, frame)
+            if labels is not None:
+                self.cover = frame.cover_view
+                return px, labels
         rgb, zbuf, cover, labels = self._mesh.draw(lv, cam, self.EYE, phase, fx.doors, sky)
         if frame is not None:
             px = frame.start(True)

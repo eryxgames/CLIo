@@ -16,6 +16,10 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   highest step walked up, by the player and by monsters, whose ways go round a ledge by the
   stairs. The eye rises smoothly up a stair. `--check` checks them; the editor's cell form
   has them.
+- **CLIo Picture 0.7** draws the mesh view when it is installed (`clio_frame_rooms`): at 150 x 34,
+  E1M1 in 3.2 ms (21.7 in Python), 5.0 in braille (52.2). Every face and floor kind is compared
+  with the Python's picture, to the pixel (`tests/test_mesh.py`'s features room). `--get-picture`
+  still installs 0.6 until 0.7 is released.
 
 ## 3.0.0 - 2026-11-21
 

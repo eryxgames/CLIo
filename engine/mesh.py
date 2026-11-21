@@ -22,6 +22,7 @@ everything otherwise."""
 from __future__ import annotations
 
 import math
+import sys
 from array import array
 
 from . import firstperson as fp
@@ -204,9 +205,11 @@ class Mesh:
         return fp.View.texture(lv, tile, phase) if tile else None
 
     # ---- the picture ---------------------------------------------------------------------------------- #
-    def draw(self, lv, cam, eye, phase, doors, sky):
+    def draw(self, lv, cam, eye, phase, doors, sky, later=None):
         """The picture (rows of (r, g, b)), each pixel's distance ahead of the player (``z``; NONE where no face
-        is), the nearest wall over each character cell, and the labels of walls seen close by."""
+        is), the nearest wall over each character cell, and the labels of walls seen close by. With ``later`` (a
+        list), teleporters' floors are left as CLIo Picture leaves them - haze, their distance set - and their
+        (pixel, face) pairs go into it: what the library's own test is made from."""
         view = self.view
         PW, PH, half, yh = view.PW, view.PH, view.half, view.yh
         cx, cy, fx, fy, rx, ry = cam
@@ -236,13 +239,14 @@ class Mesh:
             return v
 
         labels = []
-        for face in self.faces(lv, cam, eye, doors, phase, ex, ey):
+        for k, face in enumerate(self.faces(lv, cam, eye, doors, phase, ex, ey)):
             spans = self.spans(face, cam, eye, ex, ey)
             if not spans:
                 continue
             kind = face.kind
             if kind in (FLOOR, CEILING):
-                self.flat(face, spans, rgb, zbuf, sb, dirx, diry, ex, ey, eye, light, colour, sky, phase)
+                self.flat(face, spans, rgb, zbuf, sb, dirx, diry, ex, ey, eye, light, colour, sky, phase,
+                          later=None if later is None else (later, k))
                 continue
             n = (face.side, 0) if kind == XWALL else (0, face.side)
             k = SIDE + (1.0 - SIDE) * abs(n[0] * fx + n[1] * fy)
@@ -292,6 +296,48 @@ class Mesh:
             if hit is not None:
                 over.append((hit, face.label, getattr(face.cell, "label_role", None), hit[4]))
         return rgb, zbuf, cover, [(h[:4], t, r, z) for h, t, r, z in over]
+
+    def draw_frame(self, lv, cam, eye, phase, doors, sky, frame):
+        """The picture drawn by CLIo Picture (0.7) into the frame - pixels, distances, the walls' cover - and the
+        labels; None when the library cannot (the Python draws it then)."""
+        from . import picture
+        view = self.view
+        cx, cy, fx, fy, rx, ry = cam
+        ex, ey = cx - fx * Z0, cy - fy * Z0
+        faces = self.faces(lv, cam, eye, doors, phase, ex, ey)
+        later = picture.rooms(frame, view, sys.modules[__name__], faces, cam, eye, phase, sky)
+        if later is None:
+            return None
+        zbuf = frame.depth
+        if later:                                             # teleporters' rings, as the Python draws them
+            PW, half, yh = view.PW, view.half, view.yh
+            lx, ly = view.LW * Z0, view.TALL * Z0
+            dirx = [fx + ((x + 0.5 - half) / lx) * rx for x in range(PW)]
+            diry = [fy + ((x + 0.5 - half) / lx) * ry for x in range(PW)]
+            sb = [(y + 0.5 - yh) / ly for y in range(view.PH)]
+            lit = {}
+
+            def colour(c, q):
+                v = lit.get((c, q))
+                if v is None:
+                    v = lit[(c, q)] = fp.shade(c, q / 256.0)
+                return v
+            cur, view.cur_z = view.cur_z, -1e9
+            try:
+                for pixel, k in later:
+                    y, x = divmod(pixel, PW)
+                    self.flat(faces[k], [(y, x, x + 1)], frame.rows, zbuf, sb, dirx, diry, ex, ey, eye, None, colour,
+                              sky, phase, force=True)
+            finally:
+                view.cur_z = cur
+        labels = []
+        for face in faces:
+            if face.label is not None and face.side * (fx if face.kind == XWALL else fy) < 0 and \
+                    self.spans(face, cam, eye, ex, ey):
+                hit = self.label_at(face, cam, eye, zbuf)
+                if hit is not None:
+                    labels.append((hit[:4], face.label, getattr(face.cell, "label_role", None), hit[4]))
+        return labels
 
     def spans(self, face, cam, eye, ex, ey):
         """The pixels the face covers: (row, first column, column after the last), clipped to the picture."""
@@ -351,14 +397,18 @@ class Mesh:
                 out.append((y, xa, xb))
         return out
 
-    def flat(self, face, spans, rgb, zbuf, sb, dirx, diry, ex, ey, eye, light, colour, sky, phase):
-        """A floor or a ceiling: each row of it is one distance off."""
+    def flat(self, face, spans, rgb, zbuf, sb, dirx, diry, ex, ey, eye, light, colour, sky, phase, force=False,
+             later=None):
+        """A floor or a ceiling: each row of it is one distance off. With ``force``, pixels the library left to
+        the Python (a teleporter's rings): drawn where the pixel still holds this floor's distance."""
         PW = self.view.PW
         floor = face.kind == FLOOR
         dh = eye - face.at
         ix, iy = face.ix, face.iy
         if floor:
             cell, tex, fixed, toxic, fire, mark = face.info
+            pad = later is not None and fixed and not getattr(cell, "plate", None) and \
+                not getattr(cell, "sunk", False) and getattr(cell, "teleport", None)    # the library's kind 4
         else:
             tex = face.info
         for y, x0, x1 in spans:
@@ -374,7 +424,7 @@ class Mesh:
             row, base = rgb[y], y * PW
             for x in range(x0, x1):
                 i = base + x
-                if z >= zbuf[i]:
+                if (zbuf[i] != z) if force else (z >= zbuf[i]):
                     continue
                 ux = ex + d * dirx[x] - ix
                 uy = ey + d * diry[x] - iy
@@ -382,7 +432,7 @@ class Mesh:
                 uy = -0.5 if uy < -0.5 else 0.4999 if uy > 0.4999 else uy
                 if not floor:
                     if tex == "sky":
-                        c = sky[y][x] if sky is not None else fp.HAZE
+                        c = sky[y][x] if sky is not None and y < len(sky) else fp.HAZE
                         zbuf[i] = z
                         row[x] = c
                         continue
@@ -404,6 +454,11 @@ class Mesh:
                     th, tw = len(tex), len(tex[0])
                     c = tex[min(th - 1, int((uy + 0.5) * th))][min(tw - 1, int((ux + 0.5) * tw))]
                 if c is None and fixed:
+                    if pad:                                  # left as the library leaves it
+                        zbuf[i] = z
+                        row[x] = fp.HAZE
+                        later[0].append((i, later[1]))
+                        continue
                     c = fp.View.fixture(cell, ux, uy, phase)
                 if c is None and toxic:
                     c = fp.TOXIC_HI if fp.noise(int(ux * 8) + ix * 8, int(uy * 8) + iy * 8, phase) < 0.07 else fp.TOXIC

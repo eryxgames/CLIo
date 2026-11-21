@@ -88,5 +88,9 @@
  "e1m6_end": {
   "text": "Behind the gallery door the kernel's own lift waits, doors open, as if it had been told you were coming. Down here nothing is scheduled; nothing is anyone's.\n\nThe crontab ticks on behind you, every line commented out. Somewhere below, something reads the comments.",
   "show_once": false
+ },
+ "e1m7_end": {
+  "text": "The hatch drops shut under you and the stack goes quiet. Up here the return address is a room with a window, and through the window, for the first time, a city: towers in a haze, and over them all one spire, lit from inside, turning slowly as if it were looking for someone.\n\nOn the glass, in frost, someone has written: ASPIRATION CENTRAL.\n\nNext: Aspiration Central.",
+  "show_once": false
  }
 }

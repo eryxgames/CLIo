@@ -1921,7 +1921,9 @@ stairs and plating as map characters (it walks into them). RØØTLESS's **SIM-11
   beats later, if given): whoever hangs there falls.
 
 The bot walks the ceiling too: plating up to it and hatches are map characters among its goals,
-and `drop` lets go (then `mag` puts the boots on again).
+and `drop` lets go (then `mag` puts the boots on again). RØØTLESS's **E1M7: The Stack** is built on
+it: an overflow hall crossed on its ceiling, a switch reached only from up there, a corridor whose
+plating dies behind the player, and a hatch up to the way out.
 
 ### Doors and gates: lockers, supply crates, bars, force fields, timed and one-way doors
 

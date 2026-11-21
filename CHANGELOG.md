@@ -44,6 +44,9 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   marked `"high"` are reached only from up there; hatches (`"hatch"`) lead up to the deck above
   and down again; letting go (F3) drops him on to what is below; an event can cut a ceiling's
   power (`"mag_off_on"`, `"mag_delay"`). Keys follow the screen. The level bot walks it too.
+- **RØØTLESS E1M7: The Stack**, after E1M6: the overflow hall crossed on its ceiling (hornets
+  come up there), a switch reached only from it, a drop to a door, a corridor whose plating dies
+  behind you, and a hatch up to the return address - and a first look at Aspiration Central.
 - **Play in the browser** (`engine/editor/web/play.html`, `engine/web.py`): every game and the
   tech demo in a web page, the engine unchanged in Python made for the web (Pyodide) - a
   terminal on the page (xterm.js), keys shared with the game's worker, sound through WebAudio,

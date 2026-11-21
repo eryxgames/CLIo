@@ -2491,6 +2491,229 @@
    }
   }
  },
+ "e1m7": {
+  "name": "The Stack",
+  "title": "E1M7   THE STACK",
+  "intro": [
+   "Under kernel space the stack grows downward, frame under frame - and something has filled it.",
+   "Overflow: the floors are awash with it. The ceilings are plated for the maintenance drones.",
+   "You have boots for plating. Somewhere above the last frame is the return address."
+  ],
+  "par": 110,
+  "music": "the_stack",
+  "facing": "e",
+  "death_text": "outro_lose",
+  "render": "mesh",
+  "events": {
+   "frame": "RET: the return address pops. Down by the floor, the frame's door slides open.",
+   "unwind": "The stack unwinds: behind you the plating dies, frame by frame. Keep moving."
+  },
+  "bot": [
+   "magboots",
+   "shotgun",
+   "^",
+   "!",
+   "i",
+   "drop",
+   "mag",
+   "%",
+   "H",
+   "E"
+  ],
+  "map": [
+   "#################!##################",
+   "#~~~~~~~~~~~~~~~~~~~################",
+   "#~~~~~~~~~~~~~~~~~~~######rKrrrrrr##",
+   "#~~~~~~~zo~~~~~q~~~~######rrrrrrrrE#",
+   "#~~~~~~~oo~~~~~~~~~~######rrrrrrrr##",
+   "#~~~~~q~~~~~~~~~~~~~######rrrJrrrr##",
+   "#~~~~~~~~~~~~~~~~~~~######rrrrrnrr##",
+   "#~~~~~~~~~q~~~~~~~~~################",
+   "#oooo~~~~~~~~ok~~~~~################",
+   "#oSoo~~~~~~~~mo~~ooo################",
+   "^oooo~~~~~~~~~~~~ooo#omoabcdefgh~~##",
+   "#o@Go~~~~~~~~~~~~oioDoooabcdefgh~H##",
+   "#ooos~~~~~~~~~~~~ooo#oooabcdefgh~~##",
+   "######################%#########&###"
+  ],
+  "legend": {
+   "~": {
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "ceiling": "magwall",
+    "toxic": true
+   },
+   "o": {
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "ceiling": "magwall"
+   },
+   "i": {
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "ceiling": "magwall"
+   },
+   "@": {
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "ceiling": "magwall",
+    "start": true,
+    "floor": "pad"
+   },
+   "G": {
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "ceiling": "magwall",
+    "item": "magboots"
+   },
+   "S": {
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "ceiling": "magwall",
+    "item": "shotgun"
+   },
+   "s": {
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "ceiling": "magwall",
+    "item": "shells"
+   },
+   "m": {
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "ceiling": "magwall",
+    "item": "medkit"
+   },
+   "z": {
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "ceiling": "magwall",
+    "monster": "zombie"
+   },
+   "k": {
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "ceiling": "magwall",
+    "monster": "kworker"
+   },
+   "q": {
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "ceiling": "magwall",
+    "toxic": true,
+    "monster": "hornet"
+   },
+   "^": {
+    "mag_ceiling": true
+   },
+   "%": {
+    "mag_ceiling": true
+   },
+   "&": {
+    "mag_ceiling": true
+   },
+   "!": {
+    "switch": "frame",
+    "high": true,
+    "label": "RET"
+   },
+   "D": {
+    "door": true,
+    "opens_on": "frame"
+   },
+   "H": {
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "ceiling": "magwall",
+    "toxic": true,
+    "hatch": "ret"
+   },
+   "J": {
+    "hatch": "ret",
+    "deck": 1,
+    "ceiling_height": 1.4
+   },
+   "r": {
+    "ceiling_height": 1.4
+   },
+   "K": {
+    "monster": "kworker",
+    "ceiling_height": 1.4
+   },
+   "c": {
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "ceiling": "magwall",
+    "toxic": true,
+    "mag_off_on": "unwind",
+    "mag_delay": 7
+   },
+   "E": {
+    "exit": true
+   },
+   "a": {
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "ceiling": "magwall",
+    "toxic": true,
+    "mag_off_on": "unwind",
+    "mag_delay": 5,
+    "on_enter": "unwind"
+   },
+   "b": {
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "ceiling": "magwall",
+    "toxic": true,
+    "mag_off_on": "unwind",
+    "mag_delay": 6
+   },
+   "d": {
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "ceiling": "magwall",
+    "toxic": true,
+    "mag_off_on": "unwind",
+    "mag_delay": 8
+   },
+   "e": {
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "ceiling": "magwall",
+    "toxic": true,
+    "mag_off_on": "unwind",
+    "mag_delay": 9
+   },
+   "f": {
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "ceiling": "magwall",
+    "toxic": true,
+    "mag_off_on": "unwind",
+    "mag_delay": 10
+   },
+   "g": {
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "ceiling": "magwall",
+    "toxic": true,
+    "mag_off_on": "unwind",
+    "mag_delay": 11
+   },
+   "h": {
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "ceiling": "magwall",
+    "toxic": true,
+    "mag_off_on": "unwind",
+    "mag_delay": 12
+   },
+   "n": {
+    "item": "clip",
+    "ceiling_height": 1.4
+   }
+  }
+ },
  "sim12": {
   "name": "Stairwell",
   "title": "SIM-12: Stairwell",

@@ -226,5 +226,56 @@ class CeilingTests(unittest.TestCase):
         self.assertEqual(out, "exit", lv.log[-6:])
 
 
+class TheStackTests(unittest.TestCase):
+    """RØØTLESS E1M7 The Stack: an overflow hall crossed on its ceiling, a switch only reached from up there,
+    a corridor whose plating dies behind him, a hatch up to the return address."""
+
+    def setUp(self):
+        from engine.data import GameData
+        from test_levels import ROOTLESS
+        self.data = GameData(ROOTLESS)
+
+    def level(self):
+        lv = Level(self.data, "e1m7", seed=1)
+        lv.console = Quiet()
+        return lv
+
+    def test_it_is_checked_and_follows_kernel_space(self):
+        self.assertEqual([q for q in validate(self.data) if "e1m7" in q], [])
+        scenes = {s["id"]: s for s in self.data.scenes} if isinstance(self.data.scenes, list) else self.data.scenes
+        self.assertIn({"goto": "the_stack"}, scenes["kernel_space"]["on_level_exit"])
+        lv = self.level()
+        self.assertTrue(lv.heights and View(60, 20).meshed(lv))
+
+    def test_the_hall_is_crossed_only_on_its_ceiling(self):
+        lv = self.level()
+        start = (lv.player.x, lv.player.y)
+        landing = next((c.x, c.y) for row in lv.grid for c in row if c.ch == "i")
+        ways = lv.distances(*landing)
+        self.assertIn(start, ways)                             # by the floor: only through the acid
+        acid = [c for row in lv.grid for c in row if c.toxic and not c.solid]
+        self.assertGreater(len(acid), 150)
+        switch = next(c for row in lv.grid for c in row if c.switch == "frame")
+        self.assertTrue(switch.high)
+
+    def test_the_corridor_unwinds_behind_him(self):
+        lv = self.level()
+        first = next(c for row in lv.grid for c in row if c.on_enter == "unwind")
+        lv.player.magboots = lv.player.mag_on = True
+        put(lv, first.x, first.y, 1)
+        lv.player.ceiling = True
+        lv.arrive()                                            # under its first cell: the unwinding starts
+        self.assertIn("unwind", lv.events)
+        dying = sorted({(b, x) for b, x, y in lv.cuts})
+        self.assertEqual([x - first.x for _b, x in dying], list(range(8)))   # a column a beat, further on later
+        self.assertEqual(dying[0][0] - lv.beat, 5)
+
+    def test_the_bot_plays_it_through(self):
+        for seed in (1, 4):
+            out, lv = levelbot.play(self.data, "e1m7", seed=seed)
+            self.assertEqual(out, "exit", seed)
+            self.assertLessEqual(lv.beat, 110)
+
+
 if __name__ == "__main__":
     unittest.main()

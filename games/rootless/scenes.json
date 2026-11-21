@@ -114,6 +114,24 @@
     "pause": true
    },
    {
+    "goto": "the_stack"
+   }
+  ]
+ },
+ {
+  "id": "the_stack",
+  "name": "The Stack",
+  "area": "Episode 1",
+  "description": "Under kernel space, frame under frame, the stack awash with overflow - crossed on its ceilings, upside down.",
+  "level": "e1m7",
+  "on_level_exit": [
+   {
+    "story": "e1m7_end"
+   },
+   {
+    "pause": true
+   },
+   {
     "win": "outro_demo"
    }
   ]

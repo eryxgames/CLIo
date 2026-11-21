@@ -431,5 +431,13 @@
    "seed": 66,
    "bars": 16
   }
+ },
+ "the_stack": {
+  "title": "The Stack",
+  "generate": {
+   "mood": "tense",
+   "seed": 77,
+   "bars": 16
+  }
  }
 }

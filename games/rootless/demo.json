@@ -10,6 +10,7 @@
   {"level": "e1m5", "skip": 4, "seconds": 20, "caption": "E1M5 User Space: through a one-way door, to his own locker"},
   {"level": "e1m5", "skip": 150, "seconds": 22, "caption": "E1M5 User Space: an emitter shot through its own field, then a time slice"},
   {"level": "e1m6", "seconds": 24, "caption": "E1M6 Kernel Space: in the mesh view, up the scheduler's dais to the crontab"},
+  {"level": "e1m7", "skip": 6, "seconds": 22, "caption": "E1M7 The Stack: on the ceiling, upside down, over the overflow"},
   {"level": "e1m3", "skip": 300, "seconds": 18, "caption": "E1M3 Drone Refit Assembly: lift-off at the last"},
   {"level": "sim1", "skip": 130, "seconds": 18, "views": ["dots-fill"], "caption": "SIM-1 Long Fens: land without end, in braille"},
   {"level": "sim11", "seconds": 22, "caption": "SIM-11 Deep Works: magboots on a slick deck, the stairs, up a magnetic wall"},

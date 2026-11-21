@@ -516,7 +516,7 @@ class HeightTests(unittest.TestCase):
         data = GameData(ROOTLESS)
         for lid in data.levels:
             lv = Level(data, lid, seed=1)
-            if lv.land is None and lid != "sim12":           # SIM-12: the stairwell, built on heights
+            if lv.land is None and lid not in ("sim12", "e1m6"):     # SIM-12, E1M6: built on heights
                 self.assertFalse(lv.heights, lid)
                 self.assertEqual(lv.ground(lv.player.x + 0.3, lv.player.y), 0.0)
 
@@ -560,6 +560,46 @@ class StairwellTests(unittest.TestCase):
             self.assertEqual(out, "exit", seed)
             self.assertLessEqual(lv.beat, 90)
 
+
+
+class KernelSpaceTests(unittest.TestCase):
+    """RØØTLESS E1M6 Kernel Space: a hall of many floors - the gallery a storey up, the scheduler's dais in
+    tiers, the interrupt well, a low crawlway - drawn as a mesh."""
+
+    def test_it_is_checked_and_drawn_as_a_mesh(self):
+        data = GameData(ROOTLESS)
+        self.assertEqual([q for q in validate(data) if "e1m6" in q], [])
+        lv = Level(data, "e1m6", seed=1)
+        self.assertTrue(lv.heights and view().meshed(lv))
+        self.assertEqual(data.scenes["user_space"]["on_level_exit"][-1], {"goto": "kernel_space"})   # after E1M5
+
+    def test_the_gallery_and_the_well_are_reached_their_own_ways(self):
+        lv = Level(GameData(ROOTLESS), "e1m6", seed=1)
+        self.assertGreater(lv.distances(6, 3)[(6, 4)], 6)     # the gallery from just below it: round by the stairs
+        self.assertGreater(lv.distances(3, 15)[(3, 16)], 6)   # out of the well: up its ramp
+        self.assertEqual(lv.distances(3, 16)[(3, 15)], 1)     # into it: a drop
+
+    def test_the_cache_lines_hide_the_trench_but_not_from_the_gallery(self):
+        lv = Level(GameData(ROOTLESS), "e1m6", seed=1)
+        self.assertFalse(lv.line_of_sight(18, 10, 16, 5))
+        self.assertTrue(lv.line_of_sight(16, 3, 16, 5))
+
+    def test_the_crontab_opens_the_gallery_door(self):
+        lv = Level(GameData(ROOTLESS), "e1m6", seed=1)
+        lv.console = Quiet()
+        self.assertTrue(lv.cell(25, 2).solid)
+        put(lv, 13, 14, 2)                                    # on the dais top, facing the console
+        lv.run_line("use")
+        self.assertIn("crontab", " ".join(t for t, _r in lv.log[-3:]))
+        self.assertFalse(lv.cell(25, 2).solid)
+
+    def test_the_bot_plays_it_through(self):
+        from engine import levelbot
+        data = GameData(ROOTLESS)
+        for seed in (1, 4):
+            out, lv = levelbot.play(data, "e1m6", seed=seed)
+            self.assertEqual(out, "exit", seed)
+            self.assertLessEqual(lv.beat, 150)
 
 
 if __name__ == "__main__":

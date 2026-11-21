@@ -356,7 +356,7 @@ class UserSpaceTests(unittest.TestCase):
         self.assertEqual(sorted(m.on_death for m in lv.monsters if m.on_death), ["mmu_east", "mmu_west"])
         scenes = {s["id"]: s for s in data.scenes} if isinstance(data.scenes, list) else data.scenes
         self.assertIn({"goto": "user_space"}, scenes["xantrium_fens"]["on_level_exit"])
-        self.assertIn({"win": "outro_demo"}, scenes["user_space"]["on_level_exit"])
+        self.assertIn({"goto": "kernel_space"}, scenes["user_space"]["on_level_exit"])     # on to E1M6
 
     def test_the_bot_gets_through_and_a_save_holds_it(self):
         from engine.data import GameData

@@ -96,6 +96,24 @@
     "pause": true
    },
    {
+    "goto": "kernel_space"
+   }
+  ]
+ },
+ {
+  "id": "kernel_space",
+  "name": "Kernel Space",
+  "area": "Episode 1",
+  "description": "Ring 0: a hall of many floors - a gallery, the scheduler's dais, the interrupt well - and your crontab.",
+  "level": "e1m6",
+  "on_level_exit": [
+   {
+    "story": "e1m6_end"
+   },
+   {
+    "pause": true
+   },
+   {
     "win": "outro_demo"
    }
   ]

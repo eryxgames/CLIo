@@ -1964,7 +1964,9 @@ action), a turn is drawn turning, magboots walking up a wall turn the whole view
 fill the corners), bullet holes show where shots hit the walls, and `"detail": "low"` draws the
 floors and ceilings at half width, as the classic picture does. The editor's look from a cell
 shows either picture (*rooms as the level says*, *classic rooms*, *mesh view*). RØØTLESS's
-SIM-12 (`--level sim12`) has stairs, a mezzanine, a pit and a ramp. A demo clip can ask for
+SIM-12 (`--level sim12`) has stairs, a mezzanine, a pit and a ramp; **E1M6: Kernel Space** is
+a whole level built on heights: a gallery a storey up, reached by its stairs, the scheduler's
+dais in tiers, the interrupt well and a crawlway under a low ceiling. A demo clip can ask for
 the mesh too: `"render": "mesh"`.
 
 **Terraces on open land.** On a level with `"land"`, a map cell with `"height"` stands that

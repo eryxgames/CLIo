@@ -423,5 +423,13 @@
    "B",
    "B"
   ]
+ },
+ "kernel_space": {
+  "title": "Kernel Space",
+  "generate": {
+   "mood": "dark",
+   "seed": 66,
+   "bars": 16
+  }
  }
 }

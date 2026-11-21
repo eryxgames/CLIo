@@ -34,6 +34,9 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   the editor's look from a cell shows classic rooms or the mesh view.
 - Terraces on open land: a map cell with `"height"` on a level with `"land"` stands that much
   over the pad - steps, platforms - walked up within `"climb"` (the Python draws them).
+- **RØØTLESS E1M6: Kernel Space**, after E1M5: a hall of many floors in the mesh view - a
+  gallery a storey up, the scheduler's dais in tiers with your crontab on top, the interrupt
+  well, a crawlway under a low ceiling. In the RØØTLESS demo and the tech demo.
 - **Play in the browser** (`engine/editor/web/play.html`, `engine/web.py`): every game and the
   tech demo in a web page, the engine unchanged in Python made for the web (Pyodide) - a
   terminal on the page (xterm.js), keys shared with the game's worker, sound through WebAudio,

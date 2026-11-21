@@ -17,6 +17,7 @@
   {"level": "sim11", "skip_until": "vehicle", "seconds": 14, "caption": "Under water: the bottom below, the surface above"},
   {"card": "MESH VIEW", "style": "chrome", "palette": "ice", "seconds": 3, "text": ["rooms in a true perspective, floors and ceilings at their own heights"]},
   {"level": "sim12", "seconds": 14, "caption": "Real stairs, a mezzanine, a pit: SIM-12 Stairwell"},
+  {"level": "e1m6", "skip": 20, "seconds": 14, "caption": "RØØTLESS E1M6 Kernel Space: a gallery a storey up, a dais in tiers, a well"},
   {"level": "e1m1", "render": "mesh", "seconds": 10, "caption": "E1M1 drawn as a mesh (--render mesh)"},
   {"card": "DOORS", "style": "chrome", "palette": "ice", "seconds": 3, "text": ["lockers, supply crates, bars, force fields, timed and one-way doors"]},
   {"level": "e1m5", "skip": 150, "seconds": 16, "caption": "A field shot down through itself; a door open for a time slice"},

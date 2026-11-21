@@ -2282,6 +2282,215 @@
    "E"
   ]
  },
+ "e1m6": {
+  "name": "Kernel Space",
+  "title": "E1M6   KERNEL SPACE",
+  "intro": [
+   "Ring 0. The hall hums like a held breath; the floor is not one floor here but many - a gallery",
+   "a storey up, the scheduler's dais in tiers, the interrupt well sunk under it all. On the dais",
+   "a crontab ticks. Every line of it has your name."
+  ],
+  "par": 150,
+  "music": "kernel_space",
+  "facing": "n",
+  "death_text": "outro_lose",
+  "render": "mesh",
+  "events": {
+   "crontab": "crontab -e. You put a # in front of every line with your name on it. Up in the gallery a door unlocks."
+  },
+  "bot": [
+   "shotgun",
+   "!",
+   "E"
+  ],
+  "map": [
+   "#################################",
+   "#MMMMMhMMMMMMMMMMMMMMLMMM#,,,,,##",
+   "#MMMMMMMMMMMkMMMMMMMMMMMMT,,,,,E#",
+   "#MMMMMMMMMMMMMMMMMMMMMMMM#,,,,,##",
+   "#.777...............z....########",
+   "#.666...........z........########",
+   "#.555.........BBBBBBBBB..########",
+   "#.444.........BBBBBBBBB..########",
+   "#.333....................########",
+   "#.222...z................cccccc##",
+   "#.111....................#####c##",
+   "#........xxxxxxxxx.......#####U##",
+   "#........xyyyyyyyx....z..#####c##",
+   "#........xyKvvvvyx.......#####c##",
+   "#........xyvDDDvyx.......#####A##",
+   "#........xyvD!Dvyx.......#####c##",
+   "#pppppmn.xyvDDDvyx.......#####c##",
+   "#pupepmn.xyvvvvvyx..d....#####c##",
+   "#ppuppmn.xyyyyyyyx.......#####c##",
+   "#pppppmn.xxxxxxxxx.......cccccc##",
+   "#pHpppmn.................########",
+   "#pppppmn..s..S...........########",
+   "#........................########",
+   "###########lllll#################",
+   "###########ll@ll#################",
+   "#################################"
+  ],
+  "legend": {
+   ".": {
+    "ceiling_height": 2.6
+   },
+   "@": {
+    "start": true,
+    "floor": "pad",
+    "ceiling_height": 1.4
+   },
+   "l": {
+    "floor": "pad",
+    "ceiling_height": 1.4
+   },
+   "S": {
+    "item": "shotgun",
+    "ceiling_height": 2.6
+   },
+   "s": {
+    "item": "shells",
+    "ceiling_height": 2.6
+   },
+   "z": {
+    "monster": "zombie",
+    "ceiling_height": 2.6
+   },
+   "d": {
+    "monster": "daemon",
+    "ceiling_height": 2.6
+   },
+   "M": {
+    "height": 0.96,
+    "ceiling_height": 2.6
+   },
+   "h": {
+    "item": "medkit",
+    "height": 0.96,
+    "ceiling_height": 2.6
+   },
+   "k": {
+    "monster": "kworker",
+    "height": 0.96,
+    "ceiling_height": 2.6
+   },
+   "L": {
+    "monster": "spinlock",
+    "height": 0.96,
+    "ceiling_height": 2.6
+   },
+   "T": {
+    "door": true,
+    "opens_on": "crontab",
+    "height": 0.96,
+    "ceiling_height": 1.96
+   },
+   ",": {
+    "height": 0.96,
+    "ceiling_height": 1.96
+   },
+   "7": {
+    "height": 0.84,
+    "ceiling_height": 2.6
+   },
+   "6": {
+    "height": 0.72,
+    "ceiling_height": 2.6
+   },
+   "5": {
+    "height": 0.6,
+    "ceiling_height": 2.6
+   },
+   "4": {
+    "height": 0.48,
+    "ceiling_height": 2.6
+   },
+   "3": {
+    "height": 0.36,
+    "ceiling_height": 2.6
+   },
+   "2": {
+    "height": 0.24,
+    "ceiling_height": 2.6
+   },
+   "1": {
+    "height": 0.12,
+    "ceiling_height": 2.6
+   },
+   "B": {
+    "height": 0.8,
+    "ceiling_height": 2.6
+   },
+   "x": {
+    "height": 0.2,
+    "ceiling_height": 2.6
+   },
+   "y": {
+    "height": 0.4,
+    "ceiling_height": 2.6
+   },
+   "v": {
+    "height": 0.6,
+    "ceiling_height": 2.6
+   },
+   "D": {
+    "height": 0.8,
+    "ceiling_height": 1.8
+   },
+   "K": {
+    "monster": "kworker",
+    "height": 0.6,
+    "ceiling_height": 2.6
+   },
+   "!": {
+    "switch": "crontab",
+    "label": "CRON"
+   },
+   "n": {
+    "height": -0.25,
+    "ceiling_height": 2.6
+   },
+   "m": {
+    "height": -0.5,
+    "ceiling_height": 2.6
+   },
+   "p": {
+    "floor": "grate",
+    "height": -0.8,
+    "ceiling_height": 2.6
+   },
+   "H": {
+    "floor": "grate",
+    "item": "medkit",
+    "height": -0.8,
+    "ceiling_height": 2.6
+   },
+   "e": {
+    "floor": "grate",
+    "item": "shells",
+    "height": -0.8,
+    "ceiling_height": 2.6
+   },
+   "u": {
+    "floor": "grate",
+    "monster": "bugrat",
+    "height": -0.8,
+    "ceiling_height": 2.6
+   },
+   "c": {
+    "ceiling_height": 0.9
+   },
+   "A": {
+    "item": "armor",
+    "secret": true,
+    "ceiling_height": 0.9
+   },
+   "U": {
+    "monster": "bugrat",
+    "ceiling_height": 0.9
+   }
+  }
+ },
  "sim12": {
   "name": "Stairwell",
   "title": "SIM-12: Stairwell",

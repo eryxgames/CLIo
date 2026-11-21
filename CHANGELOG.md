@@ -4,9 +4,28 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 
 ## Unreleased
 
-First-person levels: a scene can hold a map that the player walks through, seen through
-his eyes and redrawn in place, with monsters that move a beat at a time. A third demo
-game, RØØTLESS, shows them.
+CLIo 3: from text adventures to a first-person shooter, in the same terminal.
+
+**What's new, for players**
+
+- **RØØTLESS**, a third game: a first-person shooter drawn in pixel blocks (or braille), a
+  beat at a time - five levels and a secret one, monsters with brains that take cover and
+  work in squads, vehicles to ride and fly, open land to the horizon, 3D-modelled drones,
+  lockers and supply crates, force fields, and a boss on a crontab.
+- **A simulatron of other kinds of game**, all in RØØTLESS: a platformer, an arcade shooter,
+  real-time strategy against the computer, a flight simulator, a reactor to keep in bounds,
+  card duels, levels without end, and a test course for magboots, jetpacks and submarines.
+- **Demos that play themselves**: CLIo's tech demo from the launcher, each game's own from its
+  title screen - or left alone for a while.
+- **Phones**: tap and swipe in RØØTLESS, a row of game keys for Termux, and optional
+  downloads from the launcher that make the picture several times faster.
+- **Windows**: the old console's fonts are drawn for, so no more question marks.
+- **Saves inside levels**, real time if you want it (`--realtime`), and physically modelled
+  sound for shots and blasts (`--sounds ballistic`).
+- **For game makers**: the editor paints first-person levels and monsters, grows monsters on a
+  body plan, imports 3D models from Blender, and checks that a level can be finished.
+
+The details follow.
 
 ### Added
 

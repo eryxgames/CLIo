@@ -1,0 +1,146 @@
+# Developing CLIo
+
+For people working on the engine itself. Making a game needs none of this: see
+[AUTHORING.md](AUTHORING.md). Playing needs even less: see the [README](../README.md).
+
+## What the engine does
+
+- [x] Core engine: scenes, exits (locked, blocked, guarded, hidden), items, fixtures with state machines
+- [x] Parser with synonyms, directions, `use X on Y`, `give X to Y`, game-defined verbs, typo suggestions
+- [x] Inventory, equipment slots, crafting, combining, repairing
+- [x] Simple dialogues (original format) **and** branching dialogue trees with conditions and effects
+- [x] Character interaction: giving, trading, NPC crafting, shops
+- [x] Character movement, followers, ambushes, guards
+- [x] Character/enemy spawning (`spawn` effect, generated dungeons)
+- [x] Quests with stages that track themselves, a journal, triggers
+- [x] RPG features: stats, levels, experience, gold, classes
+- [x] Tactical combat: telegraphed enemy moves, guard/focus/heavy, skills, status effects, items, fleeing
+- [x] Fights against groups: every enemy shows its intent, targets by number, area skills and items
+- [x] Character generator (name and class at the start of a game)
+- [x] Sounds and music: synthesizer, generative composer, optional audio files
+- [x] Sound sets, and physically modelled shots, ricochets and blasts from
+      [Ballistic Foley Lab](https://github.com/eigensoundlab/ballistic)'s engine (Node.js, its C
+      engine, or baked)
+- [x] Styling: seven themes, frames, typewriter / fade / glitch effects, HUD
+- [x] ASCII art with colour masks, half-block pixel sprites, procedural sprites
+- [x] Banners: a game's title (or any text) in nine graphic styles and thirteen palettes, with
+      animation - glitch, flicker, shine, twinkle, pulse, colour cycle, typing, hand-drawn frames
+- [x] A game's own palettes and house style for banners, drawn live in the editor
+- [x] Pictures in the same styles - half blocks, square blocks, braille dots, LED, ASCII -
+      with drawings that play in turn, drawn and played in the editor
+- [x] Fifteen CLIo logos to choose from, most of them animated
+- [x] Auto-map
+- [x] Generative maze, monster packs, endless dungeons that scale with depth
+- [x] Game modes (for example story and rogue), permadeath, scores and a records table
+- [x] Card battles: decks, hands and energy, enemies that show what they will do, duellists with
+      decks of their own that choose by search, card rewards; a mode or a character turns them on
+- [x] First-person levels: a map drawn in perspective and redrawn in place (frame mode),
+      textured walls, sprites that shrink with distance and keep their eyes, 3D models, monsters
+      that aim, throw fire, charge, spawn and fight each other, keys, doors, lockers, supply
+      crates, bars, force fields, timed and one-way doors, secrets, events, a boss on a
+      schedule, an automap; arrow keys or typed commands, any window size; a game's own tiles;
+      crates, pressure plates, teleporters, lifts, stairs, magnetic walls, a jetpack, water to
+      swim and dive in; debris and gibs; an end screen; a map painter in the editor
+- [x] Monsters with brains that take cover, flank, hold and fall back, throw grenades and lay
+      mines, in squads that share what they see - packs that swarm, sweeps, ambushes, assaults;
+      open land and dungeons without end; saves that hold a level's state
+- [x] Arcade stages in real time: platformers (jumps, platforms, ladders, doors and keys,
+      checkpoints) and top-down chases, enemies that walk, hop, fly, hunt and shoot, drawn in
+      half-block pixels; a bot that proves each stage can be cleared
+- [x] Real-time strategy: skirmishes with workers, two resources, buildings, training, upgrades
+      and tech, armies on flow fields, fliers and transports, control groups, fog of war, a
+      computer player that builds, researches and attacks in waves; keys and the mouse; orders
+      kept by tick, so a game plays back (the base for lockstep multiplayer)
+- [x] Simulators: cars, boats, a hopper and planes in fixed steps over a map, instruments,
+      fuel and systems as data (formulas), checkpoints and landings; systems sims with controls
+      and charts; an autopilot that proves each one can be done
+- [x] Save / load of the *whole* world, named slots
+- [x] Optional C libraries, exactly as fast as the Python is right: CLIo Picture (the
+      first-person picture; models kept as meshes for crowds) and Ballistic's C engine (sound)
+- [x] Demos that play by themselves: CLIo's tech demo and a game's own
+- [x] Three demo games, a starter template, several hundred automated tests
+- [x] Game editor in the browser: `python clio.py mygame --edit`, or
+      [on the web](https://eryxgames.github.io/CLIo/) with nothing installed - forms for
+      everything a game is made of, the map, conversations as graphs, all text as a
+      table, an enemy workshop, a sprite editor, and a check that the game can be finished
+- [ ] The older entity data editor (`utils/entity_editor.py`, Tkinter, desktop only - still alpha and
+      still edits the CLIo 1 file layout in `game_files/`; its Project Map needs
+      `pip install graphviz pillow` plus the Graphviz program)
+
+## Project layout
+
+```
+clio.py              launcher
+engine/
+  term.py            terminal detection, colour, markup, wrapping
+  ui.py              frames, panels, menus, HUD, text effects
+  theme.py           themes (files in engine/style/configs/)
+  art.py             ASCII art files          sprite.py   pixel sprites
+  banner.py          text in graphic styles   fx.py       art animation
+  automap.py         auto-map                 maze.py     dungeon generator
+  audio/             synth, composer, sound effects, playback backends
+    ballistic/       Ballistic Foley Lab's sound engine (Node.js, or its C engine: --get-ballistic)
+  picture/           CLIo Picture: the first-person picture in C, when installed (--get-picture)
+  downloads.py       the launcher's optional downloads
+  data.py            loading and normalising game files
+  world.py           game state, save/load
+  parser.py          command parser           actions.py  the verbs
+  conditions.py      conditions and effects   quests.py   dialogue.py   combat.py
+  game.py            the turn loop
+  level.py           first-person levels      firstperson.py  the view
+  levelbot.py        a player that proves a level can be finished
+  model.py           3D models in levels      gltf.py     glTF from Blender
+  frame.py  keys.py  the redrawn screen and single keys
+  demo.py            the demos (engine/demos/clio.json, a game's demo.json)
+  editor/            the editor (a page in the browser, also served as a web site)
+games/               derelict/  depths/  rootless/
+templates/starter/   a tiny complete game to copy (Apache-2.0)
+game_files/          the original CLIo 1 sandbox
+tests/               python -m unittest discover -s tests
+utils/               Tkinter data editor (desktop, alpha)
+index.html, .nojekyll   the editor as a web site (GitHub Pages serves the repository as it is)
+legacy/prototypes/   early dialogue / crafting experiments from CLIo 1
+```
+
+`python main.py` still works, as in CLIo 1. Games written for CLIo 1 (`config.json` + scenes /
+items / characters / story texts) load as they are; see "Coming from CLIo 1" in the authoring
+guide.
+
+## Tests
+
+```
+python -m unittest discover -s tests     # 681 tests, about a minute
+python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
+python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
+python tests/bot.py 30 cards             # the same with card battles (the Deck mode)
+python tests/levelbot.py 10              # an automatic player walks Rootless's E1M1 ten times
+python tests/levelbot.py 10 rootless e1m9  # ...and its secret level
+python tests/levelbot.py 10 rootless e1m2  # ...and E1M2, the loader and all
+python tests/levelbot.py 10 rootless e1m3  # ...and E1M3, out over the swamp
+python tests/levelbot.py 10 rootless e1m4  # ...and E1M4, across the fens to the mast
+python tests/levelbot.py 10 rootless e1m5  # ...and E1M5, lockers, fields and the time slice
+python tests/levelbot.py 10 rootless sim1  # ...and the Simulatron's fens without end (also sim2, sim3)
+python tests/levelbot.py 10 rootless sim4  # ...and the Kill House, a room for each kind of squad
+```
+
+The tests play the adventure and the dungeon to every ending from scripts, walk Rootless's
+levels to their exits (key presses in a redrawn screen and typed commands), check that every
+screen fits 40 columns in both Unicode and ASCII (and down to 24), fight packs, run rogue mode
+until the bot falls, round-trip saves, and render every sound effect. They write nothing into
+the repository: saves and audio go to temporary folders. With `CLIO_PICTURE_LIB` set to a build
+of CLIo Picture (and `CLIO_PICTURE_REQUIRE=1`), the picture tests compare it with the Python.
+
+## Releasing
+
+Raise `__version__` in `engine/__init__.py`, add a `## x.y.z - date` section to
+`CHANGELOG.md`, then push a tag: `git tag -a vx.y.z -m "CLIo x.y.z" && git push origin vx.y.z`.
+The release workflow (`.github/workflows/release.yml`) runs the tests, makes the GitHub release
+with those notes (each paragraph joined onto one line, as GitHub keeps line breaks in release
+notes), the engine as a zip and the editor's web pack, and pushes both to itch.io
+(channels `win-linux-mac` and `html5`). It needs the repository secret `BUTLER_API_KEY`
+(itch.io → Settings → API keys, the key whose source is wharf); without it the itch.io step is
+skipped.
+
+The optional libraries are released from their own repositories; CLIo follows one release of
+each (`RELEASE` and `SHA256` in `engine/picture/fetch.py` and `engine/audio/ballistic/fetch.py`,
+sizes in `engine/downloads.py`).

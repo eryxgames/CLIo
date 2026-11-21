@@ -1888,6 +1888,41 @@ The level bot takes `jet`, `land`, `dive`, `surface`, `mag` and `unmag` among it
 stairs and plating as map characters (it walks into them). RØØTLESS's **SIM-11: Deep Works**
 (`--level sim11`) has all of these.
 
+**On the ceiling.**
+
+```json
+"c": {"ceiling_mag": true, "ceiling_height": 2.2, "ceiling": "magwall"},
+"^": {"mag_ceiling": true},                "!": {"switch": "valve", "high": true},
+"h": {"hatch": "deck2", "ceiling_mag": true, "ceiling_height": 2.2},   "H": {"hatch": "deck2", "deck": 1},
+"x": {"ceiling_mag": true, "ceiling_height": 2.2, "mag_off_on": "purge", "mag_delay": 3}
+```
+
+- A cell's ceiling with `"ceiling_mag": true` is plated: magboots walk on it, upside down.
+  **Plating up to the ceiling** (`"mag_ceiling": true`, a wall, tile `magwall`) takes him there:
+  walked into in magboots, the world turns half round and he hangs from the ceiling of the cell
+  he stood in, facing back into the room; walked into from the ceiling, down again.
+- Up there he walks over what is on the floor - acid, fire, drops, deep water, monsters - and
+  takes nothing from it (no items, no plates, no pads). A wall, a shut door, a bare ceiling, open
+  sky or a step in the ceiling higher than `"climb"` stops him; a crate only if there is no room
+  over it. A bite does not reach him in a room higher than 1.3 (fliers' does); guns do.
+- The picture is the room seen from just under its ceiling, turned half round - exact, as cheap
+  as any picture, in the classic view and the mesh view alike; the hands stay at the bottom. Keys
+  follow the screen: right turns to what is on the screen's right, which in the world is left
+  (the automap shows the truth). Looking up and down follows the screen too.
+- **Out of reach**: in a room higher than 1.3, a switch, exit, locker or panel with
+  `"high": true` is reached only from the ceiling, and the others only from the floor.
+- **Letting go** (F3 or `mag off` on the ceiling): he falls to the floor and lands on what is
+  there - a monster takes 30 + 20 per wall's height of the fall. A fall longer than 1.25 hurts
+  (25 a wall's height over it); into a drop, fatal.
+- **A hatch** (`"hatch": name`, a floor cell; two of a name, the higher one with the higher
+  `"deck"`): from under it, on the ceiling, Enter climbs up through it to the floor above; from
+  above, Enter goes down - on to the ceiling below in magboots on a plated ceiling, else a drop.
+- **The plating's power**: `"mag_off_on": event` cuts it when the event comes (`"mag_delay"`
+  beats later, if given): whoever hangs there falls.
+
+The bot walks the ceiling too: plating up to it and hatches are map characters among its goals,
+and `drop` lets go (then `mag` puts the boots on again).
+
 ### Doors and gates: lockers, supply crates, bars, force fields, timed and one-way doors
 
 ```json

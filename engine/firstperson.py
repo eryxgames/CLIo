@@ -641,6 +641,7 @@ class FX:
         self.eye = None          # how high the eye is (of a wall's height), in place of the player's: a lift-off
         self.yaw = None          # the mesh view: the way it looks, in radians (0 north, pi/2 east) - a turn drawn
         self.hands = True        # what is in the hands drawn (not in View.rolled's bigger picture)
+        self.flip = None         # upside down (on the ceiling): None - as the player is; True or False to say
         self.__dict__.update(kw)
 
 
@@ -1399,13 +1400,15 @@ class View:
         rx, ry = DIRS[(f + 1) % 4]
         land = getattr(lv, "land", None)
         meshed = land is None and self.meshed(lv)
+        inverted = bool(getattr(p, "ceiling", False)) if fx.flip is None else bool(fx.flip)
         sky_f = f
         self.yh = self.yh0
         if meshed:
             if fx.yaw is not None:                            # turning: the picture between two facings
                 fx_, fy_, rx, ry = math.sin(fx.yaw), -math.cos(fx.yaw), math.cos(fx.yaw), math.sin(fx.yaw)
                 sky_f = fx.yaw / (math.pi / 2)
-            self.yh = self.yh0 + int(round(getattr(p, "look", 0) * self.look_ph * LOOK))   # looking up or down
+            look = getattr(p, "look", 0) * (-1 if inverted else 1)     # upside down: up on the screen is down
+            self.yh = self.yh0 + int(round(look * self.look_ph * LOOK))   # looking up or down
         cam = (cx, cy, fx_, fy_, rx, ry)
         self.cover = {}
         self.cur_z = -1e9
@@ -1417,7 +1420,10 @@ class View:
             self.persp, self.air = mesh_mod.Z0, None
             g = lv.ground(cx, cy)
             eye = fx.eye if fx.eye is not None else self.eye_of(lv)
-            self.set_eye_abs(g + (self.EYE0 if eye is None else eye))
+            if inverted and fx.eye is None and hasattr(lv, "ceiling_at"):   # hanging: the eye under the ceiling
+                self.set_eye_abs(lv.ceiling_at(cx, cy) - self.EYE0)
+            else:
+                self.set_eye_abs(g + (self.EYE0 if eye is None else eye))
             px, mesh_labels = self.mesh_picture(lv, cam, phase, fx, frame, self.sky_rows(lv, cx, cy, sky_f, phase))
             sight, far = SIGHT, FAR
         elif land is not None:                                  # open land: a true perspective, the ground drawn first
@@ -1436,7 +1442,10 @@ class View:
             sight, far = land.see, 40
         else:
             self.persp = self.air = None
-            self.set_eye(fx.eye if fx.eye is not None else self.eye_of(lv))
+            if inverted and fx.eye is None:                  # hanging from the ceiling: the eye just under it
+                self.set_eye(1.0 - self.EYE0)
+            else:
+                self.set_eye(fx.eye if fx.eye is not None else self.eye_of(lv))
             if frame is not None:
                 px = self.backdrop_frame(frame, lv, cx, cy, f, phase)
             if px is None:
@@ -1702,6 +1711,8 @@ class View:
                 a, k = obj
                 t = self.tz(z)
                 self.boom(px, self.X(a, z), foot(a, z, t) - 7 * t * self.K, (4 + 19 * k) * t * self.K, k)
+        if inverted:                                          # on the ceiling: the world turned over, the hands not
+            px, labels, overlays = self.turned_over(px, labels, overlays)
         self.cur_z = -1e9                                     # what is in the hands is nearer than anything
         self.weapon(px, lv, fx)
         if any(k < 0.2 for _x, _y, k in fx.booms):
@@ -1737,6 +1748,23 @@ class View:
         if fr is not None and self.style == "pixel":
             return fr.halves(over, shade, mix)
         return self.halves(px, over) if self.style == "pixel" else self.braille(px, over)
+
+    def turned_over(self, px, labels, overlays):
+        """The picture turned half round (upside down and left to right), with its labels and the walls' cover -
+        how the world looks hanging from the ceiling. Exact: every pixel goes somewhere."""
+        fr = getattr(px, "frame", None)
+        rows = fr.lists() if fr is not None else px
+        PW, PH, W, VR = self.PW, self.PH, self.W, self.VR
+        out = [rows[PH - 1 - y][::-1] for y in range(PH)]
+        labels = [(VR - 1 - row, W - col - len(text), text, role, z, sel) for row, col, text, role, z, sel in labels]
+        overlays = [((PW - cx, PH - y1, PH - y0, t), text, role, z) for (cx, y0, y1, t), text, role, z in overlays]
+        cover, self.cover = self.cover, {}
+        for r in range(VR):
+            for c in range(W):
+                v = cover.get((r, c))
+                if v is not None:
+                    self.cover[(VR - 1 - r, W - 1 - c)] = v
+        return out, labels, overlays
 
     use_frame = True                                          # CLIo Picture's frame when it has one (tests turn it off)
 

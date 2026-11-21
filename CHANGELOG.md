@@ -37,6 +37,13 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 - **RØØTLESS E1M6: Kernel Space**, after E1M5: a hall of many floors in the mesh view - a
   gallery a storey up, the scheduler's dais in tiers with your crontab on top, the interrupt
   well, a crawlway under a low ceiling. In the RØØTLESS demo and the tech demo.
+- **Magboots on the ceiling**: plating up to the ceiling (`"mag_ceiling"`) takes the player on to
+  a plated ceiling (`"ceiling_mag"`), and the world is drawn turned half round - exact and as
+  cheap as any picture, in the classic and the mesh view. Up there he walks over acid, fire,
+  drops and monsters (out of reach of bites in a tall room); switches, exits, lockers and panels
+  marked `"high"` are reached only from up there; hatches (`"hatch"`) lead up to the deck above
+  and down again; letting go (F3) drops him on to what is below; an event can cut a ceiling's
+  power (`"mag_off_on"`, `"mag_delay"`). Keys follow the screen. The level bot walks it too.
 - **Play in the browser** (`engine/editor/web/play.html`, `engine/web.py`): every game and the
   tech demo in a web page, the engine unchanged in Python made for the web (Pyodide) - a
   terminal on the page (xterm.js), keys shared with the game's worker, sound through WebAudio,

@@ -16,7 +16,7 @@ from .level import Level, TextConsole
 
 # goals that are commands: the jetpack up and down, under the water and up, the magboots on and off
 COMMANDS = {"jet": "jet on", "land": "jet off", "dive": "dive", "surface": "surface", "mag": "mag on",
-            "unmag": "mag off"}
+            "unmag": "mag off", "drop": "mag off"}
 
 
 class Bot(TextConsole):
@@ -52,15 +52,19 @@ class Bot(TextConsole):
 
     # ---- where things are ------------------------------------------------ #
     def face(self, lv, dx, dy):
-        """The command that turns towards (dx, dy), or None when already facing it."""
+        """The command that turns towards (dx, dy), or None when already facing it. (On the ceiling right and
+        left are the screen's: the other way round in the world.)"""
         want = DIRS.index((dx, dy))
         d = (want - lv.player.facing) % 4
+        if getattr(lv.player, "ceiling", False):
+            return None if d == 0 else {1: "turn left", 2: "turn around", 3: "turn right"}[d]
         return None if d == 0 else {1: "turn right", 2: "turn around", 3: "turn left"}[d]
 
     def step(self, lv, dx, dy):
         """A step to (dx, dy) without turning: forwards, back, or to the side."""
         f = lv.player.facing
-        return {DIRS[f]: "k", DIRS[(f + 1) % 4]: "l", DIRS[(f + 2) % 4]: "j", DIRS[(f + 3) % 4]: "h"}[(dx, dy)]
+        right, left = ("h", "l") if getattr(lv.player, "ceiling", False) else ("l", "h")
+        return {DIRS[f]: "k", DIRS[(f + 1) % 4]: right, DIRS[(f + 2) % 4]: "j", DIRS[(f + 3) % 4]: left}[(dx, dy)]
 
     def go(self, lv, x, y):
         """The next command on the shortest way to (x, y), or None when there or there is no way.
@@ -71,6 +75,8 @@ class Bot(TextConsole):
         p = lv.player
         if (p.x, p.y) == (x, y):
             return None
+        if getattr(p, "ceiling", False):
+            return self.go_ceiling(lv, x, y)
         if getattr(lv, "world", None) is not None:
             return self.go_window(lv, x, y)
         if getattr(lv, "land", None) is not None:
@@ -108,6 +114,29 @@ class Bot(TextConsole):
                 if m is not None and not m.vehicle:             # blocked by a monster: face it and shoot
                     return self.face(lv, dx, dy) or "f"
                 return self.face(lv, dx, dy) or "k"
+        return None
+
+    def go_ceiling(self, lv, x, y):
+        """The next command along the ceiling towards (x, y): over the floor's acid, pits and monsters."""
+        p = lv.player
+        first = {(p.x, p.y): None}
+        frontier = [(p.x, p.y)]
+        while frontier:
+            nxt = []
+            for (cx, cy) in frontier:
+                for dx, dy in DIRS:
+                    n = (cx + dx, cy + dy)
+                    if n in first or not lv.ceiling_ok(cx, cy, n[0], n[1]):
+                        continue
+                    first[n] = first[(cx, cy)] or (dx, dy)
+                    if n == (x, y):
+                        dx, dy = first[n]
+                        m = lv.monster_at(p.x + dx, p.y + dy)
+                        if m is not None and m.float and not m.dead:
+                            return self.face(lv, dx, dy) or "f"
+                        return self.face(lv, dx, dy) or "k"
+                    nxt.append(n)
+            frontier = nxt
         return None
 
     def go_far(self, lv, x, y):
@@ -323,11 +352,15 @@ class Bot(TextConsole):
             for row in lv.grid:
                 for c in row:
                     if c.ch == g and (c.kind not in ("exit", "switch") or not c.pressed) and not c.opened:
-                        if c.kind in ("exit", "switch", "locker") or c.stairs or c.mag or c.supply is not None:
+                        if c.kind in ("exit", "switch", "locker") or c.stairs or c.mag or c.mag_ceiling \
+                                or c.supply is not None:
                             self.exit = (c.x, c.y)
                             for dx, dy in DIRS:              # stand in front of it
                                 if lv.cell(c.x + dx, c.y + dy).kind == "floor":
                                     return c.x + dx, c.y + dy
+                            return c.x, c.y
+                        if c.hatch:                          # a hatch: stand under it (or on it), and through
+                            self.exit = (c.x, c.y)
                             return c.x, c.y
                         if not (c.on_enter and c.on_enter in lv.events):
                             return c.x, c.y
@@ -377,6 +410,14 @@ class Bot(TextConsole):
                 self.goals.pop(0)
                 return "w"
             return step or "w"
+        if p.ceiling:                                    # on the ceiling: what is below cannot reach him; shoot
+            weapon = self.pick_weapon(lv)                # what is in front, and on along the ceiling
+            if weapon:
+                return weapon
+            cone = [m for m in lv.cone() if not m.barrel]
+            if cone and (lv.weapons.get(p.weapon) or {}).get("kind") != "melee":
+                return "f %s" % cone[0].tag
+            return self.goal_step(lv)
         # out of a grenade's blast: a step that takes him furthest from it
         live = [g for g in lv.grenades if g.fuse <= 3]
         if live and min(max(abs(g.x - p.x), abs(g.y - p.y)) for g in live) <= 1:
@@ -477,6 +518,11 @@ class Bot(TextConsole):
             step = self.go(lv, *target)
             if step:
                 return step
+        return self.goal_step(lv)
+
+    def goal_step(self, lv):
+        """On to the goal: the next step there, or - there - its switch, ride, hatch or command."""
+        p = lv.player
         goal = self.goal_cell(lv)
         if goal is None:
             if self.goals and self.goals[0] in COMMANDS:
@@ -488,7 +534,14 @@ class Bot(TextConsole):
         if step is None:
             if self.goals:
                 ex = lv.cell(*self.exit) if self.exit else None
-                rides = ex is not None and (ex.stairs or ex.mag or ex.kind == "locker" or ex.supply is not None)
+                if ex is not None and ex.hatch and (p.x, p.y) == self.exit:
+                    self.goals.pop(0)                    # under the hatch (or on it): through it
+                    self.exit = None
+                    self.fields.clear()
+                    self.plan = None
+                    return "use"
+                rides = ex is not None and (ex.stairs or ex.mag or ex.mag_ceiling or ex.kind == "locker"
+                                            or ex.supply is not None)
                 if rides and abs(self.exit[0] - p.x) + abs(self.exit[1] - p.y) == 1:
                     turn = self.face(lv, self.exit[0] - p.x, self.exit[1] - p.y)
                     if turn:

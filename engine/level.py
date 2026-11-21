@@ -87,7 +87,7 @@ HELP = [
     ("Ctrl+← →  or  , .  strafe     space  fire", "text"),
     ("Enter  open, press   Tab  map   1-7 ]  weapons", "text"),
     ("F2  TTY goggles on/off (the battery lasts while off)", "text"),
-    ("F3 magboots  F4 jetpack  F6 dive / surface", "text"),
+    ("F3 magboots (on the ceiling: let go)  F4 jetpack  F6 dive / surface", "text"),
     ("F5  save   F9  load the last save", "text"),
     ("", "text"),
     ("Typed: k j h l, turn left/right/around, use,", "dim"),
@@ -138,15 +138,22 @@ class Cell:
                  "crate", "plate", "down", "open_while", "teleport", "arrive_only", "pad_facing", "lift", "deck", "sunk",
                  "oil", "slick", "conveyor", "scorched", "exit_kind", "heavy", "switch", "sky", "deep", "steep",
                  "duel", "stairs", "mag", "pit", "bulkhead", "supply", "locker", "opened", "gate", "field", "zap",
-                 "open_for", "closes_at", "from_side", "on_open", "height", "ceiling_height", "step")
+                 "open_for", "closes_at", "from_side", "on_open", "height", "ceiling_height", "step",
+                 "ceiling_mag", "mag_off_on", "mag_delay", "high", "hatch", "mag_ceiling")
 
     def __init__(self, x, y, ch, spec):
         self.x, self.y, self.ch = x, y, ch
         self.stairs = spec.get("stairs")                # stairs: walked into, they lead to the other of their name
         self.mag = spec.get("mag")                      # magnetic plating: magboots walk up it to the other of its name
+        self.mag_ceiling = bool(spec.get("mag_ceiling"))  # magnetic plating up to the ceiling: magboots walk up it
+        self.ceiling_mag = bool(spec.get("ceiling_mag"))  # the ceiling here is plated: magboots walk on it
+        self.mag_off_on = spec.get("mag_off_on")        # ... until this event cuts its power
+        self.mag_delay = int(spec.get("mag_delay") or 0)  # ... so many beats after the event
+        self.high = bool(spec.get("high"))              # a switch, exit or locker up by the ceiling: reached from it
+        self.hatch = spec.get("hatch")                  # a hatch in the ceiling to the other of its name (the deck above)
         self.bulkhead = bool(spec.get("bulkhead"))      # a wall down into the water: a diver passes under it
         self.tex = spec.get("wall") or spec.get("texture") or (
-            "stairs" if self.stairs else "magwall" if self.mag else "bulkhead" if self.bulkhead else
+            "stairs" if self.stairs else "magwall" if self.mag or self.mag_ceiling else "bulkhead" if self.bulkhead else
             "field" if spec.get("field") else "steel")
         self.floor = spec.get("floor")                  # tiles under and over this cell, else the level's
         self.ceiling = spec.get("ceiling")
@@ -217,7 +224,7 @@ class Cell:
             self.kind = "panel"
         elif self.switch:
             self.kind = "switch"
-        elif spec.get("wall") or self.stairs or self.mag or self.bulkhead \
+        elif spec.get("wall") or self.stairs or self.mag or self.mag_ceiling or self.bulkhead \
                 or ((spec.get("opens_on") or spec.get("open_while")) and not spec.get("door")):
             self.kind = "wall"
         else:
@@ -336,7 +343,8 @@ class Field:
 # what can change in a cell while a level is played (the rest is as the map made it): saved, and kept for a
 # forgotten chunk. A test plays every level through and checks that nothing else changes.
 CELL_STATE = ("kind", "open", "pressed", "found", "crate", "heavy", "down", "sunk", "scorched", "sealed",
-              "toxic", "oil", "slick", "secret", "panel", "key", "supply", "locker", "opened", "closes_at")
+              "toxic", "oil", "slick", "secret", "panel", "key", "supply", "locker", "opened", "closes_at",
+              "ceiling_mag")
 cell_state = operator.attrgetter(*CELL_STATE)
 JOURNAL_KEEP = 20000         # lines of play a save keeps (a snapshot carries the rest)
 
@@ -477,8 +485,10 @@ class Player:
         self.diving = False                          # under the water (swimming, or in a submarine that dived)
         self.air = int(cfg.get("breath", 20))        # beats of breath left under water
         self.look = 0                                # looking up (+) or down (-), in steps (the mesh view)
+        self.ceiling = False                         # on the ceiling, upside down, held by the magboots
 
-    DEFAULTS = {"magboots": False, "mag_on": False, "jet": 0, "jet_on": False, "diving": False, "air": 20, "look": 0}
+    DEFAULTS = {"magboots": False, "mag_on": False, "jet": 0, "jet_on": False, "diving": False, "air": 20, "look": 0,
+                "ceiling": False}
 
     @property
     def nightvision(self):
@@ -495,6 +505,7 @@ class Player:
 for _kind in (Monster, Item, Player, Grenade, Shot):
     snapshot.register(_kind)                             # a save holds these, each once
 snapshot.LEVEL_DEFAULTS.setdefault("rides", list)
+snapshot.LEVEL_DEFAULTS.setdefault("cuts", list)
 
 
 def bresenham(x0, y0, x1, y1):
@@ -549,6 +560,7 @@ class Level:
         self.monsters, self.items, self.shots, self.decals = [], [], [], []
         self.grenades = []
         self.holes = []                                  # (x, y, face, along, down): bullet holes in walls
+        self.cuts = []                                   # (beat, x, y): plated ceilings whose power goes then
         self.marks, self.marks_version = {}, 0
         self.log = []
         self.beat = 0
@@ -1014,6 +1026,9 @@ class Level:
 
     def room_eye(self, x, y):
         """How high one sees from at (x, y) in rooms at heights: the floor there, and a head above it."""
+        p = self.player
+        if (x, y) == (p.x, p.y) and p.ceiling:
+            return self.ceiling_at(x, y) - 0.5
         m = self.monster_at(x, y)
         return self.ground(x, y) + 0.5 + (m.float if m is not None and m.float else 0.0)
 
@@ -1812,6 +1827,8 @@ class Level:
 
     def turn(self, d):
         p = self.player
+        if p.ceiling:                                    # upside down: right on the screen is left in the world
+            d = -d
         old_cells = self.console.snapshot(self) if self.console else None
         p.facing = (p.facing + d) % 4
         self.update_seen()
@@ -1821,6 +1838,8 @@ class Level:
 
     def step(self, side, ahead):
         p = self.player
+        if p.ceiling:
+            return self.ceiling_step(-side, ahead)       # upside down: a step to the right is to the world's left
         fx, fy = DIRS[p.facing]
         rx, ry = DIRS[(p.facing + 1) % 4]
         nx, ny = p.x + fx * ahead + rx * side, p.y + fy * ahead + ry * side
@@ -2161,7 +2180,9 @@ class Level:
         if not self.plate_cells:
             return
         p = self.player
-        weight = {(m.x, m.y) for m in self.monsters if not m.dead and not m.gone and not m.float} | {(p.x, p.y)}
+        weight = {(m.x, m.y) for m in self.monsters if not m.dead and not m.gone and not m.float}
+        if not p.ceiling:
+            weight.add((p.x, p.y))
         down = set()
         for c in self.plate_cells:
             now = c.crate or (c.x, c.y) in weight
@@ -2204,6 +2225,9 @@ class Level:
 
     def arrive(self, teleported=False):
         p = self.player
+        if p.ceiling:                                    # on the ceiling: what lies on the floor is out of reach
+            self.arrive_ceiling()
+            return
         for it in self.items:
             if not it.taken and (it.x, it.y) == (p.x, p.y):
                 self.take(it)
@@ -2378,6 +2402,266 @@ class Level:
         self.end_beat()
         return True
 
+    # ---- on the ceiling ------------------------------------------------- #
+    @staticmethod
+    def top_of(cell):
+        """A cell's ceiling (in walls' heights): its own, else a wall's height over its floor."""
+        return cell.ceiling_height if cell.ceiling_height is not None else cell.height + 1.0
+
+    def ceiling_at(self, x, y):
+        """How high the ceiling is at (x, y): a cell's own at its middle, blended between cells (1 in flat rooms)."""
+        if not getattr(self, "heights", False):
+            return self.top_of(self.cell(int(round(x)), int(round(y))))
+        ix, iy = int(math.floor(x)), int(math.floor(y))
+        ux, uy = x - ix, y - iy
+        total = weight = 0.0
+        for cx, cy, w in ((ix, iy, (1 - ux) * (1 - uy)), (ix + 1, iy, ux * (1 - uy)), (ix, iy + 1, (1 - ux) * uy),
+                          (ix + 1, iy + 1, ux * uy)):
+            c = self.cell(cx, cy)
+            if w <= 0.0 or c.drawn_as_wall():
+                continue
+            total += self.top_of(c) * w
+            weight += w
+        if weight <= 0.0:
+            return self.top_of(self.cell(int(math.floor(x + 0.5)), int(math.floor(y + 0.5))))
+        return total / weight
+
+    def room_over(self, cell):
+        """How far a cell's ceiling is over its floor: in a room this low (1.3), both are within reach."""
+        return self.top_of(cell) - cell.height
+
+    def ceiling_ok(self, x0, y0, x1, y1):
+        """Can magboots walk the ceiling from (x0, y0) to (x1, y1)? Plated, under no sky, nothing standing up to
+        it (a wall, a shut door; a crate only if there is room over it), and no step in it higher than climb."""
+        c = self.cell(x1, y1)
+        if c is None or not c.ceiling_mag or c.sky:
+            return False
+        if c.solid and not (c.crate and self.room_over(c) > 1.15):
+            return False
+        if getattr(self, "heights", False) and abs(self.top_of(c) - self.top_of(self.cell(x0, y0))) > self.step_up + 1e-9:
+            return False
+        return True
+
+    def within_reach(self, cell):
+        """Whether the thing ahead can be reached: from the ceiling only what is up by it (``"high"``), from the
+        floor only what is not - but in a room no higher than 1.3, both."""
+        p = self.player
+        low = self.room_over(self.cell(p.x, p.y)) <= 1.3
+        if low or cell.kind == "door" or not (cell.solid or cell.high):
+            return True
+        if p.ceiling and not cell.high:
+            self.say("Out of reach from up here: it is down by the floor.", "dim")
+            return False
+        if not p.ceiling and cell.high:
+            self.say("Out of reach: it is up by the ceiling.%s" % (" Magboots could take you there." if
+                                                                 p.magboots else ""), "dim")
+            return False
+        return True
+
+    def reaches_up(self, m):
+        """Can a monster's bite reach the player on the ceiling? Not in a room higher than 1.3, unless it flies."""
+        p = self.player
+        return not p.ceiling or bool(m.float) or self.room_over(self.cell(p.x, p.y)) <= 1.3
+
+    def ceiling_step(self, side, ahead):
+        """A step along the ceiling (``side`` already the world's): over what is on the floor - acid, fire,
+        monsters, pits - but not past a wall, a shut door, bare or open ceiling, or a step too high."""
+        p = self.player
+        fx, fy = DIRS[p.facing]
+        rx, ry = DIRS[(p.facing + 1) % 4]
+        nx, ny = p.x + fx * ahead + rx * side, p.y + fy * ahead + ry * side
+        cell = self.cell(nx, ny)
+        if cell.mag_ceiling and ahead > 0 and side == 0:
+            return self.up_wall(cell)
+        if cell.solid and not (cell.crate and self.room_over(cell) > 1.15):
+            if ahead > 0 and side == 0:
+                return self.use()
+            self.say("A wall.", "dim")
+            return False
+        if not self.ceiling_ok(p.x, p.y, nx, ny):
+            if cell.sky:
+                self.say("Open sky over there: nothing for the boots to hold.", "dim")
+            elif not cell.ceiling_mag:
+                self.say("The ceiling there is bare: nothing for the boots to hold.", "dim")
+            else:
+                self.say("Too high a step in the ceiling.", "dim")
+            self.sfx("locked")
+            return False
+        m = self.monster_at(nx, ny)
+        if m is not None and m.float and not m.dead:
+            self.say("%s is in the way." % m.tag, "dim")
+            return False
+        ox, oy = p.x, p.y
+        p.x, p.y = nx, ny
+        self.sfx("magwalk", "footstep")
+        self.anim([FX(cam=(ox + (nx - ox) * ease(i / 4.0), oy + (ny - oy) * ease(i / 4.0))) for i in range(1, 5)], 0.03)
+        self.update_seen()
+        self.arrive()
+        self.end_beat()
+        return True
+
+    def arrive_ceiling(self):
+        """On the ceiling of a cell: a secret, its event, a checkpoint - but nothing on the floor."""
+        p = self.player
+        cell = self.cell(p.x, p.y)
+        if cell.secret and not cell.found and not cell.panel:
+            cell.found = True
+            self.stats["secrets"] += 1
+            self.sfx("secret")
+            self.say("A secret area!", "secret")
+        if cell.on_enter and cell.on_enter not in self.events:
+            self.event(cell.on_enter)
+        if cell.savepoint and (p.x, p.y) not in self.reached:
+            self.reached.add((p.x, p.y))
+            if self.host is not None and not self.replaying:
+                self.pending_save.append((None, "checkpoint"))
+
+    def flip_ride(self, change, tip, back, down=False):
+        """The view turning as he goes from the floor to the ceiling or back: the picture at ``tip``'s angles,
+        ``change()`` done, then at ``back``'s (the mesh view turned whole; else the picture)."""
+        console = self.console
+        old = console.snapshot(self, style="pixel") if console else None
+        rolled = getattr(console, "rolled", None)
+        olds = rolled(self, tip) if rolled and old is not None else None
+        change()
+        self.update_seen()
+        new = console.snapshot(self, style="pixel") if console else None
+        news = rolled(self, back) if olds else None
+        if console is not None and old is not None:
+            console.tilt(self, old, new, not down, olds, news, tip, back)
+
+    def up_wall(self, cell):
+        """Plating up to the ceiling, walked into in magboots: up the wall and on to the ceiling of the cell he
+        stands in, facing back into the room - or, from the ceiling, down it to the floor."""
+        p = self.player
+        here = self.cell(p.x, p.y)
+        if not p.mag_on:
+            self.say("Magnetic plating, up to the ceiling." + (" (F3: magboots on)" if p.magboots else ""), "dim")
+            self.sfx("locked")
+            return False
+        if p.vehicle is not None or p.jet_on or self.swimming():
+            self.say("Not from here.", "dim")
+            return False
+        if p.ceiling:
+            def change():
+                p.ceiling = False
+                p.facing = (p.facing + 2) % 4
+            self.sfx("magwalk", "footstep")
+            self.flip_ride(change, (-10, -28, -52, -76, -90), TIP_BACK, down=True)
+            self.say("Down the plating, and on your feet again.", "info")
+        else:
+            if not here.ceiling_mag or here.sky:
+                self.say("The plating ends at a bare ceiling: nothing to hold on to up there.", "dim")
+                self.sfx("locked")
+                return False
+
+            def change():
+                p.ceiling = True
+                p.facing = (p.facing + 2) % 4
+            self.sfx("magwalk", "footstep")
+            self.flip_ride(change, TIP, (-90, -72, -46, -22, -6))
+            self.say("Up the plating and on to the ceiling: the world hangs below you. (F3: let go)", "info")
+        self.update_seen()
+        self.end_beat()
+        return True
+
+    def drop(self, why=None):
+        """Off the ceiling: he falls to the floor (hurt by a long fall), on to whatever stands there."""
+        p = self.player
+        here = self.cell(p.x, p.y)
+        fall = self.room_over(here)
+
+        def change():
+            p.ceiling = False
+        self.flip_ride(change, (-30, -60, -90), (90, 60, 30), down=True)
+        if why:
+            self.say(why, "alert")
+        self.sfx("land", "footstep")
+        m = self.monster_at(p.x, p.y)
+        if m is not None and not m.dead:                 # on to it: a stomp
+            self.damage([(m, int(30 + 20 * fall))], lead="You land on it:")
+            if self.over:
+                return True
+            if not m.dead:
+                spot = next(((m.x + dx, m.y + dy) for dx, dy in DIRS if self.free(m.x + dx, m.y + dy, skip=m)), None)
+                if spot is not None:
+                    m.x, m.y = spot
+                    self.say("%s is thrown aside." % m.tag, "hit")
+                else:
+                    spot = next(((p.x + dx, p.y + dy) for dx, dy in DIRS if self.free(p.x + dx, p.y + dy)), None)
+                    if spot is not None:
+                        p.x, p.y = spot
+        hurt = int(max(0.0, fall - 1.25) * 25)
+        if here.pit:
+            self.hurt(999, "You fall into the pit.")
+        elif hurt:
+            self.hurt(hurt, "You land hard.")
+        else:
+            self.say("You drop, turn over and land on your feet.", "dim")
+        self.update_seen()
+        if not self.over:
+            self.arrive()
+            self.end_beat()
+        return True
+
+    def cut_plating(self, cell):
+        """A plated ceiling loses its power: the boots let go of it."""
+        cell.ceiling_mag = False
+        p = self.player
+        if p.ceiling and (p.x, p.y) == (cell.x, cell.y):
+            self.sfx("mag_off", "switch")
+            self.drop("The plating over you dies. Your boots let go.")
+        elif p.ceiling and abs(p.x - cell.x) + abs(p.y - cell.y) <= 3:
+            self.sfx("mag_off", "switch")
+            self.say("The plating near you goes dead.", "alert")
+
+    def through_hatch(self, here):
+        """A hatch: from under it, on the ceiling, up through it to the floor of the deck above; from above, down
+        through it - on to the ceiling below in magboots, or a drop to its floor."""
+        p = self.player
+        dest = next((c for row in self.grid for c in row if c.hatch == here.hatch and c is not here), None)
+        if dest is None:
+            self.say("The hatch is welded shut.", "dim")
+            return False
+        up = dest.deck > here.deck
+        if up and not p.ceiling:
+            self.say("A hatch in the ceiling, out of reach.%s" % (" Magboots could take you up there." if p.magboots
+                                                                   else ""), "dim")
+            return False
+        if not up and p.ceiling:
+            self.say("The hatch leads down: let go first.", "dim")
+            return False
+        if self.monster_at(dest.x, dest.y) is not None:
+            self.say("Something is on the hatch at the other side.", "dim")
+            return False
+        land_on = not up and p.mag_on and dest.ceiling_mag and not dest.sky
+
+        def change():
+            p.x, p.y = dest.x, dest.y
+            p.ceiling = land_on
+        console = self.console
+        old = console.snapshot(self, style="pixel") if console else None
+        self.sfx("door")
+        change()
+        self.update_seen()
+        new = console.snapshot(self, style="pixel") if console else None
+        if console is not None and old is not None:
+            console.ride(self, old, new, not up)
+        if up:
+            self.say("You climb up through the hatch.", "info")
+        elif land_on:
+            self.say("Down through the hatch; your boots catch the ceiling below.", "info")
+        else:
+            fall = self.room_over(dest)
+            hurt = int(max(0.0, fall - 1.25) * 25)
+            self.say("Down through the hatch.", "info")
+            if hurt:
+                self.hurt(hurt, "You land hard.")
+        if not self.over:
+            self.arrive()
+            self.end_beat()
+        return True
+
     def magswitch(self, how=None):
         """Magboots on (they grip: no sliding, belts do not carry him, the plating can be walked) or off."""
         p = self.player
@@ -2388,6 +2672,11 @@ class Level:
         if want == p.mag_on:
             self.say("Your magboots are %s already." % ("on" if want else "off"), "dim")
             return True
+        if not want and p.ceiling:                       # letting go of the ceiling
+            p.mag_on = False
+            self.sfx("mag_off", "switch")
+            self.say("Magboots off: you let go of the ceiling.", "info")
+            return self.drop()
         p.mag_on = want
         self.sfx("mag_on" if want else "mag_off", "switch")
         self.say("Magboots on: they grip the deck." if want else "Magboots off: your feet are your own again.", "info")
@@ -2410,6 +2699,9 @@ class Level:
             return False
         if p.diving:
             self.say("Not under water.", "dim")
+            return False
+        if p.ceiling:
+            self.say("Not while you hang from the ceiling.", "dim")
             return False
         p.jet_on = True
         self.sfx("jet_on", "power")
@@ -2592,6 +2884,18 @@ class Level:
         x, y = self.ahead()
         cell = self.cell(x, y)
         p = self.player
+        here = self.cell(p.x, p.y)
+        usable = cell.kind in ("door", "switch", "exit", "locker", "panel") or cell.stairs or cell.mag \
+            or cell.mag_ceiling or cell.crate
+        if here.hatch and p.vehicle is None and not usable:
+            return self.through_hatch(here)             # a hatch overhead (or underfoot): through it
+        if cell.mag_ceiling:
+            return self.up_wall(cell)
+        if not self.within_reach(cell):
+            return False
+        if p.ceiling and not cell.solid:
+            self.say("Nothing up here to use. (F3: magboots off - you drop)", "dim")
+            return False
         if p.vehicle is not None and cell.kind not in ("exit", "switch"):   # in the cage, Enter climbs down
             if cell.kind == "door":
                 self.say("The %s will not fit through the door: you climb down." % p.vehicle.name, "dim")
@@ -3466,6 +3770,11 @@ class Level:
                         and (c.x, c.y) != (self.player.x, self.player.y):
                     c.kind = "field"                     # the field comes back on
                     closed += 1
+                if c.mag_off_on == name and c.ceiling_mag:
+                    if c.mag_delay:
+                        self.cuts.append((self.beat + c.mag_delay, c.x, c.y))
+                    else:
+                        self.cut_plating(c)
                 if c.opens_on == name:
                     if c.kind == "door":
                         c.sealed = False
@@ -3503,6 +3812,13 @@ class Level:
             return
         self.beat += 1
         self.__dict__["_spreading"] = []                 # the last beat's ways are done with
+        if self.cuts:                                    # plated ceilings whose power goes now
+            due = [(x, y) for b, x, y in self.cuts if b <= self.beat]
+            self.cuts = [(b, x, y) for b, x, y in self.cuts if b > self.beat]
+            for x, y in due:
+                self.cut_plating(self.cell(x, y))
+            if self.over:
+                return
         p = self.player
         if self.world is not None:
             self.world.follow()                          # wake what is near, put what he left to sleep
@@ -3551,7 +3867,7 @@ class Level:
         if burning and not self.over:
             self.damage(burning, lead="The acid:")
         cell = self.cell(p.x, p.y)
-        if cell.toxic and not self.over and not p.jet_on:
+        if cell.toxic and not self.over and not p.jet_on and not p.ceiling:
             self.acid()
         self.air_beat()
         if self.over:
@@ -3606,7 +3922,7 @@ class Level:
             return
         p = self.player
         dmg = int(self.cfg.get("fire_damage", 6))
-        if (p.x, p.y) in self.fires and not p.jet_on:
+        if (p.x, p.y) in self.fires and not p.jet_on and not p.ceiling:
             self.sfx("fire_burn", "hurt")
             self.hurt(dmg, "You are standing in fire!", by=None)
             if self.over:
@@ -4038,6 +4354,8 @@ class Level:
                 self.damage([(foe, self.rng.randint(lo, hi))], lead="%s tears into %s:" % (m.tag, foe.tag), source=m)
             return
         p = self.player
+        if not self.reaches_up(m):                       # he is up on the ceiling of a tall room
+            return
         if abs(p.x - m.x) + abs(p.y - m.y) == 1:
             self.sfx((m.spec.get("sounds") or {}).get("attack") or "hit")
             pack = 0                                     # the others of its squad at him too: worse together
@@ -4387,7 +4705,8 @@ class FrameConsole:
                         ("  goggles off: %d" % lv.player.goggles, "dim"))
         p = lv.player
         if p.magboots:
-            segs.append(("  mag" if p.mag_on else "  mag off", "info" if p.mag_on else "dim"))
+            segs.append(("  mag: ceiling" if p.ceiling else "  mag" if p.mag_on else "  mag off",
+                         "info" if p.mag_on else "dim"))
         if p.jet or p.jet_on:
             segs.append(("  jet%s: %d" % (" up" if p.jet_on else "", p.jet), "alert" if p.jet_on and p.jet <= 5 else "ammo"))
         if p.diving and p.vehicle is None:
@@ -4526,7 +4845,8 @@ class FrameConsole:
                       for k in (0.25, 0.5, 0.75)]
         else:
             new = view.render(lv, FX(), self.phase)
-            frames = [slide(old, new, k, direction) for k in (0.3, 0.6, 0.85)]
+            side = -direction if getattr(lv.player, "ceiling", False) else direction    # upside down: the screen's way
+            frames = [slide(old, new, k, side) for k in (0.3, 0.6, 0.85)]
         self.screen.play(frames, lambda cells: self.draw(lv, prompt=None, cells=cells), 0.03)
 
     def ride(self, lv, old, new, down):
@@ -4542,18 +4862,19 @@ class FrameConsole:
             return None
         return [view.rolled(lv, a, self.phase) for a in angles]
 
-    def tilt(self, lv, old, new, up, olds=None, news=None):
+    def tilt(self, lv, old, new, up, olds=None, news=None, tip=TIP, back=TIP_BACK):
         """Magboots up (or down) a wall: the world tips on its side, goes by, and tips back at the other end.
-        ``olds``/``news``: the mesh view at TIP's and TIP_BACK's angles (rolled), else the picture is turned."""
+        ``olds``/``news``: the mesh view at ``tip``'s and ``back``'s angles (rolled), else the picture is turned
+        through them. (On to the ceiling: back from -90 to 0, the picture upside down already.)"""
         from .firstperson import tilt
         if olds and news:
             frames = list(olds) + [vslide(olds[-1], news[0], k, not up) for k in (0.2, 0.45, 0.7, 0.9, 1.0)]
             frames += list(news[1:]) + [new]
             self.screen.play(frames, lambda cells: self.draw(lv, prompt=None, cells=cells), 0.06)
             return
-        frames = [tilt(old, a) for a in TIP]
-        frames += [vslide(tilt(old, 90), tilt(new, 90), k, not up) for k in (0.2, 0.45, 0.7, 0.9, 1.0)]
-        frames += [tilt(new, a) for a in TIP_BACK[1:] + (0,)]
+        frames = [tilt(old, a) for a in tip]
+        frames += [vslide(tilt(old, tip[-1]), tilt(new, back[0]), k, not up) for k in (0.2, 0.45, 0.7, 0.9, 1.0)]
+        frames += [tilt(new, a) for a in tuple(back[1:]) + (0,)]
         self.screen.play(frames, lambda cells: self.draw(lv, prompt=None, cells=cells), 0.06)
 
     def ending(self, lv):
@@ -4597,7 +4918,7 @@ class TextConsole:
     def ride(self, lv, old, new, down):
         pass
 
-    def tilt(self, lv, old, new, up, olds=None, news=None):
+    def tilt(self, lv, old, new, up, olds=None, news=None, tip=TIP, back=TIP_BACK):
         pass
 
     def ending(self, lv):
@@ -5205,13 +5526,13 @@ def validate(data):
         for ch in used:
             sp = legend.get(ch)
             if isinstance(sp, dict):
-                listening |= {sp.get("opens_on"), sp.get("closes_on"), sp.get("wake_on")}
+                listening |= {sp.get("opens_on"), sp.get("closes_on"), sp.get("wake_on"), sp.get("mag_off_on")}
         listening |= set((lv.get("events") or {}))
         counts = {}
         for ch in used:
             sp = legend.get(ch)
             if isinstance(sp, dict):
-                for key in ("teleport", "lift", "plate", "open_while", "stairs", "mag"):
+                for key in ("teleport", "lift", "plate", "open_while", "stairs", "mag", "hatch"):
                     if sp.get(key):
                         counts.setdefault((key, sp[key]), 0)
                         counts[(key, sp[key])] += sum(r.count(ch) for r in rows)
@@ -5219,6 +5540,8 @@ def validate(data):
             if key in ("stairs", "mag") and n != 2:
                 problems.append("level '%s': the %s '%s' should have two ends, it has %d"
                                 % (lid, "stairs" if key == "stairs" else "magnetic plating", name, n))
+            if key == "hatch" and n != 2:
+                problems.append("level '%s': the hatch '%s' should have two ends, it has %d" % (lid, name, n))
             if key == "teleport" and n < 2:
                 problems.append("level '%s': the teleporter '%s' has one pad; it needs another to lead to" % (lid, name))
             if key == "lift" and n != 2:
@@ -5276,6 +5599,16 @@ def validate(data):
             if isinstance(spec.get("ceiling_height"), (int, float)) and \
                     spec["ceiling_height"] <= (spec.get("height") if isinstance(spec.get("height"), (int, float)) else 0):
                 problems.append("level '%s': '%s' has its ceiling at or under its floor" % (lid, ch))
+            if spec.get("high") and not (spec.get("switch") or spec.get("exit") or spec.get("locker") is not None
+                                         or spec.get("panel")):
+                problems.append("level '%s': '%s' is \"high\", but only a switch, an exit, a locker or a panel is "
+                                "reached from the ceiling" % (lid, ch))
+            if (spec.get("mag_off_on") or spec.get("mag_delay")) and not spec.get("ceiling_mag"):
+                problems.append("level '%s': '%s' cuts the power of a plated ceiling, but its ceiling is not plated "
+                                "(\"ceiling_mag\": true)" % (lid, ch))
+            if spec.get("mag_delay") is not None and (isinstance(spec["mag_delay"], bool)
+                                                      or not isinstance(spec["mag_delay"], int) or spec["mag_delay"] < 0):
+                problems.append("level '%s': '%s' mag_delay should be the beats after its event (0 or more)" % (lid, ch))
             if spec.get("open_for") is not None:
                 v = spec["open_for"]
                 if isinstance(v, bool) or not isinstance(v, int) or v < 1:

@@ -108,7 +108,7 @@ Without one, a game is simply silent; the in-game `sound` command says what it f
 Two **optional downloads** make RØØTLESS nicer. The launcher offers them under **Downloads**
 (it says the size first and installs nothing without a yes):
 
-- **CLIo Picture** (about 45 KB, `--get-picture`): draws the first-person picture several times
+- **CLIo Picture** (about 50 KB, `--get-picture`): draws the first-person picture several times
   faster - the same picture, to the last pixel.
 - **Ballistic's C engine** (about 1 MB, `--get-ballistic`): physically modelled shots, ricochets
   and blasts for RØØTLESS's Ballistic sound set (`--sounds ballistic`) - some of them; with

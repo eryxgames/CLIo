@@ -469,7 +469,7 @@ The details follow.
   commands say how many of a set's Ballistic sounds the C engine makes and what the rest need;
   sounds baked into the game need nothing.
 - **CLIo Picture** (`engine/picture/`, `--get-picture`): a C library, found and installed as
-  Ballistic's is, for the inner loops of the pictures; `--get-picture` installs release 0.5.0
+  Ballistic's is, for the inner loops of the pictures; `--get-picture` installs release 0.6.0
   for Linux, macOS, Windows or Android (Termux), checked by its SHA-256. It draws the open
   land's ground (the caster, `Land.cast`) and the sky over open cells (all but the sun's disc
   and glow, which stay in Python), from release 0.3 the rooms' floor and ceiling (all but

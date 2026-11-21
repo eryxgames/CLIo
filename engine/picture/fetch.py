@@ -19,18 +19,18 @@ import sys
 import urllib.request
 import zipfile
 
-RELEASE = "0.5.0"
+RELEASE = "0.6.0"
 URL = "https://github.com/eryxgames/clio-picture/releases/download/v{v}/clio-picture-{v}-{p}.zip"
 SOURCE = "https://github.com/eryxgames/clio-picture"
 SHA256 = {                      # from the release's checksums.txt
-    "android-arm64-v8a": "d1a337a7a7b40ace042ab84a1ef764164164f288a79eeed7eaea5d083f7fd401",
-    "android-armeabi-v7a": "bb00296fa2d62cf09809b31b8ee6419cc7b6b50756f02c1cc3b4b1967afc1eef",
-    "android-x86_64": "18257d41444c4c2064bcdb0372ddb2f3023c70d7c1836ac5f60e309818cd477b",
-    "linux-arm64": "ed88c67ebdca78a8f14630b728b38a030b0b7b76303895c58cdc2d2a5cc894f6",
-    "linux-x64": "af10e02d83875852e9625cb075242d85f19dafdaed275be2b0a6d77e0be43c42",
-    "macos-universal": "acb2fde5b6a22b9dba5bd103f1bdb8c15e0b6b3f5aaff1536e9a9b376d333859",
-    "windows-arm64": "6ca88230e89c5f918364ea841089b5046202d809a268fbe27f82af3da649cb88",
-    "windows-x64": "52a32a1d05000b1f5545fbfc6690dd6870561823fc5c7788eaf897fc2e4c14e0",
+    "android-arm64-v8a": "d863affd4a4090434a8d993edc2a8a76c1629008bad1cdc06152560833ab21bd",
+    "android-armeabi-v7a": "9e72a781e1a246478f1fab4b4c9c47722e83c676aac48854b6908fb4666b3b59",
+    "android-x86_64": "c62a47669a8286dcde357ec95a1a1b04aeb1ea68b252614583e9daa5a9990564",
+    "linux-arm64": "606fd29e57faff219beadad962c88ec46e4e251fb579653559825cc7759d6080",
+    "linux-x64": "74c563b69c9a517fc87887f4aaed7af8afaa195ff46b798b2c257448c8aa6dc3",
+    "macos-universal": "27b931ccd5f33d2bc4b10d70de858dfb6b034a579d0ce24eabd6226d00347174",
+    "windows-arm64": "44778da9c395e5d29a1652139bc4da74097dbdb44975c3ab2e34f08dd1743250",
+    "windows-x64": "2778f138f2e1ca5dba51e273d66afa781b39aa084ae32f7e611c8dcb43e513c8",
 }
 
 

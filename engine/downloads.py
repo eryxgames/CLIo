@@ -12,8 +12,8 @@ from .term import is_termux
 
 # the release zips' sizes, for asking first (bytes; from the releases CLIo follows)
 PICTURE_SIZE = {
-    "android-arm64-v8a": 45098, "android-armeabi-v7a": 47727, "android-x86_64": 46708, "linux-arm64": 42951,
-    "linux-x64": 43446, "macos-universal": 68119, "windows-arm64": 82678, "windows-x64": 98627,
+    "android-arm64-v8a": 47182, "android-armeabi-v7a": 49463, "android-x86_64": 48839, "linux-arm64": 44991,
+    "linux-x64": 45514, "macos-universal": 71190, "windows-arm64": 84434, "windows-x64": 100550,
 }
 BALLISTIC_SIZE = {
     "android-arm64-v8a": 1206755, "android-armeabi-v7a": 1111941, "android-x86_64": 1332340, "linux-arm64": 703726,

@@ -1826,7 +1826,9 @@ drawn: `pixel` (half blocks), `dots` or `dots-fill` (braille); `--view` override
 `"detail"` is how fine the floor and ceiling are: `"high"`, `"low"` (half width, half the
 work - for a slow machine or a very wide window) or `"auto"` (the default: low only for a
 very big picture); `--detail` overrides it. Walls are drawn 10 cells ahead; monsters, items
-and shots count within 7.
+and shots count within 7. `"render"` is how rooms are drawn: `"classic"` (the default) or
+`"mesh"` (see *Heights and the mesh view*); a level can say it too, and `--render`
+overrides both.
 
 **Faster pictures.** `python clio.py --get-picture` installs CLIo Picture, a small C library
 ([eryxgames/clio-picture](https://github.com/eryxgames/clio-picture)) that draws the open
@@ -1922,6 +1924,38 @@ stairs and plating as map characters (it walks into them). RØØTLESS's **SIM-11
 Line of sight, shots and the automap go through bars and fields; monsters do not. The level bot
 opens lockers and supply crates when they are among its goals (their map characters), and
 plans a one-way door only from its side. RØØTLESS's **E1M5: User Space** has all of these.
+
+### Heights and the mesh view
+
+```json
+"1": {"height": 0.12}, "2": {"height": 0.24}, "3": {"height": 0.36},
+"B": {"height": 0.48, "ceiling_height": 1.6},     "L": {"ceiling_height": 0.8},
+"t": {"height": 0.36, "step": "hazard"}
+```
+
+The classic picture of a room shrinks each cell to 0.64 of the one before, and every floor
+is at 0 and every ceiling at 1 (a wall's height). The **mesh view** draws rooms as open land
+is drawn - a true perspective, from a camera a little behind the player - with each cell's
+floor and ceiling at its own height: stairs you see the steps of, balconies, raised daises,
+sunken pits (a negative `height`), low passages. The walls, floors, ceilings, steps and
+lintels are faces, filled pixel by pixel; monsters, items, fire and models stand on the
+floor under them and are hidden by what stands in front.
+
+- `"height"`: the cell's floor, in walls' heights (0 if not said). A stair step is about
+  0.12; the player's eye is half a wall over the floor.
+- `"ceiling_height"`: its ceiling (else a wall's height over its floor). Lower than the
+  next cell's, a lintel is drawn over the opening; open to the `"sky"`, none.
+- `"step"`: the tile of the risers up to this cell (the engine's `step`, a dark plate with
+  a bright lip, if not said).
+- A level's `"climb"` (game.json `first_person` too): the highest step a walker goes up,
+  in walls' heights (0.55). Down, any drop. Monsters find their way round a ledge by the
+  stairs; floating and flying ones go anywhere.
+
+Ask for it with `"render": "mesh"` in the level (or in `first_person`, for every level);
+`--render mesh` draws any game's rooms this way, and `--render classic` keeps the old
+picture even where a level asks for the mesh (its heights still count for walking, and the
+picture is flat). Line of sight does not look at heights: a raised floor is no cover.
+Open land is drawn as it always was.
 
 ### 3D models
 

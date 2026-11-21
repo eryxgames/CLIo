@@ -126,6 +126,13 @@ class Frame:
             r.depth = d
         return self.px
 
+    def put_picture(self, rows, depth):
+        """A picture made in Python (rows of (r, g, b)) and each pixel's distance (pw * ph)."""
+        n = self.pw * self.ph
+        flat = array("I", [(c[0] << 16) | (c[1] << 8) | c[2] for row in rows for c in row])
+        ctypes.memmove(self.rgb, flat.buffer_info()[0], n * 4)
+        ctypes.memmove(self.depth, depth.buffer_info()[0], n * 8)
+
     def put_bytes(self, data):
         """The pixels as kept by bytes(frame.rgb)."""
         ctypes.memmove(self.rgb, data, len(data))

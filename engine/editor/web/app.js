@@ -1694,6 +1694,8 @@ function describe(spec, info) {
   if (spec.closes_on) more.push(`shuts on ${spec.closes_on}`);
   if (spec.open_while) more.push(`open while plate "${spec.open_while}" is down`);
   if (spec.secret && k !== "panel") more.push("a secret area");
+  if (spec.height) more.push(`its floor ${spec.height} high`);
+  if (spec.ceiling_height !== undefined) more.push(`its ceiling ${spec.ceiling_height} high`);
   if (spec.oil) more.push("oil on the floor (slippery, burns)");
   else if (spec.slick) more.push("slick floor (things slide)");
   if (spec.conveyor) more.push(`a belt moving ${({ n: "north", e: "east", s: "south", w: "west" })[String(spec.conveyor)[0]] || spec.conveyor}`);
@@ -2049,6 +2051,11 @@ function levelEditor(kind, thing, id) {
       rows.push(field("Ceiling tile", tileSelect(s.ceiling, (v) => { s.ceiling = v; write(); })));
       rows.push(field("Open to the sky (the level's \"sky\" over it, no ceiling)", el("input", { type: "checkbox", checked: !!s.sky,
         onchange: (e) => { s.sky = e.target.checked; write(); } })));
+      const num = (v) => (e) => { const n = e.target.value === "" ? undefined : Number(e.target.value); s[v] = n === undefined || Number.isNaN(n) ? undefined : n; if (v === "height" && !s.height) delete s.height; write(); };
+      rows.push(field("Floor height, in walls' heights (stairs: about 0.12 a step; drawn by the mesh view)",
+        el("input", { type: "number", step: "0.01", value: s.height === undefined ? "" : String(s.height), placeholder: "0", oninput: num("height") })));
+      rows.push(field("Ceiling height (empty: a wall's height over the floor)",
+        el("input", { type: "number", step: "0.01", value: s.ceiling_height === undefined ? "" : String(s.ceiling_height), oninput: num("ceiling_height") })));
     }
     const rename = el("input", { type: "text", class: "code short", maxlength: "1", value: ch, "aria-label": "The character", onchange: (e) => {
       const next = e.target.value;

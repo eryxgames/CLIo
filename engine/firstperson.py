@@ -37,6 +37,7 @@ SIGHT = 7                    # cells of things drawn ahead - and seen, aimed at,
 BACK = 4                     # cells behind the player whose walls still show at the edges of the picture
 REF_H, REF_W = 18, 12        # the yardstick: a sprite this big is a person's size
 DIRS = ((0, -1), (1, 0), (0, 1), (-1, 0))          # north, east, south, west
+RENDERS = ("classic", "mesh")                       # how rooms are drawn: this module's picture, or engine/mesh.py's
 STYLES = {"pixel": (1, 2), "dots": (2, 4), "dots-fill": (2, 4)}
 BRAILLE_BIT = ((0x01, 0x08), (0x02, 0x10), (0x04, 0x20), (0x40, 0x80))     # [row][column]
 BAYER_2X4 = ((0, 4), (6, 2), (1, 5), (7, 3))
@@ -329,6 +330,25 @@ def _screens(seed=1):
     return t
 
 
+def _step():
+    """A step's riser (the mesh view): dark plate, a worn bright lip along its top, a kick strip low down."""
+    t = _blank(shade(STEEL, 0.8))
+    for y in range(TS):
+        for x in range(TS):
+            if y <= 1:
+                c = (150, 146, 132) if y == 0 else HILITE    # the lip a foot comes down on
+            elif y == 2:
+                c = SEAM
+            elif y >= 26:
+                c = KICK
+            elif noise(x, y, 11) < 0.05:
+                c = shade(STEEL, 0.7)
+            else:
+                c = shade(STEEL, 0.8)
+            t[y][x] = c
+    return t
+
+
 def _hazard():
     t = _steel()
     for y in range(24, TS - 1):
@@ -519,7 +539,7 @@ def _make_textures():
     for k, c in KEY_COLOURS.items():
         out["door_" + k] = _door(stripe=c)
     out.update({"locker": _locker(), "locker_open": _locker(opened=True), "bars": _gate(), "field": _field(),
-                "door_timed": _timed_door(), "door_oneway": _oneway_door()})
+                "door_timed": _timed_door(), "door_oneway": _oneway_door(), "step": _step()})
     for k, c in KEY_COLOURS.items():
         out["locker_" + k] = _locker(stripe=c)
         out["bars_" + k] = _gate(stripe=c)
@@ -779,8 +799,11 @@ def vslide(old, new, k, down, gap=3):
 class View:
     """The picture of a level from the player's place, ``W`` x ``VR`` characters."""
 
-    def __init__(self, W, VR, style="pixel", detail="high"):
+    def __init__(self, W, VR, style="pixel", detail="high", render=None, render_game=None):
         self.style = style if style in STYLES else "pixel"
+        self.render_mode = render if render in RENDERS else None     # the player's choice of how rooms are drawn
+        self.render_game = render_game if render_game in RENDERS else None
+        self._mesh = None
         self.sx, self.sy = STYLES[self.style]
         self.W, self.VR = W, VR
         self.PW, self.PH = W * self.sx, VR * self.sy
@@ -1372,7 +1395,17 @@ class View:
         self.cur_z = -1e9
         frame = picture_frame.frame_for(self) if self.use_frame else None     # CLIo Picture 0.4: kept in C
         px = None
-        if land is not None:                                  # open land: a true perspective, the ground drawn first
+        meshed = land is None and self.meshed(lv)
+        mesh_labels = ()
+        if meshed:                                            # rooms as faces in a true perspective (engine/mesh.py)
+            from . import mesh as mesh_mod
+            self.persp, self.air = mesh_mod.Z0, None
+            g = lv.ground(cx, cy)
+            eye = fx.eye if fx.eye is not None else self.eye_of(lv)
+            self.set_eye_abs(g + (self.EYE0 if eye is None else eye))
+            px, mesh_labels = self.mesh_picture(lv, cam, phase, fx, frame, self.sky_rows(lv, cx, cy, f, phase))
+            sight, far = SIGHT, FAR
+        elif land is not None:                                  # open land: a true perspective, the ground drawn first
             self.persp = land.Z0 if hasattr(land, "Z0") else 1.6
             g = lv.ground(cx, cy)
             eye = fx.eye if fx.eye is not None else self.eye_of(lv)
@@ -1397,14 +1430,14 @@ class View:
             sight, far = SIGHT, FAR
 
         def gnd(a, z):                                       # the ground under a point ahead (0 in rooms)
-            if land is None:
+            if land is None and not meshed:
                 return 0.0
             return lv.ground(cx + rx * a + fx_ * z, cy + ry * a + fy_ * z)
 
         def foot(a, z, t):
             return self.yh + (self.FS - gnd(a, z) * self.TALL) * t
         self.fireball = lv.sprites.get("fireball")
-        labels, overlays = [], []
+        labels, overlays = [], list(mesh_labels)
 
         def rel(x, y):
             dx, dy = x - cx, y - cy
@@ -1416,7 +1449,9 @@ class View:
         items = []
         icx, icy = int(round(cx)), int(round(cy))
         sub_a, sub_z = rel(icx, icy)                          # the camera between cells, while it moves
-        if land is not None:                                  # open land: the walls are the map's, few and known
+        if meshed:                                            # the walls are faces of the mesh, drawn already
+            near = []
+        elif land is not None:                                # open land: the walls are the map's, few and known
             near = [(x, y) for x, y in getattr(lv, "land_walls", ())]
         else:
             near = []
@@ -1518,7 +1553,7 @@ class View:
             return c.drawn_as_wall() and c.texture() not in see_through
 
         for z, _o, _a, kind, obj in items:
-            if land is not None:
+            if land is not None or meshed:
                 self.cur_z = z                                # the ground nearer than this hides it
             if kind == "wall":
                 cell, a, x, y = obj
@@ -1690,6 +1725,35 @@ class View:
 
     use_frame = True                                          # CLIo Picture's frame when it has one (tests turn it off)
 
+    def meshed(self, lv):
+        """Whether rooms are drawn as a mesh (engine/mesh.py): the player's choice, else the level's, else the
+        game's; classic when nobody says."""
+        mode = self.render_mode or getattr(lv, "render", None) or self.render_game
+        return mode == "mesh"
+
+    def mesh_picture(self, lv, cam, phase, fx, frame, sky):
+        """The rooms as a mesh: the picture's rows, which keep each pixel's distance (as open land's), and the
+        labels of walls close by."""
+        from . import mesh as mesh_mod
+        if self._mesh is None:
+            self._mesh = mesh_mod.Mesh(self)
+        rgb, zbuf, cover, labels = self._mesh.draw(lv, cam, self.EYE, phase, fx.doors, sky)
+        if frame is not None:
+            px = frame.start(True)
+            frame.put_picture(rgb, zbuf)
+            for key, v in cover.items():
+                frame.cover_view[key] = v
+            self.cover = frame.cover_view
+            return px, labels
+        from .land import DepthRow
+        PW, px = self.PW, []
+        for y, row in enumerate(rgb):
+            r = DepthRow(row)
+            r.depth, r.view = zbuf[y * PW:(y + 1) * PW], self
+            px.append(r)
+        self.cover = cover
+        return px, labels
+
     def recolour(self, px, how, k, colour, fn):
         """The whole picture through ``fn``: in the library's frame by its number ``how`` (1 times k, 2 sudo,
         3 the goggles, 4 towards colour by k), else in Python."""
@@ -1860,7 +1924,7 @@ class View:
         clip = ("attack" if m.intent in ("aim", "windup", "spin") or m.id in fx.emuzzle else
                 "walk" if m.id in fx.pos else "idle")
         lift = m.float * 0.6 + (fx.rise.get(m.id, 0.0) if fx.rise else 0.0)
-        g = lv.ground(mx, my) if getattr(lv, "land", None) is not None else 0.0
+        g = lv.ground(mx, my) if self.persp is not None else 0.0     # open land, or rooms with heights in the mesh
         lift += g
         tz = self.tz(z)
         foot = self.yh + (self.FS - g * self.TALL) * tz

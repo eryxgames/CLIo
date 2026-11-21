@@ -135,7 +135,7 @@ class Cell:
                  "crate", "plate", "down", "open_while", "teleport", "arrive_only", "pad_facing", "lift", "deck", "sunk",
                  "oil", "slick", "conveyor", "scorched", "exit_kind", "heavy", "switch", "sky", "deep", "steep",
                  "duel", "stairs", "mag", "pit", "bulkhead", "supply", "locker", "opened", "gate", "field", "zap",
-                 "open_for", "closes_at", "from_side", "on_open")
+                 "open_for", "closes_at", "from_side", "on_open", "height", "ceiling_height", "step")
 
     def __init__(self, x, y, ch, spec):
         self.x, self.y, self.ch = x, y, ch
@@ -194,6 +194,10 @@ class Cell:
         self.deep = bool(spec.get("deep"))              # water too deep to wade: floaters and fliers only
         self.steep = bool(spec.get("steep"))            # too steep to climb (open land): floaters and fliers only
         self.pit = bool(spec.get("pit"))                # a drop: fliers and floaters only
+        self.height = float(spec.get("height") or 0.0)  # in rooms: the floor this high (walls' heights; the mesh view)
+        top = spec.get("ceiling_height")                # ... and the ceiling (else a wall's height over the floor)
+        self.ceiling_height = float(top) if top is not None else None
+        self.step = spec.get("step")                    # the tile of the risers up to this cell (else the engine's)
         self.found = False
         self.open = 0.0
         self.exit_kind = "secret" if spec.get("exit") == "secret" else "exit"
@@ -283,7 +287,7 @@ VOID = Cell(-1, -1, " ", {"wall": "steel"})
 class Field:
     """Steps to a cell from the cells round it, a ring at a time - only as many rings as have been asked for
     (``get``), or all of them (``finish``). Monsters do not block; deep water, slopes and pits only floaters."""
-    __slots__ = ("dist", "frontier", "d", "limit", "floats", "links", "cell")
+    __slots__ = ("dist", "frontier", "d", "limit", "floats", "links", "cell", "up")
 
     def __init__(self, lv, x0, y0, limit, floats):
         self.dist = {(x0, y0): 0}
@@ -291,6 +295,7 @@ class Field:
         self.d, self.limit, self.floats = 0, limit, floats
         self.links = lv.pad_links()
         self.cell = lv.cell
+        self.up = (lv.step_up + 1e-9) if getattr(lv, "heights", False) and not floats else None
 
     def get(self, at, default=None):
         dist = self.dist
@@ -304,6 +309,7 @@ class Field:
 
     def ring(self):
         dist, cell, links, floats = self.dist, self.cell, self.links, self.floats
+        up = self.up
         self.d = d = self.d + 1
         nxt = []
         for (x, y) in self.frontier:
@@ -312,6 +318,8 @@ class Field:
                     continue
                 c = cell(n[0], n[1])
                 if c.solid or (not floats and (c.deep or c.steep or c.pit)):        # as passable() has it
+                    continue
+                if up is not None and cell(x, y).height - c.height > up:            # walked from n: a step too high
                     continue
                 dist[n] = d
                 nxt.append(n)
@@ -508,12 +516,16 @@ def ease(k):
 # the level
 # --------------------------------------------------------------------------- #
 class Level:
+    heights = False                                      # rooms with floors at heights (made from a map only)
+
     def __init__(self, data, level_id, audio=None, seed=None, player=None, depth=0):
         spec = (data.levels or {}).get(level_id)
         if not isinstance(spec, dict):
             raise ValueError("there is no level '%s'" % level_id)
         self.data, self.id, self.spec = data, level_id, spec
         self.cfg = data.config.get("first_person") or {}
+        self.render = spec.get("render")                 # "mesh" or "classic": how this level would be drawn
+        self.step_up = float(spec.get("climb", self.cfg.get("climb", 0.55)))   # the highest step walked up
         self.audio = audio
         made = spec.get("generate") if isinstance(spec.get("generate"), dict) else spec.get("world")
         if seed is None and isinstance(made, dict) and made.get("seed") == "run":
@@ -688,6 +700,9 @@ class Level:
             start = next(((c.x, c.y) for row in self.grid for c in row if not c.solid), (1, 1))
         self.player.x, self.player.y = start
         self.player.facing = FACING.get(str(self.spec.get("facing", "n")).lower(), 0)
+        # rooms with floors at heights: a step higher than step_up is not walked up (the mesh view draws them)
+        self.heights = self.land is None and any(c.height or c.ceiling_height is not None
+                                                 for row in self.grid for c in row)
         # number the tags in the order a player meets them: z1 is the nearest zombie
         far = self.distances(*start, limit=400)
         counts = {}
@@ -896,9 +911,11 @@ class Level:
 
     def ground(self, x, y):
         """How high the ground is at (x, y) - cells or between them - above the floor the map stands on
-        (0 everywhere in rooms)."""
+        (in rooms, the floor of the cell there: 0 but where the map raises it)."""
         if self.land is None:
-            return 0.0
+            if not getattr(self, "heights", False):
+                return 0.0
+            return self.floor_at(x, y)
         if (int(round(x)), int(round(y))) in self.land.stamp and float(x).is_integer() and float(y).is_integer():
             return 0.0
         return self.land.ground(x, y) - self.land.base
@@ -926,6 +943,32 @@ class Level:
         if c.deep or c.steep or c.pit:
             return floats or bool(getattr(who, "float", 0))
         return True
+
+    def floor_at(self, x, y):
+        """The floor's height at (x, y) in rooms: a cell's own at its middle, and between cells blended from the
+        cells round the point that are not walls - walking up stairs, the eye rises smoothly."""
+        ix, iy = int(math.floor(x)), int(math.floor(y))
+        ux, uy = x - ix, y - iy
+        total = weight = 0.0
+        for cx, cy, w in ((ix, iy, (1 - ux) * (1 - uy)), (ix + 1, iy, ux * (1 - uy)), (ix, iy + 1, (1 - ux) * uy),
+                          (ix + 1, iy + 1, ux * uy)):
+            if w <= 0.0:
+                continue
+            c = self.cell(cx, cy)
+            if c.drawn_as_wall():
+                continue
+            total += c.height * w
+            weight += w
+        if weight <= 0.0:
+            return self.cell(int(math.floor(x + 0.5)), int(math.floor(y + 0.5))).height
+        return total / weight
+
+    def step_ok(self, x0, y0, x1, y1, floats=False):
+        """Can a walker go from (x0, y0) to (x1, y1)? In rooms with heights, not up a step higher than step_up
+        (down any). Floaters and fliers go anywhere."""
+        if floats or not getattr(self, "heights", False):
+            return True
+        return self.cell(x1, y1).height - self.cell(x0, y0).height <= self.step_up + 1e-9
 
     def free(self, x, y, skip=None):
         p = self.player
@@ -1791,6 +1834,10 @@ class Level:
                 if not cell.deep:
                     self.say("You are under water: surface first (F6, or surface).", "dim")
                     return False
+        if not flying and not cell.solid and not self.step_ok(p.x, p.y, nx, ny):
+            self.say("Too high a step to climb.", "dim")
+            self.sfx("locked")
+            return False
         if cell.pit and not cell.solid and not flying:
             self.say("A sheer drop. Without wings you would not climb out.", "dim")
             self.sfx("locked")
@@ -3655,6 +3702,8 @@ class Level:
     def move_mob(self, m, x, y):
         if not self.free(x, y, skip=m):
             return False
+        if not self.step_ok(m.x, m.y, x, y, getattr(m, "float", 0)):
+            return False
         self.moved.append((m, m.x, m.y))
         m.x, m.y = x, y
         m.stride += 1
@@ -4134,7 +4183,7 @@ class FrameConsole:
     """Frame mode: the first-person picture, redrawn in place; keys act at once."""
 
     def __init__(self, term, style="pixel", keys=True, keymap=None, animate=True, speed=1.0, detail="auto",
-                 realtime=None, touch=False):
+                 realtime=None, touch=False, render=None, render_game=None):
         from .frame import Screen
         from .keys import KeyReader
         self.screen = Screen(term, KeyReader() if keys else None, keymap or KEYMAP, animate, speed)
@@ -4147,6 +4196,7 @@ class FrameConsole:
         self.keys = self.screen.keys
         self.style = style
         self.detail = detail if detail in DETAILS else "auto"   # how fine the floor is: see View
+        self.render, self.render_game = render, render_game      # how rooms are drawn: the player's, the game's
         self.view = None
         self.views = {}
         self.size = None
@@ -4206,7 +4256,7 @@ class FrameConsole:
         VR = max(6, min(H - 7, 34))
         if (W, VR) != self.size:
             self.size = (W, VR)
-            self.view = View(W, VR, self.style, self.detail)
+            self.view = View(W, VR, self.style, self.detail, self.render, self.render_game)
             self.views = {}
         return W, H, VR
 
@@ -4216,7 +4266,7 @@ class FrameConsole:
         if not style or style == self.style:
             return self.view
         if style not in self.views:
-            self.views[style] = View(self.size[0], self.size[1], style, self.detail)
+            self.views[style] = View(self.size[0], self.size[1], style, self.detail, self.render, self.render_game)
         return self.views[style]
 
     def rows(self, lv, fx=None, cells=None, page=None, automap=False):
@@ -4756,7 +4806,8 @@ def play_scene(game, scene, resume_from=None):
                                detail=settings.get("detail") or cfg.get("detail", "auto"),
                                keys=not settings.get("lines"), keymap=keymap, animate=term.animate,
                                speed=max(0.0, float(term.speed or 1.0)), realtime=settings.get("realtime"),
-                               touch=settings.get("touch", _termux()))
+                               touch=settings.get("touch", _termux()), render=settings.get("render"),
+                               render_game=cfg.get("render"))
     else:
         def write(text):
             term.line(text)
@@ -5035,6 +5086,11 @@ def validate(data):
         if lv.get("world") is not None or lv.get("generate") is not None:   # made as it goes, or from a seed
             problems.extend("level '%s': %s" % (lid, p) for p in made_problems(lv, data, sprites))
             continue
+        if lv.get("render") is not None and lv.get("render") not in ("classic", "mesh"):
+            problems.append("level '%s': render should be classic or mesh" % lid)
+        if lv.get("climb") is not None and (isinstance(lv["climb"], bool) or not isinstance(lv["climb"], (int, float))
+                                             or lv["climb"] < 0):
+            problems.append("level '%s': climb should be the highest step walked up (walls' heights)" % lid)
         rows = lv.get("map")
         if land is not None and rows is None:
             rows = []                                # open land: the map (a camp, a compound) is optional
@@ -5148,6 +5204,13 @@ def validate(data):
                     problems.append("level '%s': '%s' opens from '%s'; it should be n, e, s or w" % (lid, ch, spec["from"]))
                 elif not (spec.get("door") or spec.get("gate")):
                     problems.append("level '%s': '%s' has \"from\", but only a door opens from one side" % (lid, ch))
+            for key in ("height", "ceiling_height"):
+                v = spec.get(key)
+                if v is not None and (isinstance(v, bool) or not isinstance(v, (int, float))):
+                    problems.append("level '%s': '%s' %s should be a number (walls' heights)" % (lid, ch, key))
+            if isinstance(spec.get("ceiling_height"), (int, float)) and \
+                    spec["ceiling_height"] <= (spec.get("height") if isinstance(spec.get("height"), (int, float)) else 0):
+                problems.append("level '%s': '%s' has its ceiling at or under its floor" % (lid, ch))
             if spec.get("open_for") is not None:
                 v = spec["open_for"]
                 if isinstance(v, bool) or not isinstance(v, int) or v < 1:

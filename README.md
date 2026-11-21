@@ -120,6 +120,8 @@ CLIo's.
 ## Looks
 
 - `--view dots` draws RØØTLESS in braille dots (finer, on a terminal font that has them).
+- `--render mesh` draws RØØTLESS's rooms in a true perspective, as its open land is drawn
+  (`--render classic`: the old way).
 - `--style retro` (or elegant, minimal, modern, techno, console) changes the frames and colours.
 - `--test-display` draws a test page: run it if something looks wrong. If a symbol shows as a
   box, add `--glyphs safe` (or set `CLIO_GLYPHS=safe`).

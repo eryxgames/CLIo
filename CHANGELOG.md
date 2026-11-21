@@ -2,6 +2,21 @@
 
 Notable changes to CLIo. Versions follow [semantic versioning](https://semver.org).
 
+## Unreleased
+
+### Added
+
+- **The mesh view** (`engine/mesh.py`; `--render mesh`, `"render": "mesh"` in a level or in
+  game.json's `first_person`): rooms in a true perspective, as open land is drawn - walls,
+  floors, ceilings, steps and lintels as faces filled pixel by pixel, each pixel keeping its
+  distance so that monsters, items and models are hidden by what stands in front of them.
+  About 11 ms a picture in Python at 110 columns (30 in braille).
+- **Floors and ceilings at heights** in rooms: `"height"`, `"ceiling_height"` and `"step"` (the
+  risers' tile; the engine's own `step`) in a map's legend; a level's `"climb"` (0.55) is the
+  highest step walked up, by the player and by monsters, whose ways go round a ledge by the
+  stairs. The eye rises smoothly up a stair. `--check` checks them; the editor's cell form
+  has them.
+
 ## 3.0.0 - 2026-11-21
 
 CLIo 3: from text adventures to a first-person shooter, in the same terminal.

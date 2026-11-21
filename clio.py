@@ -662,5 +662,23 @@ def main(argv=None):
     return 0
 
 
+def interrupted(out=None):
+    """Ctrl+C where nothing else caught it - a menu waiting, the logo, the demo between clips: the terminal as it
+    was (colours, cursor, the mouse let go) and no traceback. Returns the exit code a shell expects (130)."""
+    out = out or sys.stdout
+    try:
+        if out.isatty():
+            out.write("\x1b[0m\x1b[?25h\x1b[?1000l\x1b[?1006l")
+        out.write("\n")
+        out.flush()
+    except Exception:
+        pass
+    return 130
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        code = main()
+    except KeyboardInterrupt:
+        code = interrupted()
+    sys.exit(code)

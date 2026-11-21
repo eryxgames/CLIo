@@ -28,6 +28,11 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   "MESH VIEW" card and E1M1 as a mesh in CLIo's (a clip's `"render"`).
 - The level bot goes round steps it cannot climb.
 
+### Fixed
+
+- Ctrl+C while CLIo's menu waits (or between demo clips, or over the logo) ends CLIo cleanly - the
+  terminal as it was, exit code 130 - instead of leaving a Python traceback (seen in Termux).
+
 ## 3.0.0 - 2026-11-21
 
 CLIo 3: from text adventures to a first-person shooter, in the same terminal.

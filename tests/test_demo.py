@@ -210,3 +210,64 @@ class Menus(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CtrlCTests(unittest.TestCase):
+    @unittest.skipIf(os.name == "nt", "a pseudo-terminal is a POSIX thing")
+    def test_ctrl_c_at_the_menu_ends_cleanly(self):
+        # Termux, 2026-11-21: Ctrl+C while the launcher's menu waited for a key (its demo starts when idle) left a
+        # traceback. Now: the terminal as it was, exit code 130, no traceback.
+        import pty
+        import select
+        import signal
+        import time
+        root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+        pid, fd = pty.fork()
+        if pid == 0:
+            os.environ["CLIO_DEMO_IDLE"] = "600"
+            signal.signal(signal.SIGINT, signal.SIG_DFL)      # a shell's background job starts with it ignored
+            os.execvp(sys.executable, [sys.executable, os.path.join(root, "clio.py"), "--no-sound"])
+
+        def gather(seconds):
+            nonlocal got
+            end = time.monotonic() + seconds
+            while time.monotonic() < end:
+                if select.select([fd], [], [], 0.2)[0]:
+                    try:
+                        chunk = os.read(fd, 4096)
+                    except OSError:
+                        return True                            # the other end closed: CLIo has ended
+                    if not chunk:
+                        return True
+                    got += chunk
+                    if b"#>" in got and seconds > 5:
+                        return False
+            return False
+
+        got, status = b"", None
+        try:
+            gather(30)
+            self.assertIn(b"#>", got)                          # the menu, waiting
+            # A signal that comes just before Python blocks waiting for a key is only seen after the next key
+            # (CPython's way): a person never types that fast, the test does - so it waits, and types again.
+            for _ in range(4):
+                time.sleep(0.5)
+                os.write(fd, b"\x03")
+                if gather(3):
+                    break
+            for _ in range(50):
+                done, status = os.waitpid(pid, os.WNOHANG)
+                if done:
+                    break
+                time.sleep(0.1)
+            else:
+                status = None
+        finally:
+            if status is None:
+                os.kill(pid, signal.SIGKILL)
+                os.waitpid(pid, 0)
+            os.close(fd)
+        self.assertIsNotNone(status, "CLIo did not end")
+        self.assertNotIn(b"Traceback", got)
+        self.assertTrue(os.WIFEXITED(status))
+        self.assertEqual(os.WEXITSTATUS(status), 130)

@@ -168,11 +168,18 @@ def choose_game(term, logo=None, effect=None):
     tech = demo.tech() if term.is_tty and term.ansi and term.inp is None else None
     if tech:                                      # the tech demo: chosen, or after a while with no key
         labels.append("{key}Tech demo{/} {hint}%s CLIo shows what it can do{/}" % ui.g("dot"))
+    from engine import downloads
+    extras = term.is_tty and term.inp is None and downloads.wanted()
+    if extras:                                    # what is not here yet: asked about, never fetched unasked
+        labels.append("{key}Downloads{/} {hint}%s faster pictures, sounds without Node.js - optional{/}" % ui.g("dot"))
     idle = demo.idle_play(term, tech)
     while True:
         pick = ui.menu(labels, title="Choose a game:", cancel_label="Quit", idle=idle)
         if pick is not None and tech and pick == len(games):
             demo.play(term, tech)
+            continue
+        if pick is not None and extras and pick == len(labels) - 1:
+            downloads.menu(term, ui)
             continue
         return games[pick][0] if pick is not None else None
 

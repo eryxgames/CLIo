@@ -424,6 +424,12 @@ game, RØØTLESS, shows them.
 - RØØTLESS: a hacking deck (ping, firewall, traceroute, fork bomb, kill -9, sudo, grep,
   nohup, chmod 000, fsck, rm -rf, overclock), Black ICE and the Kernel Sentinel, and
   **SIM-10: Root Shell** (`--level sim10`): hack a terminal, then out-deal a sentinel.
+- **Downloads** in the launcher (`engine/downloads.py`): CLIo Picture and Ballistic's C engine
+  for this machine, each with its size and source, asked about first and fetched only on a
+  yes (as `--get-picture` and `--get-ballistic`), and how to get Node.js (`pkg install
+  nodejs` on Termux). Shown while one of them is not here yet. The `sound set` and `sound`
+  commands say how many of a set's Ballistic sounds the C engine makes and what the rest need;
+  sounds baked into the game need nothing.
 - **CLIo Picture** (`engine/picture/`, `--get-picture`): a C library, found and installed as
   Ballistic's is, for the inner loops of the pictures; `--get-picture` installs release 0.5.0
   for Linux, macOS, Windows or Android (Termux), checked by its SHA-256. It draws the open

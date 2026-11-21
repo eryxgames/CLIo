@@ -150,6 +150,12 @@ python clio.py
 For sound, install any one player: `pkg install play-audio` (recommended) or `pkg install mpv`.
 Without one the game is simply silent; the in-game `sound` command tells you what it found.
 
+Two optional downloads make a phone game nicer, and the launcher offers both under
+**Downloads** (it says the size first and installs nothing without a yes; the same as
+`python clio.py --get-picture` and `--get-ballistic`): CLIo Picture (about 45 KB) draws the
+first-person picture several times faster, and Ballistic's C engine (about 1.2 MB) makes some
+of RØØTLESS's Ballistic sound set without Node.js. For all of that set, `pkg install nodejs`.
+
 In first-person levels the picture answers taps: its left and right thirds turn, their bottom
 corners strafe, the top of the middle steps forward, the centre fires and the bottom uses
 (opens, presses). Swipe up or down to step forward or back; tap the status line for the next
@@ -261,7 +267,7 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 649 tests, about a minute
+python -m unittest discover -s tests     # 661 tests, about a minute
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 python tests/bot.py 30 cards             # the same with card battles (the Deck mode)

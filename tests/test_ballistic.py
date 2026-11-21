@@ -216,7 +216,9 @@ class WithoutNodeTests(unittest.TestCase):
                   sounds={"pistol": CHIP}, env=NO_NODE)
         a.sfx("pistol")
         own = a.backend.log[-1][1]
-        self.assertIn("Node.js or the C engine (libballistic), and neither is here", a.choose_set("b"))
+        said = a.choose_set("b")
+        self.assertIn("Its 3 Ballistic sounds need Node.js (", said)
+        self.assertIn("python clio.py --get-ballistic", said)
         self.assertTrue(a.sfx("pistol"))
         self.assertEqual(a.backend.log[-1][1], own)
         self.assertTrue(a.sfx("zap2"))                            # its fallback
@@ -250,6 +252,40 @@ class WithoutNodeTests(unittest.TestCase):
 
 
 @unittest.skipUnless(NODE, "Node.js is not installed")
+class SayWhatIsMissingTests(unittest.TestCase):
+    """What the sound set command and the sound command say when Ballistic's sounds cannot all be made."""
+
+    def test_on_termux_it_names_the_package(self):
+        a = audio(sets={"b": {"pistol": SHOT}}, env=dict(NO_NODE, TERMUX_VERSION="0.118"))
+        self.assertIn("Node.js (pkg install nodejs)", a.choose_set("b"))
+
+    def test_with_node_nothing_is_missing(self):
+        a = audio(sets={"b": {"pistol": SHOT}}, env={"CLIO_NODE": sys.executable, "CLIO_BALLISTIC_LIB": "none"})
+        self.assertEqual(a.choose_set("b"), "Sound set: b.")
+
+    def test_baked_sounds_need_nothing(self):
+        game = folder()
+        sounds = os.path.join(game, "sounds", "b")
+        os.makedirs(sounds)
+        with open(os.path.join(sounds, "pistol.1.wav"), "wb") as f:
+            f.write(b"RIFF")
+        with open(os.path.join(sounds, ballistic.BAKED), "w") as f:
+            json.dump({"format": ballistic.BAKED_FORMAT, "version": 1,
+                       "sounds": {"pistol": {"spec": "old", "files": ["pistol.1.wav"]}}}, f)
+        a = audio(sets={"b": {"pistol": SHOT}}, env=NO_NODE, game_dir=game)
+        self.assertEqual(a.choose_set("b"), "Sound set: b.")
+        self.assertTrue(any("all 1 baked into the game" in l for l in a.status()))
+
+    @unittest.skipUnless(CLIB, "Ballistic's C engine is not installed")
+    def test_with_the_c_engine_it_counts_what_it_makes(self):
+        lever = {"ballistic": "lever", "p": {}, "vol": 0.5}
+        e = {"CLIO_BALLISTIC_LIB": CLIB.path, "CLIO_NODE": "none", "TERMUX_VERSION": "1"}
+        a = audio(sets={"b": {"pistol": SHOT, "lever": lever}}, env=e)
+        self.assertIn("The C engine makes 1 of its 2 Ballistic sounds; the other 1 need Node.js (pkg install "
+                      "nodejs)", a.choose_set("b"))
+        self.assertTrue(any("makes 1 of 2; the rest need Node.js, pkg install nodejs" in l for l in a.status()))
+
+
 class RenderTests(unittest.TestCase):
     def test_takes_render_vary_and_are_kept(self):
         cache = folder()
@@ -374,7 +410,7 @@ class CEngineTests(unittest.TestCase):
         self.assertFalse(os.path.basename(a.backend.log[-1][1]).startswith("ballistic-"))
         status = " ".join(a.status())
         self.assertIn("C engine", status)
-        self.assertIn("the rest needs Node.js", status)
+        self.assertIn("makes 2 of 3; the rest need Node.js", status)
         a.shutdown()
 
     def test_mono_takes(self):

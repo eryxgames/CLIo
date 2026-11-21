@@ -821,20 +821,51 @@ class Sounds:
         self._baked.pop(folder, None)
         return bad
 
-    def status(self, uses):
-        """A line for the ``sound`` command, when the game uses Ballistic sounds."""
+    def made_by_c(self, uses):
+        """How many of ``uses`` (``(name, spec)``) the C engine makes: None without it."""
+        c = self.clib
+        if not c:
+            return None
+        return sum(1 for _n, s in uses if c.supports({"preset": spec_of(s)["preset"], "p": spec_of(s)["p"]}))
+
+    def missing(self, uses):
+        """What it takes to hear all of ``uses`` (``(name, spec)``): a line, or None when nothing is missing."""
+        if not uses or self.node_ok():
+            return None
+        from ...downloads import node_hint
+        n = len(uses)
+        made = self.made_by_c(uses)
+        if made is None:
+            return ("Its %d Ballistic sounds need Node.js (%s), which makes all of them, or Ballistic's C engine "
+                    "(python clio.py --get-ballistic, or Downloads in the launcher), which makes some of them; "
+                    "until then the game's own sounds play." % (n, node_hint(self.env)))
+        if made >= n:
+            return None
+        return ("The C engine makes %d of its %d Ballistic sounds; the other %d need Node.js (%s) and play as the "
+                "game's own sounds until then." % (made, n, n - made, node_hint(self.env)))
+
+    def status(self, uses, unbaked=None):
+        """A line for the ``sound`` command, when the game uses Ballistic sounds (``unbaked``: those of them with
+        no takes baked into the game - all of them when not given)."""
         if not uses:
             return []
+        unbaked = uses if unbaked is None else unbaked
         c = self.clib
         if not c and not self.node:
-            return ["Ballistic sounds: neither Node.js nor the C engine found - the game's own sounds play instead "
-                    "(python clio.py --get-ballistic installs the C engine; or install Node.js)"]
+            if not unbaked:
+                return ["Ballistic sounds: all %d baked into the game - no engine needed" % len(uses)]
+            return ["Ballistic sounds: neither Node.js nor the C engine found - the game's own sounds play instead. "
+                    + self.missing(unbaked)]
         if not c and self.broken:
             return ["Ballistic sounds: not working (%s) - the game's own sounds play instead" % self.broken]
         if c:
             whole = all(c.supports({"preset": spec_of(s)["preset"], "p": spec_of(s)["p"]}) for _n, s in uses)
-            engines = "C engine %s" % c.version + ("" if whole else (", Node.js for the rest" if self.node_ok()
-                                                                     else ", the rest needs Node.js"))
+            if whole or self.node_ok():
+                engines = "C engine %s" % c.version + ("" if whole else ", Node.js for the rest")
+            else:
+                from ...downloads import node_hint
+                engines = "C engine %s makes %d of %d; the rest need Node.js, %s" % (
+                    c.version, self.made_by_c(uses), len(uses), node_hint(self.env))
         else:
             engines = "Node.js"
         line = "Ballistic sounds (%s): %d take%s rendered" % (engines, self.rendered, "" if self.rendered == 1 else "s")

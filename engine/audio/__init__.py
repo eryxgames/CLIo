@@ -239,6 +239,16 @@ class Audio:
         out += [(n, s) for n, s in self.sounds.items() if ballistic.is_spec(s) and n not in mine]
         return out
 
+    def _unbaked(self, found=None):
+        """Of the Ballistic sounds in use, those with no takes baked into the game: an engine must make them."""
+        mine = (self.sets.get(self.sound_set) if self.sound_set else None) or {}
+        out = []
+        for n, s in (self._ballistic_sounds() if found is None else found):
+            where = self.sound_set if n in mine else None
+            if not self.ballistic.baked(where, n, ballistic.spec_of(s))[0]:
+                out.append((n, s))
+        return out
+
     def prepare(self):
         """Render the Ballistic sounds in use in the background, so the first shot need not wait."""
         if not (self.enabled and self.available):
@@ -269,9 +279,9 @@ class Audio:
         if not self.set_sound_set(want):
             return "There is no sound set called '%s'. There are: %s." % (want.strip(), names)
         line = "Sound set: %s." % (self.sound_set or "default")
-        if self._ballistic_sounds() and not self.ballistic.available():
-            line += (" Its Ballistic sounds need Node.js or the C engine (libballistic), and neither is here: the game's"
-                     " own sounds play instead.")
+        lack = self.ballistic.missing(self._unbaked())
+        if lack:
+            line += " " + lack
         return line
 
     def voice(self, pitch=220, wave="square", seed=0):
@@ -428,7 +438,7 @@ class Audio:
                                                        ", ".join(["default"] + sorted(self.sets))))
         found = self._ballistic_sounds()
         if found:
-            lines.extend(self.ballistic.status(found))
+            lines.extend(self.ballistic.status(found, self._unbaked(found)))
         if self.wanted:
             lines.append("Track: %s" % self.wanted.split(":", 1)[-1])
         if self.last_error:

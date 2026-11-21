@@ -1164,6 +1164,13 @@ class EditorTests(unittest.TestCase):
         self.assertEqual((v["cols"], v["lines"], len(v["rows"]), v["facing"], v["inside"]), (80, 17, 17, "w", False))
         self.assertEqual(sum(len(run[0]) for run in v["rows"][0]), 80)
         self.assertTrue(service.handle(ROOTLESS, "/api/view", {"level": "e1m1", "x": 0, "y": 0})["inside"])
+        at = {"level": "e1m1", "x": 15, "y": 22, "facing": "w"}
+        mesh = service.handle(ROOTLESS, "/api/view", dict(at, render="mesh"))      # the rooms in the mesh view
+        self.assertNotEqual(mesh["rows"], v["rows"])
+        self.assertEqual(service.handle(ROOTLESS, "/api/view", dict(at, render="classic"))["rows"], v["rows"])
+        self.assertEqual(service.handle(ROOTLESS, "/api/view", dict(at, render="odd"))["rows"], v["rows"])
+        sim = service.handle(ROOTLESS, "/api/view", {"level": "sim12"})                # a level drawn as a mesh
+        self.assertEqual(sim["rows"], service.handle(ROOTLESS, "/api/view", {"level": "sim12", "render": "mesh"})["rows"])
         t = service.handle(ROOTLESS, "/api/tileview", {"name": "grate", "where": "floor"})
         self.assertEqual(len(t["rows"]), 17)
         w = service.handle(ROOTLESS, "/api/weaponview", {"weapon": "1"})

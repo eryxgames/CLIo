@@ -261,7 +261,7 @@ KINDS = [
         R("death_text", "ref", "Text when the player dies", of="texts"),
         R("realtime", "number", "Real time: seconds a beat lasts when no key is pressed (0: it waits)"),
         R("render", "choice", "How its rooms are drawn (a player's --render wins)", options=["classic", "mesh"]),
-        R("climb", "number", "Rooms with heights: the highest step walked up, in walls' heights (0.55)")]},
+        R("climb", "number", "Rooms with heights, terraces on open land: the highest step walked up, in walls' heights (0.55)")]},
     {"key": "tiles", "file": "tiles", "label": "Tiles", "one": "tile", "shape": "map", "editor": "sprite", "fields": []},
     {"key": "weapons", "file": "weapons", "label": "Weapons", "one": "weapon", "shape": "map", "title": "name",
      "editor": "weapon", "fields": [

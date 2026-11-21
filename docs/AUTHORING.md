@@ -1955,11 +1955,23 @@ floor under them and are hidden by what stands in front.
 Ask for it with `"render": "mesh"` in the level (or in `first_person`, for every level);
 `--render mesh` draws any game's rooms this way, and `--render classic` keeps the old
 picture even where a level asks for the mesh (its heights still count for walking, and the
-picture is flat). Line of sight does not look at heights: a raised floor is no cover.
-Open land is drawn as it always was. In the mesh view the player looks up and down
-(Shift+Up, Shift+Down, or `look up`, `look down`, `look`: a free action) and a turn is drawn
-turning. RØØTLESS's SIM-12 (`--level sim12`) has stairs, a mezzanine, a pit and a ramp. A
-demo clip can ask for it too: `"render": "mesh"`.
+picture is flat). Heights count for line of sight too: a floor that rises over the line
+between two eyes (each half a wall over its floor) hides one from the other - a block as high
+as the chest, a ledge - and so does a ceiling that comes down below it; from up on a gallery
+one sees over what hides from the floor. Open land is drawn as it always was. In the mesh view
+the player looks up and down (Shift+Up, Shift+Down, or `look up`, `look down`, `look`: a free
+action), a turn is drawn turning, magboots walking up a wall turn the whole view (the rooms
+fill the corners), bullet holes show where shots hit the walls, and `"detail": "low"` draws the
+floors and ceilings at half width, as the classic picture does. The editor's look from a cell
+shows either picture (*rooms as the level says*, *classic rooms*, *mesh view*). RØØTLESS's
+SIM-12 (`--level sim12`) has stairs, a mezzanine, a pit and a ramp. A demo clip can ask for
+the mesh too: `"render": "mesh"`.
+
+**Terraces on open land.** On a level with `"land"`, a map cell with `"height"` stands that
+much over the pad: steps up a slope, a raised platform, with sharp edges. Walking up them
+keeps to `"climb"`, as in rooms; the ground (and the eye) rises from one to the next, and a
+terrace hides what is behind it from below. (The Python draws a land with terraces; CLIo
+Picture does not yet.)
 
 ### 3D models
 

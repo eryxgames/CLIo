@@ -27,6 +27,13 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   mezzanine, a pump pit, a low passage and a ramp down, drawn as a mesh; in both demos, with a
   "MESH VIEW" card and E1M1 as a mesh in CLIo's (a clip's `"render"`).
 - The level bot goes round steps it cannot climb.
+- The mesh view, finished for CLIo Picture 0.7: bullet holes on its walls; `"detail": "low"`
+  draws its floors and ceilings at half width; magboots up a wall turn the whole view (drawn
+  bigger and cut to size, so the rooms fill the corners); heights count for line of sight (a
+  ledge, a block as high as the chest or a low ceiling hides; from a gallery one sees over);
+  the editor's look from a cell shows classic rooms or the mesh view.
+- Terraces on open land: a map cell with `"height"` on a level with `"land"` stands that much
+  over the pad - steps, platforms - walked up within `"climb"` (the Python draws them).
 - **Play in the browser** (`engine/editor/web/play.html`, `engine/web.py`): every game and the
   tech demo in a web page, the engine unchanged in Python made for the web (Pyodide) - a
   terminal on the page (xterm.js), keys shared with the game's worker, sound through WebAudio,

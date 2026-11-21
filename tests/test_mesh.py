@@ -177,6 +177,55 @@ class PictureTests(unittest.TestCase):
             b = view(80, 24, frame=True, render="mesh").render(lv, FX(), 1)
             self.assertEqual(a, b, lid)
 
+    def test_bullet_holes_show_on_the_walls(self):
+        lv = room(HALL)
+        before, _z, v, _ = picture_of(lv)
+        lv.hole(4, 0, 2, 0.0, 0.5)                            # the far wall's face turned south, to the player
+        after, _z, v, _ = picture_of(lv)
+        changed = [(y, x) for y in range(v.PH) for x in range(v.PW) if before[y][x] != after[y][x]]
+        self.assertTrue(changed)
+        for y, x in changed:
+            self.assertLess(sum(after[y][x]), sum(before[y][x]))      # dark
+            self.assertLessEqual(abs(x - v.PW // 2), 1)               # in the middle of the wall ahead
+            self.assertLessEqual(abs(y - v.yh), 2)                    # halfway up it, about at the eye
+        lv.hole(4, 0, 0, 0.0, 0.5)                            # the face turned north, away: not seen
+        self.assertEqual(picture_of(lv)[0], after)
+
+    def test_a_hole_hidden_behind_a_pillar_is_not_drawn(self):
+        rows = list(HALL)
+        rows[3] = "#...#...#"
+        lv = room(rows)
+        before = picture_of(lv)[0]
+        lv.hole(4, 0, 2, 0.0, 0.5)
+        self.assertEqual(picture_of(lv)[0], before)
+        lv.hole(4, 3, 2, 0.1, 0.4)                            # on the pillar itself: seen
+        self.assertNotEqual(picture_of(lv)[0], before)
+
+    def test_low_detail_draws_the_floor_at_half_width(self):
+        lv = room(HALL)
+        high, zh, v, _ = picture_of(lv, view())
+        low, zl, v, _ = picture_of(lv, View(60, 20, "pixel", "low"))
+        self.assertNotEqual(high, low)
+        self.assertEqual(list(zh), list(zl))                  # the same faces, as near
+        def alike(px):                                        # pairs of floor pixels of one colour, of all pairs
+            pairs = [(y, x) for y in range(v.yh + 3, v.PH) for x in range(0, v.PW - 1, 2)
+                     if zl[y * v.PW + x] == zl[y * v.PW + x + 1]]
+            return sum(px[y][x] == px[y][x + 1] for y, x in pairs) / float(len(pairs))
+        self.assertGreater(alike(low), 0.95)                  # all but where one cell's floor meets the next
+        self.assertLess(alike(high), alike(low) - 0.04)
+
+    def test_holes_are_drawn_the_same_by_clio_picture(self):
+        if picture.load() is None:
+            self.skipTest("CLIo Picture is not installed")
+        lv = room(HALL)
+        for along, down in ((0.0, 0.5), (0.3, 0.4), (-0.4, 0.6)):
+            lv.hole(4, 0, 2, along, down)
+        lv.hole(0, 3, 1, 0.2, 0.5)                            # the west wall's face, turned east
+        a = view(80, 24, frame=False, render="mesh").render(lv, FX(), 1)
+        b = view(80, 24, frame=True, render="mesh").render(lv, FX(), 1)
+        self.assertEqual(a, b)
+        self.assertNotEqual(a, view(80, 24, frame=False, render="mesh").render(room(HALL), FX(), 1))
+
     def test_clio_picture_draws_every_face_and_floor_as_the_python_does(self):
         lib = picture.load()
         if lib is None or not hasattr(lib, "clio_frame_rooms"):
@@ -261,6 +310,54 @@ class TurnAndLookTests(unittest.TestCase):
             View.render = real
         self.assertEqual([round(y / (math.pi / 2), 2) for y in yaws], [0.25, 0.5, 0.75])
 
+    def test_the_rolled_view_is_the_picture_turned_with_rooms_in_its_corners(self):
+        from engine.firstperson import tilt
+        lv = room(HALL)
+        v = view(60, 20, render="mesh")
+        flat = v.render(lv, FX(hands=False), 1)
+        self.assertEqual(v.rolled(lv, 0, 1), flat)            # drawn bigger at the same scale, cut to size: the same
+        dark = (10, 10, 14)
+
+        def darks(cells):
+            return sum((fg == dark) + (bg == dark) for row in cells for _ch, fg, bg in row)
+        self.assertGreater(darks(tilt(flat, 90)), 100)        # the picture turned: dark corners
+        turned = v.rolled(lv, 90, 1)
+        self.assertEqual(darks(turned), 0)                    # the view turned: the rooms there
+        self.assertEqual((len(turned), len(turned[0])), (20, 60))
+        if picture.load() is not None:
+            self.assertEqual(view(60, 20, frame=True, render="mesh").rolled(lv, 52, 1), v.rolled(lv, 52, 1))
+
+    def test_magboots_up_a_wall_roll_the_mesh_view(self):
+        import io
+        from engine.level import KEYMAP, TIP, TIP_BACK, FrameConsole
+        from engine.term import Term
+        import test_deep
+        for render, want in (("mesh", list(TIP) + list(TIP_BACK)), ("classic", [])):
+            term = Term(out=io.StringIO(), width=80, height=24, color=3, unicode=True, animate=False, env={})
+            con = FrameConsole(term, "pixel", keys=False, keymap=KEYMAP, animate=False)
+            lv = test_deep.room(test_deep.Rides.MAP, render=render)
+            lv.console = con
+            con.layout()
+            played, angles, real = [], [], View.rolled
+
+            def spy(self_, lv_, degrees, phase=0):
+                angles.append(degrees)
+                return real(self_, lv_, degrees, phase)
+            con.screen.play = lambda frames, draw, dt: played.append(list(frames))
+            View.rolled = spy
+            try:
+                test_deep.at(lv, 5, 8, 0)                     # under the plating, facing north
+                lv.player.magboots = lv.player.mag_on = True
+                lv.run_line("k")
+            finally:
+                View.rolled = real
+            self.assertEqual((lv.player.x, lv.player.y), (5, 5), render)
+            self.assertEqual(angles, want, render)
+            ride = [f for f in played if len(f) == 15]
+            self.assertEqual(len(ride), 1, render)
+            if render == "mesh":
+                self.assertEqual(ride[0][-1], con.snapshot(lv, style="pixel"))     # back on his feet
+
     def test_looking_up_and_down_moves_the_horizon_in_the_mesh_view(self):
         lv = Level(GameData(ROOTLESS), "e1m1", seed=1)
         lv.console = Quiet()
@@ -290,7 +387,6 @@ class TurnAndLookTests(unittest.TestCase):
                                                                                          "look up"))
 
     def test_the_library_turns_and_looks_as_the_python_does(self):
-        import math
         lib = picture.load()
         if lib is None or not hasattr(lib, "clio_frame_rooms"):
             self.skipTest("CLIo Picture 0.7 is not installed")
@@ -379,6 +475,31 @@ class HeightTests(unittest.TestCase):
                      "#.....#",
                      "#######"])
         self.assertEqual(flat.distances(1, 1)[(1, 3)], 2)
+
+    def test_a_ledge_or_a_low_ceiling_hides_what_is_behind_it(self):
+        rows = ["#########",
+                "#...z...#",
+                "#.BBBBB.#",
+                "#.......#",
+                "#...@...#",
+                "#########"]
+        legend = {"B": {"height": 0.8}, "z": "zombie", "T": {"height": 1.5}, "c": {"ceiling_height": 0.3}}
+        lv = room(rows, legend)
+        m = lv.monsters[0]
+        self.assertFalse(lv.line_of_sight(4, 4, 4, 1))         # a block as high as his chest, from the floor
+        lv.update_seen()
+        self.assertFalse(m.seen)
+        self.assertFalse(lv.line_of_sight(4, 1, 4, 4))         # both ways
+        self.assertTrue(lv.line_of_sight(1, 4, 1, 1))          # beside it: seen
+        tower = room(rows[:3] + ["#@TTTTTT#", "#TTTTTTT#", rows[5]], legend)
+        put(tower, 4, 4, 0)
+        self.assertTrue(tower.line_of_sight(4, 4, 4, 1))       # from up on a tower: over it
+        tower.update_seen()
+        self.assertTrue(tower.monsters[0].seen)
+        low = room(rows[:2] + ["#.ccccc.#"] + rows[3:], legend)
+        self.assertFalse(low.line_of_sight(4, 4, 4, 1))        # a crawlspace's ceiling at his knees
+        flat = room(rows[:2] + ["#.......#"] + rows[3:], legend)
+        self.assertTrue(flat.line_of_sight(4, 4, 4, 1))
 
     def test_a_monster_does_not_step_up_a_ledge(self):
         lv = room(["#####",

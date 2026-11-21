@@ -112,12 +112,15 @@ def engine_tile(name):
     return made
 
 
-def _picture(lv, style="pixel", W=80, VR=17, fx=None, phase=0):
-    return runs(firstperson.View(W, VR, style).render(lv, fx or firstperson.FX(), phase))
+def _picture(lv, style="pixel", W=80, VR=17, fx=None, phase=0, render=None):
+    """``render``: rooms drawn "classic" or as a "mesh" - None: as the level (else the game) says."""
+    view = firstperson.View(W, VR, style, render=render, render_game=(getattr(lv, "cfg", None) or {}).get("render"))
+    return runs(view.render(lv, fx or firstperson.FX(), phase))
 
 
-def view(game_dir, level_id, x, y, facing, style="pixel", pending=None, width=80):
-    """The level as the player sees it from cell ``(x, y)``, facing n, e, s or w, before anything moves."""
+def view(game_dir, level_id, x, y, facing, style="pixel", pending=None, width=80, render=None):
+    """The level as the player sees it from cell ``(x, y)``, facing n, e, s or w, before anything moves.
+    ``render``: "classic" or "mesh" for its rooms; None: as the level (else the game) draws them."""
     data = _game(game_dir, pending)
     if level_id not in (data.levels or {}):
         raise EditorError("There is no level called %s." % level_id)
@@ -134,7 +137,9 @@ def view(game_dir, level_id, x, y, facing, style="pixel", pending=None, width=80
     W = max(40, min(160, int(width or 80)))
     VR = max(11, round(W * 17 / 80))
     here = lv.cell(p.x, p.y)
-    return {"rows": _picture(lv, style if style in firstperson.STYLES else "pixel", W, VR), "cols": W, "lines": VR,
+    render = render if render in firstperson.RENDERS else None
+    pic = _picture(lv, style if style in firstperson.STYLES else "pixel", W, VR, render=render)
+    return {"rows": pic, "cols": W, "lines": VR,
             "at": [p.x, p.y], "facing": "nesw"[p.facing], "inside": bool(here.solid),
             "seen": sorted("%s %s" % (m.tag, m.name) for m in lv.visible())}
 

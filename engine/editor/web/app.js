@@ -1808,6 +1808,9 @@ function levelEditor(kind, thing, id) {
   const viewNote = el("p", { class: "note" });
   const styleSel = el("select", { "aria-label": "Drawn as", onchange: (e) => { ui.style = e.target.value; look(); } },
     ...["pixel", "dots", "dots-fill"].map((s) => el("option", { value: s, selected: ui.style === s }, s)));
+  const renderSel = el("select", { "aria-label": "Rooms drawn", onchange: (e) => { ui.render = e.target.value; look(); } },
+    ...[["", "rooms as the level says"], ["classic", "classic rooms"], ["mesh", "mesh view"]].map(([v, label]) =>
+      el("option", { value: v, selected: (ui.render || "") === v }, label)));
   const checkOut = el("div", {});
 
   const used = () => new Set(thing.map.join(""));
@@ -2091,7 +2094,7 @@ function levelEditor(kind, thing, id) {
   async function look() {
     if (!ui.cam) { const [x, y] = startCell(); ui.cam = { x, y, f: String(thing.facing || "n")[0] }; draw(); }
     let res;
-    try { res = await api("/api/view", { pending: pending(), level: id, x: ui.cam.x, y: ui.cam.y, facing: ui.cam.f, style: ui.style }); }
+    try { res = await api("/api/view", { pending: pending(), level: id, x: ui.cam.x, y: ui.cam.y, facing: ui.cam.f, style: ui.style, render: ui.render || null }); }
     catch (err) { viewNote.textContent = "It cannot be drawn: " + err.message; return; }
     paintCells(view, res.rows, res.cols, res.lines);
     viewNote.textContent = `From (${res.at[0]}, ${res.at[1]}) facing ${{ n: "north", e: "east", s: "south", w: "west" }[res.facing]}` +
@@ -2115,7 +2118,7 @@ function levelEditor(kind, thing, id) {
   });
   const walkButtons = el("span", { class: "row" },
     ...[["left", "↶ Turn left"], ["step", "↑ Step"], ["back", "↓ Back"], ["right", "Turn right ↷"]].map(([c, label]) =>
-      el("button", { type: "button", class: "quiet small", onclick: () => walk(c) }, label)), styleSel);
+      el("button", { type: "button", class: "quiet small", onclick: () => walk(c) }, label)), styleSel, renderSel);
 
   // ---- the level bot plays it
   const goals = el("input", { type: "text", class: "code", value: Array.isArray(thing.bot) ? thing.bot.join(", ") : "", placeholder: "item ids or map characters, in order; E last",

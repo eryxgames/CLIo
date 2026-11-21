@@ -148,6 +148,7 @@ class Land:
         self.at = tuple(int(v) for v in (spec.get("at") or [0, 0])[:2])
         self.base = 0.0                                           # the height things are counted from (the pad's)
         self.stamp = {}                                           # (x, y) of a map cell -> its floor tile's rows
+        self.terrace = {}                                         # (x, y) of a map cell -> its floor over the pad's
         self.stamp_chunks = set()                                 # the chunks with a map cell in them
         self.pad_fn = None                                        # a world's sites: (kx, ky) -> pads in the chunk
         try:
@@ -318,11 +319,19 @@ class Land:
         return self.chunk_of(x, y)[0][((y & 15) << 4) | (x & 15)]
 
     def ground(self, x, y):
-        """The ground under a point between cells (cells' middles are whole numbers), blended."""
+        """The ground under a point between cells (cells' middles are whole numbers), blended - a terrace's
+        cells at their own heights."""
         x0, y0 = math.floor(x), math.floor(y)
         fx, fy = x - x0, y - y0
-        h00, h10 = self.height(x0, y0), self.height(x0 + 1, y0)
-        h01, h11 = self.height(x0, y0 + 1), self.height(x0 + 1, y0 + 1)
+        terrace = self.terrace
+        if terrace:
+            def height(cx, cy):
+                t = terrace.get((cx, cy))
+                return self.height(cx, cy) if t is None else self.base + t
+        else:
+            height = self.height
+        h00, h10 = height(x0, y0), height(x0 + 1, y0)
+        h01, h11 = height(x0, y0 + 1), height(x0 + 1, y0 + 1)
         return (h00 * (1 - fx) + h10 * fx) * (1 - fy) + (h01 * (1 - fx) + h11 * fx) * fy
 
     def uses(self):
@@ -442,7 +451,7 @@ class Land:
         offs = [x + step * 0.5 - half for x in cols]
         eye_abs = eye + self.base
         chunks, build = self.chunks, self.build
-        stamp, stamp_chunks = self.stamp, self.stamp_chunks
+        stamp, stamp_chunks, terrace = self.stamp, self.stamp_chunks, self.terrace
         D = Z0 * 0.8
         alive = len(cols)
         while D < self.view and alive:
@@ -469,7 +478,7 @@ class Land:
                 k = ((iy & 15) << 4) | (ix & 15)
                 kind = ch[2][k]
                 if key in stamp_chunks and (ix, iy) in stamp:
-                    h = self.base
+                    h = self.base + terrace.get((ix, iy), 0.0) if terrace else self.base     # a terrace: higher
                     tex = stamp[(ix, iy)]
                     if tex:
                         u, v = wx + 0.5 - ix, wy + 0.5 - iy

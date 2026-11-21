@@ -640,6 +640,7 @@ class FX:
         self.tick = 0.0          # how far into the beat the animation is (0..1): spinning parts turn by it
         self.eye = None          # how high the eye is (of a wall's height), in place of the player's: a lift-off
         self.yaw = None          # the mesh view: the way it looks, in radians (0 north, pi/2 east) - a turn drawn
+        self.hands = True        # what is in the hands drawn (not in View.rolled's bigger picture)
         self.__dict__.update(kw)
 
 
@@ -813,6 +814,8 @@ class View:
             detail = "low" if self.PW * self.PH > AUTO_LOW else "high"
         self.detail = "low" if detail == "low" else "high"
         self.yh = self.yh0 = round(self.PH * 0.40)            # the horizon, in pixel rows
+        self.look_ph = self.PH                                # looking up or down moves the horizon by this picture's
+        self._twin = None                                     # View.rolled's bigger picture at this one's scale
         self.FS = self.PH - self.yh                           # floor height on screen at distance 0
         self.CH = self.FS * 0.92                              # ceiling height
         self.TALL = self.FS + self.CH                         # a wall's height on screen at distance 0
@@ -1402,7 +1405,7 @@ class View:
             if fx.yaw is not None:                            # turning: the picture between two facings
                 fx_, fy_, rx, ry = math.sin(fx.yaw), -math.cos(fx.yaw), math.cos(fx.yaw), math.sin(fx.yaw)
                 sky_f = fx.yaw / (math.pi / 2)
-            self.yh = self.yh0 + int(round(getattr(p, "look", 0) * self.PH * LOOK))   # looking up or down
+            self.yh = self.yh0 + int(round(getattr(p, "look", 0) * self.look_ph * LOOK))   # looking up or down
         cam = (cx, cy, fx_, fy_, rx, ry)
         self.cover = {}
         self.cur_z = -1e9
@@ -1742,6 +1745,26 @@ class View:
         game's; classic when nobody says."""
         mode = self.render_mode or getattr(lv, "render", None) or self.render_game
         return mode == "mesh"
+
+    def rolled(self, lv, degrees, phase=0):
+        """The mesh view turned ``degrees`` about the picture's middle, as the world tips when magboots walk up
+        a wall: drawn bigger at this picture's scale - the corners show the rooms, not the dark - then turned
+        and cut to this size. Pixel-style cells; what is in the hands is left out."""
+        twin = self._twin
+        if twin is None:
+            D = math.hypot(self.PW, self.PH)
+            W2, VR2 = int(math.ceil(D / self.sx)) + 2, int(math.ceil(D / self.sy)) + 2
+            W2 += (W2 - self.W) % 2                           # even margins: the middles meet
+            VR2 += (VR2 - self.VR) % 2
+            twin = self._twin = View(W2, VR2, self.style, self.detail)
+            twin.LW, twin.K, twin.TALL, twin.EYE0 = self.LW, self.K, self.TALL, self.EYE0
+            twin.yh = twin.yh0 = self.yh0 + (twin.PH - self.PH) // 2
+            twin.look_ph = self.look_ph
+        twin.render_mode, twin.render_game, twin.use_frame = self.render_mode, self.render_game, self.use_frame
+        big = twin.render(lv, FX(hands=False), phase)
+        turned = tilt(big, degrees) if degrees else big
+        r0, c0 = (twin.VR - self.VR) // 2, (twin.W - self.W) // 2
+        return [row[c0:c0 + self.W] for row in turned[r0:r0 + self.VR]]
 
     def mesh_picture(self, lv, cam, phase, fx, frame, sky):
         """The rooms as a mesh: the picture's rows, which keep each pixel's distance (as open land's), and the
@@ -2182,6 +2205,8 @@ class View:
         self.blit(px, pic.rows, x0, y0, s)
 
     def weapon(self, px, lv, fx):
+        if not fx.hands:
+            return
         if getattr(lv.player, "vehicle", None) is not None:
             return self.cockpit(px, lv, fx)
         pic = lv.sprites.get(lv.weapon_sprite())

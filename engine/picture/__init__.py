@@ -480,8 +480,8 @@ def land_draw(land, view, cam, eye, phase, sky_rows, frame=None):
     zero (Land.cast's eye plus the land's base). With a ``frame`` (0.4): drawn into it, its cells covered
     marked; True when done."""
     lib = load()
-    if lib is None or not hasattr(lib, "clio_land_draw") or not isinstance(phase, int):
-        return None
+    if lib is None or not hasattr(lib, "clio_land_draw") or not isinstance(phase, int) or land.terrace:
+        return None                                       # terraces: the Python draws them (the library: later)
     PW, PH = view.PW, view.PH
     step = 2 if view.detail == "low" else 1
     try:

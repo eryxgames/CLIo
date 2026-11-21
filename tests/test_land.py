@@ -67,6 +67,28 @@ class GroundTests(unittest.TestCase):
         self.assertNotIn((10, 10), lv.land.stamp)
         self.assertTrue(lv.cell(10, 10).sky)
 
+    def test_terraces_raise_the_maps_floor(self):
+        rows = ["#######", "#.....#", "#.@12T#", "#...TT#", "##.####"]
+        legend = {"1": {"height": 0.3}, "2": {"height": 0.6}, "T": {"height": 0.9}}
+        lv = land_level(rows=rows, legend=legend, land={"at": [20, 20], "start": None})
+        self.assertTrue(lv.terraced and not lv.heights)
+        self.assertEqual((lv.ground(23, 22), lv.ground(24, 22), lv.ground(25, 22)), (0.3, 0.6, 0.9))
+        self.assertEqual(lv.ground(22, 22), 0.0)
+        self.assertAlmostEqual(lv.ground(22.5, 22), 0.15)            # between: blended, as stairs walked up
+        self.assertTrue(lv.step_ok(22, 22, 23, 22) and lv.step_ok(23, 22, 24, 22))   # a step at a time: up
+        self.assertFalse(lv.step_ok(22, 22, 24, 22))                 # two at once: too high
+        self.assertTrue(lv.step_ok(25, 22, 22, 22))                  # down: any
+        put(lv, 22, 22, 1)
+        lv.run_line("k")
+        lv.run_line("k")
+        self.assertEqual((lv.player.x, lv.player.y), (24, 22))      # up the steps
+        flat = land_level(rows=rows, land={"at": [20, 20], "start": None})
+        self.assertFalse(flat.terraced)
+        put(flat, 21, 22, 1)
+        put(lv, 21, 22, 1)
+        v = fp.View(80, 24, "pixel")
+        self.assertNotEqual(v.render(lv, fp.FX(), 0), v.render(flat, fp.FX(), 0))     # drawn higher
+
     def test_ground_between_cells_is_smooth(self):
         lv = land_level()
         a, b = lv.ground(10, 10), lv.ground(11, 10)

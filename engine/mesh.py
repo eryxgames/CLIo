@@ -134,7 +134,6 @@ class Mesh:
             return f
 
         reach0 = view.half / (view.LW * Z0)                   # half the picture's width in cells, a cell per Z0 away
-        icx, icy = int(round(cx)), int(round(cy))
         for x, y in self.cells_near(cam, reach0):
             if True:
                 c = cell_at(x, y)
@@ -252,7 +251,6 @@ class Mesh:
         zbuf = array("d", [NONE]) * (PW * PH)
         walls = bytearray(PW * PH)
         lit = {}
-        lights = {}
 
         def light(z, k):                                      # the light at z ahead, times k: 0..256
             fog, fade = fog_of(z)
@@ -316,6 +314,7 @@ class Mesh:
                     row[x] = colour(c, q)
             if face.label is not None and face.side * (fx if kind == XWALL else fy) < 0:   # a wall facing the player
                 labels.append(face)
+        self.holes(lv, cam, eye, doors, rgb, zbuf)
         cover = self.cover(zbuf, walls)
         over = []
         for face in labels:                                   # labels of walls seen close by, as View.front_face's
@@ -357,6 +356,7 @@ class Mesh:
                               sky, phase, force=True)
             finally:
                 view.cur_z = cur
+        self.holes(lv, cam, eye, doors, frame.rows, zbuf)
         labels = []
         for face in faces:
             if face.label is not None and face.side * (fx if face.kind == XWALL else fy) < 0 and \
@@ -438,7 +438,8 @@ class Mesh:
                 not getattr(cell, "sunk", False) and getattr(cell, "teleport", None)    # the library's kind 4
         else:
             tex = face.info
-        for y, x0, x1 in spans:
+        step = 2 if later is None and not force and getattr(self.view, "detail", "high") == "low" else 1
+        for y, x0, x1 in spans:                              # low detail: every other pixel, each drawn twice
             s = sb[y]
             if s == 0.0:
                 continue
@@ -449,67 +450,121 @@ class Mesh:
             fog, fade = fog_of(z)
             q = int(fog * fade * 256.0)
             row, base = rgb[y], y * PW
-            for x in range(x0, x1):
+            for x in range(x0 - (x0 & 1) if step == 2 else x0, x1, step):    # low: pairs from an even column
                 i = base + x
-                if (zbuf[i] != z) if force else (z >= zbuf[i]):
-                    continue
-                ux = ex + d * dirx[x] - ix
-                uy = ey + d * diry[x] - iy
+                if force:
+                    if zbuf[i] != z:
+                        continue
+                    one, two = True, False
+                else:
+                    one = x >= x0 and z < zbuf[i]
+                    two = step == 2 and x + 1 < x1 and z < zbuf[i + 1]
+                    if not (one or two):
+                        continue
+                xs = x if x >= x0 else x + 1                 # the pixel whose ray gives the colour
+                ux = ex + d * dirx[xs] - ix
+                uy = ey + d * diry[xs] - iy
                 ux = -0.5 if ux < -0.5 else 0.4999 if ux > 0.4999 else ux
                 uy = -0.5 if uy < -0.5 else 0.4999 if uy > 0.4999 else uy
                 if not floor:
                     if tex == "sky":
-                        c = sky[y][x] if sky is not None and y < len(sky) else fp.HAZE
-                        zbuf[i] = z
-                        row[x] = c
-                        continue
-                    c = None
+                        v = sky[y][xs] if sky is not None and y < len(sky) else fp.HAZE
+                    else:
+                        c = None
+                        if tex is not None:
+                            th, tw = len(tex), len(tex[0])
+                            c = tex[min(th - 1, int((uy + 0.5) * th))][min(tw - 1, int((ux + 0.5) * tw))]
+                        if c is None:
+                            c = fp.CEIL
+                            if abs(ux) > 0.47 or abs(uy) > 0.47:
+                                c = fp.CEIL_LINE
+                            elif (ix * 7 + iy * 3) % 4 == 0 and abs(ux) < 0.24 and abs(uy) < 0.24:
+                                c = fp.LIGHT
+                        v = colour(c, q)
+                else:
+                    c = None                                 # the floor: as View._backdrop draws it
                     if tex is not None:
                         th, tw = len(tex), len(tex[0])
                         c = tex[min(th - 1, int((uy + 0.5) * th))][min(tw - 1, int((ux + 0.5) * tw))]
-                    if c is None:
-                        c = fp.CEIL
-                        if abs(ux) > 0.47 or abs(uy) > 0.47:
-                            c = fp.CEIL_LINE
-                        elif (ix * 7 + iy * 3) % 4 == 0 and abs(ux) < 0.24 and abs(uy) < 0.24:
-                            c = fp.LIGHT
+                    if c is None and fixed:
+                        if pad:                              # left as the library leaves it
+                            zbuf[i] = z
+                            row[x] = fp.HAZE
+                            later[0].append((i, later[1]))
+                            continue
+                        c = fp.View.fixture(cell, ux, uy, phase)
+                    if c is None and toxic:
+                        c = fp.TOXIC_HI if fp.noise(int(ux * 8) + ix * 8, int(uy * 8) + iy * 8, phase) < 0.07 else fp.TOXIC
+                        v = colour(c, int((0.45 + 0.55 * fog) * fade * 256.0))
+                    else:
+                        if c is None:
+                            c = fp.FLOOR_A if (ix + iy) & 1 else fp.FLOOR_B
+                            if abs(ux) > 0.46 or abs(uy) > 0.46:
+                                c = fp.FLOOR_LINE
+                        if fire:
+                            c = fp.mix(c, (255, 120, 30), 0.3 + 0.25 * fp.noise(int(ux * 6) + ix * 6, int(uy * 6) + iy * 6, phase))
+                        if mark == "warn":                   # fire is coming here: hatched and glowing
+                            hatch = int((ux + uy + 1.0) * 6) % 2 == 0
+                            c = fp.mix(c, (255, 90, 30) if hatch else (150, 30, 20), 0.55 + 0.2 * (phase % 2))
+                            v = colour(c, int((0.6 + 0.4 * fog) * fade * 256.0))
+                        elif mark == "burn":
+                            k = fp.noise(int(ux * 10) + ix * 10, int(uy * 10) + iy * 10, phase + 5)
+                            c = (255, 230, 120) if k < 0.25 else (255, 140, 40) if k < 0.7 else (200, 50, 20)
+                            v = colour(c, int(fade * 256.0))
+                        else:
+                            v = colour(c, q)
+                if one:
                     zbuf[i] = z
-                    row[x] = colour(c, q)
-                    continue
-                c = None                                     # the floor: as View._backdrop draws it
-                if tex is not None:
-                    th, tw = len(tex), len(tex[0])
-                    c = tex[min(th - 1, int((uy + 0.5) * th))][min(tw - 1, int((ux + 0.5) * tw))]
-                if c is None and fixed:
-                    if pad:                                  # left as the library leaves it
-                        zbuf[i] = z
-                        row[x] = fp.HAZE
-                        later[0].append((i, later[1]))
-                        continue
-                    c = fp.View.fixture(cell, ux, uy, phase)
-                if c is None and toxic:
-                    c = fp.TOXIC_HI if fp.noise(int(ux * 8) + ix * 8, int(uy * 8) + iy * 8, phase) < 0.07 else fp.TOXIC
-                    zbuf[i] = z
-                    row[x] = colour(c, int((0.45 + 0.55 * fog) * fade * 256.0))
-                    continue
-                if c is None:
-                    c = fp.FLOOR_A if (ix + iy) & 1 else fp.FLOOR_B
-                    if abs(ux) > 0.46 or abs(uy) > 0.46:
-                        c = fp.FLOOR_LINE
-                if fire:
-                    c = fp.mix(c, (255, 120, 30), 0.3 + 0.25 * fp.noise(int(ux * 6) + ix * 6, int(uy * 6) + iy * 6, phase))
-                zbuf[i] = z
-                if mark == "warn":                           # fire is coming here: hatched and glowing
-                    hatch = int((ux + uy + 1.0) * 6) % 2 == 0
-                    c = fp.mix(c, (255, 90, 30) if hatch else (150, 30, 20), 0.55 + 0.2 * (phase % 2))
-                    row[x] = colour(c, int((0.6 + 0.4 * fog) * fade * 256.0))
-                    continue
-                if mark == "burn":
-                    k = fp.noise(int(ux * 10) + ix * 10, int(uy * 10) + iy * 10, phase + 5)
-                    c = (255, 230, 120) if k < 0.25 else (255, 140, 40) if k < 0.7 else (200, 50, 20)
-                    row[x] = colour(c, int(fade * 256.0))
-                    continue
-                row[x] = colour(c, q)
+                    row[x] = v
+                if two:
+                    zbuf[i + 1] = z
+                    row[x + 1] = v
+
+    def holes(self, lv, cam, eye, doors, rows, zbuf):
+        """Bullet holes in the walls seen (the level's ``holes``), as the classic view's dents: each where its wall
+        shows at its middle - a hole is as high on a wall as a shot flies, so from the floor up."""
+        spots = getattr(lv, "holes", None)
+        if not spots:
+            return
+        view = self.view
+        PW, PH, half, yh = view.PW, view.PH, view.half, view.yh
+        cx, cy, fx, fy, rx, ry = cam
+        ex, ey = cx - fx * Z0, cy - fy * Z0
+        lx = view.LW * Z0
+        for x, y, n, along, down in spots:
+            dx, dy = fp.DIRS[n]
+            ax, ay = fp.DIRS[(n + 1) % 4]
+            wx, wy = x + 0.5 * dx + along * ax, y + 0.5 * dy + along * ay     # the hole, on the face turned to DIRS[n]
+            if (ex - wx) * dx + (ey - wy) * dy <= 0:                      # the face is turned away from the camera
+                continue
+            c = lv.cell(x, y)
+            if c is None or (c.kind == "door" and doors.get((x, y), c.open) > 0.0):
+                continue
+            h, top = heights(lv.cell(x + dx, y + dy))
+            wh = min(top - 0.02, h + 1.0 - down)
+            ddx, ddy = wx - cx, wy - cy
+            z = ddx * fx + ddy * fy
+            d = z + Z0
+            if d <= NEAR:
+                continue
+            t = Z0 / d
+            px_ = half + (ddx * rx + ddy * ry) * view.LW * t
+            py_ = yh + (eye - wh) * view.TALL * t
+            xi, yi = int(px_), int(py_)
+            if not (0 <= xi < PW and 0 <= yi < PH):
+                continue
+            sa = (xi + 0.5 - half) / lx                           # where that pixel's ray meets the face
+            if dx:
+                ray = fx + sa * rx
+                dp = (wx - ex) / ray if ray else -1.0
+            else:
+                ray = fy + sa * ry
+                dp = (wy - ey) / ray if ray else -1.0
+            zp = dp - Z0
+            if dp <= NEAR or abs(zbuf[yi * PW + xi] - zp) > 0.02 + 0.002 * zp:
+                continue                                          # something nearer hides it, or no wall is there
+            fog, fade = fog_of(z)
+            view.dents(rows, [(px_, py_, max(1, int(round(view.TALL * t * 0.05))))], fog * fade, 0, PW)
 
     def cover(self, zbuf, walls):
         """The nearest wall over each character cell (View.cover's rule)."""

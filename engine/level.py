@@ -298,7 +298,8 @@ class Field:
         self.d, self.limit, self.floats = 0, limit, floats
         self.links = lv.pad_links()
         self.cell = lv.cell
-        self.up = (lv.step_up + 1e-9) if getattr(lv, "heights", False) and not floats else None
+        self.up = (lv.step_up + 1e-9) if (getattr(lv, "heights", False) or getattr(lv, "terraced", False)) \
+            and not floats else None
 
     def get(self, at, default=None):
         dist = self.dist
@@ -436,6 +437,8 @@ class Grenade:
         self.x, self.y, self.fuse, self.blast = x, y, fuse, blast
 
 
+TIP = (10, 28, 52, 76, 90)    # degrees the world turns through as magboots walk up a wall
+TIP_BACK = (90, 72, 46, 22, 6)  # ... and back at the other end
 HOLES = 60                   # bullet holes kept in a level's walls (the oldest go first)
 
 
@@ -521,6 +524,7 @@ def ease(k):
 # --------------------------------------------------------------------------- #
 class Level:
     heights = False                                      # rooms with floors at heights (made from a map only)
+    terraced = False                                     # open land with the map's floors raised (terraces)
 
     def __init__(self, data, level_id, audio=None, seed=None, player=None, depth=0):
         spec = (data.levels or {}).get(level_id)
@@ -678,6 +682,8 @@ class Level:
                     spec = {"monster": spec} if spec in (self.data.monsters or {}) else {"item": spec}
                 cell = Cell(x, y, ch, {k: v for k, v in spec.items() if k not in ("monster", "item")})
                 line.append(cell)
+                if self.land is not None and cell.height:   # a terrace: the map's floor raised over the pad
+                    self.land.terrace[(x, y)] = cell.height
                 if spec.get("start"):
                     start = (x, y)
                 if spec.get("monster"):
@@ -707,6 +713,7 @@ class Level:
         # rooms with floors at heights: a step higher than step_up is not walked up (the mesh view draws them)
         self.heights = self.land is None and any(c.height or c.ceiling_height is not None
                                                  for row in self.grid for c in row)
+        self.terraced = self.land is not None and bool(self.land.terrace)    # open land with terraces: steps too
         # number the tags in the order a player meets them: z1 is the nearest zombie
         far = self.distances(*start, limit=400)
         counts = {}
@@ -921,7 +928,7 @@ class Level:
                 return 0.0
             return self.floor_at(x, y)
         if (int(round(x)), int(round(y))) in self.land.stamp and float(x).is_integer() and float(y).is_integer():
-            return 0.0
+            return self.land.terrace.get((int(x), int(y)), 0.0)
         return self.land.ground(x, y) - self.land.base
 
     def cell(self, x, y):
@@ -970,7 +977,7 @@ class Level:
     def step_ok(self, x0, y0, x1, y1, floats=False):
         """Can a walker go from (x0, y0) to (x1, y1)? In rooms with heights, not up a step higher than step_up
         (down any). Floaters and fliers go anywhere."""
-        if floats or not getattr(self, "heights", False):
+        if floats or not (getattr(self, "heights", False) or getattr(self, "terraced", False)):
             return True
         return self.cell(x1, y1).height - self.cell(x0, y0).height <= self.step_up + 1e-9
 
@@ -990,10 +997,25 @@ class Level:
             land = self.land
             stamp, height, base = land.stamp, land.height, land.base
             for i, (x, y) in enumerate(cells[1:-1], 1):         # ground() at a cell's middle: its own height
-                g = 0.0 if (x, y) in stamp else height(x, y) - base
+                g = land.terrace.get((x, y), 0.0) if (x, y) in stamp else height(x, y) - base
                 if g > h0 + (h1 - h0) * i / n + 0.05:
                     return False
+        elif getattr(self, "heights", False) and len(cells) > 2:     # rooms at heights: a ledge or a low ceiling
+            h0, h1 = self.room_eye(x0, y0), self.room_eye(x1, y1)    # between hides, as the mesh view shows it
+            n = len(cells) - 1
+            for i, (x, y) in enumerate(cells[1:-1], 1):
+                c = self.cell(x, y)
+                line = h0 + (h1 - h0) * i / n
+                if c.height > line + 0.05:
+                    return False
+                if c.ceiling_height is not None and not c.sky and c.ceiling_height < line - 0.05:
+                    return False
         return True
+
+    def room_eye(self, x, y):
+        """How high one sees from at (x, y) in rooms at heights: the floor there, and a head above it."""
+        m = self.monster_at(x, y)
+        return self.ground(x, y) + 0.5 + (m.float if m is not None and m.float else 0.0)
 
     def covered(self, sx, sy, tx, ty):
         """Whether one at (tx, ty) is in cover from a shot from (sx, sy): a wall, a crate or a closed door right
@@ -2307,12 +2329,15 @@ class Level:
         console = self.console
         if mag:
             old = console.snapshot(self, style="pixel") if console else None
+            rolled = getattr(console, "rolled", None)
+            olds = rolled(self, TIP) if rolled and old is not None else None      # the mesh view: turned whole
             p.x, p.y, p.facing = lx, ly, face
             self.update_seen()
             new = console.snapshot(self, style="pixel") if console else None
+            news = rolled(self, TIP_BACK) if olds else None
             self.sfx("magwalk", "footstep")
             if console is not None and old is not None:
-                console.tilt(self, old, new, up)
+                console.tilt(self, old, new, up, olds, news)
             self.say("The magboots clamp; the world tips on its side; you walk %s the plating." % ("up" if up else "down"),
                      "info")
         else:
@@ -4509,12 +4534,26 @@ class FrameConsole:
         frames = [vslide(old, new, k, down) for k in (0.08, 0.18, 0.3, 0.42, 0.52, 0.62, 0.72, 0.82, 0.92, 1.0)]
         self.screen.play(frames, lambda cells: self.draw(lv, prompt=None, cells=cells), 0.11)
 
-    def tilt(self, lv, old, new, up):
-        """Magboots up (or down) a wall: the world tips on its side, goes by, and tips back at the other end."""
+    def rolled(self, lv, angles):
+        """The mesh view at each of ``angles`` (degrees) turned about its middle (View.rolled); None in the
+        classic view, whose picture is turned as it is."""
+        view = self.view_for(lv, "pixel")
+        if not view.meshed(lv) or getattr(lv, "land", None) is not None:
+            return None
+        return [view.rolled(lv, a, self.phase) for a in angles]
+
+    def tilt(self, lv, old, new, up, olds=None, news=None):
+        """Magboots up (or down) a wall: the world tips on its side, goes by, and tips back at the other end.
+        ``olds``/``news``: the mesh view at TIP's and TIP_BACK's angles (rolled), else the picture is turned."""
         from .firstperson import tilt
-        frames = [tilt(old, a) for a in (10, 28, 52, 76, 90)]
+        if olds and news:
+            frames = list(olds) + [vslide(olds[-1], news[0], k, not up) for k in (0.2, 0.45, 0.7, 0.9, 1.0)]
+            frames += list(news[1:]) + [new]
+            self.screen.play(frames, lambda cells: self.draw(lv, prompt=None, cells=cells), 0.06)
+            return
+        frames = [tilt(old, a) for a in TIP]
         frames += [vslide(tilt(old, 90), tilt(new, 90), k, not up) for k in (0.2, 0.45, 0.7, 0.9, 1.0)]
-        frames += [tilt(new, a) for a in (72, 46, 22, 6, 0)]
+        frames += [tilt(new, a) for a in TIP_BACK[1:] + (0,)]
         self.screen.play(frames, lambda cells: self.draw(lv, prompt=None, cells=cells), 0.06)
 
     def ending(self, lv):
@@ -4558,7 +4597,7 @@ class TextConsole:
     def ride(self, lv, old, new, down):
         pass
 
-    def tilt(self, lv, old, new, up):
+    def tilt(self, lv, old, new, up, olds=None, news=None):
         pass
 
     def ending(self, lv):

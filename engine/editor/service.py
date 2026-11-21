@@ -72,7 +72,7 @@ def handle(game_dir, path, body=None):
         return levels.engine_tile(body.get("name") or "steel")
     if path == "/api/view":                                 # a level seen from a cell
         return levels.view(game_dir, str(body.get("level") or ""), body.get("x"), body.get("y"), body.get("facing"),
-                           body.get("style") or "pixel", pending, body.get("width") or 80)
+                           body.get("style") or "pixel", pending, body.get("width") or 80, body.get("render"))
     if path == "/api/tileview":                             # a tile on the walls (floor, ceiling) of a small room
         return levels.tile_view(game_dir, str(body.get("name") or ""), body.get("where") or "wall", pending)
     if path == "/api/weaponview":                           # a weapon in the hands, and one shot of it

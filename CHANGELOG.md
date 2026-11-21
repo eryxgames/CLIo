@@ -47,6 +47,14 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 - **RØØTLESS E1M7: The Stack**, after E1M6: the overflow hall crossed on its ceiling (hornets
   come up there), a switch reached only from it, a drop to a door, a corridor whose plating dies
   behind you, and a hatch up to the return address - and a first look at Aspiration Central.
+- **Light and weather**: a level's `"lights"` (ambient light and its tint, changes by events with
+  an alarm's pulse, a day going round with a sun and a moon) and lamps on map cells (colour,
+  reach, power, flicker, switched by events); its `"weather"` (clear, rain, storm with lightning
+  and thunder, snow, fog, dust; a cycle by beats, changes by events). The mesh view and open land
+  light each pixel by its place and fog it by its distance; rain and snow fall only under open
+  sky; the classic picture is lit as a whole. Fog shortens sight both ways; in the dark a monster
+  further than two cells is not seen without the goggles. In RØØTLESS: E1M6 and E1M7 lit, rain
+  through SIM-12's skylight, weather and a day on SIM-1's fens.
 - **Play in the browser** (`engine/editor/web/play.html`, `engine/web.py`): every game and the
   tech demo in a web page, the engine unchanged in Python made for the web (Pyodide) - a
   terminal on the page (xterm.js), keys shared with the game's worker, sound through WebAudio,

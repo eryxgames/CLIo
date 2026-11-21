@@ -4,6 +4,7 @@
   "engine/actions.py",
   "engine/arcade.py",
   "engine/art.py",
+  "engine/atmosphere.py",
   "engine/automap.py",
   "engine/banner.py",
   "engine/cards.py",

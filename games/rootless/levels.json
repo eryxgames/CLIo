@@ -1398,7 +1398,40 @@
    "shotgun",
    "boots",
    "E"
-  ]
+  ],
+  "weather": {
+   "cycle": [
+    {
+     "beats": 40,
+     "kind": "clear"
+    },
+    {
+     "beats": 30,
+     "kind": "rain",
+     "amount": 0.6
+    },
+    {
+     "beats": 16,
+     "kind": "storm",
+     "amount": 0.9
+    },
+    {
+     "beats": 24,
+     "kind": "fog",
+     "amount": 0.5
+    },
+    {
+     "beats": 30,
+     "kind": "clear"
+    }
+   ]
+  },
+  "lights": {
+   "day": {
+    "beats": 280,
+    "start": 0.08
+   }
+  }
  },
  "sim2": {
   "name": "Deep Swap",
@@ -2444,7 +2477,16 @@
    },
    "!": {
     "switch": "crontab",
-    "label": "CRON"
+    "label": "CRON",
+    "lamp": {
+     "colour": [
+      255,
+      200,
+      130
+     ],
+     "reach": 6,
+     "power": 1.2
+    }
    },
    "n": {
     "height": -0.25,
@@ -2463,7 +2505,17 @@
     "floor": "grate",
     "item": "medkit",
     "height": -0.8,
-    "ceiling_height": 2.6
+    "ceiling_height": 2.6,
+    "lamp": {
+     "colour": [
+      120,
+      255,
+      150
+     ],
+     "reach": 3,
+     "power": 0.8,
+     "flicker": 0.5
+    }
    },
    "e": {
     "floor": "grate",
@@ -2488,6 +2540,24 @@
    "U": {
     "monster": "bugrat",
     "ceiling_height": 0.9
+   }
+  },
+  "lights": {
+   "ambient": 0.45,
+   "tint": [
+    170,
+    190,
+    255
+   ],
+   "events": {
+    "crontab": {
+     "ambient": 0.85,
+     "tint": [
+      255,
+      240,
+      220
+     ]
+    }
    }
   }
  },
@@ -2604,13 +2674,40 @@
     "monster": "hornet"
    },
    "^": {
-    "mag_ceiling": true
+    "mag_ceiling": true,
+    "lamp": {
+     "colour": [
+      140,
+      200,
+      255
+     ],
+     "reach": 4,
+     "power": 0.9
+    }
    },
    "%": {
-    "mag_ceiling": true
+    "mag_ceiling": true,
+    "lamp": {
+     "colour": [
+      140,
+      200,
+      255
+     ],
+     "reach": 4,
+     "power": 0.9
+    }
    },
    "&": {
-    "mag_ceiling": true
+    "mag_ceiling": true,
+    "lamp": {
+     "colour": [
+      140,
+      200,
+      255
+     ],
+     "reach": 4,
+     "power": 0.9
+    }
    },
    "!": {
     "switch": "frame",
@@ -2649,7 +2746,16 @@
     "mag_delay": 7
    },
    "E": {
-    "exit": true
+    "exit": true,
+    "lamp": {
+     "colour": [
+      255,
+      225,
+      170
+     ],
+     "reach": 7,
+     "power": 1.1
+    }
    },
    "a": {
     "ceiling_mag": true,
@@ -2711,6 +2817,25 @@
    "n": {
     "item": "clip",
     "ceiling_height": 1.4
+   }
+  },
+  "lights": {
+   "ambient": 0.5,
+   "tint": [
+    170,
+    235,
+    190
+   ],
+   "events": {
+    "unwind": {
+     "ambient": 0.45,
+     "tint": [
+      255,
+      90,
+      70
+     ],
+     "pulse": 0.5
+    }
    }
   }
  },
@@ -2837,6 +2962,18 @@
     "ceiling_height": 1.45
    },
    ",": {}
+  },
+  "weather": {
+   "kind": "rain",
+   "amount": 0.55
+  },
+  "lights": {
+   "ambient": 0.8,
+   "tint": [
+    200,
+    210,
+    235
+   ]
   }
  }
 }

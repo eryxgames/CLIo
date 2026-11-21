@@ -1711,6 +1711,9 @@ class View:
                 a, k = obj
                 t = self.tz(z)
                 self.boom(px, self.X(a, z), foot(a, z, t) - 7 * t * self.K, (4 + 19 * k) * t * self.K, k)
+        atm = getattr(lv, "atmosphere", None)
+        if atm is not None:                                   # light and weather (engine/atmosphere.py)
+            px = atm.apply(self, px, cam, lv.beat + float(fx.tick or 0.0), meshed or land is not None)
         if inverted:                                          # on the ceiling: the world turned over, the hands not
             px, labels, overlays = self.turned_over(px, labels, overlays)
         self.cur_z = -1e9                                     # what is in the hands is nearer than anything

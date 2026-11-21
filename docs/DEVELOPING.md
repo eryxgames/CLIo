@@ -109,7 +109,7 @@ guide.
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 752 tests, about a minute
+python -m unittest discover -s tests     # 766 tests, about a minute
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 python tests/bot.py 30 cards             # the same with card battles (the Deck mode)

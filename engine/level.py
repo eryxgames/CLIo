@@ -139,7 +139,7 @@ class Cell:
                  "oil", "slick", "conveyor", "scorched", "exit_kind", "heavy", "switch", "sky", "deep", "steep",
                  "duel", "stairs", "mag", "pit", "bulkhead", "supply", "locker", "opened", "gate", "field", "zap",
                  "open_for", "closes_at", "from_side", "on_open", "height", "ceiling_height", "step",
-                 "ceiling_mag", "mag_off_on", "mag_delay", "high", "hatch", "mag_ceiling")
+                 "ceiling_mag", "mag_off_on", "mag_delay", "high", "hatch", "mag_ceiling", "lamp")
 
     def __init__(self, x, y, ch, spec):
         self.x, self.y, self.ch = x, y, ch
@@ -151,6 +151,7 @@ class Cell:
         self.mag_delay = int(spec.get("mag_delay") or 0)  # ... so many beats after the event
         self.high = bool(spec.get("high"))              # a switch, exit or locker up by the ceiling: reached from it
         self.hatch = spec.get("hatch")                  # a hatch in the ceiling to the other of its name (the deck above)
+        self.lamp = spec.get("lamp") or None            # a lamp here: its colour, reach, power... (engine/atmosphere.py)
         self.bulkhead = bool(spec.get("bulkhead"))      # a wall down into the water: a diver passes under it
         self.tex = spec.get("wall") or spec.get("texture") or (
             "stairs" if self.stairs else "magwall" if self.mag or self.mag_ceiling else "bulkhead" if self.bulkhead else
@@ -536,6 +537,7 @@ def ease(k):
 class Level:
     heights = False                                      # rooms with floors at heights (made from a map only)
     terraced = False                                     # open land with the map's floors raised (terraces)
+    atmosphere = None                                    # light and weather, when the level has them
 
     def __init__(self, data, level_id, audio=None, seed=None, player=None, depth=0):
         spec = (data.levels or {}).get(level_id)
@@ -634,6 +636,8 @@ class Level:
         self.player.x, self.player.y = self.world.start
         face = self.spec.get("facing")
         self.player.facing = FACING.get(str(face).lower(), 0) if face else (self.world.facing or 0)
+        from .atmosphere import Atmosphere
+        self.atmosphere = Atmosphere(self) if Atmosphere.wanted(self) else None    # light and weather
 
     def protos(self):
         """The level's monsters and items, and those its world may put about later: for their pictures."""
@@ -726,6 +730,8 @@ class Level:
         self.heights = self.land is None and any(c.height or c.ceiling_height is not None
                                                  for row in self.grid for c in row)
         self.terraced = self.land is not None and bool(self.land.terrace)    # open land with terraces: steps too
+        from .atmosphere import Atmosphere
+        self.atmosphere = Atmosphere(self) if Atmosphere.wanted(self) else None    # light and weather
         # number the tags in the order a player meets them: z1 is the nearest zombie
         far = self.distances(*start, limit=400)
         counts = {}
@@ -1094,11 +1100,27 @@ class Level:
         a, z = self.rel(x, y)
         return 1 <= z <= fp.SIGHT and abs(a) <= z + 0.5
 
+    def sees(self, x0, y0, x1, y1):
+        """Line of sight, and through the weather's fog no further than it lets one see."""
+        if not self.line_of_sight(x0, y0, x1, y1):
+            return False
+        atm = getattr(self, "atmosphere", None)
+        far = atm.sight() if atm is not None else None
+        return far is None or max(abs(x1 - x0), abs(y1 - y0)) <= far
+
+    def lit_enough(self, m):
+        """A monster in the dark (light under 0.22) further than two cells is not seen - but through goggles."""
+        atm = getattr(self, "atmosphere", None)
+        if atm is None or not atm.lighting or self.player.nightvision or self.dist(m) <= 2:
+            return True
+        from .atmosphere import DARK
+        return atm.light_here(m.x, m.y) >= DARK
+
     def update_seen(self):
         p = self.player
         for m in self.monsters:
             m.seen = (not m.dead and not m.gone and self.in_view(m.x, m.y)
-                      and self.line_of_sight(p.x, p.y, m.x, m.y))
+                      and self.sees(p.x, p.y, m.x, m.y) and self.lit_enough(m))
             m.targeted = m is self.target
         R = fp.SIGHT
         for y in range(p.y - R, p.y + R + 1):
@@ -3812,6 +3834,9 @@ class Level:
             return
         self.beat += 1
         self.__dict__["_spreading"] = []                 # the last beat's ways are done with
+        atm = getattr(self, "atmosphere", None)
+        if atm is not None and atm.flash(self.beat):     # lightning: the thunder after it
+            self.sfx("thunder", "boom")
         if self.cuts:                                    # plated ceilings whose power goes now
             due = [(x, y) for b, x, y in self.cuts if b <= self.beat]
             self.cuts = [(b, x, y) for b, x, y in self.cuts if b > self.beat]
@@ -4018,7 +4043,7 @@ class Level:
             if m.awake or m.dead or m.gone or m.barrel or m.wake_on:
                 continue
             near = max(abs(m.x - p.x), abs(m.y - p.y)) <= int(m.spec.get("sight", 8))
-            if (near and self.line_of_sight(m.x, m.y, p.x, p.y)) or (m.x, m.y) in heard:
+            if (near and self.sees(m.x, m.y, p.x, p.y)) or (m.x, m.y) in heard:
                 self.wake(m)
         return heard
 
@@ -4106,7 +4131,7 @@ class Level:
         tx, ty = (foe.x, foe.y) if foe else (p.x, p.y)
         d = max(abs(m.x - tx), abs(m.y - ty))
         adjacent = abs(m.x - tx) + abs(m.y - ty) == 1
-        los = self.line_of_sight(m.x, m.y, tx, ty)
+        los = self.sees(m.x, m.y, tx, ty)
         reach = int(a.get("range", 8))
         fl = bool(m.float) and self.land is not None             # in open land, a floater takes its own way
         lim = 24 if self.land is not None else 40                # open land: the hunt goes this far, no further
@@ -5527,6 +5552,11 @@ def validate(data):
             sp = legend.get(ch)
             if isinstance(sp, dict):
                 listening |= {sp.get("opens_on"), sp.get("closes_on"), sp.get("wake_on"), sp.get("mag_off_on")}
+                if isinstance(sp.get("lamp"), dict):
+                    listening |= {sp["lamp"].get("on_on"), sp["lamp"].get("off_on")}
+        for key in ("lights", "weather"):
+            if isinstance(lv.get(key), dict) and isinstance(lv[key].get("events"), dict):
+                listening |= set(lv[key]["events"])
         listening |= set((lv.get("events") or {}))
         counts = {}
         for ch in used:
@@ -5548,6 +5578,8 @@ def validate(data):
                 problems.append("level '%s': the lift '%s' should have two ends, it has %d" % (lid, name, n))
             if key == "open_while" and ("plate", name) not in counts:
                 problems.append("level '%s': no plate called '%s' holds what opens while it is down" % (lid, name))
+        from .atmosphere import problems as atmosphere_problems
+        problems += atmosphere_problems(lid, lv, {ch: legend.get(ch) for ch in used})
         for ch in sorted(used):
             spec = legend.get(ch)
             if spec is None:

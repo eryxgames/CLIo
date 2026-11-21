@@ -2012,6 +2012,46 @@ keeps to `"climb"`, as in rooms; the ground (and the eye) rises from one to the 
 terrace hides what is behind it from below. (The Python draws a land with terraces; CLIo
 Picture does not yet.)
 
+### Light and weather
+
+```json
+"lights": {"ambient": 0.45, "tint": [170, 190, 255],
+           "events": {"alarm": {"ambient": 0.4, "tint": [255, 70, 50], "pulse": 0.5}},
+           "day": {"beats": 240, "start": 0.3}},
+"weather": {"kind": "rain", "amount": 0.6,
+            "cycle": [{"beats": 40, "kind": "clear"}, {"beats": 20, "kind": "storm", "amount": 1}],
+            "events": {"vent": {"kind": "fog", "fog": 0.3, "fog_colour": [190, 200, 170]}}},
+"L": {"lamp": {"colour": [255, 200, 130], "reach": 5, "power": 1.2, "flicker": 0.4, "off_on": "cut"}}
+```
+
+- **Light**: `"ambient"` is how lit the whole level is (1 as drawn, 0.3 a dim hall, up to 2),
+  `"tint"` its colour. **Lamps** are map cells with `"lamp"` (`true`, or its `"colour"`,
+  `"reach"` in cells (4), `"power"` (1), `"flicker"` 0..1 for a bad tube, `"pulse"` times a beat,
+  `"off": true` to start dark, `"on_on"`/`"off_on"` events); a lamp lights what it can see within
+  its reach, fading out. A lamp on a wall lights the room in front of it.
+- **Changes**: `"events"` change the ambient, the tint and a `"pulse"` (an alarm's throb, times a
+  beat) when the event comes - the last one the level lists wins. `"day"` turns the light with
+  a sun: a day `"beats"` long, `"start"` where in it the level starts (0 dawn, 0.25 noon, 0.5 dusk,
+  0.75 midnight); at night the light is a quarter, and blue, and the sky goes dark too.
+- **Weather**: `"kind"` is `clear`, `rain`, `storm` (rain, wind, lightning and its thunder -
+  the sound `thunder`), `snow`, `fog` or `dust`; `"amount"` 0..1, `"wind"`, `"fog"` (a density:
+  each kind has its own) and `"fog_colour"`. A `"cycle"` goes round by beats; `"events"` change it.
+  Rain, snow and dust fall only over cells open to the sky (`"sky": true`, and open land) - in a
+  room, through its skylight - and in front of only what is further off than each drop.
+- **Seeing**: fog shortens sight (to about 2.2 / density cells), the monsters' as well as the
+  player's; in the dark (light under 0.22) a monster more than two cells off is not seen, unless
+  the player wears the goggles.
+- **The picture**: in the mesh view and on open land each pixel takes the light of the place it
+  shows (blended between cells) and the fog of its distance; the classic picture is lit as a
+  whole by the light where the player stands, and has no fog or rain. Everything follows from
+  the beat and the events, so saves and replays need nothing more. In Python a lit picture costs
+  about 9 ms more at 110 columns (CLIo Picture does not yet do it: a lit picture is finished in
+  Python).
+
+RØØTLESS: Kernel Space is dim and blue with a warm lamp over the crontab (the lights come up
+when it is commented out), The Stack goes red and throbs when the stack unwinds, it rains
+through SIM-12's skylight, and SIM-1's fens have weather going round and a day.
+
 ### 3D models
 
 Beside sprites, a level can draw low-poly 3D models: a monster, a vehicle or an item with

@@ -8,7 +8,8 @@
 #   4. pushes both to itch.io with butler (if the BUTLER_API_KEY secret is set).
 #
 # itch.io channels: "win-linux-mac" (the engine; pure Python 3.8+, standard library only) and
-# "html5" (the editor in the browser; tick "played in the browser" on that upload once).
+# "html5" (the games and the editor in the browser; tick "played in the browser" on that upload once, and
+# "SharedArrayBuffer support" in the embed options: playing needs it).
 name: Release
 
 on:

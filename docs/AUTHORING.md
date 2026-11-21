@@ -1010,7 +1010,8 @@ named. Click a node to open it in the form below.
 ### On the web
 
 The same editor runs without CLIo installed, from a web address: the repository itself
-is the site (<https://eryxgames.github.io/CLIo/>). There the page has no program to talk
+is the site (<https://eryxgames.github.io/CLIo/>; its first page offers the games to play and
+the editor). There the page has no program to talk
 to, so it runs the engine itself - Python in the browser - and everything above works
 the same: the check as you type, the map, the fights, the walkthroughs.
 

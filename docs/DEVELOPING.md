@@ -109,7 +109,7 @@ guide.
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 712 tests, about a minute
+python -m unittest discover -s tests     # 723 tests, about a minute
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 python tests/bot.py 30 cards             # the same with card battles (the Deck mode)
@@ -140,6 +140,34 @@ notes), the engine as a zip and the editor's web pack, and pushes both to itch.i
 (channels `win-linux-mac` and `html5`). It needs the repository secret `BUTLER_API_KEY`
 (itch.io → Settings → API keys, the key whose source is wharf); without it the itch.io step is
 skipped.
+
+**itch.io's page** plays the `html5` upload in a frame: tick *SharedArrayBuffer support* in its
+embed options once - playing needs it (below).
+
+### In the browser
+
+`engine/editor/web/play.html` plays CLIo in a web page: `play.html?game=rootless` (or `depths`,
+`derelict`; none: CLIo's own menu; `?demo`: the tech demo). Its worker (`play.js`) runs Python
+compiled for the web (Pyodide, from jsDelivr), writes the engine, `clio.py` and the games into
+it (the manifest's `engine` and `play` lists) and runs `engine/web.py`, which gives the engine
+what a terminal gives it on a desktop: standard input and output that are a terminal, a stand-in
+`termios`, `select` and `os.read` on the keys, `time.sleep`, the terminal's size, a sound backend
+(WAVs to the page's WebAudio, each sent once) and the data folder's writes reported (the page
+keeps saves in IndexedDB and hands them back next visit). The page shows the terminal with
+xterm.js (jsDelivr; its WebGL renderer draws blocks and braille exactly).
+
+The keys go through memory the page and the worker share (SharedArrayBuffer), so a game waits
+for a key as in a terminal - which needs a cross-origin isolated page: itch.io's
+*SharedArrayBuffer support*, or the headers `Cross-Origin-Opener-Policy: same-origin` and
+`Cross-Origin-Embedder-Policy: require-corp` from the server; on a host that cannot send them
+(GitHub Pages) `coi.js`, a service worker, adds them and the page reloads once. In a frame that
+is not isolated the page offers a tab of its own. `?pyodide=` and `?npm=` take Python and
+xterm.js from elsewhere (a local copy). `tests/test_web.py` runs the games on a page made of a
+script; in a real browser:
+
+```
+python3 -m http.server     # plus the two headers, or try GitHub Pages' way: coi.js does it
+```
 
 The optional libraries are released from their own repositories; CLIo follows one release of
 each (`RELEASE` and `SHA256` in `engine/picture/fetch.py` and `engine/audio/ballistic/fetch.py`,

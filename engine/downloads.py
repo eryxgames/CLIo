@@ -59,6 +59,9 @@ class Offer:
 
 def offers(env=None, plat=None):
     """What can be downloaded for this machine: ``[Offer]`` (none where no release is listed for it)."""
+    from . import web
+    if web.in_browser():                                  # a page cannot fetch and load a library
+        return []
     from .audio import ballistic
     from .audio.ballistic import fetch as ballistic_fetch
     from .picture import fetch as picture_fetch

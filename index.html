@@ -2,11 +2,44 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>CLIo editor</title>
-<meta http-equiv="refresh" content="0; url=engine/editor/web/index.html">
-<link rel="canonical" href="engine/editor/web/index.html">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CLIo: games in your terminal</title>
+<meta name="description" content="CLIo: a first-person shooter, a dungeon crawler and a text adventure in a terminal - played here in the browser, or made with the editor.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230b0b10'/%3E%3Ccircle cx='11' cy='10' r='3.4' fill='%23ffb729'/%3E%3Cpath d='M7 4H4v8h3' stroke='%232f8aff' stroke-width='2.2' fill='none'/%3E%3C/svg%3E">
+<style>
+  html { background: #0b0b10; color: #d6ecff; font: 16px/1.5 system-ui, sans-serif; }
+  body { max-width: 44em; margin: 0 auto; padding: 2.5em 1.2em 3em; }
+  h1 { font: 700 2.6em/1 "DejaVu Sans Mono", Consolas, Menlo, monospace; margin: 0; color: #2f8aff; letter-spacing: .04em; }
+  h1 span { color: #ffb729; }
+  .tag { margin: .4em 0 2em; color: #9fb8d6; }
+  .games { display: grid; gap: .8em; grid-template-columns: repeat(auto-fit, minmax(13em, 1fr)); }
+  a.game { display: block; padding: 1em 1.1em; border-radius: 10px; background: #14161f; border: 1px solid #2a3050;
+           color: inherit; text-decoration: none; }
+  a.game:hover, a.game:focus { border-color: #ffb729; }
+  a.game b { display: block; font-size: 1.15em; color: #ffb729; }
+  a.game small { color: #9fb8d6; }
+  .more { margin: 1.6em 0; display: flex; flex-wrap: wrap; gap: .6em; }
+  .more a { padding: .55em 1em; border-radius: 8px; background: #22263a; color: #d6ecff; text-decoration: none; }
+  .more a.make { background: #2f8aff; color: #fff; }
+  p.note { color: #7f93ad; font-size: .9em; }
+  p.note a { color: #8fc1ff; }
+</style>
 </head>
 <body>
-<p><a href="engine/editor/web/index.html">CLIo: open the game editor</a></p>
+<h1>CLI<span>o</span></h1>
+<p class="tag">Games in your terminal - and here, in the browser.</p>
+<div class="games">
+  <a class="game" href="engine/editor/web/play.html?game=rootless"><b>RØØTLESS</b><small>A first-person shooter in pixel blocks, a beat at a time, and its simulatron.</small></a>
+  <a class="game" href="engine/editor/web/play.html?game=depths"><b>The Hollow</b><small>A dungeon crawler, new on every run; rogue and deck modes.</small></a>
+  <a class="game" href="engine/editor/web/play.html?game=derelict"><b>Derelict</b><small>A short sci-fi text adventure aboard an abandoned hauler.</small></a>
+</div>
+<div class="more">
+  <a href="engine/editor/web/play.html">All games (CLIo's menu)</a>
+  <a href="engine/editor/web/play.html?demo">The tech demo</a>
+  <a class="make" href="engine/editor/web/index.html">Make a game: the editor</a>
+</div>
+<p class="note">Python and the games are fetched the first time (about 12 MB) and run in this browser; saves stay in it.
+On a phone, keys for moving and firing are under the picture. For sound, press a key or tap the picture once.
+CLIo itself runs in a real terminal, faster and with every option: <a href="https://github.com/eryxgames/CLIo">github.com/eryxgames/CLIo</a>.</p>
 </body>
 </html>

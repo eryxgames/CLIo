@@ -27,6 +27,12 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   mezzanine, a pump pit, a low passage and a ramp down, drawn as a mesh; in both demos, with a
   "MESH VIEW" card and E1M1 as a mesh in CLIo's (a clip's `"render"`).
 - The level bot goes round steps it cannot climb.
+- **Play in the browser** (`engine/editor/web/play.html`, `engine/web.py`): every game and the
+  tech demo in a web page, the engine unchanged in Python made for the web (Pyodide) - a
+  terminal on the page (xterm.js), keys shared with the game's worker, sound through WebAudio,
+  saves kept in the browser, keys for phones under the picture. The site's first page (and
+  itch.io's) offers the games and the editor. Needs a cross-origin isolated page: itch.io's
+  *SharedArrayBuffer support*; on GitHub Pages a service worker (`coi.js`) does it.
 
 ### Fixed
 

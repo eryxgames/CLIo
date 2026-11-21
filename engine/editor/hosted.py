@@ -33,6 +33,7 @@ GAMES = "/games"                        # where opened games live, in the browse
 MOST = 64 * 1024 * 1024                 # a game larger than this is not a folder of text
 LEFT_OUT = ("__pycache__", "saves")     # folders that are not part of a game
 DEMOS = ("depths", "derelict")          # the games the page offers; a game of your own in games/ is not put on show
+PLAYED = ("rootless", "depths", "derelict")     # the games play.html plays (engine/web.py)
 
 
 # ------------------------------------------------------------------- the list
@@ -54,11 +55,22 @@ def _game(folder):
             "files": _files(os.path.join(ROOT, folder), lambda name: not name.endswith(".pyc"))}
 
 
+def _played():
+    """What play.html's worker fetches besides the engine's modules: clio.py, the engine's own art, demos and
+    looks, and the games it plays (not the web pages, nor Ballistic's engine, which needs Node.js)."""
+    data = [f for f in _files(os.path.join(ROOT, "engine"), lambda name: not name.endswith((".py", ".pyc")))
+            if not f.startswith(("engine/editor/", "engine/audio/ballistic/"))]
+    games = [f for g in PLAYED for f in _files(os.path.join(ROOT, "games", g), lambda name: not name.endswith(".pyc"))]
+    return ["clio.py"] + data + games
+
+
 def manifest():
-    """What the page fetches: the engine's modules, and the games it can open without being given one."""
+    """What the page fetches: the engine's modules, the games it can open without being given one, and what
+    play.html needs to play."""
     return {"engine": _files(os.path.join(ROOT, "engine"), lambda name: name.endswith(".py")),
             "starter": _game("templates/starter"),
-            "games": [_game("games/" + g) for g in DEMOS]}
+            "games": [_game("games/" + g) for g in DEMOS],
+            "play": _played()}
 
 
 def pack(path):
@@ -67,6 +79,7 @@ def pack(path):
     web = os.path.relpath(os.path.dirname(MANIFEST), ROOT).replace(os.sep, "/")
     names = ["index.html", "LICENSE", "NOTICE"] + ["%s/%s" % (web, n) for n in sorted(os.listdir(os.path.dirname(MANIFEST)))]
     names += listed["engine"] + listed["starter"]["files"] + [f for g in listed["games"] for f in g["files"]]
+    names += listed["play"]
     names = sorted(set(n for n in names if os.path.isfile(os.path.join(ROOT, n))))
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
         for name in names:

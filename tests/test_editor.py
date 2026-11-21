@@ -730,7 +730,10 @@ class HostedTests(unittest.TestCase):
         # GitHub Pages leaves out files that start with an underscore (engine/__init__.py) unless told not to
         self.assertTrue(os.path.isfile(os.path.join(ROOT, ".nojekyll")))
         with open(os.path.join(ROOT, "index.html"), encoding="utf-8") as f:
-            self.assertIn('url=engine/editor/web/index.html', f.read())   # by name: not every host finds a folder's page
+            page = f.read()
+        self.assertIn('href="engine/editor/web/index.html"', page)       # by name: not every host finds a folder's page
+        for game in hosted.PLAYED:
+            self.assertIn('href="engine/editor/web/play.html?game=%s"' % game, page)
         web = os.path.dirname(hosted.MANIFEST)
         with open(os.path.join(web, "worker.js"), encoding="utf-8") as f:
             worker = f.read()
@@ -779,7 +782,8 @@ class HostedTests(unittest.TestCase):
         for name in ["index.html", "engine/__init__.py", "engine/editor/web/index.html", "engine/editor/web/worker.js",
                      "engine/editor/web/app.js", "games/derelict/game.json", "templates/starter/game.json"]:
             self.assertIn(name, names)
-        for name in listed["engine"] + listed["starter"]["files"] + [f for g in listed["games"] for f in g["files"]]:
+        for name in listed["engine"] + listed["starter"]["files"] + [f for g in listed["games"] for f in g["files"]] \
+                + listed["play"] + ["engine/editor/web/" + n for n in ("play.html", "play.mjs", "play.js", "coi.js")]:
             self.assertIn(name, names)
         self.assertFalse([n for n in names if n.startswith(("tests/", "utils/", "docs/")) or "__pycache__" in n])
 

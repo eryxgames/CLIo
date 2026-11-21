@@ -23,6 +23,13 @@ python clio.py rootless   # or go straight to one
 
 There is nothing to install: no packages, no accounts. Saves stay on your machine.
 
+**Or play in your browser**, with nothing at all to install:
+[eryxgames.github.io/CLIo](https://eryxgames.github.io/CLIo/) (and on the game's itch.io page).
+The same engine runs there in Python made for the web: the first visit fetches about 12 MB,
+saves stay in that browser, and a phone gets keys for moving and firing under the picture.
+It is slower than a terminal and has no downloads (CLIo Picture, Ballistic's sounds); every
+game and the tech demo play.
+
 ## The games
 
 | Game | What it is |

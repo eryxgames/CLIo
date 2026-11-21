@@ -13,6 +13,7 @@
   {"level": "sim1", "skip": 130, "seconds": 18, "views": ["dots-fill"], "caption": "SIM-1 Long Fens: land without end, in braille"},
   {"level": "sim11", "seconds": 22, "caption": "SIM-11 Deep Works: magboots on a slick deck, the stairs, up a magnetic wall"},
   {"level": "sim11", "skip_until": "vehicle", "seconds": 18, "views": ["pixel", "dots"], "caption": "SIM-11 Deep Works: the bathyscaphe dives under a bulkhead"},
+  {"level": "sim12", "seconds": 18, "caption": "SIM-12 Stairwell: the mesh view - stairs up to the mezzanine, a pit, a ramp down"},
   {"sim": "sim8", "seconds": 16, "caption": "SIM-8 Fen Hopper: the flight simulator"},
   {"stage": "sim6", "seconds": 16, "caption": "SIM-6 Purge: the arcade"},
   {"skirmish": "sim7", "seconds": 22, "caption": "SIM-7 Xantrium Rush: the computer against itself"},

@@ -75,6 +75,7 @@ class Bot(TextConsole):
             return self.go_window(lv, x, y)
         if getattr(lv, "land", None) is not None:
             return self.go_far(lv, x, y)
+        up = self.airborne(lv)                            # flying or floating: steps do not matter
         for hot in (False, True):
             first = {(p.x, p.y): None}
             frontier = [(p.x, p.y)]
@@ -84,7 +85,7 @@ class Bot(TextConsole):
                 for (cx, cy) in frontier:
                     for dx, dy in DIRS:
                         n = (cx + dx, cy + dy)
-                        if not self.open_cell(lv, n, hot and n != (x, y)):
+                        if not self.open_cell(lv, n, hot and n != (x, y)) or not lv.step_ok(cx, cy, n[0], n[1], up):
                             continue
                         way = [n] + lv.slide_path(n[0], n[1], dx, dy) if (cx, cy) == (p.x, p.y) else \
                             [n] + self.slide(lv, n, dx, dy)
@@ -182,6 +183,7 @@ class Bot(TextConsole):
         parked = {(m.x, m.y) for m in lv.monsters if not m.dead and not m.gone and (m.vehicle or m.barrel)}
         parked.discard((gx, gy))
         safe = p.vehicle is not None or p.boots > 0           # acid does not hurt: no reason to go round it
+        up = self.airborne(lv)
         acid = max(8, 800 // max(p.hp, 10))                   # it hurts more the less he has to lose
         cost = {start: 0}
         came = {start: None}
@@ -202,7 +204,7 @@ class Bot(TextConsole):
                 if abs(n[0] - p.x) > R or abs(n[1] - p.y) > R or n in parked:
                     continue
                 cell = lv.cell(*n)
-                if not self.open_ground(lv, cell):
+                if not self.open_ground(lv, cell) or not lv.step_ok(c[0], c[1], n[0], n[1], up):
                     continue
                 nd = d + (1 if safe or not cell.toxic else acid)
                 if nd < cost.get(n, 1 << 30):
@@ -220,6 +222,7 @@ class Bot(TextConsole):
         import heapq
         dist = {(gx, gy): 0}
         heap = [(0, gx, gy)]
+        up = self.airborne(lv)
         parked = {(m.x, m.y) for m in lv.monsters if not m.dead and not m.gone and (m.vehicle or m.barrel)}
         parked.discard((gx, gy))                         # machines and barrels stay put: go round them
         while heap:
@@ -230,13 +233,20 @@ class Bot(TextConsole):
             cost = 3 if here.toxic else 1
             for dx, dy in DIRS:
                 n = (cx + dx, cy + dy)
-                if not (0 <= n[0] < lv.w and 0 <= n[1] < lv.h) or n in parked or not self.open_ground(lv, lv.cell(*n)):
+                if not (0 <= n[0] < lv.w and 0 <= n[1] < lv.h) or n in parked or not self.open_ground(lv, lv.cell(*n)) \
+                        or not lv.step_ok(n[0], n[1], cx, cy, up):       # walked from n towards the goal
                     continue
                 nd = d + cost
                 if nd < dist.get(n, 1 << 30):
                     dist[n] = nd
                     heapq.heappush(heap, (nd, n[0], n[1]))
         return dist
+
+    @staticmethod
+    def airborne(lv):
+        """Flying, floating or on the jetpack: a step's height does not stop him."""
+        f = getattr(lv, "airborne", None)
+        return bool(f()) if callable(f) else False
 
     def open_ground(self, lv, c):
         """Can the player stand on (or fly over) this cell, things that move aside?"""
@@ -528,7 +538,8 @@ class Bot(TextConsole):
                     return True
                 for dx, dy in DIRS:
                     n = (cx + dx, cy + dy)
-                    if n not in seen and 0 <= n[0] < lv.w and 0 <= n[1] < lv.h and self.open_ground(lv, lv.cell(*n)):
+                    if n not in seen and 0 <= n[0] < lv.w and 0 <= n[1] < lv.h and self.open_ground(lv, lv.cell(*n)) \
+                            and lv.step_ok(cx, cy, n[0], n[1], self.airborne(lv)):
                         seen.add(n)
                         nxt.append(n)
             frontier = nxt

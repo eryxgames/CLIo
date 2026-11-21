@@ -8,7 +8,7 @@
   "show_once": false
  },
  "outro_demo": {
-  "text": "SIMULATION PAUSED. End of the demo - Episode 1 goes on in the full game.\n\nFree programs of the simulatron, made new each run: --level sim1 (Long Fens, open land without end), sim2 (Deep Swap, floor after floor) and sim3 (Swap Sprawl, rooms without end); and training programs: sim4 (Kill House: squads), sim5 (Bus Run, side on, in real time) and sim6 (Purge, from above, in real time) sim7 (Xantrium Rush, real-time strategy), sim8 (Fen Hopper, flight) sim9 (Coolant Loop, a reactor's systems), sim10 (Root Shell, card duels) and sim11 (Deep Works: magboots, stairs, a jetpack, the water and a submarine).",
+  "text": "SIMULATION PAUSED. End of the demo - Episode 1 goes on in the full game.\n\nFree programs of the simulatron, made new each run: --level sim1 (Long Fens, open land without end), sim2 (Deep Swap, floor after floor) and sim3 (Swap Sprawl, rooms without end); and training programs: sim4 (Kill House: squads), sim5 (Bus Run, side on, in real time) and sim6 (Purge, from above, in real time) sim7 (Xantrium Rush, real-time strategy), sim8 (Fen Hopper, flight) sim9 (Coolant Loop, a reactor's systems), sim10 (Root Shell, card duels) sim11 (Deep Works: magboots, stairs, a jetpack, the water and a submarine) and sim12 (Stairwell: real stairs, a mezzanine and a pit, drawn as a mesh).",
   "show_once": false
  },
  "outro_lose": {
@@ -75,6 +75,10 @@
  },
  "sim11_end": {
   "text": "UNIT EVALUATION: mobility. \"Boots, stairs, a jetpack, a submarine,\" says the instructor bot. \"The real station has all of them. It also has what flooded it.\"",
+  "show_once": false
+ },
+ "sim12_end": {
+  "text": "UNIT EVALUATION: footing. \"Up the stairs, round the pit, down the ramp,\" says the instructor bot. \"Below decks nothing is level. Neither is anything that lives there.\"",
   "show_once": false
  },
  "e1m5_end": {

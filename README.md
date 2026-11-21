@@ -46,6 +46,7 @@ with `python clio.py rootless --level ID`:
 | `sim9` | Coolant Loop: keep a reactor's systems in bounds |
 | `sim10` | Root Shell: hacking, as card duels |
 | `sim11` | Deep Works: magboots, stairs, a jetpack, diving, a submarine |
+| `sim12` | Stairwell: real stairs, a mezzanine and a pit, drawn as a mesh |
 
 Each game has a demo that plays itself: `python clio.py rootless --demo`. Left alone on the
 title screen or the launcher, the demos start by themselves.
@@ -121,7 +122,8 @@ CLIo's.
 
 - `--view dots` draws RØØTLESS in braille dots (finer, on a terminal font that has them).
 - `--render mesh` draws RØØTLESS's rooms in a true perspective, as its open land is drawn
-  (`--render classic`: the old way).
+  (`--render classic`: the old way). There Shift+Up and Shift+Down look up and down (`look`
+  looks ahead again), and a turn is drawn as one. SIM-12 is always drawn this way.
 - `--style retro` (or elegant, minimal, modern, techno, console) changes the frames and colours.
 - `--test-display` draws a test page: run it if something looks wrong. If a symbol shows as a
   box, add `--glyphs safe` (or set `CLIO_GLYPHS=safe`).
@@ -164,7 +166,7 @@ python clio.py [game] [options]
   --demo          play the game's demo (or, with no game named, CLIo's tech demo) and exit
   --attract       the same, over and over until a key
   --level ID      start a new game in a first-person level (or arcade stage, skirmish or sim)
-                  (rootless: e1m1, e1m2, e1m3, e1m4, e1m5, e1m9, sim1 ... sim11)
+                  (rootless: e1m1, e1m2, e1m3, e1m4, e1m5, e1m9, sim1 ... sim12)
   --mode NAME     game mode, for games that have several (depths: story, rogue, cards)
   --seed N        reproducible random numbers (same seed, same dungeon)
   --style NAME    default, elegant, minimal, modern, retro, techno, console

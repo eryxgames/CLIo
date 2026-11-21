@@ -63,7 +63,10 @@ KEYMAP = {
     "1": "1", "2": "2", "3": "3", "4": "4", "5": "5", "6": "6", "7": "7",
     "?": "help", "f1": "help", "f2": "goggles", "f5": "save", "f9": "load", "]": "next",
     "f3": "mag", "f4": "jet", "f6": "dive",
+    "shift-up": "look up", "shift-down": "look down", "ctrl-up": "look up", "ctrl-down": "look down",
+    "alt-up": "look up", "alt-down": "look down",
 }
+LOOK_STEPS = 2               # how far up or down the player looks, in steps (the mesh view draws it)
 
 WEAPONS = {
     "1": {"name": "fist", "ammo": None, "sprite": "w_fist", "sound": "punch", "kind": "melee", "damage": [6, 14]},
@@ -470,8 +473,9 @@ class Player:
         self.jet_on = False                          # in the air on it
         self.diving = False                          # under the water (swimming, or in a submarine that dived)
         self.air = int(cfg.get("breath", 20))        # beats of breath left under water
+        self.look = 0                                # looking up (+) or down (-), in steps (the mesh view)
 
-    DEFAULTS = {"magboots": False, "mag_on": False, "jet": 0, "jet_on": False, "diving": False, "air": 20}
+    DEFAULTS = {"magboots": False, "mag_on": False, "jet": 0, "jet_on": False, "diving": False, "air": 20, "look": 0}
 
     @property
     def nightvision(self):
@@ -1403,6 +1407,9 @@ class Level:
                 self.console.page(self, [(l, "text") for l in self.audio.status()] +
                                   ([("sound set NAME plays another set of sounds", "dim")] if self.audio.sets else []))
             return True
+        m = re.fullmatch(r"look(?:\s+(up|down|ahead|level))?", t)
+        if m:
+            return self.look_at(m.group(1))
         m = re.fullmatch(r"(?:goggles|nv)(?:\s+(on|off))?", t)
         if m:
             return self.goggles(m.group(1))
@@ -1748,6 +1755,18 @@ class Level:
         self.update_seen()
 
     # ---- the player's actions --------------------------------------------- #
+    def look_at(self, way=None):
+        """Look up or down a step, or straight ahead again (a free action; the mesh view draws it - the classic
+        picture always looks straight ahead)."""
+        p = self.player
+        if way == "up":
+            p.look = min(LOOK_STEPS, p.look + 1)
+        elif way == "down":
+            p.look = max(-LOOK_STEPS, p.look - 1)
+        else:
+            p.look = 0
+        return True
+
     def goggles(self, how=None):
         """Put the TTY goggles on or take them off (a free action, as turning is): their battery lasts longer."""
         p = self.player
@@ -4474,8 +4493,15 @@ class FrameConsole:
         return self.view_for(lv, style).render(lv, FX(), self.phase)
 
     def turn(self, lv, old, direction):
-        new = self.view_for(lv).render(lv, FX(), self.phase)
-        frames = [slide(old, new, k, direction) for k in (0.3, 0.6, 0.85)]
+        view = self.view_for(lv)
+        if view.meshed(lv) and getattr(lv, "land", None) is None and abs(direction) == 1:
+            # the mesh view turns: the picture at angles between the old facing and the new
+            face = lv.player.facing
+            frames = [view.render(lv, FX(yaw=(face - direction * (1 - k)) * math.pi / 2), self.phase)
+                      for k in (0.25, 0.5, 0.75)]
+        else:
+            new = view.render(lv, FX(), self.phase)
+            frames = [slide(old, new, k, direction) for k in (0.3, 0.6, 0.85)]
         self.screen.play(frames, lambda cells: self.draw(lv, prompt=None, cells=cells), 0.03)
 
     def ride(self, lv, old, new, down):

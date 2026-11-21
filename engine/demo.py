@@ -116,6 +116,8 @@ def problems(spec, data=None, where="demo.json"):
         for v in clip.get("views") or []:
             if v not in ("pixel", "dots", "dots-fill"):
                 out.append("%s: no view '%s' (pixel, dots, dots-fill)" % (at, v))
+        if clip.get("render") not in (None, "classic", "mesh"):
+            out.append("%s: \"render\" is classic or mesh" % at)
         if clip.get("skip_until") not in (None, "vehicle", "fight"):
             out.append("%s: \"skip_until\" is vehicle or fight" % at)
     return out
@@ -566,7 +568,7 @@ def level_console(player, bot, clip):
     class DemoConsole(FrameConsole):
         def __init__(self):
             FrameConsole.__init__(self, player.term, (clip.get("views") or ["pixel"])[0], keys=False,
-                                  animate=player.term.animate)
+                                  animate=player.term.animate, render=clip.get("render"))
             self.screen = player.screen
             self.views_ = clip.get("views") or ["pixel"]
             self.every = float(clip.get("view_every") or

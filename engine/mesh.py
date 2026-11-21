@@ -135,10 +135,8 @@ class Mesh:
 
         reach0 = view.half / (view.LW * Z0)                   # half the picture's width in cells, a cell per Z0 away
         icx, icy = int(round(cx)), int(round(cy))
-        for dz in range(-fp.BACK, FAR + 1):
-            reach = int(reach0 * (dz + 0.5 + Z0)) + 2
-            for da in range(-reach, reach + 1):
-                x, y = icx + fx * dz + rx * da, icy + fy * dz + ry * da
+        for x, y in self.cells_near(cam, reach0):
+            if True:
                 c = cell_at(x, y)
                 if c is None or opaque(c, x, y):
                     continue
@@ -176,6 +174,35 @@ class Mesh:
                     if ntop < top - 1e-9 and not getattr(n, "sky", False):      # a lintel down to the next cell
                         upright(x, y, d, max(ntop, h), top, top, n)
         return out
+
+    @staticmethod
+    def cells_near(cam, reach0):
+        """The cells that can show, nearest rows first: for the four facings row by row ahead of the player, as the
+        classic picture walks them; between two facings (a turn being drawn), every cell round him inside the
+        picture's wedge, by distance ahead."""
+        cx, cy, fx, fy, rx, ry = cam
+        icx, icy = int(round(cx)), int(round(cy))
+        if all(float(v).is_integer() for v in (fx, fy, rx, ry)):
+            fx, fy, rx, ry = int(fx), int(fy), int(rx), int(ry)
+            for dz in range(-fp.BACK, FAR + 1):
+                reach = int(reach0 * (dz + 0.5 + Z0)) + 2
+                for da in range(-reach, reach + 1):
+                    yield icx + fx * dz + rx * da, icy + fy * dz + ry * da
+            return
+        r = FAR + fp.BACK + 2
+        found = []
+        for y in range(icy - r, icy + r + 1):
+            for x in range(icx - r, icx + r + 1):
+                dz = (x - cx) * fx + (y - cy) * fy
+                if dz < -fp.BACK - 0.5 or dz > FAR + 0.5:
+                    continue
+                da = (x - cx) * rx + (y - cy) * ry
+                if abs(da) > reach0 * (dz + 0.5 + Z0) + 2.5:
+                    continue
+                found.append((round(dz, 9), round(da, 9), x, y))
+        found.sort()
+        for _dz, _da, x, y in found:
+            yield x, y
 
     @staticmethod
     def under(lv, cell, ix, iy, phase):

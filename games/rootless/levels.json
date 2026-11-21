@@ -2281,5 +2281,130 @@
    "T",
    "E"
   ]
+ },
+ "sim12": {
+  "name": "Stairwell",
+  "title": "SIM-12: Stairwell",
+  "intro": [
+   "A training program of the simulatron: the station's stairwell, drawn as it stands.",
+   "Real stairs up to the mezzanine, a pump pit sunk in the floor, a low passage and a ramp",
+   "down to the way out. A step higher than your knee is a wall to you - and to them."
+  ],
+  "par": 90,
+  "music": "swap_partition",
+  "facing": "n",
+  "death_text": "outro_lose",
+  "render": "mesh",
+  "map": [
+   "########################",
+   "#MMaMMMMMMMMMMcc6789,,,#",
+   "#MMMMMMMkMMMMM######,,,#",
+   "#MMMMMMMMMMMMM######,,,#",
+   "#.....5555.......###,,,#",
+   "#.....4444.......###,,,#",
+   "#.....3333..***..###,,,#",
+   "#.....2222..***..####E##",
+   "#.....1111.......#######",
+   "#................#######",
+   "#.pppq...........#######",
+   "#.peuq.......z...#######",
+   "#.pppq..z........#######",
+   "#................#######",
+   "#.......@........#######",
+   "########################"
+  ],
+  "legend": {
+   ".": {
+    "ceiling_height": 2.4
+   },
+   "@": {
+    "start": true,
+    "ceiling_height": 2.4
+   },
+   "M": {
+    "height": 0.72,
+    "ceiling_height": 2.4
+   },
+   "a": {
+    "item": "medkit",
+    "height": 0.72,
+    "ceiling_height": 2.4
+   },
+   "k": {
+    "monster": "kworker",
+    "height": 0.72,
+    "ceiling_height": 2.4
+   },
+   "5": {
+    "height": 0.6,
+    "ceiling_height": 2.4
+   },
+   "4": {
+    "height": 0.48,
+    "ceiling_height": 2.4
+   },
+   "3": {
+    "height": 0.36,
+    "ceiling_height": 2.4
+   },
+   "2": {
+    "height": 0.24,
+    "ceiling_height": 2.4
+   },
+   "1": {
+    "height": 0.12,
+    "ceiling_height": 2.4
+   },
+   "*": {
+    "sky": true,
+    "ceiling_height": 2.4
+   },
+   "p": {
+    "height": -0.7,
+    "ceiling_height": 2.4,
+    "floor": "grate"
+   },
+   "e": {
+    "item": "shells",
+    "height": -0.7,
+    "ceiling_height": 2.4,
+    "floor": "grate"
+   },
+   "u": {
+    "monster": "bugrat",
+    "height": -0.7,
+    "ceiling_height": 2.4,
+    "floor": "grate"
+   },
+   "q": {
+    "height": -0.35,
+    "ceiling_height": 2.4
+   },
+   "z": {
+    "monster": "zombie",
+    "ceiling_height": 2.4
+   },
+   "c": {
+    "height": 0.72,
+    "ceiling_height": 1.45
+   },
+   "6": {
+    "height": 0.6,
+    "ceiling_height": 1.45
+   },
+   "7": {
+    "height": 0.48,
+    "ceiling_height": 1.45
+   },
+   "8": {
+    "height": 0.36,
+    "ceiling_height": 1.45
+   },
+   "9": {
+    "height": 0.24,
+    "ceiling_height": 1.45
+   },
+   ",": {}
+  }
  }
 }

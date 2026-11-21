@@ -264,5 +264,23 @@
     "win": "outro_demo"
    }
   ]
+ },
+ {
+  "id": "sim_stairwell",
+  "name": "Simulatron: Stairwell",
+  "area": "Free programs",
+  "description": "A training program: real stairs, a mezzanine, a pump pit - the rooms drawn as they stand.",
+  "level": "sim12",
+  "on_level_exit": [
+   {
+    "story": "sim12_end"
+   },
+   {
+    "pause": true
+   },
+   {
+    "win": "outro_demo"
+   }
+  ]
  }
 ]

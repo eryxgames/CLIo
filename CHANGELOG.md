@@ -20,6 +20,13 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   E1M1 in 3.2 ms (21.7 in Python), 5.0 in braille (52.2). Every face and floor kind is compared
   with the Python's picture, to the pixel (`tests/test_mesh.py`'s features room). `--get-picture`
   still installs 0.6 until 0.7 is released.
+- **Looking up and down, and turning, in the mesh view**: Shift+Up and Shift+Down (or Ctrl, Alt;
+  `look up`, `look down`, `look`), two steps each way, free as turning is; a turn is drawn at
+  angles between the two facings instead of sliding. CLIo Picture 0.7 draws both.
+- **RØØTLESS SIM-12 Stairwell** (`--level sim12`): a hall with a skylight, stairs up to a
+  mezzanine, a pump pit, a low passage and a ramp down, drawn as a mesh; in both demos, with a
+  "MESH VIEW" card and E1M1 as a mesh in CLIo's (a clip's `"render"`).
+- The level bot goes round steps it cannot climb.
 
 ## 3.0.0 - 2026-11-21
 

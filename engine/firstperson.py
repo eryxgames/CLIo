@@ -38,6 +38,7 @@ BACK = 4                     # cells behind the player whose walls still show at
 REF_H, REF_W = 18, 12        # the yardstick: a sprite this big is a person's size
 DIRS = ((0, -1), (1, 0), (0, 1), (-1, 0))          # north, east, south, west
 RENDERS = ("classic", "mesh")                       # how rooms are drawn: this module's picture, or engine/mesh.py's
+LOOK = 0.12                  # the mesh view: a step of looking up or down moves the horizon this much of the picture
 STYLES = {"pixel": (1, 2), "dots": (2, 4), "dots-fill": (2, 4)}
 BRAILLE_BIT = ((0x01, 0x08), (0x02, 0x10), (0x04, 0x20), (0x40, 0x80))     # [row][column]
 BAYER_2X4 = ((0, 4), (6, 2), (1, 5), (7, 3))
@@ -638,6 +639,7 @@ class FX:
         self.missiles = ()       # things flying: (x, y, height, sprite name, glow colour or None) - a rocket, a grenade
         self.tick = 0.0          # how far into the beat the animation is (0..1): spinning parts turn by it
         self.eye = None          # how high the eye is (of a wall's height), in place of the player's: a lift-off
+        self.yaw = None          # the mesh view: the way it looks, in radians (0 north, pi/2 east) - a turn drawn
         self.__dict__.update(kw)
 
 
@@ -810,7 +812,7 @@ class View:
         if detail == "auto":                                  # a big picture's floor at half width: half the work
             detail = "low" if self.PW * self.PH > AUTO_LOW else "high"
         self.detail = "low" if detail == "low" else "high"
-        self.yh = round(self.PH * 0.40)                       # the horizon, in pixel rows
+        self.yh = self.yh0 = round(self.PH * 0.40)            # the horizon, in pixel rows
         self.FS = self.PH - self.yh                           # floor height on screen at distance 0
         self.CH = self.FS * 0.92                              # ceiling height
         self.TALL = self.FS + self.CH                         # a wall's height on screen at distance 0
@@ -897,9 +899,12 @@ class View:
         look = getattr(lv, "sky_look", None)
         if look is None:
             return None
-        rx, ry = DIRS[(f + 1) % 4]
+        if isinstance(f, int):
+            rx, ry = DIRS[(f + 1) % 4]
+        else:                                                 # between two facings (the mesh view turning)
+            rx, ry = math.cos(f * math.pi / 2), math.sin(f * math.pi / 2)
         lateral = round((cx * rx + cy * ry) * 4) / 4.0
-        key = (f, lateral, phase, id(look))
+        key = (f, lateral, phase, id(look), self.yh)
         sky = self.skies.get(key)
         if sky is None:
             if len(self.skies) > 16:
@@ -1389,13 +1394,20 @@ class View:
         f = fx.face if fx.face is not None else p.facing
         fx_, fy_ = DIRS[f]
         rx, ry = DIRS[(f + 1) % 4]
-        cam = (cx, cy, fx_, fy_, rx, ry)
         land = getattr(lv, "land", None)
+        meshed = land is None and self.meshed(lv)
+        sky_f = f
+        self.yh = self.yh0
+        if meshed:
+            if fx.yaw is not None:                            # turning: the picture between two facings
+                fx_, fy_, rx, ry = math.sin(fx.yaw), -math.cos(fx.yaw), math.cos(fx.yaw), math.sin(fx.yaw)
+                sky_f = fx.yaw / (math.pi / 2)
+            self.yh = self.yh0 + int(round(getattr(p, "look", 0) * self.PH * LOOK))   # looking up or down
+        cam = (cx, cy, fx_, fy_, rx, ry)
         self.cover = {}
         self.cur_z = -1e9
         frame = picture_frame.frame_for(self) if self.use_frame else None     # CLIo Picture 0.4: kept in C
         px = None
-        meshed = land is None and self.meshed(lv)
         mesh_labels = ()
         if meshed:                                            # rooms as faces in a true perspective (engine/mesh.py)
             from . import mesh as mesh_mod
@@ -1403,7 +1415,7 @@ class View:
             g = lv.ground(cx, cy)
             eye = fx.eye if fx.eye is not None else self.eye_of(lv)
             self.set_eye_abs(g + (self.EYE0 if eye is None else eye))
-            px, mesh_labels = self.mesh_picture(lv, cam, phase, fx, frame, self.sky_rows(lv, cx, cy, f, phase))
+            px, mesh_labels = self.mesh_picture(lv, cam, phase, fx, frame, self.sky_rows(lv, cx, cy, sky_f, phase))
             sight, far = SIGHT, FAR
         elif land is not None:                                  # open land: a true perspective, the ground drawn first
             self.persp = land.Z0 if hasattr(land, "Z0") else 1.6

@@ -1955,7 +1955,10 @@ Ask for it with `"render": "mesh"` in the level (or in `first_person`, for every
 `--render mesh` draws any game's rooms this way, and `--render classic` keeps the old
 picture even where a level asks for the mesh (its heights still count for walking, and the
 picture is flat). Line of sight does not look at heights: a raised floor is no cover.
-Open land is drawn as it always was.
+Open land is drawn as it always was. In the mesh view the player looks up and down
+(Shift+Up, Shift+Down, or `look up`, `look down`, `look`: a free action) and a turn is drawn
+turning. RØØTLESS's SIM-12 (`--level sim12`) has stairs, a mezzanine, a pit and a ramp. A
+demo clip can ask for it too: `"render": "mesh"`.
 
 ### 3D models
 

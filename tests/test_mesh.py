@@ -226,6 +226,83 @@ class PictureTests(unittest.TestCase):
                 self.assertEqual((len(cells), len(cells[0])), (18, 60), lid)
 
 
+class TurnAndLookTests(unittest.TestCase):
+    def test_a_turn_is_drawn_at_angles_between(self):
+        import math
+        lv = Level(GameData(ROOTLESS), "e1m1", seed=1)
+        north = view(render="mesh").render(lv, FX(), 0)
+        self.assertEqual(view(render="mesh").render(lv, FX(yaw=0.0), 0), north)   # a facing's own angle: the same
+        east = view(render="mesh").render(lv, FX(face=1), 0)
+        between = view(render="mesh").render(lv, FX(yaw=math.pi / 4), 0)
+        self.assertNotEqual(between, north)
+        self.assertNotEqual(between, east)
+
+    def test_the_console_turns_the_mesh_view_through_its_angles(self):
+        import io
+        import math
+        from engine.level import KEYMAP, FrameConsole
+        from engine.term import Term
+        term = Term(out=io.StringIO(), width=80, height=24, color=3, unicode=True, animate=False, env={})
+        con = FrameConsole(term, "pixel", keys=False, keymap=KEYMAP, animate=False, render="mesh")
+        lv = Level(GameData(ROOTLESS), "e1m1", seed=1)
+        con.layout()
+        yaws = []
+        real = View.render
+
+        def spy(self_, lv_, fx, phase=0):
+            yaws.append(fx.yaw)
+            return real(self_, lv_, fx, phase)
+        con.screen.play = lambda frames, draw, dt: list(frames)
+        View.render = spy
+        try:
+            lv.player.facing = 1
+            con.turn(lv, None, 1)                              # turned right, north to east
+        finally:
+            View.render = real
+        self.assertEqual([round(y / (math.pi / 2), 2) for y in yaws], [0.25, 0.5, 0.75])
+
+    def test_looking_up_and_down_moves_the_horizon_in_the_mesh_view(self):
+        lv = Level(GameData(ROOTLESS), "e1m1", seed=1)
+        lv.console = Quiet()
+        beat = lv.beat
+        lv.run_line("look up")
+        lv.run_line("look up")
+        lv.run_line("look up")
+        self.assertEqual(lv.player.look, 2)                    # two steps at most
+        self.assertEqual(lv.beat, beat)                        # free, as turning is
+        v = view(render="mesh")
+        up = v.render(lv, FX(), 0)
+        self.assertEqual(v.yh, v.yh0 + round(2 * v.PH * 0.12))
+        lv.run_line("look")
+        self.assertEqual(lv.player.look, 0)
+        ahead = v.render(lv, FX(), 0)
+        self.assertEqual(v.yh, v.yh0)
+        self.assertNotEqual(up, ahead)
+        lv.run_line("look down")
+        classic = view()
+        down = classic.render(lv, FX(), 0)
+        lv.player.look = 0
+        self.assertEqual(classic.render(lv, FX(), 0), down)   # the classic picture looks straight ahead
+
+    def test_the_keys_look_up_and_down(self):
+        from engine.level import KEYMAP
+        self.assertEqual((KEYMAP["shift-up"], KEYMAP["shift-down"], KEYMAP["ctrl-up"]), ("look up", "look down",
+                                                                                         "look up"))
+
+    def test_the_library_turns_and_looks_as_the_python_does(self):
+        import math
+        lib = picture.load()
+        if lib is None or not hasattr(lib, "clio_frame_rooms"):
+            self.skipTest("CLIo Picture 0.7 is not installed")
+        lv = features_room()
+        put(lv, 6, 9, 0)
+        for look, yaw in ((1, 0.3), (-2, 1.1), (2, -0.6)):
+            lv.player.look = look
+            a = view(64, 20, frame=False, render="mesh").render(lv, FX(yaw=yaw), 2)
+            b = view(64, 20, frame=True, render="mesh").render(lv, FX(yaw=yaw), 2)
+            self.assertEqual(a, b, (look, yaw))
+
+
 STAIRS = ["#########",
           "#PPPPPPP#",
           "#PPPPPPP#",
@@ -318,7 +395,7 @@ class HeightTests(unittest.TestCase):
         data = GameData(ROOTLESS)
         for lid in data.levels:
             lv = Level(data, lid, seed=1)
-            if lv.land is None:
+            if lv.land is None and lid != "sim12":           # SIM-12: the stairwell, built on heights
                 self.assertFalse(lv.heights, lid)
                 self.assertEqual(lv.ground(lv.player.x + 0.3, lv.player.y), 0.0)
 
@@ -333,6 +410,35 @@ class HeightTests(unittest.TestCase):
     def test_the_step_tile_is_the_engines(self):
         self.assertIn("step", TEXTURES)
         self.assertEqual(len(TEXTURES["step"]), 32)
+
+
+class StairwellTests(unittest.TestCase):
+    """RØØTLESS SIM-12: a hall, stairs up to a mezzanine, a pump pit, a low passage and a ramp down."""
+
+    def test_it_is_checked_and_drawn_as_a_mesh(self):
+        data = GameData(ROOTLESS)
+        self.assertEqual([q for q in validate(data) if "sim12" in q], [])
+        lv = Level(data, "sim12", seed=1)
+        self.assertTrue(lv.heights)
+        self.assertTrue(view().meshed(lv))
+        self.assertFalse(view(render="classic").meshed(lv))  # a player may still ask for the classic picture
+        cells = view(render=None).render(lv, FX(), 0)
+        self.assertEqual(len(cells), 20)
+
+    def test_the_mezzanine_is_reached_only_by_the_stairs(self):
+        lv = Level(GameData(ROOTLESS), "sim12", seed=1)
+        steps = lv.distances(2, 2)                            # walked to a cell of the mezzanine
+        self.assertGreater(steps[(2, 4)], 6)                 # from the hall just below: round by the stairs
+        self.assertEqual(steps[(2, 3)], 1)                   # along the mezzanine
+
+    def test_the_bot_plays_it_through(self):
+        from engine import levelbot
+        data = GameData(ROOTLESS)
+        for seed in (1, 4):
+            out, lv = levelbot.play(data, "sim12", seed=seed)
+            self.assertEqual(out, "exit", seed)
+            self.assertLessEqual(lv.beat, 90)
+
 
 
 if __name__ == "__main__":

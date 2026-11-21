@@ -125,7 +125,7 @@ class StopLine(Exception):
 # --------------------------------------------------------------------------- #
 # the map
 # --------------------------------------------------------------------------- #
-WALLS = ("wall", "panel", "exit", "switch")       # the kinds of cell that are walls: nothing goes through
+WALLS = ("wall", "panel", "exit", "switch", "locker", "field")   # the kinds of cell nothing goes through
 
 
 class Cell:
@@ -134,7 +134,8 @@ class Cell:
                  "savepoint",
                  "crate", "plate", "down", "open_while", "teleport", "arrive_only", "pad_facing", "lift", "deck", "sunk",
                  "oil", "slick", "conveyor", "scorched", "exit_kind", "heavy", "switch", "sky", "deep", "steep",
-                 "duel", "stairs", "mag", "pit", "bulkhead")
+                 "duel", "stairs", "mag", "pit", "bulkhead", "supply", "locker", "opened", "gate", "field", "zap",
+                 "open_for", "closes_at", "from_side", "on_open")
 
     def __init__(self, x, y, ch, spec):
         self.x, self.y, self.ch = x, y, ch
@@ -142,11 +143,25 @@ class Cell:
         self.mag = spec.get("mag")                      # magnetic plating: magboots walk up it to the other of its name
         self.bulkhead = bool(spec.get("bulkhead"))      # a wall down into the water: a diver passes under it
         self.tex = spec.get("wall") or spec.get("texture") or (
-            "stairs" if self.stairs else "magwall" if self.mag else "bulkhead" if self.bulkhead else "steel")
+            "stairs" if self.stairs else "magwall" if self.mag else "bulkhead" if self.bulkhead else
+            "field" if spec.get("field") else "steel")
         self.floor = spec.get("floor")                  # tiles under and over this cell, else the level's
         self.ceiling = spec.get("ceiling")
         self.crate = bool(spec.get("crate"))            # a crate stands here: it can be pushed
         self.heavy = spec.get("crate") == "heavy" or (self.crate and bool(spec.get("heavy")))   # only a machine moves it
+        self.supply = contents(spec["supply"]) if spec.get("supply") is not None else None   # a crate that opens
+        if self.supply is not None:
+            self.crate = True
+        self.locker = contents(spec["locker"]) if spec.get("locker") is not None else None   # a locker in the wall
+        self.opened = False                             # the locker or the supply crate has been opened (and emptied)
+        self.on_open = spec.get("on_open")              # opening it sets off this event
+        self.gate = bool(spec.get("gate"))              # bars: a door seen and shot through
+        self.field = spec.get("field")                  # a force field: seen and shot through, never walked through
+        self.zap = int(spec.get("zap", 10) or 0) if self.field else 0     # what touching it costs
+        self.open_for = int(spec.get("open_for") or 0)  # a timed door: it shuts again this many beats after it opens
+        self.closes_at = None                           # the beat after which it shuts
+        side = str(spec.get("from") or "").lower()[:1]
+        self.from_side = FACING.get(side) if side else None   # a one-way door: it opens only from this side
         self.plate = spec.get("plate")                  # a pressure plate, by name
         self.down = False
         self.open_while = spec.get("open_while")        # a door or wall open only while a plate of this name is down
@@ -167,7 +182,8 @@ class Cell:
         self.opens_on = spec.get("opens_on")
         self.closes_on = spec.get("closes_on")
         self.on_enter = spec.get("on_enter")
-        self.sealed = bool(spec.get("sealed")) or bool(spec.get("door") and spec.get("opens_on") and not spec.get("key"))
+        self.sealed = bool(spec.get("sealed")) or bool((spec.get("door") or spec.get("gate")) and spec.get("opens_on")
+                                                       and not spec.get("key"))
         self.pressed = False
         self.secret = bool(spec.get("secret")) or bool(self.panel)
         self.savepoint = bool(spec.get("savepoint"))    # a checkpoint: the game is saved when it is first reached
@@ -183,7 +199,11 @@ class Cell:
         self.exit_kind = "secret" if spec.get("exit") == "secret" else "exit"
         if spec.get("exit"):
             self.kind = "exit"
-        elif spec.get("door"):
+        elif self.locker is not None:
+            self.kind = "locker"
+        elif self.field:
+            self.kind = "field"
+        elif spec.get("door") or self.gate:
             self.kind = "door"
             self.open = 1.0 if spec.get("open") else 0.0
         elif self.panel:
@@ -196,7 +216,7 @@ class Cell:
         else:
             self.kind = "floor"
         self.label, self.label_role = None, None
-        if self.kind == "door" and self.key:
+        if self.kind in ("door", "locker") and self.key:
             self.label = "".join(b if b == self.key else "-" for b in "rwx")
             self.label_role = "key_" + self.key
         elif self.kind == "exit":
@@ -219,11 +239,26 @@ class Cell:
             return (self.open if opened is None else opened) < 1.0
         return self.kind in WALLS
 
+    @property
+    def clear(self):
+        """Bars or a force field: what is beyond is seen, and shot at, through it."""
+        return self.gate or self.kind == "field"
+
     def texture(self):
         if self.kind == "door":
+            if self.gate:
+                return "bars_" + self.key if self.key else "bars"
+            if self.open_for:
+                return "door_timed"
+            if self.from_side is not None:
+                return "door_oneway"
             if self.sealed:
                 return "sealed"
             return "door_" + self.key if self.key else "door"
+        if self.kind == "locker":
+            if self.opened:
+                return "locker_open"
+            return "locker_" + self.key if self.key else "locker"
         if self.kind == "panel":
             return self.panel if self.panel in ("fist", "shoot") else "steel"
         if self.kind == "exit":
@@ -231,6 +266,15 @@ class Cell:
         if self.kind == "switch":
             return "switch_on" if self.pressed else "switch"
         return self.tex
+
+
+def contents(v):
+    """What a locker or a supply crate holds, as item ids: a list, one id, or true (nothing)."""
+    if isinstance(v, str):
+        return (v,)
+    if isinstance(v, (list, tuple)):
+        return tuple(str(i) for i in v)
+    return ()
 
 
 VOID = Cell(-1, -1, " ", {"wall": "steel"})
@@ -280,7 +324,7 @@ class Field:
 # what can change in a cell while a level is played (the rest is as the map made it): saved, and kept for a
 # forgotten chunk. A test plays every level through and checks that nothing else changes.
 CELL_STATE = ("kind", "open", "pressed", "found", "crate", "heavy", "down", "sunk", "scorched", "sealed",
-              "toxic", "oil", "slick", "secret", "panel", "key")
+              "toxic", "oil", "slick", "secret", "panel", "key", "supply", "locker", "opened", "closes_at")
 cell_state = operator.attrgetter(*CELL_STATE)
 JOURNAL_KEEP = 20000         # lines of play a save keeps (a snapshot carries the rest)
 
@@ -288,7 +332,8 @@ JOURNAL_KEEP = 20000         # lines of play a save keeps (a snapshot carries th
 class Monster:
     # what a monster's mind holds (engine/ai): an older save's monsters get these
     DEFAULTS = {"tactic": None, "role": None, "squad": None, "seen_at": None, "post": None, "side": 0, "goal": None,
-                "said": None, "spot": None, "grenades_left": 0, "mines_left": 0, "lobbed": None, "dived": False}
+                "said": None, "spot": None, "grenades_left": 0, "mines_left": 0, "lobbed": None, "dived": False,
+                "on_death": None}
 
     def __init__(self, mid, kind, spec, x, y, tag):
         self.id, self.kind, self.spec = mid, kind, spec
@@ -307,6 +352,7 @@ class Monster:
         self.attack = spec.get("attack") or {}
         self.awake = bool(spec.get("awake"))
         self.wake_on = None
+        self.on_death = None                            # its death sets off this event (its map cell's "on_death")
         self.intent = None
         self.cool = 0
         self.grudge = None
@@ -622,6 +668,7 @@ class Level:
                     m = self.add_monster(spec["monster"], x, y)
                     if m is not None:
                         m.wake_on = spec.get("wake_on")
+                        m.on_death = spec.get("on_death")
                         m.roll_dir = FACING.get(str(spec.get("roll") or "").lower()[:1])
                         if spec.get("awake"):
                             m.awake = True
@@ -654,10 +701,12 @@ class Level:
         self.pads = [c for c in cells if c.teleport]
         self.lifts = [c for c in cells if c.lift]
         self.rides = [c for c in cells if c.stairs or c.mag]
+        self.timed_cells = [c for c in cells if c.open_for]
         self.belts = [c for c in cells if c.conveyor is not None]
         self.fires = {}                                  # (x, y) -> beats it burns on
         self.total_kills = sum(1 for m in self.monsters if not m.barrel and not m.spec.get("boss"))
-        self.total_items = sum(1 for it in self.items if not it.mine)
+        self.total_items = sum(1 for it in self.items if not it.mine) + sum(
+            sum(1 for i in (c.locker or ()) + (c.supply or ()) if not self.mine_id(i)) for c in cells)
         self.total_secrets = sum(1 for row in self.grid for c in row if c.secret)
 
     def add_monster(self, kind, x, y):
@@ -672,6 +721,10 @@ class Level:
             self.boss = m
         self.monsters.append(m)
         return m
+
+    def mine_id(self, iid):
+        spec = (self.data.items or {}).get(iid)
+        return isinstance(spec, dict) and isinstance((spec.get("pickup") or {}).get("mine"), dict)
 
     def add_item(self, iid, x, y):
         spec = (self.data.items or {}).get(iid)
@@ -754,6 +807,8 @@ class Level:
                 self.tiles[name] = frames
                 if any(c is None for f in frames for r in f for c in r):
                     self.see_through.add(name)
+        from .firstperson import clear_textures
+        self.see_through |= {n for n in clear_textures() if n not in self.tiles}   # the engine's bars and fields
         self.floor_tile, self.ceiling_tile = self.spec.get("floor"), self.spec.get("ceiling")
         from .firstperson import sky_spec
         open_air = self.land is not None or (self.world is None and any(c.sky for row in self.grid for c in row))
@@ -826,6 +881,7 @@ class Level:
             m = self.add_monster(spec["monster"], x, y)
             if m is not None:
                 m.wake_on = spec.get("wake_on")
+                m.on_death = spec.get("on_death")
                 if spec.get("awake"):
                     m.awake = True
                 if spec.get("squad"):
@@ -875,7 +931,8 @@ class Level:
     def line_of_sight(self, x0, y0, x1, y1):
         cells = bresenham(x0, y0, x1, y1)
         for (x, y) in cells[1:-1]:
-            if self.cell(x, y).solid:
+            c = self.cell(x, y)
+            if c.solid and not c.clear:                  # bars and force fields are seen through
                 return False
         if self.land is not None and len(cells) > 2:          # open land: a hill between hides
             h0, h1 = self.eye_height(x0, y0), self.eye_height(x1, y1)
@@ -1980,14 +2037,16 @@ class Level:
             self.say("The crate will not move: something is behind it.", "dim")
             self.sfx("locked")
             return False
-        heavy = cell.heavy
-        cell.crate = cell.heavy = False
+        heavy, load = cell.heavy, (cell.supply, cell.opened)
+        cell.crate = cell.heavy = cell.opened = False
+        cell.supply = None
         ox, oy = p.x, p.y
         p.x, p.y = cell.x, cell.y
         path = [(cell.x, cell.y), (bx, by)] + ([] if beyond.toxic or heavy else self.slide_path(bx, by, dx, dy, crate=True))
         bx, by = path[-1]
         beyond = self.cell(bx, by)
         beyond.crate, beyond.heavy = True, heavy
+        beyond.supply, beyond.opened = load
         self.sfx("push", "drop")
         n = len(path) - 1
         frames = 4 * n
@@ -1995,6 +2054,7 @@ class Level:
                       crates={(bx, by): self.along(path, i / float(frames))}) for i in range(1, frames + 1)], 0.035)
         if beyond.toxic:
             beyond.crate, beyond.heavy, beyond.toxic, beyond.sunk = False, False, False, True
+            beyond.supply, beyond.opened = None, False
             self.marks_version += 1
             self.say("The %s sinks into the acid and settles: a step you can stand on." % ("container" if heavy else "crate"), "good")
             self.sfx("wade", "drop")
@@ -2455,10 +2515,24 @@ class Level:
             self.say("It will not open: something holds it shut. A plate somewhere keeps it.", "dim")
             self.sfx("locked")
             return False
+        if cell.crate and cell.supply is not None:
+            return self.open_box(cell)
         if cell.crate:
             self.say("A crate. Walk into it to push it.", "dim")
             return False
+        if cell.kind == "locker":
+            return self.open_box(cell)
+        if cell.kind == "field":
+            return self.zapped(cell)
         if cell.kind == "door" and cell.open < 1.0:
+            if cell.from_side is not None and (p.x - cell.x, p.y - cell.y) != DIRS[cell.from_side]:
+                self.say("It does not open from this side.", "dim")
+                self.sfx("locked")
+                return False
+            if cell.sealed and cell.open_for:
+                self.say("Shut. A switch somewhere opens it - for a few beats.", "dim")
+                self.sfx("locked")
+                return False
             if cell.sealed:
                 self.say("Sealed. Something keeps it shut.", "dim")
                 self.sfx("locked")
@@ -2525,7 +2599,82 @@ class Level:
         self.sfx("door")
         self.anim([FX(doors={(cell.x, cell.y): k}) for k in (0.2, 0.4, 0.6, 0.8, 0.95)], 0.04)
         cell.open = 1.0
+        if cell.open_for:
+            cell.closes_at = self.beat + cell.open_for
+            self.say("It will shut again in %d beats." % cell.open_for, "alert")
         self.update_seen()
+
+    def open_box(self, cell):
+        """A locker or a supply crate opened: what is in it falls at his feet, and he takes what he can use."""
+        p = self.player
+        what = "locker" if cell.kind == "locker" else "crate"
+        if cell.opened:
+            self.say("An empty %s." % what, "dim")
+            return False
+        if cell.key and cell.key not in p.keys:
+            self.say("Locked: this %s needs the %s key." % (what, cell.label), "hurt")
+            self.sfx("locked")
+            return False
+        inside = cell.locker if what == "locker" else cell.supply
+        cell.opened = True
+        if what == "locker":
+            cell.locker = ()
+        else:
+            cell.supply = ()
+        self.sfx("locker" if what == "locker" else "crate_open", "open")
+        self.anim([FX(shake=s) for s in (1, 0)], 0.04)
+        found = [it for it in (self.add_item(i, p.x, p.y) for i in inside) if it is not None]
+        if not found:
+            self.say("You open the %s. Nothing in it." % what, "dim")
+        else:
+            self.say("You %s." % ("open the locker" if what == "locker" else "pry the crate open"), "good")
+            for it in found:
+                if not it.taken and not self.over:
+                    self.take(it)
+        if cell.on_open:
+            self.event(cell.on_open)
+        self.end_beat()
+        return True
+
+    def zapped(self, cell):
+        """Walking into a force field: it throws him back."""
+        self.sfx("zap", "hurt")
+        self.anim([FX(whiten=k) for k in (0.35, 0.15, 0.0)], 0.04)
+        if cell.zap:
+            self.hurt(cell.zap, "The field throws you back.")
+        else:
+            self.say("The field will not let you through.", "dim")
+        self.end_beat()
+        return True
+
+    def shut_doors(self):
+        """Timed doors shut once their beats are up - not on whoever stands in them; the switch that opened one
+        can open it again."""
+        p = self.player
+        for c in getattr(self, "timed_cells", ()):
+            if c.closes_at is None or c.open < 1.0:
+                continue
+            left = c.closes_at - self.beat
+            if left == 0:
+                self.sfx("door_warn", "tick")
+                self.say("A door starts to close!", "alert")
+            if left >= 0:
+                continue
+            if (c.x, c.y) == (p.x, p.y) or self.monster_at(c.x, c.y) is not None or c.crate:
+                continue                                 # something stands in it: it waits
+            self.ways_change()                           # the map changes: the beat's ways first
+            c.open, c.closes_at = 0.0, None
+            if c.opens_on:                               # shut till the switch is thrown again
+                c.sealed = True
+                self.events.discard(c.opens_on)
+                for row in self.grid:
+                    for o in row:
+                        if o.kind == "switch" and o.switch == c.opens_on:
+                            o.pressed = False
+            self.sfx("door")
+            self.say("A door slams shut.", "alert")
+            self.anim([FX(doors={(c.x, c.y): k}) for k in (0.7, 0.4, 0.1)], 0.04)
+            self.update_seen()
 
     def open_panel(self, cell):
         self.ways_change()                               # the map may change
@@ -2793,6 +2942,8 @@ class Level:
                 self.sfx("clack", "hit_wall")
                 self.say("Your shot pings off the %s." % ball.name, "dim")
                 return
+            if cell.solid and cell.clear:
+                continue                                 # through the bars, through the field
             if cell.solid:
                 if cell.kind == "panel" and cell.panel == "shoot":
                     self.open_panel(cell)
@@ -2873,6 +3024,8 @@ class Level:
                 o.grudge = None
         if m.barrel:
             self.explode(m)
+            if m.on_death and not self.over:
+                self.event(m.on_death)
             return
         if not m.spec.get("boss"):
             self.stats["kills"] += 1
@@ -2886,6 +3039,8 @@ class Level:
             self.say("Its tanks burst into flame.", "alert")
         self.say((m.spec.get("death") or "%s dies.") % m.tag, "good")
         self.sfx((m.spec.get("sounds") or {}).get("death") or "enemy_down")
+        if m.on_death:
+            self.event(m.on_death)
         drop = m.spec.get("drops")
         if drop and drop in (self.data.items or {}) and not any(i.x == m.x and i.y == m.y and not i.taken
                                                                   for i in self.items):
@@ -3101,12 +3256,15 @@ class Level:
             dx, dy = sign(c.x - x0), sign(c.y - y0)
             t = self.cell(c.x + dx, c.y + dy)
             if (dx or dy) and not t.solid and not self.monster_at(t.x, t.y) and (t.x, t.y) != (self.player.x, self.player.y):
-                c.crate = False
+                load = (c.supply, c.opened)
+                c.crate = c.opened = False
+                c.supply = None
                 if t.toxic:
                     t.toxic, t.sunk = False, True
                     self.marks_version += 1
                 else:
                     t.crate = True
+                    t.supply, t.opened = load
                     slid[(t.x, t.y)] = (c.x, c.y)
         for m in self.monsters:
             if m.ball and not m.gone and max(abs(m.x - x0), abs(m.y - y0)) == 1 and (m.x == x0 or m.y == y0) \
@@ -3204,16 +3362,23 @@ class Level:
         if name in self.events:
             return
         self.events.add(name)
-        opened = closed = 0
+        opened = closed = timed = 0
         for row in self.grid:
             for c in row:
                 if c.closes_on == name and c.kind == "door" and c.open >= 1.0:
                     c.open, c.sealed = 0.0, True
                     closed += 1
+                if c.closes_on == name and c.field and c.kind == "floor" and self.monster_at(c.x, c.y) is None \
+                        and (c.x, c.y) != (self.player.x, self.player.y):
+                    c.kind = "field"                     # the field comes back on
+                    closed += 1
                 if c.opens_on == name:
                     if c.kind == "door":
                         c.sealed = False
                         c.open = 1.0
+                        if c.open_for:
+                            c.closes_at = self.beat + c.open_for
+                            timed = c.open_for
                     else:
                         c.kind = "floor"
                     opened += 1
@@ -3224,6 +3389,8 @@ class Level:
             self.say("A door slams shut behind you.", "alert")
         elif opened:
             self.say("Somewhere, walls grind open.", "alert")
+        if timed:
+            self.say("It will shut again in %d beats." % timed, "alert")
         for m in self.monsters:
             if m.wake_on == name and not m.dead:
                 if m.ball and m.roll_dir is not None:     # a ball let go: it rolls after a beat's rumble
@@ -3280,6 +3447,7 @@ class Level:
         if self.over:
             return
         self.plates()
+        self.shut_doors()
         self.burn()
         if self.over:
             return
@@ -3397,14 +3565,16 @@ class Level:
             elif c.crate:
                 if self.room(tx, ty, crate=True):
                     self.ways_change()                   # the map changes: the beat's ways first
-                    heavy = c.heavy
-                    c.crate = c.heavy = False
+                    heavy, load = c.heavy, (c.supply, c.opened)
+                    c.crate = c.heavy = c.opened = False
+                    c.supply = None
                     t = self.cell(tx, ty)
                     if t.toxic:
                         t.toxic, t.sunk = False, True
                         self.marks_version += 1
                     else:
                         t.crate, t.heavy = True, heavy
+                        t.supply, t.opened = load
                         crates[(tx, ty)] = (c.x, c.y)
             elif m is not None and not m.float and not m.spec.get("boss"):
                 if self.room(tx, ty):
@@ -3508,7 +3678,7 @@ class Level:
             return
         a = m.attack
         kind = a.get("kind", "melee")
-        if kind == "cron":
+        if kind in ("cron", "none"):                     # Cron keeps its own time; "none" only stands there
             return
         m.cool = max(0, m.cool - 1)
         if m.stun:                                      # still reeling: no aim, no step
@@ -4166,13 +4336,18 @@ class FrameConsole:
                     and max(abs(x - p.x), abs(y - p.y)) <= fp.MINE_SEEN:
                 return (255, 40, 30)
             if c.kind == "door":
-                return fp.KEY_COLOURS.get(c.key, (170, 140, 90)) if c.open < 1 else (90, 80, 60)
+                return fp.KEY_COLOURS.get(c.key, (150, 150, 170) if c.gate else (170, 140, 90)) if c.open < 1 \
+                    else (90, 80, 60)
+            if c.kind == "field":
+                return (90, 200, 255)
+            if c.kind == "locker":
+                return (120, 124, 136) if c.opened else fp.KEY_COLOURS.get(c.key, (176, 150, 210))
             if c.kind == "exit":
                 return (90, 230, 120)
             if c.kind == "switch":
                 return (230, 190, 70) if not c.pressed else (90, 230, 120)
             if c.crate:
-                return (140, 104, 64)
+                return (200, 160, 60) if c.supply else (140, 104, 64)
             if c.kind in ("wall", "panel"):
                 return (120, 124, 136)
             if land is not None and (x, y) not in land.stamp:   # open land: its own colours, darker
@@ -4346,13 +4521,17 @@ class TextConsole:
         if any(not it.taken and (it.x, it.y) == (x, y) for it in lv.items):
             return "*"
         if c.kind == "door":
-            return "/" if c.open >= 1 else (c.key or "+").upper() if c.key else "+"
+            return "/" if c.open >= 1 else (c.key or "+").upper() if c.key else "H" if c.gate else "+"
+        if c.kind == "field":
+            return "%"
+        if c.kind == "locker":
+            return "#" if c.opened else "L"
         if c.kind == "exit":
             return "E"
         if c.kind == "switch":
             return "|" if c.pressed else "\\"
         if c.crate:
-            return "&"
+            return "$" if c.supply else "&"
         if c.kind in ("wall", "panel"):
             return "#"
         if (x, y) in lv.marks:
@@ -4745,7 +4924,7 @@ def validate(data):
             problems.append("monster '%s' should be an object" % kind)
             continue
         a = spec.get("attack") or {}
-        if a.get("kind") not in (None, "melee", "hitscan", "projectile", "spawner", "cron", "barrel", "flame"):
+        if a.get("kind") not in (None, "melee", "hitscan", "projectile", "spawner", "cron", "barrel", "flame", "none"):
             problems.append("monster '%s': unknown attack kind '%s'" % (kind, a.get("kind")))
         spawn = a.get("spawn")
         if spawn and spawn not in mons:
@@ -4949,6 +5128,39 @@ def validate(data):
                 elif spec["switch"] not in listening:
                     problems.append("level '%s': the switch '%s' sets off '%s', but nothing opens, closes or wakes on it"
                                     % (lid, ch, spec["switch"]))
+            for key in ("locker", "supply"):
+                if spec.get(key) is not None:
+                    v = spec[key]
+                    ids = [v] if isinstance(v, str) else v if isinstance(v, list) else [] if v is True else None
+                    if ids is None or not all(isinstance(i, str) for i in ids):
+                        problems.append("level '%s': '%s' is a %s; its value should be a list of item ids (or true: "
+                                        "empty)" % (lid, ch, "locker" if key == "locker" else "supply crate"))
+                    else:
+                        for i in ids:
+                            if i not in items:
+                                problems.append("level '%s': the %s '%s' holds an unknown item '%s'"
+                                                % (lid, "locker" if key == "locker" else "supply crate", ch, i))
+            if spec.get("from") is not None:
+                if str(spec["from"]).lower()[:1] not in FACING or not spec["from"]:
+                    problems.append("level '%s': '%s' opens from '%s'; it should be n, e, s or w" % (lid, ch, spec["from"]))
+                elif not (spec.get("door") or spec.get("gate")):
+                    problems.append("level '%s': '%s' has \"from\", but only a door opens from one side" % (lid, ch))
+            if spec.get("open_for") is not None:
+                v = spec["open_for"]
+                if isinstance(v, bool) or not isinstance(v, int) or v < 1:
+                    problems.append("level '%s': '%s' open_for should be the beats it stays open (1 or more)" % (lid, ch))
+                elif not (spec.get("door") or spec.get("gate")):
+                    problems.append("level '%s': '%s' has open_for, but only a door shuts on its own" % (lid, ch))
+            if spec.get("zap") is not None and (isinstance(spec["zap"], bool) or not isinstance(spec["zap"], int)
+                                                or spec["zap"] < 0):
+                problems.append("level '%s': '%s' zap should be the damage the field does (0 or more)" % (lid, ch))
+            for key, what in (("on_open", "opening it"), ("on_death", "its death")):
+                if spec.get(key) is not None and (not isinstance(spec[key], str) or not spec[key]):
+                    problems.append("level '%s': '%s' %s should be the name of the event %s sets off"
+                                    % (lid, ch, key, what))
+                elif spec.get(key) and spec[key] not in listening:
+                    problems.append("level '%s': '%s' sets off '%s' (%s), but nothing opens, closes or wakes on it"
+                                    % (lid, ch, spec[key], key))
             if spec.get("roll") is not None:
                 if str(spec["roll"]).lower()[:1] not in FACING or not spec["roll"]:
                     problems.append("level '%s': '%s' rolls '%s'; it should be n, e, s or w" % (lid, ch, spec["roll"]))

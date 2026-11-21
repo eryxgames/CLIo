@@ -1608,6 +1608,9 @@ function sortOf(spec) {
   if (spec.start) return "start";
   if (spec.exit) return "exit";
   if (spec.switch) return "switch";
+  if (spec.supply !== undefined && spec.supply !== null) return "supply";
+  if (spec.locker !== undefined && spec.locker !== null) return "locker";
+  if (spec.field) return "field";
   if (spec.crate) return "crate";
   if (spec.plate) return "plate";
   if (spec.teleport) return "pad";
@@ -1617,7 +1620,7 @@ function sortOf(spec) {
   if (spec.bulkhead) return "bulkhead";
   if (spec.pit) return "pit";
   if (spec.deep) return "water";
-  if (spec.door) return "door";
+  if (spec.door || spec.gate) return "door";
   if (spec.panel) return "panel";
   if (spec.toxic) return "toxic";
   if (spec.wall || spec.texture || spec.opens_on) return "wall";
@@ -1627,13 +1630,23 @@ const SORTS = [["floor", "Floor"], ["toxic", "Toxic floor"], ["wall", "Wall"], [
   ["monster", "Monster"], ["item", "Item"], ["start", "Start"], ["exit", "Exit switch"], ["switch", "Switch (sets off an event)"],
   ["crate", "Crate (pushed)"], ["plate", "Pressure plate"], ["pad", "Teleporter pad"], ["lift", "Lift"],
   ["stairs", "Stairs (walked into)"], ["mag", "Magnetic plating (magboots walk up it)"], ["water", "Deep water"],
-  ["bulkhead", "Bulkhead (dive under it)"], ["pit", "A drop (fliers only)"]];
-const solidSort = (k) => ["wall", "panel", "exit", "switch", "unknown", "stairs", "mag", "bulkhead"].includes(k);
-const blocksWalk = (k) => solidSort(k) || k === "crate";
+  ["bulkhead", "Bulkhead (dive under it)"], ["pit", "A drop (fliers only)"],
+  ["locker", "Locker (opened with Enter)"], ["supply", "Supply crate (opened with Enter, pushed)"],
+  ["field", "Force field (seen and shot through)"]];
+const solidSort = (k) => ["wall", "panel", "exit", "switch", "unknown", "stairs", "mag", "bulkhead", "locker", "field"].includes(k);
+const blocksWalk = (k) => solidSort(k) || k === "crate" || k === "supply";
+const itemList = (v) => (typeof v === "string" ? [v] : Array.isArray(v) ? v : []);
 
 function tileOf(spec) {                                        // the tile a wall-like cell is drawn with
   const k = sortOf(spec);
-  if (k === "door") return spec.sealed || (spec.opens_on && !spec.key) ? "sealed" : spec.key ? "door_" + spec.key : "door";
+  if (k === "door") {
+    if (spec.gate) return spec.key ? "bars_" + spec.key : "bars";
+    if (spec.open_for) return "door_timed";
+    if (spec.from) return "door_oneway";
+    return spec.sealed || (spec.opens_on && !spec.key) ? "sealed" : spec.key ? "door_" + spec.key : "door";
+  }
+  if (k === "locker") return spec.key ? "locker_" + spec.key : "locker";
+  if (k === "field") return spec.wall || "field";
   if (k === "panel") return spec.panel === "shoot" ? "shoot" : "fist";
   if (k === "exit") return "exit";
   if (k === "switch") return "switch";
@@ -1652,7 +1665,11 @@ function describe(spec, info) {
     monster: () => name(spec.monster) + (info.things[spec.monster] && info.things[spec.monster].boss ? " (boss)" : ""),
     item: () => name(spec.item), start: () => "where the player starts", exit: () => (spec.exit === "secret" ? "the secret exit switch" : "the exit switch"),
     switch: () => `a switch: sets off ${spec.switch}` + (spec.label ? ` (labelled ${spec.label})` : ""),
-    door: () => (spec.key ? `door: needs the ${spec.key} key` : spec.sealed || spec.opens_on ? "sealed door" : "door") + (spec.open ? ", open" : ""),
+    door: () => (spec.gate ? "bars, seen and shot through: " : "") + (spec.key ? `door: needs the ${spec.key} key` : spec.sealed || spec.opens_on ? "sealed door" : "door") + (spec.open ? ", open" : "")
+      + (spec.open_for ? `, shuts again ${spec.open_for} beats after it opens` : "") + (spec.from ? `, opens only from the ${({ n: "north", e: "east", s: "south", w: "west" })[String(spec.from)[0]] || spec.from}` : ""),
+    locker: () => `a locker${spec.key ? ` (needs the ${spec.key} key)` : ""}: ` + (itemList(spec.locker).map(name).join(", ") || "empty"),
+    supply: () => "a supply crate: " + (itemList(spec.supply).map(name).join(", ") || "empty"),
+    field: () => `a force field (zaps for ${spec.zap === undefined ? 10 : spec.zap})`,
     panel: () => (spec.panel === "shoot" ? "dented vent: shoot it (secret)" : "hollow wall: punch it (secret)"),
     toxic: () => "toxic floor", wall: () => `wall: ${spec.wall || spec.texture || "steel"}`, floor: () => "floor",
     crate: () => (spec.crate === "heavy" ? "a container: only a vehicle shoves it" : "a crate: walk into it to push it"),
@@ -1669,6 +1686,8 @@ function describe(spec, info) {
   if (spec.on_enter) more.push(`sets off ${spec.on_enter}`);
   if (spec.on_pickup) more.push(`taken: sets off ${spec.on_pickup}`);
   if (spec.wake_on) more.push(`wakes on ${spec.wake_on}`);
+  if (spec.on_death) more.push(`its death sets off ${spec.on_death}`);
+  if (spec.on_open) more.push(`opened: sets off ${spec.on_open}`);
   if (spec.awake) more.push("awake");
   if (spec.opens_on && k !== "door") more.push(`opens on ${spec.opens_on}`);
   if (spec.opens_on && k === "door") more.push(`opens on ${spec.opens_on}`);
@@ -1765,7 +1784,7 @@ function paintCell(g, info, thing, ch, x, y, cs) {
   }
   if (k === "panel") { g.fillStyle = "#c79bff"; g.fillRect(X + 1, Y + cs - 4, 3, 3); }
 }
-const EVENT_KEYS = ["on_enter", "on_pickup", "opens_on", "closes_on", "wake_on"];
+const EVENT_KEYS = ["on_enter", "on_pickup", "opens_on", "closes_on", "wake_on", "on_death", "on_open"];
 
 function levelEditor(kind, thing, id) {
   if (!Array.isArray(thing.map) || !thing.map.length) {
@@ -1933,6 +1952,9 @@ function levelEditor(kind, thing, id) {
       if (k === "water") { s.deep = true; s.floor = s.floor || "water"; }
       if (k === "bulkhead") s.bulkhead = true;
       if (k === "pit") { s.pit = true; s.floor = s.floor || "pit"; }
+      if (k === "locker") s.locker = [];
+      if (k === "supply") s.supply = [];
+      if (k === "field") s.field = true;
       write(); edit();
     };
     const rows = [field("Is", el("select", { onchange: (e) => setSort(e.target.value) }, ...SORTS.map(([k, label]) => el("option", { value: k, selected: k === sort }, label))))];
@@ -1941,6 +1963,7 @@ function levelEditor(kind, thing, id) {
     const evRow = (key, label) => rows.push(field(label, eventInput(s[key], (v) => { s[key] = v; write(); })));
     if (sort === "monster") {
       rows.push(field("Monster", choose("monster", "monster"))); evRow("wake_on", "Wakes when this happens");
+      evRow("on_death", "Its death sets off");
       rows.push(field("Awake from the start", el("input", { type: "checkbox", checked: !!s.awake, onchange: (e) => { s.awake = e.target.checked; write(); } })));
       rows.push(field("A ball: rolls this way when it wakes", el("select", { onchange: (e) => { s.roll = e.target.value; write(); } },
         ...["", "n", "e", "s", "w"].map((f) => el("option", { value: f, selected: (s.roll || "") === f }, f || "stays")))));
@@ -1958,6 +1981,24 @@ function levelEditor(kind, thing, id) {
       rows.push(field("Open only while a plate is down", el("input", { type: "text", class: "code short", value: s.open_while || "", placeholder: "plate",
         oninput: (e) => { s.open_while = e.target.value.trim(); write(); } })));
       rows.push(field("Open from the start", el("input", { type: "checkbox", checked: !!s.open, onchange: (e) => { s.open = e.target.checked; write(); } })));
+      rows.push(field("Bars: seen and shot through", el("input", { type: "checkbox", checked: !!s.gate,
+        onchange: (e) => { s.gate = e.target.checked; if (s.gate) delete s.door; else s.door = true; write(); } })));
+      rows.push(field("Shuts again after this many beats (0: stays open)", el("input", { type: "number", min: "0", value: String(s.open_for || 0),
+        oninput: (e) => { s.open_for = Math.max(0, Number(e.target.value) || 0) || undefined; write(); } })));
+      rows.push(field("Opens only from this side", el("select", { onchange: (e) => { s.from = e.target.value || undefined; write(); } },
+        ...["", "n", "e", "s", "w"].map((f) => el("option", { value: f, selected: (s.from || "") === f }, f || "either side")))));
+    }
+    if (sort === "locker" || sort === "supply") {
+      const key = sort === "locker" ? "locker" : "supply";
+      rows.push(field("What is in it (item ids, by commas)", el("input", { type: "text", class: "code", value: itemList(s[key]).join(", "),
+        oninput: (e) => { s[key] = e.target.value.split(",").map((t) => t.trim()).filter(Boolean); write(); } })));
+      rows.push(field("Needs the key", el("select", { onchange: (e) => { s.key = e.target.value; write(); } }, ...["", "r", "w", "x"].map((k) => el("option", { value: k, selected: (s.key || "") === k }, k || "no key")))));
+      evRow("on_open", "Opening it sets off");
+    }
+    if (sort === "field") {
+      rows.push(field("Damage when touched", el("input", { type: "number", min: "0", value: String(s.zap === undefined ? 10 : s.zap),
+        oninput: (e) => { s.zap = Math.max(0, Number(e.target.value) || 0); write(); } })));
+      evRow("opens_on", "Turns off when this happens"); evRow("closes_on", "Turns on again when this happens");
     }
     if (sort === "crate") rows.push(field("Heavy: a container only a vehicle can shove", el("input", { type: "checkbox",
       checked: s.crate === "heavy", onchange: (e) => { s.crate = e.target.checked ? "heavy" : true; write(); edit(); } })));

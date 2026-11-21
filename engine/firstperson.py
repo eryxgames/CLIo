@@ -427,13 +427,112 @@ def _shoot_panel():
     return t
 
 
+def _locker(stripe=None, opened=False):
+    """A locker in the wall: a tall steel door with louvres and a handle - or, open, its dark inside and a shelf."""
+    t = _steel()
+    body, edge = (84, 92, 108), (40, 44, 52)
+    for y in range(2, TS - 2):
+        for x in range(5, TS - 5):
+            t[y][x] = edge if (x in (5, TS - 6) or y in (2, TS - 3)) else body
+    if opened:
+        for y in range(3, TS - 3):
+            for x in range(6, TS - 6):
+                t[y][x] = (22, 22, 26) if y != 12 else (70, 74, 84)          # the inside, a shelf across it
+        for y in range(3, TS - 3):                                            # the door, swung back against the frame
+            t[y][6] = t[y][7] = (120, 128, 144)
+        for x in (12, 20):
+            t[5][x] = t[6][x] = (110, 112, 120)                               # hooks
+        return t
+    for y in (5, 7, 9, 11):                                                   # louvres
+        for x in range(9, TS - 9):
+            t[y][x] = (34, 38, 46)
+            t[y + 1][x] = (112, 120, 136)
+    for y in range(15, 20):                                                   # the handle
+        t[y][TS - 9] = t[y][TS - 10] = (180, 184, 196)
+    for y in range(22, 26):                                                   # a name plate
+        for x in range(10, 20):
+            t[y][x] = (150, 140, 110)
+    if stripe:
+        for y in range(13, 15):
+            for x in range(6, TS - 6):
+                t[y][x] = stripe
+    return t
+
+
+def _gate(stripe=None):
+    """Bars: a door seen through (its gaps are clear)."""
+    t = [[None] * TS for _ in range(TS)]
+    bar, lit, dark = (112, 116, 128), (168, 172, 184), (50, 52, 60)
+    for y in range(TS):
+        for x in range(TS):
+            if y < 2 or x < 2 or x > TS - 3:
+                t[y][x] = dark                                                # the frame
+            elif (x - 2) % 5 in (2, 3):
+                t[y][x] = lit if (x - 2) % 5 == 2 else bar                    # a bar, lit on its left
+            elif y in (6, 7, 24, 25):
+                t[y][x] = stripe or bar                                       # the cross bars
+    return t
+
+
+def _field():
+    """A force field: glowing lines between two posts, clear between them."""
+    t = [[None] * TS for _ in range(TS)]
+    for y in range(TS):
+        for x in range(TS):
+            if x < 2 or x > TS - 3:
+                t[y][x] = (44, 48, 58) if y % 6 else (120, 210, 255)          # the emitter posts
+            elif y % 3 == 0 and noise(x, y, 5) < 0.9:
+                t[y][x] = (90, 200, 255) if noise(x, y, 9) < 0.7 else (200, 240, 255)
+    return t
+
+
+def _timed_door():
+    """A door with a hazard band and a clock lamp: it shuts again on its own."""
+    t = _door()
+    for y in range(13, 18):
+        for x in range(3, TS - 3):
+            if x not in (15, 16):
+                t[y][x] = (215, 175, 40) if ((x + y) // 3) % 2 else (34, 32, 30)
+    for y in range(5, 9):
+        for x in range(13, 19):
+            t[y][x] = (40, 40, 44) if (x in (13, 18) or y in (5, 8)) else (230, 120, 40)
+    return t
+
+
+def _oneway_door():
+    """A door with chevrons: it opens from one side only."""
+    t = _door()
+    for y in range(12, 20):
+        for x in range(3, TS - 3):
+            if x in (15, 16):
+                continue
+            if (x - 3 + abs(y - 15.5)) % 8 < 2:
+                t[y][x] = (235, 235, 225)
+    return t
+
+
 def _make_textures():
     out = {"steel": _steel(), "screens": _screens(1), "screens2": _screens(2), "hazard": _hazard(),
            "door": _door(), "sealed": _door(sealed=True), "exit": _exit(False), "exit_on": _exit(True),
            "fist": _fist_panel(), "shoot": _shoot_panel(), "switch": _switch(False), "switch_on": _switch(True)}
     for k, c in KEY_COLOURS.items():
         out["door_" + k] = _door(stripe=c)
+    out.update({"locker": _locker(), "locker_open": _locker(opened=True), "bars": _gate(), "field": _field(),
+                "door_timed": _timed_door(), "door_oneway": _oneway_door()})
+    for k, c in KEY_COLOURS.items():
+        out["locker_" + k] = _locker(stripe=c)
+        out["bars_" + k] = _gate(stripe=c)
     return out
+
+
+CLEAR_TEXTURES = None            # the engine's tiles that are seen through (worked out once)
+
+
+def clear_textures():
+    global CLEAR_TEXTURES
+    if CLEAR_TEXTURES is None:
+        CLEAR_TEXTURES = frozenset(n for n, rows in TEXTURES.items() if any(c is None for r in rows for c in r))
+    return CLEAR_TEXTURES
 
 
 TEXTURES = _make_textures()
@@ -463,6 +562,9 @@ def tile_data(name):
     for r in rows:
         line = ""
         for c in r:
+            if c is None:                                # clear: a letter the palette does not have
+                line += "."
+                continue
             if c not in letters:
                 if len(letters) < len(TILE_LETTERS):
                     letters[c] = TILE_LETTERS[len(letters)]
@@ -571,6 +673,33 @@ def _crate_picture():
 
 
 CRATE = _crate_picture()
+
+
+def _supply_picture(opened=False):
+    """A supply crate: olive, a stencilled band, a lid - or, opened, the lid off and its dark inside showing."""
+    olive, dark, band, stencil = (92, 102, 60), (58, 64, 38), (70, 74, 82), (220, 190, 70)
+    rows = []
+    for y in range(13):
+        row = []
+        for x in range(14):
+            c = olive
+            if y in (0, 12) or x in (0, 13):
+                c = band
+            elif y in (1, 11) or x in (1, 12):
+                c = dark
+            elif 5 <= y <= 7 and 3 <= x <= 10:
+                c = stencil if (x + y) % 3 else dark
+            row.append(c)
+        rows.append(row)
+    if opened:
+        for y in range(0, 4):
+            for x in range(1, 13):
+                rows[y][x] = (24, 24, 20) if y > 0 else (40, 40, 34)
+        rows[0] = [None] * 14                                    # the lid is off: the top edge is gone
+    return Picture(rows)
+
+
+SUPPLY, SUPPLY_OPEN = _supply_picture(), _supply_picture(True)
 
 
 def _flames():
@@ -1334,7 +1463,7 @@ class View:
             cx_, cy_ = fx.crates.get((x, y), (x, y))
             a, z = rel(cx_, cy_)
             if -0.3 < z <= sight + 0.5:
-                items.append((z, 2, 0, "crate", (a, getattr(lv.cell(x, y), "heavy", False))))
+                items.append((z, 2, 0, "crate", (a, lv.cell(x, y))))
         for (x, y), left in (getattr(lv, "fires", None) or {}).items():
             a, z = rel(x, y)
             if 0.1 < z <= sight + 0.5:
@@ -1465,8 +1594,13 @@ class View:
                     self.draw_thing(px, lv.sprites.get(mark.get("sprite")), a, z, float(mark.get("size", 2.0)), None, fx,
                                     labels=None, ground=lv.ground(mx_, my_) + float(mark.get("lift", 0)))
             elif kind == "crate":
-                a, heavy = obj
-                pic = (lv.sprites.get("container") if heavy else None) or lv.sprites.get("crate") or CRATE
+                a, cc = obj
+                heavy = getattr(cc, "heavy", False)
+                if getattr(cc, "supply", None) is not None:                # a supply crate, shut or opened
+                    pic = lv.sprites.get("supply_open" if cc.opened else "supply") or (SUPPLY_OPEN if cc.opened
+                                                                                         else SUPPLY)
+                else:
+                    pic = (lv.sprites.get("container") if heavy else None) or lv.sprites.get("crate") or CRATE
                 self.draw_thing(px, pic, a, z, 0.98 if heavy else 0.75, None, fx, labels=None, ground=gnd(a, z))
             elif kind == "grenade":
                 a, g = obj

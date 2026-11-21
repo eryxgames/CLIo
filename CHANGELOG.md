@@ -424,6 +424,15 @@ game, RØØTLESS, shows them.
 - RØØTLESS: a hacking deck (ping, firewall, traceroute, fork bomb, kill -9, sudo, grep,
   nohup, chmod 000, fsck, rm -rf, overclock), Black ICE and the Kernel Sentinel, and
   **SIM-10: Root Shell** (`--level sim10`): hack a terminal, then out-deal a sentinel.
+- **Doors and gates**: lockers in the walls (`"locker": [items]`, opened by walking into them
+  or Enter; `"key"`, `"on_open"`), supply crates that open and still stand (`"supply": [items]`;
+  pushed, thrown and carried with what is in them), bars seen and shot through (`"gate": true`),
+  force fields that throw back whoever walks in (`"field": true`, `"zap"`; off on an event or
+  when their emitter dies - a monster cell's `"on_death"`), timed doors that shut again after
+  `"open_for"` beats (their switch can be thrown again) and one-way doors (`"from"`). The
+  engine's own tiles for them (`locker`, `bars`, `field`, `door_timed`, `door_oneway`, ...),
+  the supply crate's pictures, the automap, saves, `--check`, the editor's painter and the
+  level bot know them all. Monster attack kind `"none"` (it only stands there).
 - **Downloads** in the launcher (`engine/downloads.py`): CLIo Picture and Ballistic's C engine
   for this machine, each with its size and source, asked about first and fetched only on a
   yes (as `--get-picture` and `--get-ballistic`), and how to get Node.js (`pkg install

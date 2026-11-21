@@ -1885,6 +1885,43 @@ The level bot takes `jet`, `land`, `dive`, `surface`, `mag` and `unmag` among it
 stairs and plating as map characters (it walks into them). RØØTLESS's **SIM-11: Deep Works**
 (`--level sim11`) has all of these.
 
+### Doors and gates: lockers, supply crates, bars, force fields, timed and one-way doors
+
+```json
+"L": {"locker": ["shells", "medkit"]},            "K": {"locker": ["chaingun"], "key": "w", "on_open": "alarm"},
+"$": {"supply": ["clip", "clip", "stimpack"]},    "G": {"gate": true, "opens_on": "cells_open"},
+"F": {"field": true, "opens_on": "emitter_down", "zap": 12},
+"e": {"monster": "emitter", "on_death": "emitter_down"},
+"T": {"door": true, "open_for": 6, "opens_on": "blast_run"},  "s": {"switch": "blast_run"},
+"O": {"door": true, "from": "s"}
+```
+
+- **A locker** (`"locker": [item ids]`, or `true` for an empty one) is a wall with a door in it
+  (tiles `locker`, `locker_open`; `locker_r` `_w` `_x` with a key). Walked into or used
+  (Enter), it opens: what is in it falls at the player's feet and he takes what he can use -
+  the rest stays on the floor where he stands. `"key"` locks it; `"on_open"` sets off an event
+  (an alarm that wakes the barracks: `"wake_on"`). A mine among the items is a booby trap.
+- **A supply crate** (`"supply": [item ids]`) is a crate (pushed, thrown by blasts, carried by
+  belts - its contents go with it) that Enter pries open; it stays standing, open and empty
+  (sprites `supply`, `supply_open`). `"key"` and `"on_open"` as for lockers.
+- **Bars** (`"gate": true`, a door) are seen and shot through - by both sides - but never walked
+  through until they open: by hand, with a key, on an event (`"opens_on"`), or while a plate is
+  down (tile `bars`, `bars_r` `_w` `_x` with a key).
+- **A force field** (`"field": true`, tile `field`) is seen and shot through too, and throws
+  back whoever walks into it (`"zap"`, 10 by default; 0 only stops him). It turns off on
+  `"opens_on"` and on again on `"closes_on"` (unless someone stands in it). A monster's map cell
+  can say `"on_death": event`: kill the emitter, and the field drops. (An emitter is a monster
+  with `"attack": {"kind": "none"}`: it neither moves nor strikes.)
+- **A timed door** (`"open_for": beats`) shuts again that many beats after it opens - not on
+  whoever stands in it (tile `door_timed`). Opened by a switch (`"opens_on"`), it is sealed
+  again when it shuts and the switch can be thrown again: a run against the clock.
+- **A one-way door** (`"from": "n"`, `e`, `s` or `w`) opens only from that side (tile
+  `door_oneway`); once open it stays open.
+
+Line of sight, shots and the automap go through bars and fields; monsters do not. The level bot
+opens lockers and supply crates when they are among its goals (their map characters), and
+plans a one-way door only from its side. RØØTLESS's **E1M5: User Space** has all of these.
+
 ### 3D models
 
 Beside sprites, a level can draw low-poly 3D models: a monster, a vehicle or an item with

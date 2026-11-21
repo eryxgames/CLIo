@@ -241,10 +241,16 @@ class Bot(TextConsole):
         """Can the player stand on (or fly over) this cell, things that move aside?"""
         if c.bulkhead and lv.player.diving:
             return True                                  # under it, under water
-        if c.kind in ("wall", "panel", "exit", "switch") or c.crate or (c.kind == "door" and (c.sealed or c.open_while)):
+        if c.kind in ("wall", "panel", "exit", "switch", "locker", "field") or c.crate \
+                or (c.kind == "door" and (c.sealed or c.open_while)):
             return False
         if c.kind == "door" and c.key and c.key not in lv.player.keys and c.open < 1:
             return False
+        if c.kind == "door" and c.from_side is not None and c.open < 1:     # one way: only from its side
+            p = lv.player
+            fx, fy = DIRS[c.from_side]
+            if (p.x - c.x) * fx + (p.y - c.y) * fy <= 0:
+                return False
         v = lv.player.vehicle
         if v is not None and (c.kind == "door" or c.teleport or c.lift):
             return False                                 # a machine goes through no doors
@@ -287,6 +293,7 @@ class Bot(TextConsole):
     def goal_cell(self, lv):
         while self.goals:
             g = self.goals[0]
+            self.exit = None                             # the switch, exit or ride of this goal, if it is one
             if g == "board":
                 if lv.player.vehicle is None:
                     rides = [m for m in lv.monsters if m.vehicle and not m.dead]
@@ -304,8 +311,8 @@ class Bot(TextConsole):
                     return it.x, it.y
             for row in lv.grid:
                 for c in row:
-                    if c.ch == g and (c.kind not in ("exit", "switch") or not c.pressed):
-                        if c.kind in ("exit", "switch") or c.stairs or c.mag:
+                    if c.ch == g and (c.kind not in ("exit", "switch") or not c.pressed) and not c.opened:
+                        if c.kind in ("exit", "switch", "locker") or c.stairs or c.mag or c.supply is not None:
                             self.exit = (c.x, c.y)
                             for dx, dy in DIRS:              # stand in front of it
                                 if lv.cell(c.x + dx, c.y + dy).kind == "floor":
@@ -469,7 +476,8 @@ class Bot(TextConsole):
         step = self.go(lv, *goal)
         if step is None:
             if self.goals:
-                rides = self.exit and (lv.cell(*self.exit).stairs or lv.cell(*self.exit).mag)
+                ex = lv.cell(*self.exit) if self.exit else None
+                rides = ex is not None and (ex.stairs or ex.mag or ex.kind == "locker" or ex.supply is not None)
                 if rides and abs(self.exit[0] - p.x) + abs(self.exit[1] - p.y) == 1:
                     turn = self.face(lv, self.exit[0] - p.x, self.exit[1] - p.y)
                     if turn:

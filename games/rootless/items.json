@@ -149,7 +149,7 @@
   "pickup": {
    "weapon": "shovel",
    "sprite": "shovel",
-   "size": 0.5,
+   "size": 0.75,
    "text": "A shovel: standard issue, the edge sharpened. It shares key 1 with your fists - press 1 again for the next."
   }
  },

@@ -793,6 +793,9 @@ class Level:
                 pic.walk = [Picture.from_data({"pixels": f}, pal, far_versions(f, keep)) for f in walk if f]
                 if data.get("attack"):
                     pic.attack = Picture.from_data({"pixels": data["attack"]}, pal, far_versions(data["attack"], keep))
+            sc = data.get("scale")
+            if isinstance(sc, (int, float)) and not isinstance(sc, bool) and 0.2 <= sc <= 4:
+                pic.scale = float(sc)                   # a weapon drawn with more (or fewer) pixels, as big
             mz = data.get("muzzle")
             if isinstance(mz, (list, tuple)) and len(mz) == 2 and pic.w and pic.h:
                 pic.muzzle = ((mz[0] + 0.5) / pic.w, (mz[1] + 0.5) / pic.h)

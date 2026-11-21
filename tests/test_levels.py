@@ -732,6 +732,29 @@ class MeleeWeaponTests(unittest.TestCase):
         lv.player.weapons = list(weapons)
         return lv
 
+    def test_a_weapon_sprite_drawn_with_more_detail_is_as_big(self):
+        """The shovel is drawn with finer pixels ("scale"): in hand it stands about as tall as the fist."""
+        from engine.firstperson import FX, View
+        lv = self.armed(["#####", "#.@.#", "#####"])
+        self.assertAlmostEqual(lv.sprites["w_shovel"].scale, 0.62)
+        self.assertEqual(lv.sprites["w_fist"].scale, 1.0)
+        for name in ("w_gauntlet", "w_knuckles", "w_etool"):       # in the game, kept for later levels
+            self.assertIn(name, lv.data.sprites)
+
+        def height(weapon):
+            lv.player.weapon = weapon
+            v = View(60, 20, "pixel")
+            bare = View(60, 20, "pixel")
+            lv.player.weapon, keep = "none", weapon
+            empty = bare.render(lv, FX(), 0)
+            lv.player.weapon = keep
+            full = v.render(lv, FX(), 0)
+            rows = [i for i, (a, b) in enumerate(zip(full, empty)) if a != b]
+            return (max(rows) - min(rows) + 1) if rows else 0
+        fist, shovel = height("1"), height("shovel")
+        self.assertGreater(shovel, 0)
+        self.assertLessEqual(abs(shovel - fist), fist)                 # not twice as tall
+
     def test_key_1_goes_round_the_melee_weapons(self):
         lv = self.armed(["#####", "#@..#", "#####"])
         said = []

@@ -2079,6 +2079,11 @@ or fires - a flash at the barrel, a raised arm. `"muzzle": [x, y]` is the pixel 
 leave from, where the flash is drawn (the right edge if not said). Steps and the attack
 picture are as big as the sprite, and get far versions of their own.
 
+The weapon in hand is drawn about a third of the picture's height for a sprite 11 pixels tall,
+its bottom row going on down when it is raised (a punch, a swing): make that row the sleeve.
+`"scale"` draws a weapon's pixels smaller or bigger - `0.5` for one drawn with twice the
+detail, as big as the others; RØØTLESS's shovel (`w_shovel`, 22 x 26) has `0.62`.
+
 ### Tiles
 
 The walls, floors and ceilings of levels are drawn with tiles: small pictures in the

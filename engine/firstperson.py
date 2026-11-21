@@ -257,6 +257,7 @@ class Picture:
         self.walk = []                # a monster's steps, shown while it moves
         self.attack = None            # shown while it takes aim and fires
         self.muzzle = None            # where its shots leave it, as fractions of its width and height
+        self.scale = 1.0              # a weapon in hand: its pixels this size (0.5: drawn with twice the detail)
 
     def pick(self, height):
         """The drawing to scale to ``height`` pixels: the smallest that is not much smaller."""
@@ -2104,7 +2105,7 @@ class View:
         pic = lv.sprites.get(lv.weapon_sprite())
         if pic is None:
             return
-        ws = max(1.0, self.PH * 0.32 / 11)
+        ws = max(1.0, self.PH * 0.32 / 11) * pic.scale
         sw, sh = pic.w * ws, pic.h * ws
         x0 = int(round(self.half - sw / 2)) + fx.shake * self.sx
         y0 = self.PH - int(round(sh)) + fx.recoil * self.sy

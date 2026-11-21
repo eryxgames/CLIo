@@ -453,6 +453,11 @@ The details follow.
   supply_open, key_r, four chip sounds, music `user_space`, two clips in RØØTLESS's demo and
   one in the tech demo. The level bot finishes it (10 of 10 seeds); it throws a timed door's
   switch again when the door shut before it got through.
+- RØØTLESS: a new **shovel**, after the owner's sketch - a pointed spade with a ridge and
+  rust, held in a gloved hand, the sleeve from the lower left - and its pickup, the spade
+  standing in the floor. Kept for later levels: `w_gauntlet` (an armoured fist), `w_knuckles`
+  (taped knuckles) and `w_etool` (an entrenching tool). A sprite's `"scale"` draws a weapon
+  in hand with smaller (or bigger) pixels: more detail at the same size.
 - **Doors and gates**: lockers in the walls (`"locker": [items]`, opened by walking into them
   or Enter; `"key"`, `"on_open"`), supply crates that open and still stand (`"supply": [items]`;
   pushed, thrown and carried with what is in them), bars seen and shot through (`"gate": true`),

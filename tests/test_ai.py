@@ -7,6 +7,7 @@ import os
 import random
 import sys
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -468,6 +469,132 @@ class SaveTests(unittest.TestCase):
         self.assertEqual(b.squads, {})                         # not the new level's, with its own monsters in
         for _ in range(3):
             b.run_line("w")                                    # and it plays on
+
+
+def old_distances(lv, x0, y0, limit=40, floats=False):
+    """The flood fill as it was before ways were worked out lazily: the reference."""
+    dist = {(x0, y0): 0}
+    frontier = [(x0, y0)]
+    while frontier:
+        nxt = []
+        for (x, y) in frontier:
+            d = dist[(x, y)]
+            if d >= limit:
+                continue
+            for dx, dy in ((0, -1), (1, 0), (0, 1), (-1, 0)):
+                n = (x + dx, y + dy)
+                if n not in dist and lv.passable(n[0], n[1], floats=floats):
+                    dist[n] = d + 1
+                    nxt.append(n)
+            for n in lv.pad_links().get((x, y), ()):
+                if n not in dist:
+                    dist[n] = d + 1
+                    nxt.append(n)
+        frontier = nxt
+    return dist
+
+
+def crowd(level, kind, n, seed=1):
+    lv = Level(GameData(ROOTLESS), level, seed=seed)
+    lv.console = Quiet()
+    lv.anim = lambda *a, **k: None
+    p, rng, placed = lv.player, random.Random(7), 0
+    for _ in range(n * 60):
+        if placed >= n:
+            break
+        x, y = p.x + rng.randint(-12, 12), p.y + rng.randint(-12, 12)
+        if lv.free(x, y) and (x, y) != (p.x, p.y):
+            lv.add_monster(kind, x, y)
+            placed += 1
+    for m in lv.monsters:
+        if not m.dead:
+            lv.wake(m, quiet=True)
+    return lv
+
+
+def beats(lv, n):
+    out = []
+    for _ in range(n):
+        lv.player.hp = 10 ** 6
+        lv.over = False
+        lv.end_beat()
+        out.append([(m.id, m.x, m.y, m.hp, m.dead, m.intent) for m in lv.monsters] + [lv.rng.random()])
+    return out
+
+
+class CrowdTests(unittest.TestCase):
+    """Crowds think faster - ways worked out only as far as asked, line of sight over the land's own heights -
+    and exactly as before."""
+
+    def test_ways_are_the_distances_they_were(self):
+        rng = random.Random(4)
+        for level in ("e1m1", "e1m4"):                   # teleport pads; open land with deep water and slopes
+            lv = Level(GameData(ROOTLESS), level, seed=1)
+            lv.console = Quiet()
+            p = lv.player
+            for _ in range(6):
+                x0, y0 = p.x + rng.randint(-8, 8), p.y + rng.randint(-8, 8)
+                for limit, floats in ((6, False), (24, True), (40, False)):
+                    want = old_distances(lv, x0, y0, limit, floats)
+                    self.assertEqual(list(lv.distances(x0, y0, limit, floats).items()), list(want.items()))
+                    f = lv.ways(x0, y0, limit, floats)
+                    asks = [(x0 + rng.randint(-30, 30), y0 + rng.randint(-30, 30)) for _ in range(40)]
+                    for at in asks:
+                        self.assertEqual(f.get(at, 999), want.get(at, 999), (level, x0, y0, limit, at))
+                    f.finish()
+                    self.assertEqual(f.dist, want)
+
+    def test_ways_asked_before_the_map_changes_are_as_they_were(self):
+        """A wall opens halfway through a beat: a way asked for before is finished on the map as it was."""
+        rows = [list(r) for r in HALL]
+        for y in range(1, 7):
+            rows[y][12] = "#"
+        rows[3][12] = "1"
+        data = with_level({"map": ["".join(r) for r in rows],
+                           "legend": {"1": {"wall": "steel", "opens_on": "go"}}})
+        lv = Level(data, "t", seed=1)
+        lv.console = Quiet()
+        lv.anim = lambda *a, **k: None
+        before = lv.ways(2, 3)
+        self.assertEqual(before.get((3, 3)), 1)          # one ring worked out, no more
+        lv.event("go")                                   # the wall opens
+        self.assertEqual(lv.cell(12, 3).kind, "floor")
+        self.assertIsNone(before.get((15, 3)))           # as it was: no way round
+        now = lv.ways(2, 3).get((15, 3))                 # a way asked for now goes through
+        self.assertIsNotNone(now)
+        self.assertEqual(now, old_distances(lv, 2, 3)[(15, 3)])
+
+    def test_line_of_sight_over_land_is_as_it_was(self):
+        lv = Level(GameData(ROOTLESS), "e1m4", seed=1)
+        lv.console = Quiet()
+        p, rng = lv.player, random.Random(9)
+        from engine.level import bresenham
+
+        def old(x0, y0, x1, y1):
+            cells = bresenham(x0, y0, x1, y1)
+            if any(lv.cell(x, y).solid for (x, y) in cells[1:-1]):
+                return False
+            h0, h1 = lv.eye_height(x0, y0), lv.eye_height(x1, y1)
+            n = len(cells) - 1
+            return not any(lv.ground(x, y) > h0 + (h1 - h0) * i / n + 0.05 for i, (x, y) in enumerate(cells[1:-1], 1))
+        seen = 0
+        for _ in range(600):
+            a = (p.x + rng.randint(-14, 14), p.y + rng.randint(-14, 14))
+            b = (p.x + rng.randint(-14, 14), p.y + rng.randint(-14, 14))
+            got = lv.line_of_sight(a[0], a[1], b[0], b[1])
+            self.assertEqual(got, old(a[0], a[1], b[0], b[1]), (a, b))
+            seen += got
+        self.assertTrue(50 < seen < 550)                 # hills hide some, not all
+
+    def test_a_crowd_thinks_as_with_whole_ways(self):
+        """Beat after beat, a crowd awake goes where it went when every way was worked out whole."""
+        whole = lambda self, x, y, limit=40, floats=False: self.distances(x, y, limit, floats)   # noqa: E731
+        for level, kind, n in (("e1m1", "kworker", 20), ("e1m4", "scout", 30)):
+            lazy = beats(crowd(level, kind, n), 8)
+            with mock.patch.object(Level, "ways", whole):
+                eager = beats(crowd(level, kind, n), 8)
+            self.assertEqual(lazy, eager, level)
+            self.assertNotEqual(lazy[0][:-1], lazy[-1][:-1])     # they did move
 
 
 if __name__ == "__main__":

@@ -123,7 +123,7 @@ def field(lv, x, y, floats=False, limit=None):
     key = (x, y, floats, lim)
     got = cache.get(key)
     if got is None:
-        got = cache[key] = lv.distances(x, y, limit=lim, floats=floats)
+        got = cache[key] = lv.ways(x, y, limit=lim, floats=floats)
     return got
 
 

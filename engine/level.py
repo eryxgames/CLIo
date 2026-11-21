@@ -234,6 +234,49 @@ class Cell:
 
 
 VOID = Cell(-1, -1, " ", {"wall": "steel"})
+
+
+class Field:
+    """Steps to a cell from the cells round it, a ring at a time - only as many rings as have been asked for
+    (``get``), or all of them (``finish``). Monsters do not block; deep water, slopes and pits only floaters."""
+    __slots__ = ("dist", "frontier", "d", "limit", "floats", "links", "cell")
+
+    def __init__(self, lv, x0, y0, limit, floats):
+        self.dist = {(x0, y0): 0}
+        self.frontier = [(x0, y0)]
+        self.d, self.limit, self.floats = 0, limit, floats
+        self.links = lv.pad_links()
+        self.cell = lv.cell
+
+    def get(self, at, default=None):
+        dist = self.dist
+        while at not in dist and self.frontier and self.d < self.limit:
+            self.ring()
+        return dist.get(at, default)
+
+    def finish(self):
+        while self.frontier and self.d < self.limit:
+            self.ring()
+
+    def ring(self):
+        dist, cell, links, floats = self.dist, self.cell, self.links, self.floats
+        self.d = d = self.d + 1
+        nxt = []
+        for (x, y) in self.frontier:
+            for n in ((x, y - 1), (x + 1, y), (x, y + 1), (x - 1, y)):      # DIRS: north, east, south, west
+                if n in dist:
+                    continue
+                c = cell(n[0], n[1])
+                if c.solid or (not floats and (c.deep or c.steep or c.pit)):        # as passable() has it
+                    continue
+                dist[n] = d
+                nxt.append(n)
+            if links:
+                for n in links.get((x, y), ()):         # a pad that leads here is a step away
+                    if n not in dist:
+                        dist[n] = d
+                        nxt.append(n)
+        self.frontier = nxt
 # what can change in a cell while a level is played (the rest is as the map made it): saved, and kept for a
 # forgotten chunk. A test plays every level through and checks that nothing else changes.
 CELL_STATE = ("kind", "open", "pressed", "found", "crate", "heavy", "down", "sunk", "scorched", "sealed",
@@ -811,7 +854,7 @@ class Level:
 
     def monster_at(self, x, y, skip=None):
         for m in self.monsters:
-            if not m.dead and not m.gone and m.x == x and m.y == y and m is not skip:
+            if m.x == x and m.y == y and not m.dead and not m.gone and m is not skip:
                 return m
         return None
 
@@ -837,8 +880,11 @@ class Level:
         if self.land is not None and len(cells) > 2:          # open land: a hill between hides
             h0, h1 = self.eye_height(x0, y0), self.eye_height(x1, y1)
             n = len(cells) - 1
-            for i, (x, y) in enumerate(cells[1:-1], 1):
-                if self.ground(x, y) > h0 + (h1 - h0) * i / n + 0.05:
+            land = self.land
+            stamp, height, base = land.stamp, land.height, land.base
+            for i, (x, y) in enumerate(cells[1:-1], 1):         # ground() at a cell's middle: its own height
+                g = 0.0 if (x, y) in stamp else height(x, y) - base
+                if g > h0 + (h1 - h0) * i / n + 0.05:
                     return False
         return True
 
@@ -924,25 +970,25 @@ class Level:
 
     def distances(self, x0, y0, limit=40, floats=False):
         """Steps to (x0, y0) from every cell that can walk there - or float there (monsters do not block)."""
-        dist = {(x0, y0): 0}
-        frontier = [(x0, y0)]
-        while frontier:
-            nxt = []
-            for (x, y) in frontier:
-                d = dist[(x, y)]
-                if d >= limit:
-                    continue
-                for dx, dy in DIRS:
-                    n = (x + dx, y + dy)
-                    if n not in dist and self.passable(n[0], n[1], floats=floats):
-                        dist[n] = d + 1
-                        nxt.append(n)
-                for n in self.pad_links().get((x, y), ()):     # a pad that leads here is a step away
-                    if n not in dist:
-                        dist[n] = d + 1
-                        nxt.append(n)
-            frontier = nxt
-        return dist
+        f = Field(self, x0, y0, limit, floats)
+        f.finish()
+        return f.dist
+
+    def ways(self, x0, y0, limit=40, floats=False):
+        """``distances``, worked out only as far as it is asked (``.get``): the same numbers. Kept for this beat;
+        if the map changes first, it is finished on the map as it was (``ways_change``)."""
+        f = Field(self, x0, y0, limit, floats)
+        self.__dict__.setdefault("_spreading", []).append(f)
+        return f
+
+    def ways_change(self):
+        """The map is about to change: the ways still being worked out this beat are finished first, on the map as
+        it was - so they give what working them out at once would have."""
+        spreading = self.__dict__.get("_spreading")
+        if spreading:
+            for f in spreading:
+                f.finish()
+            del spreading[:]
 
     def pad_links(self):
         """For each pad, the pads whose way leads to it: ``{(x, y): [(x, y), ...]}`` (worked out once)."""
@@ -1925,6 +1971,7 @@ class Level:
 
     def push(self, cell, dx, dy):
         """Walk into a crate: it slides one cell on, if there is room - into acid, it sinks and makes a step."""
+        self.ways_change()                               # the map may change
         p = self.player
         bx, by = cell.x + dx, cell.y + dy
         beyond = self.cell(bx, by)
@@ -1980,6 +2027,7 @@ class Level:
             if c.kind == "door":
                 if want and c.open < 1.0:
                     if quiet:
+                        self.ways_change()                   # the map changes: the beat's ways first
                         c.open = 1.0
                     else:
                         if c.open_while not in self.events:
@@ -1993,10 +2041,13 @@ class Level:
                         self.sfx("door")
                         self.say("Somewhere a door slams shut.", "alert")
                         self.anim([FX(doors={(c.x, c.y): k}) for k in (0.7, 0.4, 0.1)], 0.04)
+                    self.ways_change()
                     c.open = 0.0
             elif want and c.kind == "wall":
+                self.ways_change()
                 c.kind = "floor"
             elif not want and c.kind == "floor" and not here:
+                self.ways_change()
                 c.kind = "wall"
         self.update_seen()
 
@@ -2470,12 +2521,14 @@ class Level:
         return False
 
     def open_door(self, cell):
+        self.ways_change()                               # the map may change
         self.sfx("door")
         self.anim([FX(doors={(cell.x, cell.y): k}) for k in (0.2, 0.4, 0.6, 0.8, 0.95)], 0.04)
         cell.open = 1.0
         self.update_seen()
 
     def open_panel(self, cell):
+        self.ways_change()                               # the map may change
         cell.kind = "floor"
         cell.found = True
         self.stats["secrets"] += 1
@@ -3039,6 +3092,7 @@ class Level:
 
     def blast_push(self, x0, y0):
         """A blast throws crates and monsters next to it a cell further away, if there is room."""
+        self.ways_change()                               # the map may change
         sign = lambda v: (v > 0) - (v < 0)                    # noqa: E731
         moved, slid = [], {}
         for c in [self.cell(x, y) for y in range(y0 - 1, y0 + 2) for x in range(x0 - 1, x0 + 2)]:
@@ -3146,6 +3200,7 @@ class Level:
             self.boss_wakes()
 
     def event(self, name):
+        self.ways_change()                               # the map may change
         if name in self.events:
             return
         self.events.add(name)
@@ -3186,6 +3241,7 @@ class Level:
         if self.over:
             return
         self.beat += 1
+        self.__dict__["_spreading"] = []                 # the last beat's ways are done with
         p = self.player
         if self.world is not None:
             self.world.follow()                          # wake what is near, put what he left to sleep
@@ -3340,6 +3396,7 @@ class Level:
                     p.x, p.y = tx, ty
             elif c.crate:
                 if self.room(tx, ty, crate=True):
+                    self.ways_change()                   # the map changes: the beat's ways first
                     heavy = c.heavy
                     c.crate = c.heavy = False
                     t = self.cell(tx, ty)
@@ -3472,9 +3529,9 @@ class Level:
         fl = bool(m.float) and self.land is not None             # in open land, a floater takes its own way
         lim = 24 if self.land is not None else 40                # open land: the hunt goes this far, no further
         if not hasattr(self, "_field") or self._field[0] != (tx, ty, self.beat):
-            self._field = ((tx, ty, self.beat), self.distances(tx, ty, limit=lim), None)
+            self._field = ((tx, ty, self.beat), self.ways(tx, ty, limit=lim), None)
         if fl and self._field[2] is None:
-            self._field = (self._field[0], self._field[1], self.distances(tx, ty, limit=lim, floats=True))
+            self._field = (self._field[0], self._field[1], self.ways(tx, ty, limit=lim, floats=True))
         field = self._field[2] if fl else self._field[1]
         every = int(a.get("move_every", 1) or 1)
         still = every > 1 and (self.beat + m.id) % every != 0          # a heavy one moves every other beat

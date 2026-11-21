@@ -484,6 +484,11 @@ game, RØØTLESS, shows them.
 
 ### Changed
 
+- **Crowds think faster**, and exactly as before: a monster's way to its goal is worked out
+  only as far as it is asked (`Level.ways`; if the map changes halfway through a beat, the
+  ways asked for before are finished on the map as it was), the flood fill and the line of
+  sight over open land do less per cell. 100 awake monsters on E1M4: 49 -> 25 ms a beat
+  (kworkers), 71 -> 35 ms (scouts).
 - RØØTLESS's first episode is called **Roasted in the Shell**.
 - The banner font has `Ø`, `ø`, `Æ`, `æ`; in plain ASCII they become `0`, `o`, `AE`, `ae`.
 - **The far end of a room**: walls are drawn 10 cells ahead (monsters and items are still

@@ -2,7 +2,7 @@
 
 Notable changes to CLIo. Versions follow [semantic versioning](https://semver.org).
 
-## Unreleased
+## 3.0.0 - 2026-11-21
 
 CLIo 3: from text adventures to a first-person shooter, in the same terminal.
 

@@ -78,6 +78,24 @@
     "pause": true
    },
    {
+    "goto": "user_space"
+   }
+  ]
+ },
+ {
+  "id": "user_space",
+  "name": "User Space",
+  "area": "Episode 1",
+  "description": "The recruits' quarters, the quartermaster's heap, and the syscall gate down to the kernel.",
+  "level": "e1m5",
+  "on_level_exit": [
+   {
+    "story": "e1m5_end"
+   },
+   {
+    "pause": true
+   },
+   {
     "win": "outro_demo"
    }
   ]

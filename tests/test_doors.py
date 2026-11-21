@@ -337,5 +337,51 @@ class BotTests(unittest.TestCase):
             self.assertEqual(lv.stats["items"], 2)
 
 
+class UserSpaceTests(unittest.TestCase):
+    """RØØTLESS's E1M5: every one of them, in a level the Fens lead to."""
+
+    def test_it_checks_clean_and_has_them_all(self):
+        from engine.data import GameData
+        from test_levels import ROOTLESS
+        data = GameData(ROOTLESS)
+        self.assertEqual([q for q in validate(data) if "e1m5" in q], [])
+        lv = Level(data, "e1m5", seed=1)
+        cells = [c for row in lv.grid for c in row]
+        self.assertGreaterEqual(sum(1 for c in cells if c.kind == "locker"), 7)
+        self.assertGreaterEqual(sum(1 for c in cells if c.supply is not None), 5)
+        self.assertTrue(any(c.gate and not c.sealed for c in cells))
+        self.assertTrue(any(c.kind == "field" for c in cells))
+        self.assertEqual(len(lv.timed_cells), 1)
+        self.assertTrue(any(c.from_side is not None for c in cells))
+        self.assertEqual(sorted(m.on_death for m in lv.monsters if m.on_death), ["mmu_east", "mmu_west"])
+        scenes = {s["id"]: s for s in data.scenes} if isinstance(data.scenes, list) else data.scenes
+        self.assertIn({"goto": "user_space"}, scenes["xantrium_fens"]["on_level_exit"])
+        self.assertIn({"win": "outro_demo"}, scenes["user_space"]["on_level_exit"])
+
+    def test_the_bot_gets_through_and_a_save_holds_it(self):
+        from engine.data import GameData
+        from test_levels import ROOTLESS
+        data = GameData(ROOTLESS)
+        for seed in (0, 3):
+            out, lv = levelbot.play(data, "e1m5", seed=seed)
+            self.assertEqual(out, "exit", seed)
+            self.assertTrue(lv.cell(0, 14).opened)               # his own locker
+            self.assertIn("own_locker", lv.events)
+        lines = [l for _b, l in lv.journal]
+        again = Level(data, "e1m5", seed=3)
+        again.console = Quiet()
+        snap = None
+        for i, line in enumerate(lines):
+            if i == len(lines) // 2:
+                snap = snapshot.capture(again)
+            again.run_line(line)
+        third = Level(data, "e1m5", seed=3)
+        third.console = Quiet()
+        snapshot.restore(third, snap)
+        for line in lines[len(lines) // 2:]:
+            third.run_line(line)
+        self.assertEqual(snapshot.digest(snapshot.capture(third)), snapshot.digest(snapshot.capture(again)))
+
+
 if __name__ == "__main__":
     unittest.main()

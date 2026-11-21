@@ -1021,5 +1021,25 @@
    "",
    "Bursts for 45 at everything next to it. A torpedo sets it off from a safe distance."
   ]
+ },
+ "emitter": {
+  "name": "MMU emitter",
+  "role": "a field's power",
+  "tag": "M",
+  "sprite": "emitter",
+  "size": 1.45,
+  "hp": 40,
+  "attack": {
+   "kind": "none"
+  },
+  "sounds": {
+   "death": "zap"
+  },
+  "death": "%s spits sparks and goes dark.",
+  "man": [
+   "The memory management unit's field emitter: it keeps user space out of the kernel.",
+   "",
+   "It does not move and does not fight. Shoot it - through its own field - and the field drops."
+  ]
  }
 }

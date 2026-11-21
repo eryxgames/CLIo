@@ -15,6 +15,8 @@
   {"card": "GETTING ABOUT", "style": "chrome", "palette": "toxic", "seconds": 3, "text": ["stairs, magnetic walls, a jetpack, swimming and diving, a submarine"]},
   {"level": "sim11", "seconds": 18, "caption": "Magboots on a slick deck, stairs, a wall walked up"},
   {"level": "sim11", "skip_until": "vehicle", "seconds": 14, "caption": "Under water: the bottom below, the surface above"},
+  {"card": "DOORS", "style": "chrome", "palette": "ice", "seconds": 3, "text": ["lockers, supply crates, bars, force fields, timed and one-way doors"]},
+  {"level": "e1m5", "skip": 150, "seconds": 16, "caption": "A field shot down through itself; a door open for a time slice"},
   {"card": "GENRES", "style": "glitch", "seconds": 3, "text": ["one engine, many kinds of game - each a folder of JSON files"]},
   {"adventure": "derelict", "commands": "walkthrough", "seconds": 24, "caption": "A text adventure: Derelict"},
   {"level": "e1m1", "seconds": 14, "caption": "A first-person shooter: RØØTLESS"},

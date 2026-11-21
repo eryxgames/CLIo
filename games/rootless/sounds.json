@@ -1421,5 +1421,109 @@
    "dur": 0.45,
    "vol": 0.25
   }
+ ],
+ "locker": [
+  {
+   "wave": "square",
+   "freq": [
+    900,
+    700
+   ],
+   "dur": 0.04,
+   "vol": 0.2
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 2200,
+   "freq": 0,
+   "dur": 0.35,
+   "vol": 0.25,
+   "decay": 0.3,
+   "sustain": 0,
+   "delay": 0.05
+  },
+  {
+   "wave": "triangle",
+   "freq": [
+    220,
+    160
+   ],
+   "dur": 0.3,
+   "vol": 0.15,
+   "delay": 0.08
+  }
+ ],
+ "crate_open": [
+  {
+   "wave": "noise",
+   "noise_rate": 1400,
+   "freq": 0,
+   "dur": 0.18,
+   "vol": 0.35,
+   "decay": 0.16,
+   "sustain": 0
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 900,
+   "freq": 0,
+   "dur": 0.25,
+   "vol": 0.3,
+   "decay": 0.22,
+   "sustain": 0,
+   "delay": 0.2
+  },
+  {
+   "wave": "triangle",
+   "freq": [
+    140,
+    90
+   ],
+   "dur": 0.2,
+   "vol": 0.25,
+   "delay": 0.2
+  }
+ ],
+ "zap": [
+  {
+   "wave": "saw",
+   "freq": [
+    1400,
+    300
+   ],
+   "dur": 0.25,
+   "vol": 0.25
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 9000,
+   "freq": 0,
+   "dur": 0.3,
+   "vol": 0.35,
+   "decay": 0.28,
+   "sustain": 0
+  }
+ ],
+ "door_warn": [
+  {
+   "wave": "square",
+   "freq": 880,
+   "dur": 0.08,
+   "vol": 0.2
+  },
+  {
+   "wave": "square",
+   "freq": 880,
+   "dur": 0.08,
+   "vol": 0.2,
+   "delay": 0.16
+  },
+  {
+   "wave": "square",
+   "freq": 660,
+   "dur": 0.16,
+   "vol": 0.2,
+   "delay": 0.32
+  }
  ]
 }

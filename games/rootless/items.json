@@ -270,5 +270,16 @@
    "sound": "refuel",
    "text": "Jet fuel: 10 more beats in the air."
   }
+ },
+ "key_r": {
+  "name": "r key",
+  "description": "Read permission, on a red card.",
+  "pickup": {
+   "key": "r",
+   "sprite": "key_r",
+   "size": 0.45,
+   "sound": "unlock",
+   "text": "You have read permission: the r-- key."
+  }
  }
 }

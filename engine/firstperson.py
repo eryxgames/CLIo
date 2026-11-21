@@ -481,7 +481,7 @@ def _field():
         for x in range(TS):
             if x < 2 or x > TS - 3:
                 t[y][x] = (44, 48, 58) if y % 6 else (120, 210, 255)          # the emitter posts
-            elif y % 3 == 0 and noise(x, y, 5) < 0.9:
+            elif y % 5 == 0 and noise(x, y, 5) < 0.8:
                 t[y][x] = (90, 200, 255) if noise(x, y, 9) < 0.7 else (200, 240, 255)
     return t
 

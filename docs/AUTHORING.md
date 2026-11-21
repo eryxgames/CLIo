@@ -1900,7 +1900,8 @@ stairs and plating as map characters (it walks into them). RØØTLESS's **SIM-11
   (tiles `locker`, `locker_open`; `locker_r` `_w` `_x` with a key). Walked into or used
   (Enter), it opens: what is in it falls at the player's feet and he takes what he can use -
   the rest stays on the floor where he stands. `"key"` locks it; `"on_open"` sets off an event
-  (an alarm that wakes the barracks: `"wake_on"`). A mine among the items is a booby trap.
+  (an alarm that wakes the barracks: `"wake_on"`); `"label"` writes a few letters on it. A mine
+  among the items is a booby trap.
 - **A supply crate** (`"supply": [item ids]`) is a crate (pushed, thrown by blasts, carried by
   belts - its contents go with it) that Enter pries open; it stays standing, open and empty
   (sprites `supply`, `supply_open`). `"key"` and `"on_open"` as for lockers.

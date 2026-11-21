@@ -2046,5 +2046,240 @@
    "out",
    "E"
   ]
+ },
+ "e1m5": {
+  "name": "User Space",
+  "title": "E1M5   USER SPACE",
+  "intro": [
+   "Uplink complete. User space: where the processes live - the recruits' quarters, the",
+   "quartermaster's heap, and the syscall gate down to the kernel. Your pod is six. So is your locker."
+  ],
+  "par": 240,
+  "music": "user_space",
+  "facing": "n",
+  "death_text": "outro_lose",
+  "map": [
+   "############################!###################",
+   "########.............................#.........#",
+   "########..x.......s..................T....h..c.#",
+   "########......M...............N..x...#.........#",
+   "########.............................#..L......#",
+   "########FFFFFFFFFFFFFFJJJJJJJJJJJJJJJ#.........E",
+   "########.............................#.........#",
+   "##.u.###...g..............Q.......g..#......o..#",
+   "##...###.............................#.........#",
+   "##...#####################.#####################",
+   "###S####4#####5###########+#####################",
+   "#.................#......................#######",
+   "1.......Z.......o.#.$...........k......w.#######",
+   "#...===...===.....#...HHHH..HHHH..HHHH...#######",
+   "6...===...===.....#......................#######",
+   "#.................#..................K...#######",
+   "A.............Z...#...HHHH..HHHH.........#######",
+   "#.......Z.........+......................#######",
+   "2...===...===.....#........k.......IIIIII#######",
+   "#...===...===.....#..$..........$..I.....#######",
+   "3.................#.......%........G..R..#######",
+   "#..............o..#.....d.....f....I...q.#######",
+   "#.Z...............#................I.a...#######",
+   "#####.########################P#################",
+   "#####z#######################...################",
+   "#####.#######################.m.################",
+   "#####O##########################################",
+   "#.........######################################",
+   "#.c.......######################################",
+   "#.........######################################",
+   "#...ppp...######################################",
+   "#.y.p@p.s.######################################",
+   "#...ppp...######################################",
+   "################################################"
+  ],
+  "legend": {
+   "p": {
+    "floor": "pad"
+   },
+   "O": {
+    "door": true,
+    "from": "s"
+   },
+   "=": {
+    "wall": "bunk"
+   },
+   "1": {
+    "locker": [
+     "shells"
+    ]
+   },
+   "6": {
+    "locker": [
+     "armor",
+     "chaingun",
+     "clip"
+    ],
+    "on_open": "own_locker",
+    "label": "06"
+   },
+   "A": {
+    "locker": [
+     "stimpack",
+     "shells"
+    ],
+    "on_open": "barracks_alarm"
+   },
+   "2": {
+    "locker": [
+     "medkit"
+    ]
+   },
+   "3": {
+    "locker": true
+   },
+   "4": {
+    "locker": [
+     "clip",
+     "clip"
+    ]
+   },
+   "5": {
+    "locker": [
+     "grenades",
+     "stimpack"
+    ],
+    "key": "r"
+   },
+   "Z": {
+    "monster": "zombie",
+    "wake_on": "barracks_alarm"
+   },
+   "S": {
+    "panel": "fist"
+   },
+   "u": "sudo_orb",
+   "$": {
+    "supply": [
+     "shells",
+     "clip"
+    ]
+   },
+   "%": {
+    "supply": [
+     "medkit"
+    ]
+   },
+   "K": {
+    "supply": [
+     "key_r",
+     "stimpack"
+    ]
+   },
+   "H": {
+    "crate": "heavy"
+   },
+   "I": {
+    "gate": true,
+    "sealed": true
+   },
+   "G": {
+    "gate": true,
+    "key": "r"
+   },
+   "R": "rocket_launcher",
+   "q": "rockets",
+   "a": "armor",
+   "m": {
+    "item": "medkit",
+    "secret": true
+   },
+   "P": {
+    "panel": "shoot"
+   },
+   "F": {
+    "field": true,
+    "opens_on": "mmu_west",
+    "zap": 12
+   },
+   "J": {
+    "field": true,
+    "opens_on": "mmu_east",
+    "zap": 12
+   },
+   "M": {
+    "monster": "emitter",
+    "on_death": "mmu_west"
+   },
+   "N": {
+    "monster": "emitter",
+    "on_death": "mmu_east"
+   },
+   "Q": {},
+   "!": {
+    "switch": "time_slice",
+    "label": "SLICE"
+   },
+   "T": {
+    "door": true,
+    "open_for": 14,
+    "opens_on": "time_slice"
+   },
+   "c": "clip",
+   "s": "shells",
+   "h": "stimpack",
+   "y": "shotgun",
+   "z": {
+    "monster": "zombie"
+   },
+   "o": {
+    "monster": "orphan"
+   },
+   "k": {
+    "monster": "kworker"
+   },
+   "d": {
+    "monster": "daemon"
+   },
+   "w": {
+    "monster": "kswapd"
+   },
+   "f": {
+    "monster": "shred"
+   },
+   "g": {
+    "monster": "sudo"
+   },
+   "x": {
+    "monster": "scout"
+   },
+   "L": {
+    "monster": "spinlock"
+   }
+  },
+  "events": {
+   "own_locker": "Locker six: your name on the door, your jacket, your own chaingun, and a photo of a man you do not know. On the back, in your hand: \"Not yet.\"",
+   "barracks_alarm": "The locker's alarm whoops. In the bunks, something sits up.",
+   "mmu_west": "The west half of the field flickers out.",
+   "mmu_east": "The east half of the field flickers out.",
+   "time_slice": "SCHEDULER: one time slice granted. The door to the kernel lift opens."
+  },
+  "squads": {
+   "auto": {
+    "radius": 4
+   }
+  },
+  "bot": [
+   "shotgun",
+   "O",
+   "6",
+   "1",
+   "2",
+   "%",
+   "K",
+   "G",
+   "rocket_launcher",
+   "armor",
+   "Q",
+   "!",
+   "T",
+   "E"
+  ]
  }
 }

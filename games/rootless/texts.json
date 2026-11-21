@@ -76,5 +76,9 @@
  "sim11_end": {
   "text": "UNIT EVALUATION: mobility. \"Boots, stairs, a jetpack, a submarine,\" says the instructor bot. \"The real station has all of them. It also has what flooded it.\"",
   "show_once": false
+ },
+ "e1m5_end": {
+  "text": "The lift drops through the floor of user space and does not slow down. The numbers on its panel count rings, not decks: 3, 2, 1.\n\nAt ring 0 the doors open on a hall that hums like a held breath. Somewhere in it a crontab is ticking - your crontab - and every line of it has your name.\n\nNext: Kernel Space.",
+  "show_once": false
  }
 }

@@ -424,6 +424,16 @@ game, RØØTLESS, shows them.
 - RØØTLESS: a hacking deck (ping, firewall, traceroute, fork bomb, kill -9, sudo, grep,
   nohup, chmod 000, fsck, rm -rf, overclock), Black ICE and the Kernel Sentinel, and
   **SIM-10: Root Shell** (`--level sim10`): hack a terminal, then out-deal a sentinel.
+- RØØTLESS: **E1M5: User Space**, after the Fens (they lead to it now; it ends the demo): the
+  uplink bay behind a one-way door, the barracks (bunks, his own locker six, an alarm locker
+  that wakes the sleepers, a locker the r key opens, a hollow wall), the quartermaster's heap
+  (supply crates, the r key in one, the armoury behind bars), the syscall gate (a force field
+  across the hall, its two MMU emitters shot through it) and the scheduler's time slice (a
+  switch opens the door to the kernel lift for 14 beats; thrown again if it shuts). New: the
+  emitter, the r key, tiles field (moving), bunk and pod, sprites emitter, supply,
+  supply_open, key_r, four chip sounds, music `user_space`, two clips in RØØTLESS's demo and
+  one in the tech demo. The level bot finishes it (10 of 10 seeds); it throws a timed door's
+  switch again when the door shut before it got through.
 - **Doors and gates**: lockers in the walls (`"locker": [items]`, opened by walking into them
   or Enter; `"key"`, `"on_open"`), supply crates that open and still stand (`"supply": [items]`;
   pushed, thrown and carried with what is in them), bars seen and shot through (`"gate": true`),

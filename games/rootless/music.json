@@ -355,5 +355,73 @@
    "B",
    "B"
   ]
+ },
+ "user_space": {
+  "title": "User Space",
+  "tempo": 104,
+  "steps_per_beat": 4,
+  "instruments": {
+   "pad": {
+    "wave": "saw",
+    "lowpass": 0.22,
+    "attack": 0.2,
+    "decay": 0.4,
+    "sustain": 0.6,
+    "release": 0.6,
+    "volume": 0.16,
+    "echo": [
+     0.4,
+     0.3
+    ]
+   },
+   "bass": {
+    "wave": "square",
+    "duty": 0.5,
+    "lowpass": 0.28,
+    "volume": 0.4,
+    "gate": 0.6
+   },
+   "lead": {
+    "wave": "triangle",
+    "attack": 0.03,
+    "decay": 0.2,
+    "sustain": 0.6,
+    "release": 0.3,
+    "vibrato": [
+     5,
+     0.02
+    ],
+    "volume": 0.22,
+    "echo": [
+     0.34,
+     0.35
+    ]
+   },
+   "kit": {
+    "wave": "drums",
+    "volume": 0.55
+   }
+  },
+  "patterns": {
+   "A": {
+    "bass": "a1 . a1 . a2 . a1 . a1 . a1 . g1 . g2 . | f1 . f1 . f2 . f1 . e1 . e1 . e2 . e1 .",
+    "pad": "[a2 c3 e3]:16 | [f2 a2 c3]:8 [e2 g#2 b2]:8",
+    "kit": "k . h . s . h . k . h h s . h . | k . h . s . h . k k h . s . h h"
+   },
+   "B": {
+    "bass": "a1 . a1 . a2 . a1 . c2 . c2 . c3 . c2 . | d2 . d2 . d3 . d2 . e1 . e1 . e2 . e1 .",
+    "pad": "[a2 c3 e3]:8 [c3 e3 g3]:8 | [d3 f3 a3]:8 [e2 g#2 b2]:8",
+    "lead": "e4:4 d4:2 c4:2 b3:4 c4:2 d4:2 | a3:6 c4:2 b3:4 g#3:4",
+    "kit": "k . h . s . h k k . h . s . h . | k . h . s . h k k . h . s s s s"
+   }
+  },
+  "sequence": [
+   "A",
+   "A",
+   "B",
+   "A",
+   "B",
+   "B"
+  ]
  }
 }

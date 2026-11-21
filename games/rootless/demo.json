@@ -7,6 +7,8 @@
   {"level": "sim4", "skip": 16, "seconds": 20, "caption": "SIM-4 Kill House: grenades, then the chaingun"},
   {"level": "e1m2", "skip": 44, "seconds": 24, "caption": "E1M2 Dynamic Loader: into the cargo loader, claws first"},
   {"level": "e1m4", "skip": 120, "seconds": 28, "views": ["pixel", "dots"], "caption": "E1M4 Xantrium Fens: the hopper over open land"},
+  {"level": "e1m5", "skip": 4, "seconds": 20, "caption": "E1M5 User Space: through a one-way door, to his own locker"},
+  {"level": "e1m5", "skip": 150, "seconds": 22, "caption": "E1M5 User Space: an emitter shot through its own field, then a time slice"},
   {"level": "e1m3", "skip": 300, "seconds": 18, "caption": "E1M3 Drone Refit Assembly: lift-off at the last"},
   {"level": "sim1", "skip": 130, "seconds": 18, "views": ["dots-fill"], "caption": "SIM-1 Long Fens: land without end, in braille"},
   {"level": "sim11", "seconds": 22, "caption": "SIM-11 Deep Works: magboots on a slick deck, the stairs, up a magnetic wall"},

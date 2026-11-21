@@ -27,6 +27,7 @@ class Bot(TextConsole):
         self.turns = 0
         self.last = None
         self.exit = None
+        self.thrown = set()                              # the switches it has thrown (a timed door's: again, if it shut)
         self.fields = {}                                 # open land: the way to a goal from everywhere, by goal
         self.mines = set()                               # mines it has seen: never stepped on
 
@@ -489,11 +490,49 @@ class Bot(TextConsole):
                     return "use"
                 if self.exit and lv.cell(*self.exit).kind in ("exit", "switch") and not lv.cell(*self.exit).pressed:
                     if abs(self.exit[0] - p.x) + abs(self.exit[1] - p.y) == 1:
-                        return self.face(lv, self.exit[0] - p.x, self.exit[1] - p.y) or "use"
+                        turn = self.face(lv, self.exit[0] - p.x, self.exit[1] - p.y)
+                        if not turn and lv.cell(*self.exit).kind == "switch":
+                            self.thrown.add(lv.cell(*self.exit).ch)
+                        return turn or "use"
                     return "w"                           # no way to it from here yet: wait, and look again
+                again = self.switch_again(lv) if (p.x, p.y) != goal else None
+                if again is not None:                    # a timed door shut on the way: its switch, once more
+                    self.goals.insert(0, again)
+                    self.fields.clear()
+                    self.plan = None
+                    return "w"
                 self.goals.pop(0)
             return "w"
         return step
+
+    def switch_again(self, lv):
+        """The map character of a switch that opens a timed door, shut again, and can be thrown again (None)."""
+        timed = {c.opens_on for c in getattr(lv, "timed_cells", ()) if c.opens_on and c.open < 1.0 and c.sealed}
+        if not timed:
+            return None
+        for row in lv.grid:
+            for c in row:
+                if c.kind == "switch" and not c.pressed and c.switch in timed and c.ch in self.thrown \
+                        and c.ch not in self.goals[:1] and self.reachable(lv, c.x, c.y):
+                    return c.ch
+        return None
+
+    def reachable(self, lv, x, y):
+        """Whether the player can walk to a cell beside (x, y) from where he stands."""
+        p = lv.player
+        seen, frontier = {(p.x, p.y)}, [(p.x, p.y)]
+        while frontier:
+            nxt = []
+            for (cx, cy) in frontier:
+                if abs(cx - x) + abs(cy - y) == 1:
+                    return True
+                for dx, dy in DIRS:
+                    n = (cx + dx, cy + dy)
+                    if n not in seen and 0 <= n[0] < lv.w and 0 <= n[1] < lv.h and self.open_ground(lv, lv.cell(*n)):
+                        seen.add(n)
+                        nxt.append(n)
+            frontier = nxt
+        return False
 
     def target(self, lv):
         """Where to go now: a known medkit when hurt, else the next goal."""

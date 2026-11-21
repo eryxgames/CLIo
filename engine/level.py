@@ -223,7 +223,7 @@ class Cell:
             self.label, self.label_role = "EXIT", "good"
         elif self.kind == "switch" and spec.get("label"):
             self.label, self.label_role = str(spec["label"])[:8], "info"
-        elif (self.stairs or self.mag) and spec.get("label"):
+        elif (self.stairs or self.mag or self.kind == "locker") and spec.get("label"):
             self.label, self.label_role = str(spec["label"])[:8], "info"
 
     @property

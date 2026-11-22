@@ -143,6 +143,48 @@ def _sun_on(c, u, e, sun, PW, yh):
     return c
 
 
+def sideways_sky(sky, view, f, up, height=40.0):
+    """What is round a wall walked as a floor: the sky the world's way up, the city ``height`` cells below the
+    other way, the horizon between - for every pixel, worked out from the way its ray goes. ``f``: the facing
+    (a whole number, or quarter turns between); ``up``: which way in the map the world's up is (DIRS index)."""
+    PW, PH, half, yh = view.PW, view.PH, view.half, view.yh
+    Z0 = 1.6
+    lx, ly = view.LW * Z0, view.TALL * Z0
+    a = f * math.pi / 2
+    fx, fy = (DIRS[f] if isinstance(f, int) else (math.sin(a), -math.cos(a)))
+    rx, ry = (DIRS[(f + 1) % 4] if isinstance(f, int) else (math.cos(a), math.sin(a)))
+    wx, wy = DIRS[up]
+    top, hor = sky["top"], sky["horizon"]
+    stars = sky.get("stars") or 0
+    haze = mix(hor, (40, 44, 56), 0.3)
+    rows = []
+    for y in range(PH):
+        sv = (yh - y - 0.5) / ly
+        row = []
+        for x in range(PW):
+            sa = (x + 0.5 - half) / lx
+            dx, dy = fx + sa * rx, fy + sa * ry
+            n = math.sqrt(dx * dx + dy * dy + sv * sv)
+            e = (dx * wx + dy * wy) / n                       # how far up the world the ray goes, -1..1
+            side = (dx * -wy + dy * wx) / n                   # along the wall, across the world's up
+            if e > 0:
+                c = mix(hor, top, min(1.0, e ** 0.55))
+                if stars and e > 0.25 and noise(int((side + 2) * 180), int(sv * 120 / n + 400), 41) < stars:
+                    c = mix(c, (230, 230, 255), 0.6)
+            else:
+                s = height / max(0.004, -e)                   # down to the streets
+                u, v = side * s, (sv / n) * s
+                bu, bv = u % 7.0, v % 7.0
+                if bu < 0.9 or bv < 0.9:                      # a street, its lamps
+                    c = (255, 196, 110) if noise(int(u * 2), int(v * 2), 7) < 0.06 else (44, 44, 56)
+                else:                                         # a block: roofs, lit windows
+                    c = (232, 214, 150) if noise(int(u * 3), int(v * 3), 13) < 0.05 else (20, 22, 30)
+                c = mix(c, haze, min(1.0, (s / 260.0) ** 0.7))
+            row.append(c)
+        rows.append(row)
+    return rows
+
+
 def sky_picture(sky, PW, yh, f, lateral, phase):
     """The sky above the horizon, ``yh`` rows of ``PW`` pixels, looking ``f`` (a quarter turn is the picture's
     width): a gradient, a sun or a planet, clouds that drift, stars, and ridges - the near ones move a little
@@ -903,6 +945,16 @@ class View:
         look = getattr(lv, "sky_look", None)
         if look is None:
             return None
+        here = lv.cell(int(round(cx)), int(round(cy))) if hasattr(lv, "cell") else None
+        up = getattr(here, "world_up", None)
+        if up is not None:                                    # on a wall walked as a floor: the sky to one side
+            key = ("sideways", round(f, 3) if not isinstance(f, int) else f, up, id(look), self.yh, self.PW, self.PH)
+            sky = self.skies.get(key)
+            if sky is None:
+                if len(self.skies) > 16:
+                    self.skies.clear()
+                sky = self.skies[key] = sideways_sky(look, self, f, up)
+            return sky
         if isinstance(f, int):
             rx, ry = DIRS[(f + 1) % 4]
         else:                                                 # between two facings (the mesh view turning)

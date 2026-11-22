@@ -2012,6 +2012,34 @@ keeps to `"climb"`, as in rooms; the ground (and the eye) rises from one to the 
 terrace hides what is behind it from below. (The Python draws a land with terraces; CLIo
 Picture does not yet.)
 
+### Walls walked as floors
+
+A building's face, a lift shaft: the map is drawn as usual, its floor being the wall the
+player's magboots hold, and its cells say which way in the map the world's up is:
+
+```json
+".": {"world_up": "n", "sky": true, "floor": "facade"},
+"v": {"world_up": "n", "sky": true, "pit": true, "height": -40},
+"w": {"world_up": "n", "wall": true, "tile": "window", "sheds": {"monster": "glass", "every": 6, "near": 12}}
+```
+
+- **The sky** is drawn all round: the world's way up is sky, the other way the city far below,
+  the horizon between - facing along the wall it runs down the middle of the picture. It shows
+  wherever nothing else was drawn: past the edge of the face (a drop, `"pit"` with a
+  `"height"` far below), down a drop. Rain blows across the picture the world's way down.
+- **The boots stay on** (F3 refuses: it is a long way down), and the jetpack does not start.
+- **Falling things**: a monster with `"falls": {"speed": 2, "damage": [6, 10], "fills": false}`
+  falls the world's way down, `speed` cells a beat, hurting what it meets and breaking on it or
+  on whatever stops it (a wall, the edge of the wall-floor); it is not counted among the kills.
+  One that `"fills"` the way (a counterweight in a shaft) hits the player on the ceiling too.
+  A cell with `"sheds"` drops one every `"every"` beats (from `"first"`) while the player is
+  within `"near"` cells (14) - out of a window in a wall, into the cell below it.
+- **Getting there**: magnetic plating pairs (`"mag"`) ride from a floor to a wall and back, the
+  view tipping on its side on the way; a shaft's far wall is its "ceiling" (`"ceiling_mag"`),
+  crossed upside down.
+- The level bot waits rather than step into the way of something falling, and does not shoot
+  at it.
+
 ### Light and weather
 
 ```json

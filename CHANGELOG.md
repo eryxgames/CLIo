@@ -47,6 +47,11 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 - **RØØTLESS E1M7: The Stack**, after E1M6: the overflow hall crossed on its ceiling (hornets
   come up there), a switch reached only from it, a drop to a door, a corridor whose plating dies
   behind you, and a hatch up to the return address - and a first look at Aspiration Central.
+- **Walls walked as floors**: map cells can say which way the world's up is (`"world_up"`) - a
+  building's face, a lift shaft walked on magboots. The sky is drawn all round (the city far
+  below one way, the sky the other, the horizon between), and shows past the face's edges;
+  things fall the world's way down (`"falls"`: glass, a counterweight that fills a shaft),
+  dropped by cells that `"sheds"` them; the boots stay on; rain blows across.
 - **Light and weather**: a level's `"lights"` (ambient light and its tint, changes by events with
   an alarm's pulse, a day going round with a sun and a moon) and lamps on map cells (colour,
   reach, power, flicker, switched by events); its `"weather"` (clear, rain, storm with lightning

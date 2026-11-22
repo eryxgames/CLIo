@@ -43,7 +43,7 @@ class Bot(TextConsole):
         self.turns += 1
         if self.turns > 1500:
             return None
-        cmd = self.decide(lv)
+        cmd = self.wary(lv, self.decide(lv))
         if not cmd.startswith("turn"):
             self.last = None
         if self.verbose:
@@ -383,6 +383,39 @@ class Bot(TextConsole):
             gone = {(it.x, it.y) for it in lv.items if it.mine and not it.taken}
             self.mines &= gone
 
+    def wary(self, lv, cmd):
+        """A step into the way of something falling (glass, a counterweight) waits a beat instead - unless he
+        stands in its way already."""
+        moves = {"k": 0, "l": 1, "j": 2, "h": 3}
+        if cmd not in moves:
+            return cmd
+        p = lv.player
+        side = moves[cmd]
+        if getattr(p, "ceiling", False) and side in (1, 3):
+            side = 4 - side
+        dx, dy = DIRS[(p.facing + side) % 4]
+        danger = self.falling(lv)
+        if (p.x + dx, p.y + dy) in danger and (p.x, p.y) not in danger:
+            return "w"
+        return cmd
+
+    @staticmethod
+    def falling(lv):
+        """The cells falling things will pass in the next two beats."""
+        out = set()
+        for m in lv.monsters:
+            if m.dead or m.gone or not m.spec.get("falls"):
+                continue
+            f = m.spec["falls"] if isinstance(m.spec["falls"], dict) else {}
+            x, y = m.x, m.y
+            for _ in range(2 * max(1, int(f.get("speed", 2))) + 1):
+                down = lv.down_at(x, y)
+                if down is None:
+                    break
+                x, y = x + DIRS[down][0], y + DIRS[down][1]
+                out.add((x, y))
+        return out
+
     def decide(self, lv):
         self.look_for_mines(lv)
         p = lv.player
@@ -414,7 +447,7 @@ class Bot(TextConsole):
             weapon = self.pick_weapon(lv)                # what is in front, and on along the ceiling
             if weapon:
                 return weapon
-            cone = [m for m in lv.cone() if not m.barrel]
+            cone = [m for m in lv.cone() if not m.barrel and not m.spec.get("falls")]
             if cone and (lv.weapons.get(p.weapon) or {}).get("kind") != "melee":
                 return "f %s" % cone[0].tag
             return self.goal_step(lv)
@@ -496,7 +529,7 @@ class Bot(TextConsole):
         weapon = self.pick_weapon(lv)
         if weapon:
             return weapon
-        cone = [m for m in lv.cone() if not m.barrel or self.barrel_worth(lv, m)]
+        cone = [m for m in lv.cone() if (not m.barrel or self.barrel_worth(lv, m)) and not m.spec.get("falls")]
         w = lv.weapons.get(p.weapon) or {}
         if w.get("kind") == "melee":                     # fists or a blade: only what is in reach
             cone = [m for m in cone if lv.dist(m) <= 1]

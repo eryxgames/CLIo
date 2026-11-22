@@ -301,6 +301,8 @@ class Atmosphere:
         if lighting:
             self.begin(t)
         cover = OVERCAST.get(kind, 0.0) * (0.4 + 0.6 * amount) if self.weather else 0.0
+        if cover and lv.down_at(lv.player.x, lv.player.y) is not None if hasattr(lv, "down_at") else False:
+            cover *= 0.4                                      # on a wall: half the "sky" is the city below
         sky_k = None                                          # the sky: dark at night, clouded over in weather
         if lighting and self.day:
             a, tint, _p = self.ambient(t)
@@ -365,15 +367,21 @@ class Atmosphere:
                     v = done[key] = (min(255, max(0, int(r))), min(255, max(0, int(g))), min(255, max(0, int(b))))
                 row[x] = v
         if kind in ("rain", "storm", "snow", "dust") and amount > 0:
-            self.fall(view, rows, depths, (ex, ey, dirx, diry, Z0), t, kind, amount, wind)
+            self.fall(view, rows, depths, (ex, ey, dirx, diry, Z0, rx, ry), t, kind, amount, wind)
         return rows
 
     def fall(self, view, rows, depths, ray, t, kind, amount, wind):
         """Rain, snow or dust in the air: each drop at its own distance, drawn where nothing nearer stands and
         only over cells open to the sky."""
         lv = self.lv
-        ex, ey, dirx, diry, Z0 = ray
+        ex, ey, dirx, diry, Z0, rx, ry = ray
         PW, PH = view.PW, view.PH
+        p = lv.player
+        down = lv.down_at(p.x, p.y) if hasattr(lv, "down_at") else None
+        sideways = None
+        if down is not None:                                  # on a wall: it falls the world's way down - across
+            from .level import DIRS                           # the screen, or straight away from or at him
+            sideways = DIRS[down][0] * rx + DIRS[down][1] * ry
         per = {"rain": 26, "storm": 18, "snow": 40, "dust": 30}[kind]
         n = min(600, int(PW * PH * amount / per))
         speed = {"rain": 2.2, "storm": 3.0, "snow": 0.35, "dust": 0.25}[kind]
@@ -385,8 +393,12 @@ class Atmosphere:
             x0 = _hash(i, 1) * PW
             y0 = _hash(i, 2) * PH
             near = 1.0 / (0.6 + z * 0.35)                     # nearer drops: longer, brighter
-            y = (y0 + speed * PH * t * (0.6 + 0.4 * near)) % PH
-            x = int((x0 + drift * PW * 0.25 * t * (0.6 + 0.4 * near)) % PW)
+            if sideways is None:
+                y = (y0 + speed * PH * t * (0.6 + 0.4 * near)) % PH
+                x = int((x0 + drift * PW * 0.25 * t * (0.6 + 0.4 * near)) % PW)
+            else:
+                y = (y0 + drift * PH * 0.1 * t) % PH
+                x = int((x0 + sideways * speed * PW * t * (0.6 + 0.4 * near)) % PW)
             iy0 = int(y)
             d = z + Z0
             cell = (int(floor_(ex + d * dirx[x] + 0.5)), int(floor_(ey + d * diry[x] + 0.5)))
@@ -397,10 +409,10 @@ class Atmosphere:
             if not ok:
                 continue
             if kind in ("rain", "storm"):
-                length = 1 + int(near * 3)
+                length = 1 + int(near * 3) if sideways is None or abs(sideways) > 0.5 else 1
                 for k in range(length):
-                    yy = iy0 + k
-                    xx = x + int(drift * k * 0.6)
+                    yy = iy0 + k if sideways is None else iy0
+                    xx = x + int(drift * k * 0.6) if sideways is None else x - int(k * (sideways or 0))
                     if 0 <= yy < PH and 0 <= xx < PW and depths[yy][xx] > z:
                         c = rows[yy][xx]
                         rows[yy][xx] = ((c[0] + 170) // 2, (c[1] + 185) // 2, (c[2] + 205) // 2)

@@ -34,7 +34,7 @@ DERIVED = frozenset((
     "data", "id", "spec", "cfg", "audio", "console", "host", "dev", "sprites", "models", "tiles", "see_through",
     "floor_tile", "ceiling_tile", "sky_look", "land", "grid", "plate_cells", "held_cells", "pads", "lifts", "belts",
     "land_walls", "world", "cell", "_field", "_pad_links", "_pristine", "replaying", "loaded", "warp", "opening",
-    "timed_cells", "heights", "terraced", "atmosphere", "step_up", "render",
+    "timed_cells", "heights", "terraced", "atmosphere", "_sheds", "step_up", "render",
     "journal", "start_player", "seed", "depth", "w", "h", "map_w", "map_h", "name", "par", "weapons", "moved",
     "queue", "pending_save"))
 KEPT = frozenset(("_tags", "_ids"))   # names starting with _ are caches, but for these (the monsters' numbering)

@@ -139,7 +139,8 @@ class Cell:
                  "oil", "slick", "conveyor", "scorched", "exit_kind", "heavy", "switch", "sky", "deep", "steep",
                  "duel", "stairs", "mag", "pit", "bulkhead", "supply", "locker", "opened", "gate", "field", "zap",
                  "open_for", "closes_at", "from_side", "on_open", "height", "ceiling_height", "step",
-                 "ceiling_mag", "mag_off_on", "mag_delay", "high", "hatch", "mag_ceiling", "lamp")
+                 "ceiling_mag", "mag_off_on", "mag_delay", "high", "hatch", "mag_ceiling", "lamp", "world_up",
+                 "sheds")
 
     def __init__(self, x, y, ch, spec):
         self.x, self.y, self.ch = x, y, ch
@@ -152,6 +153,9 @@ class Cell:
         self.high = bool(spec.get("high"))              # a switch, exit or locker up by the ceiling: reached from it
         self.hatch = spec.get("hatch")                  # a hatch in the ceiling to the other of its name (the deck above)
         self.lamp = spec.get("lamp") or None            # a lamp here: its colour, reach, power... (engine/atmosphere.py)
+        up = FACING.get(str(spec.get("world_up") or "").lower())
+        self.world_up = up                              # a wall walked as a floor: which way in the map the world's up is
+        self.sheds = spec.get("sheds") if isinstance(spec.get("sheds"), dict) else None   # drops a falling thing
         self.bulkhead = bool(spec.get("bulkhead"))      # a wall down into the water: a diver passes under it
         self.tex = spec.get("wall") or spec.get("texture") or (
             "stairs" if self.stairs else "magwall" if self.mag or self.mag_ceiling else "bulkhead" if self.bulkhead else
@@ -2424,6 +2428,73 @@ class Level:
         self.end_beat()
         return True
 
+    # ---- the world sideways ---------------------------------------------- #
+    def down_at(self, x, y):
+        """Which way in the map the world's down is at (x, y): an index into DIRS, or None (the floor is the
+        floor). Walls walked as floors - a building's face, a lift shaft - say so with ``"world_up"``."""
+        c = self.cell(x, y)
+        return None if c is None or c.world_up is None else (c.world_up + 2) % 4
+
+    def shed(self):
+        """Cells that drop falling things (``"sheds"``: monster, every, near, first): glass from a broken
+        window, a counterweight down a shaft - while the player is near enough to meet them."""
+        sheds = self.__dict__.get("_sheds")
+        if sheds is None:
+            sheds = self.__dict__["_sheds"] = [c for row in self.grid for c in row if c.sheds] \
+                if self.world is None else []
+        p = self.player
+        for c in sheds:
+            sp = c.sheds
+            every = max(1, int(sp.get("every", 6)))
+            if (self.beat - int(sp.get("first", 0))) % every or \
+                    max(abs(c.x - p.x), abs(c.y - p.y)) > int(sp.get("near", 14)):
+                continue
+            x, y = c.x, c.y
+            if c.solid:                                  # out of a window in a wall: into the cell below it
+                down = self.down_at(x, y)
+                if down is None:
+                    continue
+                x, y = x + DIRS[down][0], y + DIRS[down][1]
+            if not self.free(x, y) or self.cell(x, y).solid:
+                continue
+            m = self.add_monster(sp.get("monster", "glass"), x, y)
+            if m is not None:
+                m.awake = True
+                m.intent = "fresh"                       # seen where it comes from first; it falls from the next beat
+
+    def fall_step(self, m):
+        """A falling thing's beat: ``speed`` cells the world's way down, hurting what it meets - the player
+        (not on the ceiling, unless it ``fills`` the way), a monster - and breaking on it or on what stops it."""
+        f = m.spec["falls"] if isinstance(m.spec.get("falls"), dict) else {}
+        p = self.player
+        if m.intent == "fresh":
+            m.intent = None
+            return
+        for _ in range(max(1, int(f.get("speed", 2)))):
+            down = self.down_at(m.x, m.y)
+            if down is None:
+                return self.shatter(m)
+            nx, ny = m.x + DIRS[down][0], m.y + DIRS[down][1]
+            cell = self.cell(nx, ny)
+            if (nx, ny) == (p.x, p.y) and (not p.ceiling or f.get("fills")):
+                lo, hi = f.get("damage", [6, 10])
+                self.hurt(self.rng.randint(int(lo), int(hi)), "%s hits you." % m.spec.get("name", m.kind).capitalize())
+                return self.shatter(m)
+            other = self.monster_at(nx, ny)
+            if other is not None and other is not m and not other.dead:
+                lo, hi = f.get("damage", [6, 10])
+                self.damage([(other, self.rng.randint(int(lo), int(hi)))])
+                return self.shatter(m)
+            if cell is None or cell.solid or cell.world_up is None:
+                return self.shatter(m)
+            m.x, m.y = nx, ny
+
+    def shatter(self, m):
+        """A falling thing breaks (or goes on down, out of sight): gone, and not counted."""
+        m.dead = m.gone = True
+        if m.seen or self.dist(m) <= 4:
+            self.sfx((m.spec.get("sounds") or {}).get("death") or "crate", "hit")
+
     # ---- on the ceiling ------------------------------------------------- #
     @staticmethod
     def top_of(cell):
@@ -2694,6 +2765,9 @@ class Level:
         if want == p.mag_on:
             self.say("Your magboots are %s already." % ("on" if want else "off"), "dim")
             return True
+        if not want and self.cell(p.x, p.y).world_up is not None:
+            self.say("Not here: the boots are all that hold you to the wall, and it is a long way down.", "alert")
+            return False
         if not want and p.ceiling:                       # letting go of the ceiling
             p.mag_on = False
             self.sfx("mag_off", "switch")
@@ -2722,8 +2796,8 @@ class Level:
         if p.diving:
             self.say("Not under water.", "dim")
             return False
-        if p.ceiling:
-            self.say("Not while you hang from the ceiling.", "dim")
+        if p.ceiling or self.cell(p.x, p.y).world_up is not None:
+            self.say("Not while you hang from the ceiling." if p.ceiling else "Not on a wall.", "dim")
             return False
         p.jet_on = True
         self.sfx("jet_on", "power")
@@ -3447,7 +3521,7 @@ class Level:
             if m.on_death and not self.over:
                 self.event(m.on_death)
             return
-        if not m.spec.get("boss"):
+        if not m.spec.get("boss") and not m.spec.get("falls"):
             self.stats["kills"] += 1
         gore = self.sprites.get(m.spec.get("remains", None if m.model in self.models else "gore"))
         if gore is not None:
@@ -3845,6 +3919,7 @@ class Level:
             if self.over:
                 return
         p = self.player
+        self.shed()
         if self.world is not None:
             self.world.follow()                          # wake what is near, put what he left to sleep
         self.fly()
@@ -4115,6 +4190,9 @@ class Level:
             return
         a = m.attack
         kind = a.get("kind", "melee")
+        if m.spec.get("falls"):                          # it falls, the world's way down, and stops for nothing
+            self.fall_step(m)
+            return
         if kind in ("cron", "none"):                     # Cron keeps its own time; "none" only stands there
             return
         m.cool = max(0, m.cool - 1)
@@ -5631,6 +5709,20 @@ def validate(data):
             if isinstance(spec.get("ceiling_height"), (int, float)) and \
                     spec["ceiling_height"] <= (spec.get("height") if isinstance(spec.get("height"), (int, float)) else 0):
                 problems.append("level '%s': '%s' has its ceiling at or under its floor" % (lid, ch))
+            if spec.get("world_up") is not None and str(spec["world_up"]).lower() not in FACING:
+                problems.append("level '%s': '%s' world_up should be n, e, s or w (the way in the map the world's up "
+                                "is)" % (lid, ch))
+            if spec.get("sheds") is not None:
+                sh = spec["sheds"]
+                kind = sh.get("monster", "glass") if isinstance(sh, dict) else None
+                mspec = (data.monsters or {}).get(kind) if kind else None
+                if not isinstance(sh, dict) or not isinstance(mspec, dict):
+                    problems.append("level '%s': '%s' sheds should name a monster the game has (\"monster\")"
+                                    % (lid, ch))
+                elif not mspec.get("falls"):
+                    problems.append("level '%s': '%s' sheds '%s', which does not fall (its \"falls\")" % (lid, ch, kind))
+                elif isinstance(sh.get("every", 6), bool) or not isinstance(sh.get("every", 6), int) or sh.get("every", 6) < 1:
+                    problems.append("level '%s': '%s' sheds every so many beats (1 or more)" % (lid, ch))
             if spec.get("high") and not (spec.get("switch") or spec.get("exit") or spec.get("locker") is not None
                                          or spec.get("panel")):
                 problems.append("level '%s': '%s' is \"high\", but only a switch, an exit, a locker or a panel is "

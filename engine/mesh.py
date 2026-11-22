@@ -315,6 +315,7 @@ class Mesh:
             if face.label is not None and face.side * (fx if kind == XWALL else fy) < 0:   # a wall facing the player
                 labels.append(face)
         self.holes(lv, cam, eye, doors, rgb, zbuf)
+        self.backdrop(sky, rgb, zbuf)
         cover = self.cover(zbuf, walls)
         over = []
         for face in labels:                                   # labels of walls seen close by, as View.front_face's
@@ -357,6 +358,7 @@ class Mesh:
             finally:
                 view.cur_z = cur
         self.holes(lv, cam, eye, doors, frame.rows, zbuf)
+        self.backdrop(sky, frame.rows, zbuf)
         labels = []
         for face in faces:
             if face.label is not None and face.side * (fx if face.kind == XWALL else fy) < 0 and \
@@ -519,6 +521,18 @@ class Mesh:
                 if two:
                     zbuf[i + 1] = z
                     row[x + 1] = v
+
+    def backdrop(self, sky, rows, zbuf):
+        """On a wall walked as a floor the sky is all round (a whole picture of it): it shows wherever nothing
+        was drawn - past the edge of a building's face, down a drop."""
+        PW, PH = self.view.PW, self.view.PH
+        if not sky or len(sky) < PH:
+            return
+        for y in range(PH):
+            base, row, srow = y * PW, rows[y], sky[y]
+            for x in range(PW):
+                if zbuf[base + x] >= NONE:
+                    row[x] = srow[x]
 
     def holes(self, lv, cam, eye, doors, rows, zbuf):
         """Bullet holes in the walls seen (the level's ``holes``), as the classic view's dents: each where its wall

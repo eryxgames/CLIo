@@ -54,11 +54,14 @@ For people working on the engine itself. Making a game needs none of this: see
 - [x] Simulators: cars, boats, a hopper and planes in fixed steps over a map, instruments,
       fuel and systems as data (formulas), checkpoints and landings; systems sims with controls
       and charts; an autopilot that proves each one can be done
+- [x] Realms: strategy by turns as data - stocks, people set to works, orders, a calendar whose
+      tides are told ahead, events with choices, threats that show themselves a season before
+      they come; saved with the game; a steward that plays each one over seeds
 - [x] Save / load of the *whole* world, named slots
 - [x] Optional C libraries, exactly as fast as the Python is right: CLIo Picture (the
       first-person picture; models kept as meshes for crowds) and Ballistic's C engine (sound)
 - [x] Demos that play by themselves: CLIo's tech demo and a game's own
-- [x] Three demo games, a starter template, several hundred automated tests
+- [x] Three demo games, two starter templates, several hundred automated tests
 - [x] Game editor in the browser: `python clio.py mygame --edit`, or
       [on the web](https://eryxgames.github.io/CLIo/) with nothing installed - forms for
       everything a game is made of, the map, conversations as graphs, all text as a
@@ -91,10 +94,12 @@ engine/
   levelbot.py        a player that proves a level can be finished
   model.py           3D models in levels      gltf.py     glTF from Blender
   frame.py  keys.py  the redrawn screen and single keys
+  realm.py           realms: strategy by turns (seasons, stocks, works, threats), and its steward
   demo.py            the demos (engine/demos/clio.json, a game's demo.json)
   editor/            the editor (a page in the browser, also served as a web site)
 games/               derelict/  depths/  rootless/
 templates/starter/   a tiny complete game to copy (Apache-2.0)
+templates/realm/     a tiny complete realm to copy (Apache-2.0)
 game_files/          the original CLIo 1 sandbox
 tests/               python -m unittest discover -s tests
 utils/               Tkinter data editor (desktop, alpha)
@@ -109,7 +114,8 @@ guide.
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 833 tests, about a minute
+python -m unittest discover -s tests     # 862 tests, about a minute
+python -m engine.realm templates/realm 8 # a steward plays the realm starter over eight seeds
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 python tests/bot.py 30 cards             # the same with card battles (the Deck mode)

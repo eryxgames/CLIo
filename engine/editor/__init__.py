@@ -25,11 +25,12 @@ _DEFAULT = {"scenes": "scenes.json", "items": "items.json", "characters": "chara
             "sprites": "sprites.json", "dungeon": "dungeon.json", "levels": "levels.json",
             "monsters": "monsters.json", "tiles": "tiles.json", "weapons": "weapons.json", "models": "models.json",
             "cards": "cards.json", "stages": "stages.json",
-            "skirmishes": "skirmishes.json", "sims": "sims.json"}
+            "skirmishes": "skirmishes.json", "sims": "sims.json", "realms": "realms.json"}
 _WHERE = {"scene": "scenes", "item": "items", "character": "characters", "dialogue": "dialogues",
           "level": "levels", "monster": "monsters", "tile": "tiles", "weapon": "weapons", "model": "models",
           "quest": "quests", "trigger": "triggers", "mode": "game", "floor": "dungeon", "dungeon": "dungeon",
-          "initial_scene": "game", "card": "cards", "stage": "stages", "skirmish": "skirmishes", "sim": "sims"}
+          "initial_scene": "game", "card": "cards", "stage": "stages", "skirmish": "skirmishes", "sim": "sims",
+          "realm": "realms"}
 
 
 class EditorError(Exception):

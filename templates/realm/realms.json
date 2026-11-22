@@ -1,0 +1,125 @@
+{
+  "ford": {
+    "name": "The Ford",
+    "intro": [
+      "Six families have stopped at the ford. Four years will show whether a village stands here.",
+      "Set hands to the works, give one order to build each season, and end the season."
+    ],
+    "calendar": {
+      "seasons": ["Sowing", "High Sun", "Reaping", "Frost"],
+      "length": 16,
+      "notes": {"Frost": "Nothing grows in the frost, and the wolves come down."}
+    },
+    "tides": {
+      "name": "Weather",
+      "levels": ["Fair", "Wet", "Storm"],
+      "weights": [5, 3, 1],
+      "by_season": {"Frost": 0.5},
+      "forecast": 1,
+      "notes": {"Storm": "A storm halves the wood that is cut."}
+    },
+    "stocks": {
+      "food": {"name": "Food", "start": 14, "max": "24 + 24 * granary", "warn": "people * 2"},
+      "wood": {"name": "Wood", "start": 8, "max": 30},
+      "stone": {"name": "Stone", "start": 2, "max": 20}
+    },
+    "values": {
+      "watch": {"name": "Watch", "formula": "1 + 2 * tower_hands + 3 * palisade", "show": true},
+      "wealth": "food + wood + stone"
+    },
+    "people": {
+      "name": "families",
+      "start": 6,
+      "eats": {"food": 1},
+      "growth": "0.4 if food > people * 2 else 0",
+      "room": "6 + 3 * huts",
+      "grow_text": "A new family settles at the ford.",
+      "starve_text": "Hunger drives %d of the families from the ford."
+    },
+    "works": {
+      "fields": {
+        "name": "Fields", "start": 1, "staff": 3, "max": 3, "hands": 3, "cost": {"wood": 4},
+        "yields": {"food": "0 if frost else (3 if reaping else 2) + 0.5 * rotation"},
+        "text": "Food from each hand: most at the reaping, none in the frost."
+      },
+      "woodlot": {
+        "name": "Woodlot", "start": 1, "staff": 2, "max": 2, "hands": 2, "cost": {"stone": 2},
+        "yields": {"wood": "1 if storm else 2"},
+        "text": "Wood from each hand; half in a storm."
+      },
+      "quarry": {
+        "name": "Quarry", "max": 1, "hands": 3, "cost": {"wood": 6},
+        "yields": {"stone": 1.5},
+        "text": "Stone from each hand."
+      },
+      "huts": {
+        "name": "Huts", "max": 4, "cost": {"wood": 5}, "dearer": 0.2,
+        "text": "Room for three more families."
+      },
+      "granary": {
+        "name": "Granary", "max": 2, "cost": {"wood": 6, "stone": 3},
+        "text": "Keeps 24 more food."
+      },
+      "palisade": {
+        "name": "Palisade", "max": 2, "cost": {"wood": 10},
+        "text": "Watch +3."
+      },
+      "tower": {
+        "name": "Watchtower", "max": 1, "hands": 2, "cost": {"wood": 4, "stone": 4},
+        "text": "Watch +2 for each hand that stands on it."
+      },
+      "rotation": {
+        "name": "Crop rotation", "finding": true, "cost": {"food": 10}, "needs": "fields >= 2",
+        "text": "Each hand in the fields brings half a measure more."
+      }
+    },
+    "events": [
+      {
+        "id": "strangers", "if": "turn >= 3", "chance": 0.5,
+        "text": "A family with a handcart asks to winter at the ford.",
+        "choices": [
+          {"text": "Take them in.", "say": "They unload the cart.", "do": [{"people": 1}]},
+          {"text": "Give them bread and send them on.", "say": "They cross before dark.", "do": [{"stock": {"food": -2}}]}
+        ]
+      },
+      {
+        "id": "traders", "once": false, "if": "not frost", "chance": 0.25,
+        "text": "Traders water their mules at the ford.",
+        "choices": [
+          {"text": "Sell them six wood for eight food.", "if": "wood >= 6", "do": [{"stock": {"wood": -6, "food": 8}}]},
+          {"text": "Sell them six food for four stone.", "if": "food >= 12", "do": [{"stock": {"food": -6, "stone": 4}}]},
+          {"text": "Wave them on.", "do": []}
+        ]
+      },
+      {
+        "id": "good_year", "once": false, "if": "reaping", "chance": 0.25,
+        "text": "The ears are heavy this year.", "role": "success",
+        "do": [{"stock": {"food": 6}}]
+      },
+      {
+        "id": "blight", "once": false, "if": "high_sun and wet", "chance": 0.3,
+        "text": "Wet rot gets into the stores.", "role": "warning",
+        "do": [{"stock": {"food": -4}}]
+      }
+    ],
+    "threats": {
+      "wolves": {
+        "name": "Wolves", "if": "frost", "chance": 0.6, "strength": "2 + turn / 5",
+        "text": "Wolves have been heard across the river.",
+        "held_text": "The wolves find the watch awake, and go.",
+        "lost_text": "The wolves get in among the stores.",
+        "on_lost": [{"stock": {"food": -6}}, {"if": "food < people", "then": [{"people": -1, "say": "A family gives up the ford."}]}]
+      },
+      "raiders": {
+        "name": "Raiders", "if": "wealth > 40 and turn > 5", "chance": 0.3, "warn": 2,
+        "strength": "3 + wealth / 15",
+        "text": "Riders were seen counting the roofs from the ridge.",
+        "held_text": "The riders circle the palisade twice, and ride on.",
+        "lost_text": "The riders take what they came for.",
+        "on_lost": [{"stock": {"food": "-food / 2", "wood": "-wood / 2"}, "people": -1}]
+      }
+    },
+    "score": "people * 10 + min(food, 40) / 4 + 5 * (huts + granary + palisade + tower)",
+    "end_text": "The sixteenth season ends. The ford has held."
+  }
+}

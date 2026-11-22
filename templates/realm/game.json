@@ -1,0 +1,8 @@
+{
+  "title": "The Ford",
+  "description": "A realm starter: a village through four years, a season at a time. Copy this folder to begin your own.",
+  "author": "Your Name",
+  "license": "Apache-2.0 (free to copy, change and sell)",
+  "initial_scene": "ford",
+  "music": {"generate": {"mood": "calm", "seed": "ford"}}
+}

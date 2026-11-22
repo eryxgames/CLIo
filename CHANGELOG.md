@@ -2,6 +2,31 @@
 
 Notable changes to CLIo. Versions follow [semantic versioning](https://semver.org).
 
+## Unreleased
+
+### Added
+
+- **Realms: strategy by turns** (`engine/realm.py`, `realms.json`, a scene's `"realm"`): a hold
+  and its people, a season at a time. Stocks; people who eat, grow while there is room and leave
+  when they go hungry; works that are built, staffed by the hand and yield by formulas; findings
+  learned once; one order to build and one to find a season; a calendar and a sky ("tides") that
+  is the same for a seed whoever asks and is told seasons ahead; events with choices; threats
+  that are sighted before they come, shown with their strength, the defence as it stands and the
+  odds in words. Every number may be a formula (the simulators' formulas) over the stocks, the
+  works and their hands, the season's and the tide's names, flags and the realm's own values.
+- A realm is played at the prompt (`end`, `build`, `find`, `put 3 fields`, `works`, `sky`,
+  `news`, `save`, `load`), fits 24 columns, and is saved with the game: a load goes on from its
+  season, and the title screen names it. A season is a turn of the game (triggers and quests are
+  looked at after each); a realm's effects can run the game's own (`{"game": [...]}`); its end
+  runs the scene's `on_realm_won`, `on_realm_lost`, `on_realm_quit`, or ends the game.
+- **The steward** (`python -m engine.realm GAME [REALM] [SEEDS]`, and `steward N` at the
+  prompt): a player that tries hands and orders on copies whose luck is not the luck to come, a
+  year ahead, for the realm's `score`; it says how a realm stands over some seeds.
+- `--check` checks realms (formulas and what they read, stocks and works named, effects, events,
+  threats, names used twice); `--level ID` starts a game in the scene that plays realm ID; the
+  editor lists `realms.json`.
+- **`templates/realm`**: a realm starter to copy - a village at a ford through sixteen seasons.
+
 ## 3.5.2 - 2026-11-23
 
 ### Added

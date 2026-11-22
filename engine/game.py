@@ -704,6 +704,10 @@ class Game(Actions):
             from . import sim                            # and a simulator
             sim.play_scene(self, sc)
             return True
+        if sc.get("realm") and not self.over and w.scene_id == sid:
+            from . import realm                          # and a realm (turn-based strategy), until it is played out
+            if realm.play_scene(self, sc) != "played":
+                return True
         if sc.get("on_enter") and not self.over and w.scene_id == sid:
             conditions.run(sc["on_enter"], self)
         # followers come along
@@ -960,6 +964,11 @@ class Game(Actions):
                 if lvl.get("id"):                        # saved in a level: which, and how far in
                     name = ((self.data.levels or {}).get(lvl["id"]) or {}).get("name", lvl["id"])
                     bits.append("%s, beat %d" % (name, int(lvl.get("beat", 0))))
+                elif (self.data.scenes.get(blob.get("scene_id")) or {}).get("realm"):     # saved in a realm
+                    rid = self.data.scenes[blob["scene_id"]]["realm"]
+                    state = ((blob.get("vars") or {}).get("realms") or {}).get(rid) or {}
+                    bits.append("%s, season %d" % ((self.data.realms.get(rid) or {}).get("name", rid),
+                                                   int(state.get("turn", 0)) + 1))
                 else:
                     bits.append("turn %d" % int(blob.get("turn", 0)))
                 label = ", ".join(bits)
@@ -989,9 +998,9 @@ class Game(Actions):
         cfg = self.cfg
         jump = self.settings.get("start_level")
         if jump:                                         # --level ID: straight to the scene that plays it
-            sid = next((k for k, sc in self.world.scenes.items() if jump in (sc.get("level"), sc.get("stage"), sc.get("skirmish"), sc.get("sim"))), None)
+            sid = next((k for k, sc in self.world.scenes.items() if jump in (sc.get("level"), sc.get("stage"), sc.get("skirmish"), sc.get("sim"), sc.get("realm"))), None)
             if sid is None:
-                self.say("No scene plays level, stage, skirmish or sim '%s'." % jump, "error")
+                self.say("No scene plays level, stage, skirmish, sim or realm '%s'." % jump, "error")
             else:
                 self.started = True
                 self.world.scene_id = sid
@@ -1229,6 +1238,10 @@ class Game(Actions):
             from . import sim
             sim.play_scene(self, self.world.scene)
             return True
+        if self.world.scene.get("realm"):                # saved in a realm: it goes on from that season
+            from . import realm
+            if realm.play_scene(self, self.world.scene) != "played":
+                return True
         self.say("Game loaded.", "success")
         self.resume_music()
         self.describe_scene(full=True)

@@ -24,6 +24,7 @@ to have the engine look for broken references.
 - [Arcade stages](#arcade-stages)
 - [Skirmishes (real-time strategy)](#skirmishes-real-time-strategy)
 - [Simulators](#simulators)
+- [Realms (strategy by turns)](#realms-strategy-by-turns)
 - [Coming from CLIo 1](#coming-from-clio-1)
 
 ## A complete tiny game
@@ -2788,6 +2789,115 @@ copies) and its keys play the run back:
 
 ```
 python -m engine.sim rootless       # sim8: won (done) at 33.7 seconds, damage 0, fuel 22
+```
+
+## Realms (strategy by turns)
+
+A scene can hold a realm: a hold and its people, played a season at a time - stocks, hands set
+to works, orders to build, a sky that is told ahead, events with choices, threats that show
+themselves before they come. `"realm": "id"` in the scene; the realm in `realms.json`.
+`templates/realm` is a small complete one to copy:
+
+```json
+{
+  "ford": {
+    "name": "The Ford",
+    "calendar": {"seasons": ["Sowing", "High Sun", "Reaping", "Frost"], "length": 16},
+    "tides": {"name": "Weather", "levels": ["Fair", "Wet", "Storm"], "weights": [5, 3, 1], "forecast": 1},
+    "stocks": {"food": {"start": 14, "max": "24 + 24 * granary"}, "wood": 8},
+    "values": {"watch": {"name": "Watch", "formula": "1 + 2 * tower_hands + 3 * palisade", "show": true}},
+    "people": {"name": "families", "start": 6, "eats": {"food": 1},
+               "growth": "0.4 if food > people * 2 else 0", "room": "6 + 3 * huts"},
+    "works": {
+      "fields": {"start": 1, "staff": 3, "max": 3, "hands": 3, "cost": {"wood": 4},
+                 "yields": {"food": "0 if frost else 2"}},
+      "huts": {"max": 4, "cost": {"wood": 5}, "dearer": 0.2},
+      "rotation": {"name": "Crop rotation", "finding": true, "cost": {"food": 10}, "needs": "fields >= 2"}
+    },
+    "threats": {"wolves": {"if": "frost", "chance": 0.6, "strength": "2 + turn / 5",
+                           "on_lost": [{"stock": {"food": -6}}]}}
+  }
+}
+```
+
+**A season.** The player sets hands (`put 3 fields`), gives the season's orders (`build huts`,
+`find rotation`: one of each a season, or `"orders": {"build": 2, "find": 1}`) and ends it
+(`end`). Then, in this order: works yield and people eat; people grow or go hungry; threats that
+were sighted arrive; events fire; new threats are sighted; the next season begins.
+
+**Formulas.** Wherever a number stands a formula may (the [simulators'](#simulators): numbers,
++ - * / % //, comparisons, `and`, `or`, `not`, `a if c else b`, `min`, `max`, `abs`, `clamp`,
+`floor`, `sqrt`). They read the stocks; each work (how many are built) and `<work>_hands`;
+`people`, `idle`, `busy`, `works`; `turn` (0 in the first season), `year`, `left` (seasons to
+go), `length`; `season` and `tide` (numbers from 0) and each season's and tide level's name
+(`frost`, `high_sun`, `storm`: 1 in it, else 0); flags that effects set; and the realm's
+`values`, each a formula that may read the ones before it.
+
+| Key | Meaning |
+| --- | --- |
+| `name`, `intro`, `music` | Its name, lines shown before the first season, a track. |
+| `calendar` | `seasons` (names), `length` (seasons the game lasts; none: until `win_if` or `fail_if`), `start_year`, `start_season`, `year` (the word), `notes` (a line shown in a season). |
+| `tides` | A sky that is the same for a seed whoever asks: `levels` (names, low to high), `weights` (how often each), `by_season` (how many levels a season lifts it; a part is a chance), `rise` (levels it has risen by the last season), `forecast` (seasons told ahead, 2; a formula may say, so a finding can lengthen it), `name` (the word), `notes` (a line shown at a level). |
+| `stocks` | Each a number to start with, or `{name, start, min (0), max, rate (a formula: so much a season), warn (shown in red at or below), show (false: kept out of sight), show_max}`. |
+| `values` | Numbers worked out from the others: a formula, or `{formula, name, show}`. |
+| `people` | `name` (the word: families, households), `start`, `eats` (stock: so much each a season), `growth` (people a season; parts add up), `room` (no more than this), `starve` (0.5: the part of the unfed who go), `grow_text`, `shrink_text`, `starve_text` (`%d` is how many). |
+| `works` | Below. |
+| `orders` | How many of each order a season: `{"build": 1, "find": 1}`. |
+| `events`, `threats` | Below. |
+| `win_if`, `fail_if` | Formulas looked at when a season ends; `win_text`, `fail_text` say why. A realm also falls when no one is left (`empty_text`), and stands when its last season has passed (`end_text`). |
+| `score` | What it is worth: the scene's game gets it as the variable `realm_score` (and `seasons`), for [scores and records](#game-modes-scores-and-records). The steward plays for it. |
+| `on_won`, `on_lost` | The game's [effects](#conditions-and-effects) when it ends (a scene's `on_realm_won`, `on_realm_lost`, `on_realm_quit` come first). None: the game is won (`won_text`) or lost (`lost_text`); left: the game ends. |
+
+**Works.** `name`, `text` (shown in the list); `start` (built at the beginning), `staff` (hands
+it starts with), `max` (how many may stand; a formula); `cost` (stocks), `dearer` (0.2: each one
+costs a fifth more than the last); `needs` (a formula that must hold: until then it is not on
+the list; `needs_text`); `hands` (places for hands in each one); `yields` (stock: so much **a
+hand** a season), `makes` (stock: so much for **each one built**), `upkeep` (stock: so much each
+costs a season); `on_built` (effects), `built_text`. `"finding": true` makes it a thing learned
+once, with the `find` order: its name reads 1 in formulas from then on.
+
+**Effects** (in events, choices, threats and `on_built`; a dict, or a list of them):
+
+| Effect | Does |
+| --- | --- |
+| `{"say": "text", "role": "success"}` | a line of news |
+| `{"stock": {"food": -6, "wood": "people"}}` | adds to stocks (a formula may say how much), within their bounds |
+| `{"people": -1}`, `{"work": {"fields": -1}}` | people come or go; works rise or fall |
+| `{"set": "flag"}`, `{"clear": "flag"}` | a flag: its name reads 1 in formulas while it is set |
+| `{"threat": "wolves"}` | the threat is sighted now |
+| `{"if": "food < people", "then": [...], "else": [...]}`, `{"random": [[...], [...]]}` | control |
+| `{"win": "text"}`, `{"lose": "text"}` | the realm ends |
+| `{"game": [...]}` | the game's own [effects](#conditions-and-effects): give an item, set a flag, start a quest, go to a scene |
+
+**Events** are looked at in their order when a season ends, two a season at most
+(`events_a_season`): `id`, `if` (a formula), `chance` (0 to 1; a formula), `once` (true unless
+said), `every` (seasons), `text` and `role`, `do` (effects), and `choices` - each `{text, if,
+say, do}`; the player answers with its number. An event that waits for a flag and is listed
+before the event that sets it comes a season after it.
+
+**Threats.** `name`; `if` and `chance`: when it may be sighted (`"called": true`: only when an
+effect sends it); `strength` (a formula, fixed when it is sighted); `warn` (seasons between the
+sighting and the coming: 1; 0 comes at once); `against` (what meets it: a value or a formula,
+`watch` unless said); `swing` (0.25: luck moves the strength a quarter either way). While it is
+coming the page shows its strength, the defence as it stands and the odds in words. `text`
+(sighted), `held_text` and `on_held`, `lost_text` and `on_lost`.
+
+**Playing it.** Orders are typed: `end` (`e`), `build` and `find` (alone: the list, with what
+each costs and why not now; then a name or its number), `put 3 fields` (or `fields 3`, `fields
++1`), `works`, `sky`, `news`, `save`, `load`, `quit`, and `steward 4` - the steward plays four
+seasons. A season is a turn of the game: its [triggers and quests](#quests-and-triggers) are
+looked at after each. A save holds the realm (it is in the game's variable `realms`), and the
+title screen offers it by its season. Every roll comes from the game's seed, the realm, the
+season and what is rolled for, so the same orders play the same years (`--seed`).
+
+**The steward** plays a realm by trying hands and orders on copies whose luck is not the luck to
+come, a year ahead, for the `score` - less what the threats would cost the realm as it then
+stands, with a little for what is in store towards the works it could build. It is a plain
+player, not a good one: a realm it keeps standing most of the time can be played. It says how a
+realm stands over some seeds, and `--level ID` starts a game in the scene that plays realm ID:
+
+```
+python -m engine.realm templates/realm 8   # ford: stood 8 of 8, score 142 (the middle one; 128 to 143), ...
 ```
 
 ## Demos

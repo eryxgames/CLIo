@@ -32,6 +32,7 @@
   "engine/parser.py",
   "engine/pixels.py",
   "engine/quests.py",
+  "engine/realm.py",
   "engine/realtime.py",
   "engine/records.py",
   "engine/rts.py",

@@ -433,3 +433,111 @@ class PictureTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def surfaces_library(test):
+    """Run with CLIo Picture 0.8 in use (skipped without it, failed if one is required), and leave it as it was."""
+    from engine import picture
+    from engine.picture import frame as picture_frame
+
+    def run(self):
+        picture.use(True)
+        if not picture_frame.surfaces_ok():
+            if os.environ.get("CLIO_PICTURE_REQUIRE") and picture.load() is not None and \
+                    hasattr(picture.load(), "clio_frame_rooms") and os.environ.get("CLIO_PICTURE_08"):
+                self.fail("CLIo Picture 0.8 is required here: %s" % picture.status())
+            self.skipTest("CLIo Picture 0.8 is not here: %s" % picture.status())
+        try:
+            test(self)
+        finally:
+            picture.use(True)
+    run.__name__, run.__doc__ = test.__name__, test.__doc__
+    return run
+
+
+class LibraryTests(unittest.TestCase):
+    """CLIo Picture 0.8 gives the Python's pictures, to the pixel."""
+
+    def same(self, make, W=60, VR=18, style="pixel", detail="high", t=0.0, flip=None):
+        from engine import picture
+        out = []
+        for on in (False, True):
+            picture.use(on)
+            lv = make()
+            lv.beat = int(t)
+            v = View(W, VR, style, detail)
+            v.use_frame = on
+            out.append(v.render(lv, FX(tick=t - int(t), hands=False, flip=flip), 1))
+        picture.use(True)
+        self.assertEqual(out[0], out[1])
+        return out[1]
+
+    @surfaces_library
+    def test_lit_surfaces_are_the_same(self):
+        hall = ["#########",
+                "#.......#",
+                "#.......#",
+                "#..LwR..#",
+                "#.......#",
+                "#...@...#",
+                "#########"]
+        legend = {"w": "warden", "L": {"lamp": {"colour": [255, 40, 20], "reach": 3, "power": 2.0}},
+                  "R": {"lamp": {"colour": [20, 60, 255], "reach": 3, "power": 2.0}},
+                  ".": {"floor": "polish"}, "@": {"floor": "polish", "start": True}}
+        for style, detail in (("pixel", "high"), ("dots", "high"), ("pixel", "low")):
+            for wall in ("chrome", "panel_lit"):
+                self.same(lambda: level(hall, legend=legend, wall=wall, lights={"ambient": 0.4}), style=style,
+                          detail=detail)
+        rain = {"kind": "rain", "amount": 1.0, "fog": 0.05}
+        yard = dict(SplashTests.LEGEND, s={"sky": True, "floor": "polish"})
+        for t in (0.0, 3.4, 7.75):
+            self.same(lambda: level(SplashTests.ROWS, legend=yard, wall="panel_lit", lights={"ambient": 0.3},
+                                    weather=rain), t=t)
+        self.same(lambda: level(lights={"ambient": 0.5}, wall="chrome"), flip=True)     # on the ceiling
+
+    @surfaces_library
+    def test_the_lit_episode_is_the_same(self):
+        from engine.data import GameData
+        from test_levels import ROOTLESS
+        data = GameData(ROOTLESS)
+        for lid, where in (("e1m8", None), ("e1m8", (6, 30, 1)), ("e1m6", (13, 19, 0)), ("e1m7", None)):
+            def make(lid=lid, where=where):
+                lv = Level(data, lid, seed=0)
+                lv.console = Quiet()
+                if where:
+                    put(lv, *where)
+                return lv
+            for t in (0.0, 2.6):
+                self.same(make, W=80, VR=22, t=t)
+
+    @surfaces_library
+    def test_low_detail_rooms_are_the_same(self):
+        rows = ["#########",
+                "#..%....#",
+                "#.......#",
+                "#...=...#",
+                "#.......#",
+                "#...@...#",
+                "#########"]
+        for style in ("pixel", "dots"):
+            self.same(lambda: level(rows), style=style, detail="low")
+
+    @surfaces_library
+    def test_terraces_and_the_turn_are_the_same(self):
+        from engine import firstperson as fp, picture
+        from test_land import land_level
+        rows = ["#######", "#.....#", "#.@12T#", "#...TT#", "##.####"]
+        legend = {"1": {"height": 0.3}, "2": {"height": 0.6}, "T": {"height": 0.9}}
+        for where in ((22, 22, 1), (23, 22, 1), (25, 23, 3)):
+            def make(where=where):
+                lv = land_level(rows=rows, legend=legend, land={"at": [20, 20], "start": None})
+                put(lv, *where)
+                return lv
+            for style, detail in (("pixel", "high"), ("pixel", "low"), ("dots", "high")):
+                self.same(make, W=70, VR=20, style=style, detail=detail)
+        cells = render(level(lights={"ambient": 0.6}, wall="panel_lit"))[1]
+        for deg in (6.0, 30.0, -90.0, 135.5):
+            picture.use(False)
+            slow = fp.tilt(cells, deg)
+            picture.use(True)
+            self.assertEqual(fp.tilt(cells, deg), slow)

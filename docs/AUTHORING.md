@@ -2121,8 +2121,9 @@ metallic-roughness). A tile says it in tiles.json (see Tiles); the level can say
   point of light, then a ring spreading flat - the same drops for the same beat (open land too).
 - Low detail leaves out the reflections and the splashes. Everything follows from the beat, so
   saves and replays need nothing more.
-- **Cost**: the surfaces are lit in Python - at 160 columns about 30 ms a picture more, and the
-  mesh is drawn in Python too, until CLIo Picture 0.8 lights them in C.
+- **Cost**: in Python a lit picture costs more - E1M8 at 160 columns 46 ms (34 unlit); CLIo
+  Picture 0.8 lights it in C, to the same pixels: 8.5 ms. An older library leaves lit levels to
+  the Python.
 
 RØØTLESS: the plaza under Aspiration Central at night - the tower's windows lit, the street
 lamps' pools on the wet paving, the windows' streaks in it, the rain splashing; the magnetic

@@ -74,9 +74,14 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   light in the dark; floors mirror what stands on them, dimly (Fresnel, smeared on rough floors);
   rain wets floors under the open sky (they mirror more, trembling) and splashes on the ground,
   open land too. `"wet"` wets a whole level. RØØTLESS's tiles have their materials (lit windows
-  on Aspiration Central, the plating's strips, the racks' lights, water and wet paving). In
-  Python: about 30 ms more a picture at 160 columns; CLIo Picture leaves lit surfaces to the
-  Python until 0.8.
+  on Aspiration Central, the plating's strips, the racks' lights, water and wet paving). Models
+  are lit by the level's lamps too, each triangle by its own normal.
+- **CLIo Picture 0.8** does all of it in C, to the same pixels as the Python: the G-buffer, things
+  marking it, the lighting, reflections and splashes (`clio_frame_more`, `clio_frame_surface`) -
+  E1M8 at 160 x 45 in 8.5 ms (46 in Python), E1M6 in 6.8 (42) - and the mesh view's low detail,
+  terraces on open land (`clio_land_terraced`), the picture turned over on the ceiling
+  (`clio_frame_flip`) and turned up a wall (`clio_tilt`). An older library leaves lit levels and
+  terraces to the Python. `--get-picture` still installs 0.7 until 0.8 is released.
 - **Play in the browser** (`engine/editor/web/play.html`, `engine/web.py`): every game and the
   tech demo in a web page, the engine unchanged in Python made for the web (Pyodide) - a
   terminal on the page (xterm.js), keys shared with the game's worker, sound through WebAudio,

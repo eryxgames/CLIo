@@ -15,19 +15,22 @@ try:                                        # not in every Python
 except ImportError:                         # pragma: no cover
     ctypes = None
 
-from . import _Dots, _Frame, _Tone, _chars, _colours, _ptr, _rgb, _texture, load, steps
+from . import _Dots, _Frame, _More, _Tone, _chars, _colours, _ptr, _rgb, _texture, load, steps
 
 FAR = 99.0
+_U32 = "I" if array("I").itemsize == 4 else "L"
 
 
 class FrameRow:
     """A row of the frame's pixels, as a list of (r, g, b) would be; in open land a write lands only where the
-    land is further off than ``view.cur_z`` (as DepthRow)."""
-    __slots__ = ("rgb", "depth", "view", "base", "pw")
+    land is further off than ``view.cur_z`` (as DepthRow) - and while things are drawn over a G-buffer, as
+    surface.GRow."""
+    __slots__ = ("rgb", "depth", "view", "base", "pw", "frame")
 
     def __init__(self, frame, y):
         self.rgb, self.view, self.base, self.pw = frame.rgb, frame.view, y * frame.pw, frame.pw
         self.depth = None
+        self.frame = frame
 
     def __len__(self):
         return self.pw
@@ -48,7 +51,18 @@ class FrameRow:
             raise IndexError("list assignment index out of range")
         i = self.base + x
         d = self.depth
-        if d is None or d[i] > self.view.cur_z:
+        view = self.view
+        if self.frame.marking and view.cur_thing and d is not None:     # a thing over lit surfaces
+            z = view.cur_z
+            if d[i] >= z:
+                self.rgb[i] = (c[0] << 16) | (c[1] << 8) | c[2]
+                if z > -1e8:
+                    d[i] = z
+                fr = self.frame
+                fr.kinds[i] = 7
+                fr.mats[i] = 0x80 if view.cur_glow else 0
+            return
+        if d is None or d[i] > view.cur_z:
             self.rgb[i] = (c[0] << 16) | (c[1] << 8) | c[2]
 
     def __iter__(self):
@@ -112,6 +126,10 @@ class Frame:
         self.px.frame = self
         self.cover_view = CoverView(self.cover, self.W, self.VR)
         self.land = False
+        self.kinds = self.mats = self.own = None              # the G-buffer (CLIo Picture 0.8), made when wanted
+        self.more = None
+        self.marking = self.gbuf = False
+        self._held = ()
 
     def fits(self, view):
         return (view.PW, view.PH, view.sx, view.sy) == (self.pw, self.ph, self.sx, self.sy) and view is self.view
@@ -119,6 +137,7 @@ class Frame:
     def start(self, land):
         """A new picture: nothing covered yet; distances kept (open land) or not (rooms)."""
         ctypes.memmove(self.cover, self.far.buffer_info()[0], len(self.far) * 8)
+        self.more_off()
         self.land = land
         self.s.depth = ctypes.addressof(self.depth) if land else None
         d = self.depth if land else None
@@ -138,8 +157,54 @@ class Frame:
         ctypes.memmove(self.rgb, data, len(data))
 
     def sync(self):
-        """The View's cur_z, for the library's depth test."""
+        """The View's cur_z, for the library's depth test (and what is drawn now, over a G-buffer)."""
         self.s.cur_z = self.view.cur_z
+        m = self.more
+        if m is not None:
+            m.thing = 1 if self.view.cur_thing else 0
+            m.glow = 1 if self.view.cur_glow else 0
+
+    # ---- 0.8: the G-buffer, lit surfaces ------------------------------------------------------------ #
+    def more_on(self, faces, materials, gbuf, low):
+        """What 0.8 adds, handed over beside the frame until more_off: a G-buffer (``gbuf``) the rooms fill - each
+        face's material (Face.mat) and the glowing colours of each material - and floors at half width (``low``)."""
+        n = self.pw * self.ph
+        if gbuf and self.kinds is None:
+            self.kinds, self.mats, self.own = (ctypes.c_uint8 * n)(), (ctypes.c_uint8 * n)(), (ctypes.c_uint8 * n)()
+        face_mat = array("i", [f.mat for f in faces] or [0])
+        glow_at, glow_rgb = array("i"), array(_U32)
+        for m in materials:                                   # each material's glowing colours, one after another
+            glow_at.append(len(glow_rgb))
+            glow_rgb.extend((c[0] << 16) | (c[1] << 8) | c[2] for c in sorted(m.glow))
+        glow_at.append(len(glow_rgb))
+        glow_rgb.append(0)                                    # never empty: an address to hand over
+        self._held = (face_mat, glow_at, glow_rgb)
+        addr = ctypes.addressof
+        self.more = _More(addr(self.kinds) if gbuf else None, addr(self.mats) if gbuf else None,
+                          addr(self.own) if gbuf else None, 0, 1, 0, len(faces), _ptr(face_mat), len(materials),
+                          _ptr(glow_at), _ptr(glow_rgb), 1 if low else 0)
+        self.lib.clio_frame_more(self.ref, ctypes.byref(self.more))
+        self.gbuf = bool(gbuf)
+
+    def more_off(self):
+        if self.more is not None and hasattr(self.lib, "clio_frame_more"):
+            self.lib.clio_frame_more(self.ref, None)
+        self.more = None
+        self.marking = self.gbuf = False
+
+    def mark(self, on):
+        """Things drawn from now on mark the G-buffer (or not)."""
+        self.marking = bool(on) and self.more is not None and self.gbuf
+        if self.more is not None:
+            self.more.marking = 1 if self.marking else 0
+
+    def surface(self, s):
+        """clio_frame_surface: the picture lit by its G-buffer; False if the library would not."""
+        self.mark(False)
+        return self.lib.clio_frame_surface(self.ref, ctypes.byref(s)) == 0
+
+    def flip(self):
+        self.lib.clio_frame_flip(self.ref)
 
     # ---- drawing ----------------------------------------------------------------------------------- #
     def front(self, tex, X0, X1, Y0, Y1, x0, w, y0, h, opened, fog, dist):

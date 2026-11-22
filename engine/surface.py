@@ -395,10 +395,10 @@ def shade(lv, atm, view, rows, depths, gbuf, cam, Z0, eye, t):
                 sp = NO_SPEC
             refl = None
             if k == FLOOR and mirrors and contact[x] >= 0:   # a floor mirrors what stands on it - dim
-                cell = (int(floor_(wx + 0.5)), int(floor_(wy + 0.5)))
+                cell = (int(floor_(wx + 0.5)), int(floor_(wy + 0.5)), mi)
                 wet = wet_of.get(cell)
                 if wet is None:
-                    cc = cell_at(*cell)
+                    cc = cell_at(cell[0], cell[1])
                     wet = wet_of[cell] = 0.0 if cc is None else min(0.9, reflect[mi] + wet_all +
                                                                      (wet_sky if cc.sky else 0.0))
                 if wet > 0.0:
@@ -530,8 +530,8 @@ def _h(*k):
 
 class GRow(list):
     """A row of the mesh view's picture with its G-buffer: as land.DepthRow, a write lands only where it is
-    nearer (``view.cur_z``) than what is there (or as near: the same thing again) - and then it is a thing (sprites, models, shots) at that
-    distance, glowing while ``view.cur_glow``."""
+    nearer (``view.cur_z``) than what is there (or as near: the same thing again) - and then it is a thing
+    (sprites, models, shots) at that distance, glowing while ``view.cur_glow``."""
     __slots__ = ("depth", "view", "gbuf", "base")
 
     def __setitem__(self, i, c):
@@ -568,3 +568,121 @@ def lit(lv, atm, view, px, cam, t):
             diry = [fy + ((x + 0.5 - half) / lx) * ry for x in range(view.PW)]
             atm.fall(view, rows, depths, (cx - fx * Z0, cy - fy * Z0, dirx, diry, Z0, rx, ry), t, kind, amount, wind)
     return rows
+
+
+def lit_frame(lv, atm, view, px, cam, t):
+    """As lit, in CLIo Picture's frame (0.8): the picture stays there. If the library will not, the Python lights
+    it (plain rows then)."""
+    from .mesh import Z0 as MZ0
+    fr = px.frame
+    Z0 = view.persp or MZ0
+    s = frame_surface(lv, atm, view, fr, cam, t, Z0)
+    PW, PH = view.PW, view.PH
+    if s is not None and fr.surface(s):
+        rows = px
+        depths = [fr.depth[y * PW:(y + 1) * PW] for y in range(PH)]
+    else:
+        rows = fr.lists()
+        depths = [fr.depth[y * PW:(y + 1) * PW] for y in range(PH)]
+        shade(lv, atm, view, rows, depths, view.gbuf, cam, Z0, view.EYE, t)
+    fr.more_off()
+    view.cur_z = -1e9
+    if atm is not None and atm.weather:
+        kind, amount, wind, _fog, _c = atm.sky(t)
+        if kind in ("rain", "storm", "snow", "dust") and amount > 0:
+            cx, cy, fx, fy, rx, ry = cam
+            lx, half = view.LW * Z0, view.half
+            dirx = [fx + ((x + 0.5 - half) / lx) * rx for x in range(PW)]
+            diry = [fy + ((x + 0.5 - half) / lx) * ry for x in range(PW)]
+            atm.fall(view, rows, depths, (cx - fx * Z0, cy - fy * Z0, dirx, diry, Z0, rx, ry), t, kind, amount, wind)
+    return rows
+
+
+def numbers(lv, atm, view, cam, t, Z0, box=None):
+    """What shade() works from, as plain numbers (clio_surface's, in its order): a dict - and the lamps, each
+    (x, y, h, r, g, b, reach, k, lit x0, lit y0, lit w, lit h, lit bytes), the cells' window (x0, y0, w, h, flags,
+    heights). ``box``: the floors' cells (x0, y0, x1, y1), where floors may mirror. None without a shader."""
+    from .mesh import FAR, FADE
+    sh = getattr(view, "shader", None)
+    if sh is None:
+        return None
+    kind_w, amount, fog, fog_c, cover, lift, sky_k = weather_of(atm, t)
+    mats = getattr(lv, "materials", None) or [Material("plain", {})]
+    raining = kind_w in ("rain", "storm") and amount > 0
+    spec = lv.spec if isinstance(lv.spec, dict) else {}
+    bits = atm.__dict__.setdefault("_bits", {}) if atm is not None else {}
+    lamps = []
+    for lp, (lx, ly, lh), k, seen in sh.lamps:
+        got = bits.get(id(lp))
+        if got is None:
+            if seen:
+                xs, ys = [c[0] for c in seen], [c[1] for c in seen]
+                x0, y0, w, h = min(xs), min(ys), max(xs) - min(xs) + 1, max(ys) - min(ys) + 1
+            else:
+                x0 = y0 = 0
+                w = h = 1
+            buf = bytearray(w * h)
+            for (cx_, cy_), v in seen.items():
+                if v:
+                    buf[(cy_ - y0) * w + (cx_ - x0)] = 1
+            got = bits[id(lp)] = (x0, y0, w, h, buf)
+        lamps.append((lx, ly, lh, lp.colour[0], lp.colour[1], lp.colour[2], lp.reach, k) + got)
+    p = lv.player
+    x0, y0, x1, y1 = (p.x - 8, p.y - 8, p.x + 8, p.y + 8)
+    if box is not None:
+        x0, y0, x1, y1 = min(x0, box[0]), min(y0, box[1]), max(x1, box[2]), max(y1, box[3])
+    w, h = x1 - x0 + 1, y1 - y0 + 1
+    flags, heights = bytearray(w * h), [0.0] * (w * h)
+    for y in range(y0, y1 + 1):
+        for x in range(x0, x1 + 1):
+            c = lv.cell(x, y)
+            if c is not None:
+                i = (y - y0) * w + (x - x0)
+                flags[i] = (2 if getattr(c, "sky", False) else 1) | (4 if c.solid else 0)
+                heights[i] = float(getattr(c, "height", 0.0) or 0.0)
+    cx, cy, fx, fy, rx, ry = cam
+    out = {"pw": view.PW, "ph": view.PH, "half": float(view.half), "yh": float(view.yh), "lx": view.LW * Z0,
+           "ly": view.TALL * Z0, "cx": float(cx), "cy": float(cy), "fx": float(fx), "fy": float(fy), "rx": float(rx),
+           "ry": float(ry), "z0": float(Z0), "eye": float(view.EYE), "far": float(FAR), "fade": float(FADE),
+           "none": NONE, "t": float(t), "amb": tuple(sh.amb), "key": tuple(sh.key),
+           "metal": [m.metal for m in mats], "rough": [m.rough for m in mats], "reflect": [m.reflect for m in mats],
+           "fog": float(fog), "cover": float(cover), "lift": float(lift), "amount": float(amount),
+           "wet_sky": (0.15 + 0.2 * amount) if raining else 0.0, "wet_all": _unit(spec.get("wet", 0.0)),
+           "fog_rgb": tuple(float(v) for v in fog_c), "has_sky_k": 0 if sky_k is None else 1,
+           "sky_k": tuple(sky_k or (0.0, 0.0, 0.0)), "raining": 1 if raining else 0,
+           "mirrors": 0 if getattr(view, "detail", "high") == "low" else 1, "px": float(p.x), "py": float(p.y)}
+    return out, lamps, (x0, y0, w, h, flags, heights)
+
+
+def frame_surface(lv, atm, view, fr, cam, t, Z0):
+    """clio_surface for this picture (None if it cannot be said)."""
+    try:
+        import ctypes
+        from array import array
+        from .picture import _Lamp, _Surface, _ptr
+    except ImportError:                                       # pragma: no cover
+        return None
+    got = numbers(lv, atm, view, cam, t, Z0, getattr(fr, "cells_box", None))
+    if got is None:
+        return None
+    n, lamps_, (x0, y0, w, h, flags, heights) = got
+    held = []
+    lamps = (_Lamp * max(1, len(lamps_)))()
+    for i, lp in enumerate(lamps_):
+        buf = lp[12]
+        arr = (ctypes.c_uint8 * len(buf)).from_buffer(buf)
+        held.append(arr)
+        lamps[i] = _Lamp(*(lp[:12] + (ctypes.addressof(arr),)))
+    cells = (ctypes.c_uint8 * len(flags)).from_buffer(flags)
+    heights = array("d", heights)
+    metal, rough, reflect = array("d", n["metal"]), array("d", n["rough"]), array("d", n["reflect"])
+    held += [flags, heights, cells, metal, rough, reflect, lamps]
+    D3 = ctypes.c_double * 3
+    s = _Surface(n["pw"], n["ph"], n["half"], n["yh"], n["lx"], n["ly"], n["cx"], n["cy"], n["fx"], n["fy"],
+                 n["rx"], n["ry"], n["z0"], n["eye"], n["far"], n["fade"], n["none"], n["t"], D3(*n["amb"]),
+                 len(lamps_), ctypes.addressof(lamps), D3(*n["key"]), len(n["metal"]), _ptr(metal), _ptr(rough),
+                 _ptr(reflect), n["fog"], n["cover"], n["lift"], n["amount"], n["wet_sky"], n["wet_all"],
+                 D3(*n["fog_rgb"]), n["has_sky_k"], D3(*n["sky_k"]), n["raining"], n["mirrors"], n["px"], n["py"],
+                 x0, y0, w, h, ctypes.addressof(cells), _ptr(heights))
+    s._held = held
+    return s

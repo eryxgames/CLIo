@@ -1778,7 +1778,10 @@ class View:
         atm = getattr(lv, "atmosphere", None)
         if self.gbuf is not None:                             # surfaces lit by their materials (engine/surface.py)
             from . import surface
-            px = surface.lit(lv, atm, self, px, cam, lv.beat + float(fx.tick or 0.0))
+            if getattr(px, "frame", None) is not None:
+                px = surface.lit_frame(lv, atm, self, px, cam, lv.beat + float(fx.tick or 0.0))
+            else:
+                px = surface.lit(lv, atm, self, px, cam, lv.beat + float(fx.tick or 0.0))
             self.gbuf = self.shader = None
         elif atm is not None:                                 # light and weather (engine/atmosphere.py)
             px = atm.apply(self, px, cam, lv.beat + float(fx.tick or 0.0), meshed or land is not None)
@@ -1824,11 +1827,14 @@ class View:
         """The picture turned half round (upside down and left to right), with its labels and the walls' cover -
         how the world looks hanging from the ceiling. Exact: every pixel goes somewhere."""
         fr = getattr(px, "frame", None)
-        rows = fr.lists() if fr is not None else px
         PW, PH, W, VR = self.PW, self.PH, self.W, self.VR
-        out = [rows[PH - 1 - y][::-1] for y in range(PH)]
         labels = [(VR - 1 - row, W - col - len(text), text, role, z, sel) for row, col, text, role, z, sel in labels]
         overlays = [((PW - cx, PH - y1, PH - y0, t), text, role, z) for (cx, y0, y1, t), text, role, z in overlays]
+        if fr is not None and hasattr(fr.lib, "clio_frame_flip"):     # CLIo Picture 0.8: in place, the cover too
+            fr.flip()
+            return px, labels, overlays
+        rows = fr.lists() if fr is not None else px
+        out = [rows[PH - 1 - y][::-1] for y in range(PH)]
         cover, self.cover = self.cover, {}
         for r in range(VR):
             for c in range(W):
@@ -1871,13 +1877,21 @@ class View:
         from . import mesh as mesh_mod
         if self._mesh is None:
             self._mesh = mesh_mod.Mesh(self)
+        surfaced = getattr(lv, "surfaces", False)
         if frame is not None:                                 # CLIo Picture 0.7 draws it, where it can
             px = frame.start(True)
-            labels = self._mesh.draw_frame(lv, cam, self.EYE, phase, fx.doors, sky, frame)
+            labels = self._mesh.draw_frame(lv, cam, self.EYE, phase, fx.doors, sky, frame, surfaced=surfaced)
             if labels is not None:
                 self.cover = frame.cover_view
+                if frame.gbuf:                                # 0.8: lit by their materials later, in C
+                    from . import surface
+                    self.gbuf = (frame.kinds, frame.mats, frame.own)
+                    self.shader = surface.Shader(lv, getattr(lv, "atmosphere", None), cam, mesh_mod.Z0, self.EYE,
+                                                 lv.beat + float(fx.tick or 0.0),
+                                                 getattr(lv, "materials", None) or [surface.Material("plain", {})])
+                    frame.mark(True)
                 return px, labels
-        if frame is None and getattr(lv, "surfaces", False):  # lit by their materials later: a G-buffer kept
+        if frame is None and surfaced:                        # lit by their materials later: a G-buffer kept
             from . import surface
             n = self.PW * self.PH
             gbuf = (bytearray(n), bytearray(n), bytearray(n))
@@ -1949,7 +1963,7 @@ class View:
         zc = (wx - cam[0]) * cam[2] + (wy - cam[1]) * cam[3]     # how far off it stands
         flat = max(0.0, min(1.0, 1.3 - zc))                      # close by, depth is the middle's: no bulging
         fr = getattr(px, "frame", None)
-        if fr is not None and gone <= 0:                  # CLIo Picture 0.6: the mesh is kept there; only this
+        if fr is not None and gone <= 0 and self.gbuf is None:    # CLIo Picture 0.6: the mesh kept there; only this
             lb, ll, lu = self.LIGHT
             got = picture.mesh_draw(fr, mdl, verts, wx, wy, fxw, fyw, lift, cam, self, flat, max(0.3, zc),
                                     _unit3((cam[2] * lb + cam[4] * ll, cam[3] * lb + cam[5] * ll, lu)), flash, tint,
@@ -1981,7 +1995,8 @@ class View:
         ex, ey = cam[0], cam[1]
         smooth = mdl.smooth and gone <= 0
         fr = getattr(px, "frame", None)
-        if fr is not None:                                # CLIo Picture 0.5: all of it in C
+        lamps = self.shader if self.gbuf is not None else None     # lit surfaces: the level's lamps on it too
+        if fr is not None and lamps is None:              # CLIo Picture 0.5: all of it in C
             got = picture.model_draw(fr, mdl, tris, cull, smooth, len(world), cam, self,
                                      flat if flat > 0 and gone <= 0 else 0.0, max(0.3, zc), light, flash, tint)
             if got is not False:
@@ -1998,7 +2013,8 @@ class View:
         top, xs, shown = self.PH, [], False
         fr = getattr(px, "frame", None)
         drawn = [] if fr is not None else None               # CLIo Picture's frame: the triangles together
-        lamps = self.shader if self.gbuf is not None and fr is None else None   # lit surfaces: the level's light
+        if lamps is not None:                                # lit already: the surfaces leave it as it is
+            self.cur_glow = True
         for (p0, p1, p2), f in tris:
             pts = [project(p[0], p[1], p[2]) for p in (p0, p1, p2)]
             if None in pts:
@@ -2042,8 +2058,6 @@ class View:
             if drawn is not None:
                 drawn.append((pts, cols))
             else:
-                if self.gbuf is not None:                     # lit surfaces: lit already, by the same lamps
-                    self.cur_glow = True
                 model_mod.raster(px, zbuf, W, H, pts, cols)
             shown = True
             top = min(top, pts[0][1], pts[1][1], pts[2][1])
@@ -2063,10 +2077,11 @@ class View:
 
     def shadow(self, px, x, base, w):
         fr = getattr(px, "frame", None)
+        thing, self.cur_thing = self.cur_thing, False          # lit surfaces: the floor, darker - still floor
         if fr is not None:
             fr.darken(int(x - w * 0.4), int(x + w * 0.4), int(base) - self.sy // 2, int(base), 0.6)
+            self.cur_thing = thing
             return
-        thing, self.cur_thing = self.cur_thing, False          # lit surfaces: the floor, darker - still floor
         for yy in range(int(base) - self.sy // 2, int(base) + 1):
             if 0 <= yy < self.PH:
                 for xx in range(int(x - w * 0.4), int(x + w * 0.4) + 1):
@@ -2462,6 +2477,10 @@ def tilt(cells, degrees, dark=(10, 10, 14)):
         px += [top, bot]
     a = math.radians(degrees)
     ca, sa = math.cos(a), math.sin(a)
+    got = picture.tilt(px, W, 2 * H, ca, sa, dark) if picture.load() is not None else None
+    if got is not None:                                       # CLIo Picture 0.8: the turn in C
+        get = picture.rgb_of
+        return [[(None, get(got[2 * y * W + x]), get(got[(2 * y + 1) * W + x])) for x in range(W)] for y in range(H)]
     cx, cy = (W - 1) / 2.0, (2 * H - 1) / 2.0
     out = []
     for y in range(H):

@@ -365,17 +365,33 @@ class Mesh:
                 over.append((hit, face.label, getattr(face.cell, "label_role", None), hit[4]))
         return rgb, zbuf, cover, [(h[:4], t, r, z) for h, t, r, z in over]
 
-    def draw_frame(self, lv, cam, eye, phase, doors, sky, frame):
+    def draw_frame(self, lv, cam, eye, phase, doors, sky, frame, surfaced=False):
         """The picture drawn by CLIo Picture (0.7) into the frame - pixels, distances, the walls' cover - and the
-        labels; None when the library cannot (the Python draws it then)."""
+        labels; None when the library cannot (the Python draws it then). ``surfaced`` (0.8): the surfaces' own
+        colours and the frame's G-buffer, lit later (as draw's ``gbuf``)."""
         from . import picture
         view = self.view
         cx, cy, fx, fy, rx, ry = cam
         ex, ey = cx - fx * Z0, cy - fy * Z0
         faces = self.faces(lv, cam, eye, doors, phase, ex, ey)
+        low = getattr(view, "detail", "high") == "low"
+        mats = getattr(lv, "materials", None)
+        if (surfaced or low) and hasattr(frame.lib, "clio_frame_more"):    # 0.8: the G-buffer, low detail
+            if mats is None:
+                from . import surface
+                mats = [surface.Material("plain", {})]
+            frame.more_on(faces, mats, surfaced, low)
         later = picture.rooms(frame, view, sys.modules[__name__], faces, cam, eye, phase, sky)
         if later is None:
+            frame.more_off()
             return None
+        gbuf = (frame.kinds, frame.mats, frame.own) if frame.gbuf else None
+        if gbuf is not None:
+            self.view_materials = mats
+            xs, ys = [f.ix for f in faces if f.kind == FLOOR], [f.iy for f in faces if f.kind == FLOOR]
+            frame.cells_box = (min(xs), min(ys), max(xs), max(ys)) if xs else None   # where floors may mirror
+        else:
+            frame.more_off()
         zbuf = frame.depth
         if later:                                             # teleporters' rings, as the Python draws them
             PW, half, yh = view.PW, view.half, view.yh
@@ -386,6 +402,8 @@ class Mesh:
             lit = {}
 
             def colour(c, q):
+                if gbuf is not None:                          # lit later
+                    return c
                 v = lit.get((c, q))
                 if v is None:
                     v = lit[(c, q)] = fp.shade(c, q / 256.0)
@@ -395,7 +413,7 @@ class Mesh:
                 for pixel, k in later:
                     y, x = divmod(pixel, PW)
                     self.flat(faces[k], [(y, x, x + 1)], frame.rows, zbuf, sb, dirx, diry, ex, ey, eye, None, colour,
-                              sky, phase, force=True)
+                              sky, phase, force=True, gbuf=gbuf)
             finally:
                 view.cur_z = cur
         self.holes(lv, cam, eye, doors, frame.rows, zbuf)

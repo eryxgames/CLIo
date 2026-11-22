@@ -158,6 +158,32 @@ class _Tone(ctypes.Structure if ctypes else object):
                 ("flash", ctypes.c_int), ("tinted", ctypes.c_int), ("tint", ctypes.c_uint32)] if ctypes else []
 
 
+class _More(ctypes.Structure if ctypes else object):
+    P_ = ctypes.c_void_p if ctypes else None
+    _fields_ = [("kinds", P_), ("mats", P_), ("own", P_), ("marking", ctypes.c_int), ("thing", ctypes.c_int),
+                ("glow", ctypes.c_int), ("nfaces", ctypes.c_int), ("face_mat", P_), ("nmat", ctypes.c_int),
+                ("glow_at", P_), ("glow_rgb", P_), ("low", ctypes.c_int)] if ctypes else []
+
+
+class _Lamp(ctypes.Structure if ctypes else object):
+    D_ = ctypes.c_double if ctypes else None
+    _fields_ = [("x", D_), ("y", D_), ("h", D_), ("r", D_), ("g", D_), ("b", D_), ("reach", D_), ("k", D_),
+                ("lit_x0", ctypes.c_int64), ("lit_y0", ctypes.c_int64), ("lit_w", ctypes.c_int),
+                ("lit_h", ctypes.c_int), ("lit", ctypes.c_void_p)] if ctypes else []
+
+
+class _Surface(ctypes.Structure if ctypes else object):
+    D_, P_, I_ = (ctypes.c_double, ctypes.c_void_p, ctypes.c_int) if ctypes else (None, None, None)
+    _fields_ = [("pw", I_), ("ph", I_), ("half", D_), ("yh", D_), ("lx", D_), ("ly", D_), ("cx", D_), ("cy", D_),
+                ("fx", D_), ("fy", D_), ("rx", D_), ("ry", D_), ("z0", D_), ("eye", D_), ("far", D_), ("fade", D_),
+                ("none", D_), ("t", D_), ("amb", D_ * 3), ("nlamps", I_), ("lamps", P_), ("key", D_ * 3),
+                ("nmat", I_), ("metal", P_), ("rough", P_), ("reflect", P_), ("fog", D_), ("cover", D_),
+                ("lift", D_), ("amount", D_), ("wet_sky", D_), ("wet_all", D_), ("fog_rgb", D_ * 3),
+                ("has_sky_k", I_), ("sky_k", D_ * 3), ("raining", I_), ("mirrors", I_), ("px", D_), ("py", D_),
+                ("cells_x0", ctypes.c_int64), ("cells_y0", ctypes.c_int64), ("cells_w", I_), ("cells_h", I_),
+                ("cells", P_), ("heights", P_)] if ctypes else []
+
+
 CHUNK_FN = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int64, ctypes.c_int64) if ctypes else None
 CHUNK_BYTES = 256 * 8 + 256 * 4 + 256 * 2                    # clio_chunk: heights, colours, kinds
 U32 = "I" if array("I").itemsize == 4 else "L"
@@ -233,6 +259,19 @@ def _open(path):
     if hasattr(lib, "clio_frame_rooms"):                # 0.7 and later
         lib.clio_frame_rooms.restype = I
         lib.clio_frame_rooms.argtypes = [ctypes.POINTER(_Frame), ctypes.POINTER(_Rooms), P, ctypes.POINTER(I)]
+    if hasattr(lib, "clio_frame_surface"):              # 0.8 and later
+        lib.clio_frame_more.restype = None
+        lib.clio_frame_more.argtypes = [ctypes.POINTER(_Frame), P]
+        lib.clio_frame_surface.restype = I
+        lib.clio_frame_surface.argtypes = [ctypes.POINTER(_Frame), ctypes.POINTER(_Surface)]
+        lib.clio_ggx.restype = D
+        lib.clio_ggx.argtypes = [P, P, P, D, D]
+        lib.clio_frame_flip.restype = None
+        lib.clio_frame_flip.argtypes = [ctypes.POINTER(_Frame)]
+        lib.clio_tilt.restype = I
+        lib.clio_tilt.argtypes = [P, I, I, D, D, ctypes.c_uint32, P]
+        lib.clio_land_terraced.restype = I
+        lib.clio_land_terraced.argtypes = [ctypes.POINTER(_Ground), I, P, P, CHUNK_FN, P, P, I, P, P]
     if hasattr(lib, "clio_room_draw"):                  # 0.3 and later
         lib.clio_room_draw.restype = I
         lib.clio_room_draw.argtypes = [ctypes.POINTER(_Room), ROOM_CELL_FN, P, P, P, ctypes.POINTER(I)]
@@ -419,6 +458,7 @@ class _Colours(dict):
 
 
 _rgb = _Colours()
+rgb_of = _rgb.__getitem__                                    # 0xRRGGBB -> (r, g, b), the same tuple each time
 
 
 def _pack_chunk(ch):
@@ -474,14 +514,28 @@ def _ptr(a):
     return a.buffer_info()[0]
 
 
+def tilt(px, w, h, ca, sa, dark):
+    """firstperson.tilt's turn in C (0.8): rows of h pixel rows of w (r, g, b) turned - flat 0xRRGGBB out, or None
+    without the library."""
+    lib = load()
+    if lib is None or not hasattr(lib, "clio_tilt"):
+        return None
+    src = array(U32, [(c[0] << 16) | (c[1] << 8) | c[2] for row in px for c in row])
+    out = array(U32, bytes(4 * w * h))
+    if lib.clio_tilt(_ptr(src), w, h, ca, sa, (dark[0] << 16) | (dark[1] << 8) | dark[2], _ptr(out)) != 0:
+        return None
+    return out
+
+
 def land_draw(land, view, cam, eye, phase, sky_rows, frame=None):
     """``Land.cast`` in C: (rows of colours, rows of distances) - or None without the library, or for a
     picture it cannot take (then the Python does it). ``eye``: the eye's height counted from the ground's
     zero (Land.cast's eye plus the land's base). With a ``frame`` (0.4): drawn into it, its cells covered
     marked; True when done."""
     lib = load()
-    if lib is None or not hasattr(lib, "clio_land_draw") or not isinstance(phase, int) or land.terrace:
-        return None                                       # terraces: the Python draws them (the library: later)
+    if lib is None or not hasattr(lib, "clio_land_draw") or not isinstance(phase, int) or \
+            (land.terrace and not hasattr(lib, "clio_land_terraced")):
+        return None                                       # terraces: the Python draws them (the library: 0.8)
     PW, PH = view.PW, view.PH
     step = 2 if view.detail == "low" else 1
     try:
@@ -538,7 +592,16 @@ def land_draw(land, view, cam, eye, phase, sky_rows, frame=None):
     else:
         rgb = (ctypes.c_uint32 * n)()
         dep = (ctypes.c_double * n)()
-    r = lib.clio_land_draw(ctypes.byref(g), fn, None, sky[2], sky[1], rgb, dep)
+    if land.terrace:                                      # 0.8: cells standing higher than the pad
+        try:
+            txy = array("q", [v for key in land.terrace for v in key])
+            th = array("d", [float(v) for v in land.terrace.values()])
+        except (TypeError, ValueError, OverflowError):
+            return None
+        r = lib.clio_land_terraced(ctypes.byref(g), len(th), _ptr(txy), _ptr(th), fn, None, sky[2], sky[1], rgb,
+                                   dep)
+    else:
+        r = lib.clio_land_draw(ctypes.byref(g), fn, None, sky[2], sky[1], rgb, dep)
     if failed:
         raise failed[0]
     if r != 0:

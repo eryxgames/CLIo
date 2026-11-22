@@ -2,7 +2,7 @@
 
 Notable changes to CLIo. Versions follow [semantic versioning](https://semver.org).
 
-## Unreleased
+## 3.5.0 - 2026-11-22
 
 ### Added
 

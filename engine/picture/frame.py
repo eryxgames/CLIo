@@ -301,6 +301,12 @@ def tone(kind, fog=1.0, haze=(0, 0, 0), k=0.0, gone=0.0, step=1.0, mid=0, flash=
     return t
 
 
+def surfaces_ok():
+    """Whether the library lights surfaces by their materials (engine/surface.py) - CLIo Picture 0.8."""
+    lib = load()
+    return lib is not None and hasattr(lib, "clio_frame_surface")
+
+
 def frame_for(view):
     """The View's Frame (made when its size changes), or None without a library that has frames."""
     lib = load()

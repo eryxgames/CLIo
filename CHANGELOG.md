@@ -64,6 +64,19 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   sky; the classic picture is lit as a whole. Fog shortens sight both ways; in the dark a monster
   further than two cells is not seen without the goggles. In RØØTLESS: E1M6 and E1M7 lit, rain
   through SIM-12's skylight, weather and a day on SIM-1's fens.
+- **Surfaces lit by their materials** (`engine/surface.py`), where a level has light or weather
+  (or `"surfaces": true`): a tile's `"material"` in tiles.json - `"metal"`, `"rough"` (glTF's
+  metallic-roughness, as the models'), `"reflect"` for floors, `"glow"` for its palette's letters
+  that give light. The mesh view keeps a G-buffer - what each pixel shows, its material, its
+  distance - and lights it: ambient by the player's view, lamps by how far across and how the
+  surface is turned to them, GGX highlights (a metal's in its own colour; the player's own light's
+  sheen on metal ahead); glowing texels, shots, flames and glowing model materials keep their
+  light in the dark; floors mirror what stands on them, dimly (Fresnel, smeared on rough floors);
+  rain wets floors under the open sky (they mirror more, trembling) and splashes on the ground,
+  open land too. `"wet"` wets a whole level. RØØTLESS's tiles have their materials (lit windows
+  on Aspiration Central, the plating's strips, the racks' lights, water and wet paving). In
+  Python: about 30 ms more a picture at 160 columns; CLIo Picture leaves lit surfaces to the
+  Python until 0.8.
 - **Play in the browser** (`engine/editor/web/play.html`, `engine/web.py`): every game and the
   tech demo in a web page, the engine unchanged in Python made for the web (Pyodide) - a
   terminal on the page (xterm.js), keys shared with the game's worker, sound through WebAudio,

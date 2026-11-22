@@ -642,6 +642,7 @@ def tile_data(name):
         palette.setdefault(ch, "#%02x%02x%02x" % tuple(c))
     return {"pixels": pixels, "palette": palette}
 
+GLOWING = frozenset(("shot", "boom", "missile", "flame"))   # things that give their own light
 FLOOR_A, FLOOR_B, FLOOR_LINE = (68, 61, 53), (58, 53, 47), (94, 86, 72)
 CEIL, CEIL_LINE, LIGHT = (30, 30, 36), (24, 24, 29), (168, 162, 122)
 TOXIC, TOXIC_HI = (36, 140, 54), (130, 240, 110)
@@ -871,6 +872,10 @@ class View:
         self.persp = None                                     # open land: a true perspective from this far behind
         self.air = None                                       # open land: (haze colour, how far half is haze)
         self.cur_z = -1e9                                     # how far off what is being drawn now is (open land)
+        self.cur_thing = True                                 # it stands there (not a mark on a wall or the floor)
+        self.cur_glow = False                                 # it gives light (a shot, a flame): surfaces don't dim it
+        self.gbuf = None                                      # the mesh view's G-buffer when surfaces are lit
+        self.shader = None                                    # and their light (engine/surface.py's Shader)
         self.half = self.PW / 2.0
 
     def set_eye(self, eye):
@@ -1465,6 +1470,9 @@ class View:
         self.cover = {}
         self.cur_z = -1e9
         frame = picture_frame.frame_for(self) if self.use_frame else None     # CLIo Picture 0.4: kept in C
+        self.gbuf = self.shader = None
+        if meshed and frame is not None and getattr(lv, "surfaces", False) and not picture_frame.surfaces_ok():
+            frame = None                                      # lit surfaces: the Python draws them (the library: 0.8)
         px = None
         mesh_labels = ()
         if meshed:                                            # rooms as faces in a true perspective (engine/mesh.py)
@@ -1631,6 +1639,9 @@ class View:
         for z, _o, _a, kind, obj in items:
             if land is not None or meshed:
                 self.cur_z = z                                # the ground nearer than this hides it
+            if self.gbuf is not None:                         # what the surfaces' light makes of it
+                self.cur_thing = kind != "decal"
+                self.cur_glow = kind in GLOWING or (kind == "part" and sum(obj[2]) > 420)
             if kind == "wall":
                 cell, a, x, y = obj
                 opened = fx.doors.get((x, y), cell.open if cell.kind == "door" else 0.0)
@@ -1763,8 +1774,13 @@ class View:
                 a, k = obj
                 t = self.tz(z)
                 self.boom(px, self.X(a, z), foot(a, z, t) - 7 * t * self.K, (4 + 19 * k) * t * self.K, k)
+        self.cur_thing, self.cur_glow = True, False
         atm = getattr(lv, "atmosphere", None)
-        if atm is not None:                                   # light and weather (engine/atmosphere.py)
+        if self.gbuf is not None:                             # surfaces lit by their materials (engine/surface.py)
+            from . import surface
+            px = surface.lit(lv, atm, self, px, cam, lv.beat + float(fx.tick or 0.0))
+            self.gbuf = self.shader = None
+        elif atm is not None:                                 # light and weather (engine/atmosphere.py)
             px = atm.apply(self, px, cam, lv.beat + float(fx.tick or 0.0), meshed or land is not None)
         if inverted:                                          # on the ceiling: the world turned over, the hands not
             px, labels, overlays = self.turned_over(px, labels, overlays)
@@ -1861,6 +1877,21 @@ class View:
             if labels is not None:
                 self.cover = frame.cover_view
                 return px, labels
+        if frame is None and getattr(lv, "surfaces", False):  # lit by their materials later: a G-buffer kept
+            from . import surface
+            n = self.PW * self.PH
+            gbuf = (bytearray(n), bytearray(n), bytearray(n))
+            rgb, zbuf, cover, labels = self._mesh.draw(lv, cam, self.EYE, phase, fx.doors, sky, gbuf=gbuf)
+            PW, px = self.PW, []
+            for y, row in enumerate(rgb):
+                r = surface.GRow(row)
+                r.depth, r.view, r.gbuf, r.base = zbuf[y * PW:(y + 1) * PW], self, gbuf, y * PW
+                px.append(r)
+            self.cover, self.gbuf = cover, gbuf
+            self.shader = surface.Shader(lv, getattr(lv, "atmosphere", None), cam, mesh_mod.Z0, self.EYE,
+                                         lv.beat + float(fx.tick or 0.0),
+                                         getattr(lv, "materials", None) or [surface.Material("plain", {})])
+            return px, labels
         rgb, zbuf, cover, labels = self._mesh.draw(lv, cam, self.EYE, phase, fx.doors, sky)
         if frame is not None:
             px = frame.start(True)
@@ -1967,6 +1998,7 @@ class View:
         top, xs, shown = self.PH, [], False
         fr = getattr(px, "frame", None)
         drawn = [] if fr is not None else None               # CLIo Picture's frame: the triangles together
+        lamps = self.shader if self.gbuf is not None and fr is None else None   # lit surfaces: the level's light
         for (p0, p1, p2), f in tris:
             pts = [project(p[0], p[1], p[2]) for p in (p0, p1, p2)]
             if None in pts:
@@ -1988,6 +2020,8 @@ class View:
                     n = _unit3(normals[i])
                     v = _unit3((ex - p[0], ey - p[1], self.EYE - p[2]))
                     c = model_mod.pbr(mat, rgb, (n[0], n[1], n[2]), light, v)
+                    if lamps is not None:                     # the level's lamps on it too
+                        c = lamps.model_light(c, mat, rgb, p, n, v)
                     cols.append(list(mix(c, haze, hk)) if haze else [c[0] * fog, c[1] * fog, c[2] * fog])
             else:
                 n = _normal(p0, p1, p2)
@@ -1998,6 +2032,8 @@ class View:
                 mz_ = (p0[2] + p1[2] + p2[2]) / 3
                 v = _unit3((ex - mx_, ey - my_, self.EYE - mz_))
                 c = model_mod.pbr(mat, rgb, n, light, v)
+                if lamps is not None:
+                    c = lamps.model_light(c, mat, rgb, (mx_, my_, mz_), n, v)
                 cols = mix(c, haze, hk) if haze else (int(c[0] * fog), int(c[1] * fog), int(c[2] * fog))
                 if flash:
                     cols = (255, 255, 255)
@@ -2006,6 +2042,8 @@ class View:
             if drawn is not None:
                 drawn.append((pts, cols))
             else:
+                if self.gbuf is not None:                     # lit surfaces: lit already, by the same lamps
+                    self.cur_glow = True
                 model_mod.raster(px, zbuf, W, H, pts, cols)
             shown = True
             top = min(top, pts[0][1], pts[1][1], pts[2][1])
@@ -2028,11 +2066,13 @@ class View:
         if fr is not None:
             fr.darken(int(x - w * 0.4), int(x + w * 0.4), int(base) - self.sy // 2, int(base), 0.6)
             return
+        thing, self.cur_thing = self.cur_thing, False          # lit surfaces: the floor, darker - still floor
         for yy in range(int(base) - self.sy // 2, int(base) + 1):
             if 0 <= yy < self.PH:
                 for xx in range(int(x - w * 0.4), int(x + w * 0.4) + 1):
                     if 0 <= xx < self.PW:
                         px[yy][xx] = shade(px[yy][xx], 0.6)
+        self.cur_thing = thing
 
     def draw_monster_model(self, px, lv, m, a, z, mx, my, fx, labels, cam, phase):
         mdl = lv.models[m.model]

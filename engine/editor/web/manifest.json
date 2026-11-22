@@ -41,6 +41,7 @@
   "engine/snapshot.py",
   "engine/sprite.py",
   "engine/stagebot.py",
+  "engine/surface.py",
   "engine/term.py",
   "engine/theme.py",
   "engine/ui.py",

@@ -368,6 +368,9 @@ class Atmosphere:
                 row[x] = v
         if kind in ("rain", "storm", "snow", "dust") and amount > 0:
             self.fall(view, rows, depths, (ex, ey, dirx, diry, Z0, rx, ry), t, kind, amount, wind)
+        if kind in ("rain", "storm") and amount > 0 and getattr(view, "detail", "high") != "low":
+            from .surface import splashes                     # the drops striking the ground
+            splashes(lv, view, rows, depths, None, cam, Z0, view.EYE, t, amount)
         return rows
 
     def fall(self, view, rows, depths, ray, t, kind, amount, wind):
@@ -518,4 +521,8 @@ def problems(lid, spec, legend):
             out.append("level '%s': '%s' lamp power should be 0 or more" % (lid, ch))
         if "flicker" in lamp and not number(lamp["flicker"], 0, 1):
             out.append("level '%s': '%s' lamp flicker should be 0 to 1" % (lid, ch))
+    if "surfaces" in spec and not isinstance(spec["surfaces"], bool):
+        out.append("level '%s': \"surfaces\" should be true or false" % lid)
+    if "wet" in spec and not number(spec["wet"], 0, 1):
+        out.append("level '%s': \"wet\" (how much its floors mirror) should be 0 to 1" % lid)
     return out

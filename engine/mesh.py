@@ -51,13 +51,14 @@ class Face:
     or an upright face on the line x = ``at`` (XWALL) or y = ``at`` (YWALL), from ``lo`` to ``hi`` along the
     line, ``h0`` to ``h1`` high, turned towards ``side`` (+1 or -1 along x or y)."""
     __slots__ = ("kind", "at", "lo", "hi", "h0", "h1", "side", "tex", "top", "opened", "ix", "iy", "info", "wall",
-                 "label", "cell")
+                 "label", "cell", "mat")
 
     def __init__(self, kind, at, lo=0.0, hi=0.0, h0=0.0, h1=0.0, side=1, tex=None, top=1.0, opened=0.0, ix=0, iy=0,
                  info=None, wall=False):
         self.kind, self.at, self.lo, self.hi, self.h0, self.h1, self.side = kind, at, lo, hi, h0, h1, side
         self.tex, self.top, self.opened, self.ix, self.iy, self.info, self.wall = tex, top, opened, ix, iy, info, wall
         self.label = self.cell = None
+        self.mat = 0                 # its material (engine/surface.py): an index into the level's materials
 
     def corners(self):
         """The face's four corners (x, y, height), going round."""
@@ -93,6 +94,18 @@ class Mesh:
         nv = getattr(getattr(lv, "player", None), "nightvision", False)
         texture_of, floor_info, ceiling_of = {}, {}, {}
         out = []
+        mindex = getattr(lv, "material_index", None) or {}
+        diving = getattr(getattr(lv, "player", None), "diving", False)
+
+        def floor_mat(c):                                     # as under(): the tile its floor is drawn with
+            t = getattr(c, "floor", None) or (None if c.toxic else getattr(lv, "floor_tile", None))
+            if diving and getattr(c, "deep", False):
+                t = "seabed"
+            return mindex.get(t, 0) if t else 0
+
+        def ceiling_mat(c):                                   # the engine's own ceiling: its lights glow
+            t = getattr(c, "ceiling", None) or getattr(lv, "ceiling_tile", None)
+            return mindex.get(t, 0) if t else 1
 
         def opened_of(c, x, y):
             return doors.get((x, y), c.open) if c.kind == "door" else 0.0
@@ -130,6 +143,7 @@ class Mesh:
                     return None
             if h1 - h0 <= 1e-9:
                 return None
+            f.mat = mindex.get(name or c.texture(), 0)
             out.append(f)
             return f
 
@@ -145,12 +159,16 @@ class Mesh:
                         info = floor_info.get((x, y))
                         if info is None:
                             info = floor_info[(x, y)] = self.under(lv, c, x, y, phase)
-                        out.append(Face(FLOOR, h, ix=x, iy=y, info=info))
+                        f = Face(FLOOR, h, ix=x, iy=y, info=info)
+                        f.mat = floor_mat(c)
+                        out.append(f)
                     if eye < top:
                         ceil = ceiling_of.get((x, y))
                         if ceil is None:
                             ceil = ceiling_of[(x, y)] = self.above(lv, c, phase)
-                        out.append(Face(CEILING, top, ix=x, iy=y, info=ceil))
+                        f = Face(CEILING, top, ix=x, iy=y, info=ceil)
+                        f.mat = ceiling_mat(c)
+                        out.append(f)
                 if walled(c, x, y):                           # a door, bars or a field: faces come from the cells beside
                     for d in range(4):
                         nx, ny = x + fp.DIRS[d][0], y + fp.DIRS[d][1]
@@ -231,11 +249,16 @@ class Mesh:
         return fp.View.texture(lv, tile, phase) if tile else None
 
     # ---- the picture ---------------------------------------------------------------------------------- #
-    def draw(self, lv, cam, eye, phase, doors, sky, later=None):
+    def draw(self, lv, cam, eye, phase, doors, sky, later=None, gbuf=None):
         """The picture (rows of (r, g, b)), each pixel's distance ahead of the player (``z``; NONE where no face
         is), the nearest wall over each character cell, and the labels of walls seen close by. With ``later`` (a
         list), teleporters' floors are left as CLIo Picture leaves them - haze, their distance set - and their
-        (pixel, face) pairs go into it: what the library's own test is made from."""
+        (pixel, face) pairs go into it: what the library's own test is made from.
+
+        With ``gbuf`` (three bytearrays of a byte a pixel: kinds, materials, light) the surfaces are lit later
+        (engine/surface.py): the picture keeps their own colours, and each pixel what it shows (surface.FLOOR,
+        CEILING, WALL_PX ...; 0 the sky), its material (GLOW added where the texel glows) and the light the
+        player's own view gives it (by distance and how it is turned, 0..255) - what this draws them with."""
         view = self.view
         PW, PH, half, yh = view.PW, view.PH, view.half, view.yh
         cx, cy, fx, fy, rx, ry = cam
@@ -256,13 +279,23 @@ class Mesh:
             fog, fade = fog_of(z)
             return int(fog * k * fade * 256.0)
 
-        def colour(c, q):
+        def shaded(c, q):
             key = (c, q)
             v = lit.get(key)
             if v is None:
                 v = lit[key] = fp.shade(c, q / 256.0)
             return v
 
+        def own(c, q):                                        # the surface's own colour: lit later
+            return c
+        colour = shaded
+        if gbuf is not None:
+            from . import surface
+            gk, gm, gq = gbuf
+            mats = getattr(lv, "materials", None) or [surface.Material("plain", {})]
+            glow_of = [m.glow for m in mats]
+            self.view_materials = mats
+            colour = own
         labels = []
         for k, face in enumerate(self.faces(lv, cam, eye, doors, phase, ex, ey)):
             spans = self.spans(face, cam, eye, ex, ey)
@@ -271,11 +304,15 @@ class Mesh:
             kind = face.kind
             if kind in (FLOOR, CEILING):
                 self.flat(face, spans, rgb, zbuf, sb, dirx, diry, ex, ey, eye, light, colour, sky, phase,
-                          later=None if later is None else (later, k))
+                          later=None if later is None else (later, k), gbuf=gbuf)
                 continue
             n = (face.side, 0) if kind == XWALL else (0, face.side)
             k = SIDE + (1.0 - SIDE) * abs(n[0] * fx + n[1] * fy)
             TH, TW = len(face.tex), len(face.tex[0])
+            if gbuf is not None:
+                wk = (3 if face.side > 0 else 4) if kind == XWALL else (5 if face.side > 0 else 6)
+                fm = face.mat if face.mat < len(mats) else 0
+                glow = glow_of[fm]
             ux, uy = n[1], -n[0]                              # along the face, left to right as seen from its front
             left = min(ux * a + uy * b for a, b, _h in face.corners())
             cols = {}
@@ -312,6 +349,10 @@ class Mesh:
                     zbuf[i] = z
                     walls[i] = 1
                     row[x] = colour(c, q)
+                    if gbuf is not None:
+                        gk[i] = wk
+                        gm[i] = fm | 0x80 if c in glow else fm
+                        gq[i] = q if q < 256 else 255
             if face.label is not None and face.side * (fx if kind == XWALL else fy) < 0:   # a wall facing the player
                 labels.append(face)
         self.holes(lv, cam, eye, doors, rgb, zbuf)
@@ -427,11 +468,18 @@ class Mesh:
         return out
 
     def flat(self, face, spans, rgb, zbuf, sb, dirx, diry, ex, ey, eye, light, colour, sky, phase, force=False,
-             later=None):
+             later=None, gbuf=None):
         """A floor or a ceiling: each row of it is one distance off. With ``force``, pixels the library left to
-        the Python (a teleporter's rings): drawn where the pixel still holds this floor's distance."""
+        the Python (a teleporter's rings): drawn where the pixel still holds this floor's distance. ``gbuf``: as
+        draw's."""
         PW = self.view.PW
         floor = face.kind == FLOOR
+        if gbuf is not None:
+            gk, gm, gq = gbuf
+            mats = self.view_materials
+            fm = face.mat if face.mat < len(mats) else 0
+            glow = mats[fm].glow
+            fk = 1 if floor else 2
         dh = eye - face.at
         ix, iy = face.ix, face.iy
         if floor:
@@ -468,9 +516,11 @@ class Mesh:
                 uy = ey + d * diry[xs] - iy
                 ux = -0.5 if ux < -0.5 else 0.4999 if ux > 0.4999 else ux
                 uy = -0.5 if uy < -0.5 else 0.4999 if uy > 0.4999 else uy
+                qq, hot = q, False
                 if not floor:
                     if tex == "sky":
                         v = sky[y][xs] if sky is not None and y < len(sky) else fp.HAZE
+                        qq = -1
                     else:
                         c = None
                         if tex is not None:
@@ -497,7 +547,9 @@ class Mesh:
                         c = fp.View.fixture(cell, ux, uy, phase)
                     if c is None and toxic:
                         c = fp.TOXIC_HI if fp.noise(int(ux * 8) + ix * 8, int(uy * 8) + iy * 8, phase) < 0.07 else fp.TOXIC
-                        v = colour(c, int((0.45 + 0.55 * fog) * fade * 256.0))
+                        qq = int((0.45 + 0.55 * fog) * fade * 256.0)
+                        v = colour(c, qq)
+                        hot = c == fp.TOXIC_HI
                     else:
                         if c is None:
                             c = fp.FLOOR_A if (ix + iy) & 1 else fp.FLOOR_B
@@ -508,19 +560,32 @@ class Mesh:
                         if mark == "warn":                   # fire is coming here: hatched and glowing
                             hatch = int((ux + uy + 1.0) * 6) % 2 == 0
                             c = fp.mix(c, (255, 90, 30) if hatch else (150, 30, 20), 0.55 + 0.2 * (phase % 2))
-                            v = colour(c, int((0.6 + 0.4 * fog) * fade * 256.0))
+                            qq = int((0.6 + 0.4 * fog) * fade * 256.0)
+                            v = colour(c, qq)
+                            hot = True
                         elif mark == "burn":
                             k = fp.noise(int(ux * 10) + ix * 10, int(uy * 10) + iy * 10, phase + 5)
                             c = (255, 230, 120) if k < 0.25 else (255, 140, 40) if k < 0.7 else (200, 50, 20)
-                            v = colour(c, int(fade * 256.0))
+                            qq = int(fade * 256.0)
+                            v = colour(c, qq)
+                            hot = True
                         else:
                             v = colour(c, q)
+                            hot = bool(fire)
                 if one:
                     zbuf[i] = z
                     row[x] = v
                 if two:
                     zbuf[i + 1] = z
                     row[x + 1] = v
+                if gbuf is not None:                         # what it is: the sky through an open roof is none
+                    gv = 0 if qq < 0 else fk
+                    mv = fm | 0x80 if hot or (qq >= 0 and c in glow) else fm
+                    qv = 0 if qq < 0 else qq if qq < 256 else 255
+                    if one:
+                        gk[i], gm[i], gq[i] = gv, mv, qv
+                    if two:
+                        gk[i + 1], gm[i + 1], gq[i + 1] = gv, mv, qv
 
     def backdrop(self, sky, rows, zbuf):
         """On a wall walked as a floor the sky is all round (a whole picture of it): it shows wherever nothing

@@ -2086,6 +2086,49 @@ RØØTLESS: Kernel Space is dim and blue with a warm lamp over the crontab (the 
 when it is commented out), The Stack goes red and throbs when the stack unwinds, it rains
 through SIM-12's skylight, and SIM-1's fens have weather going round and a day.
 
+### Surfaces
+
+Where a level has light or weather, the mesh view lights its walls, floors and ceilings by what
+they are made of - as the 3D models are lit (physically based: metal, roughness, glTF's
+metallic-roughness). A tile says it in tiles.json (see Tiles); the level can say more:
+
+```json
+"surfaces": true,
+"wet": 0.2
+```
+
+- `"surfaces"`: `true` lights them in a level without light or weather too (the player's own
+  light only), `false` keeps the engine's picture where it has them.
+- `"wet"` 0..1: every floor mirrors this much more (a flooded deck). In rain, floors open to the
+  sky are wet anyway.
+- **What is lit**: each pixel keeps what it shows - a floor, a ceiling, a wall turned one of four
+  ways, a thing - its material and how far off it is (a G-buffer). The level's ambient light is
+  times the light the player's view gives (dimmer far off, side on: the engine's own look); each
+  lamp adds its light by how far across it is and how the surface is turned to it (a pillar's far
+  side stays dark), and a highlight by the material (GGX, Smith's shadowing, Schlick's Fresnel - a
+  metal's highlight in its own colour, paint's white); the player's own light leaves a sheen on
+  metal straight ahead. Lamps light what is by them however far off it is from the player: a lit
+  doorway at the end of a dark hall shows.
+- **Glow**: a tile's glowing texels (lit windows, screens, a tube) are drawn as they are, in the
+  dark and through distance; so are the engine's ceiling lights, burning floors, toxic sparkles,
+  shots, flames, explosions and models' materials with `"glow"`. The fog of the weather still
+  covers them, less than the rest.
+- **Reflections**: a floor with `"reflect"` mirrors what stands on it - walls, monsters, the sky
+  through an open roof - dimly: more at a grazing look than straight down (Fresnel), smeared down
+  on a rough floor as wet streets are, sharp on water. Rain wets floors under the open sky: they
+  mirror more, and the picture in them trembles.
+- **Splashes**: rain and storms strike the ground near the player where it is open to the sky - a
+  point of light, then a ring spreading flat - the same drops for the same beat (open land too).
+- Low detail leaves out the reflections and the splashes. Everything follows from the beat, so
+  saves and replays need nothing more.
+- **Cost**: the surfaces are lit in Python - at 160 columns about 30 ms a picture more, and the
+  mesh is drawn in Python too, until CLIo Picture 0.8 lights them in C.
+
+RØØTLESS: the plaza under Aspiration Central at night - the tower's windows lit, the street
+lamps' pools on the wet paving, the windows' streaks in it, the rain splashing; the magnetic
+plating's blue strips, the server racks' lights and the steel's sheen in Kernel Space and The
+Stack.
+
 ### 3D models
 
 Beside sprites, a level can draw low-poly 3D models: a monster, a vehicle or an item with
@@ -2265,6 +2308,19 @@ cell of floor. A tile named like one of the engine's - `steel`, `screens`, `scre
 A clear pixel (`.`) shows what is behind a wall - bars, a window - though the wall still
 stops the player, shots and sight. In the editor a tile is painted like a sprite, with the
 engine's tiles to start from and a small room to see it in.
+
+What a tile is made of, for levels whose surfaces are lit (see Surfaces):
+
+```json
+"facade": {"pixels": [...], "palette": {...},
+           "material": {"metal": 0.2, "rough": 0.2, "reflect": 0, "glow": "wW"}}
+```
+
+`"metal"` 0..1 and `"rough"` 0..1 (0.85 if not said: matte) are glTF's metallic-roughness, as the
+models' materials; `"reflect"` 0..1 is how much a floor of it mirrors (polished concrete 0.05,
+wet paving 0.1, water 0.5); `"glow"` names the palette's letters that give light of their own.
+The engine's tiles have materials of their own: steel, doors and bars are metal, screens, exits
+and pressed switches glow, a force field glows.
 
 ### Playing it
 

@@ -860,6 +860,14 @@ class Level:
                     self.see_through.add(name)
         from .firstperson import clear_textures
         self.see_through |= {n for n in clear_textures() if n not in self.tiles}   # the engine's bars and fields
+        # what the tiles are made of, and whether the mesh view lights its surfaces by it (engine/surface.py):
+        # the level's "surfaces" (true / false), else wherever it has light or weather
+        from .firstperson import TEXTURES
+        from .surface import materials_of
+        self.materials, self.material_index = materials_of(getattr(self.data, "tiles", None) or {}, self.tiles,
+                                                           TEXTURES)
+        want = self.spec.get("surfaces")
+        self.surfaces = bool(want) if isinstance(want, bool) else getattr(self, "atmosphere", None) is not None
         self.floor_tile, self.ceiling_tile = self.spec.get("floor"), self.spec.get("ceiling")
         from .firstperson import sky_spec
         open_air = self.land is not None or (self.world is None and any(c.sky for row in self.grid for c in row))
@@ -5543,6 +5551,9 @@ def validate(data):
             if odd:
                 problems.append("tile '%s' uses letters its palette does not have: %s" % (name, " ".join(odd)))
                 break
+        if "material" in t:                                  # what it is made of (engine/surface.py)
+            from .surface import problems as material_problems
+            problems += material_problems("tiles.json", name, t["material"], pal)
     known_tiles = set(TEXTURES) | set(tiles)
     for wid, w in (getattr(data, "weapons", None) or {}).items():
         if not isinstance(w, dict):

@@ -966,6 +966,9 @@ that one game. Ctrl+C in the terminal ends it.
   from the first scene, a thing nothing else in the game refers to.
 - *Theme* switches between light, dark and whatever your system uses; the choice is
   remembered. *Download game* gives you the whole game folder as one zip file.
+- *Play* (beside *Save*) plays the game as it was last saved. Opened with `--edit`, it gives
+  you the command for a terminal (and copies it). On the web the game plays in the browser
+  (below).
 
 The forms are built from `engine/schema.py`, which describes the data files. To give a
 field a control, add a line there.
@@ -1027,6 +1030,14 @@ Firefox or Safari - is **kept by the browser** each time you save, and waits und
 *Carry on with* on your next visit, on that computer and in that browser. *Forget it*
 deletes that copy. It is a convenience, not a backup: clearing the browser's data removes
 it, so download the game when a session's work matters.
+
+*Play* plays the game, as last saved, in a tab of its own; the editor stays open. Save
+again and *Restart* in the game's tab plays the new version; *Back to the editor* closes
+the tab. Inside another site's page (an itch.io project) the game plays in that same frame
+instead, and *Back to the editor* opens it in the editor again - unsaved changes are lost
+on the way, so the editor asks first. That frame must let a game and its keys share memory
+(itch.io's *SharedArrayBuffer support*); where it does not, the editor says so and offers
+itself in a tab of its own, where *Play* works. *CLIo's games* goes to the site's first page.
 
 The game never leaves your computer: the site is only files, and has nowhere to send
 anything. The one thing fetched from elsewhere is Python itself (Pyodide, from the

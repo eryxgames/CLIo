@@ -96,6 +96,7 @@ async function saveAll() {
       saved.push(out.saved);
     }
     status("Saved " + saved.join(", ") + "." + (HOSTED ? await kept() : ""));
+    if (HOSTED && tab.tried === state.game.id) await handOver().catch(() => {});   // Restart in the game's tab plays this
   } catch (err) {
     status("Could not save: " + err.message, true);
   }
@@ -132,6 +133,8 @@ function renderBar() {
   const n = state.dirty.size;
   $("save").disabled = n === 0;
   $("save").textContent = n === 0 ? "Saved" : n === 1 ? "Save 1 file" : `Save ${n} files`;
+  $("play").disabled = false;
+  $("play").title = n === 0 ? "Play the game as it was last saved" : "Play the game as it was last saved (save first to play your changes)";
   document.title = (n ? "* " : "") + state.game.title + " - CLIo editor";
 }
 
@@ -2712,7 +2715,7 @@ window.addEventListener("keydown", (e) => {
 // (worker.js). The game is read from a folder or a zip file on this computer and lives in the worker's memory.
 // Where the browser lets a page write into a folder it was given (Chrome, Edge), Save writes there; elsewhere the
 // changes stay in the page until "Download game".
-const tab = { worker: null, waking: null, next: 0, asked: new Map(), game: null, home: "", folder: null, unkept: false, manifest: null };
+const tab = { worker: null, waking: null, next: 0, asked: new Map(), game: null, home: "", folder: null, unkept: false, manifest: null, tried: null };
 const SKIP = (name) => name === "__pycache__" || name === "saves" || (name.startsWith(".") && name !== ".editor-backup");
 const MOST_FILES = 3000;
 
@@ -2756,9 +2759,9 @@ async function hostedApi(path, body) {
 // A game without a folder to save into is kept by the browser between visits (IndexedDB), whole, under its id.
 const KEPT = "clio-editor";
 
-function shelf(mode, work) {
+function shelf(mode, work, name = KEPT) {
   return new Promise((resolve, reject) => {
-    const opening = indexedDB.open(KEPT, 1);
+    const opening = indexedDB.open(name, 1);
     opening.onupgradeneeded = () => opening.result.createObjectStore("games", { keyPath: "id" });
     opening.onerror = () => reject(opening.error);
     opening.onsuccess = () => {
@@ -2840,6 +2843,78 @@ async function openGame(what, work) {
 const EMBEDDED = (() => { try { return window.top !== window.self && !window.top.location.href; } catch (err) { return true; } })();
 const CAN_WRITE = !!window.showDirectoryPicker && !EMBEDDED;
 
+// ---------------------------------------------------------------------- playing the game here
+// Play hands the game, as saved, to the play page (play.html?edited=ID) through this browser's storage: the whole game
+// under its id in "clio-editor-play". The page plays it in a tab of its own while the editor stays open here. Inside
+// another site's page (itch.io) a new tab would not see this page's storage, so the game is played in this same frame
+// instead, and the play page's "Back to the editor" opens it here again (index.html?open=ID).
+const TRIED = "clio-editor-play";
+
+function gameTitle() {
+  return (state.game.files.game && state.game.files.game.data && state.game.files.game.data.title) || state.game.title;
+}
+
+async function handOver() {
+  const { files } = await ask("files", { game: tab.game });
+  await shelf("readwrite", (games) => games.put({ id: state.game.id, title: gameTitle(), when: Date.now(), files }), TRIED);
+  tab.tried = state.game.id;
+}
+
+function pageUrl(name, more) {                                       // a page beside this one, with Python from where this has it
+  const url = new URL(name, location.href);
+  for (const [k, v] of Object.entries(more)) url.searchParams.set(k, v);
+  for (const k of ["pyodide", "npm"]) if (PARAMS.get(k)) url.searchParams.set(k, PARAMS.get(k));
+  return url.href;
+}
+
+async function playGame() {
+  if (!HOSTED) {                                                       // clio.py --edit: the game is on this computer
+    const command = `python clio.py "${state.game.folder}"`;
+    let copied = false;
+    try { await navigator.clipboard.writeText(command); copied = true; } catch (err) { /* shown anyway */ }
+    return status(`To play it, run this in a terminal in CLIo's folder${copied ? " (copied)" : ""}: ${command}`);
+  }
+  if (EMBEDDED && !self.crossOriginIsolated) {                       // this frame could not run it: say so before leaving
+    $("status").replaceChildren("A game cannot run inside this frame (it does not let the game and its keys share memory). ",
+      el("a", { href: pageUrl("index.html", {}), target: "_blank", rel: "noopener" }, "Open the editor in a tab of its own"), ", open the game there and press Play.");
+    $("status").classList.add("bad");
+    return;
+  }
+  const unsaved = state.dirty.size;
+  const away = EMBEDDED ? null : window.open("", "_blank");          // opened now, while the click still counts
+  if (!EMBEDDED && !away) return status("The browser did not open a tab for the game: allow pop-ups for this page and press Play again.", true);
+  $("play").disabled = true;
+  try {
+    await handOver();
+    const url = pageUrl("play.html", { edited: state.game.id });
+    const note = unsaved ? " It plays as last saved: save to play your changes, then Restart there." : "";
+    if (away) {
+      away.location.href = url;
+      status(`${gameTitle()} is playing in a new tab.` + note, !!unsaved);
+    } else {
+      if (unsaved && !confirm("Play the game as it was last saved? Your unsaved changes are lost when the game starts in this frame.")) return;
+      state.dirty.clear();                                             // asked: no second question from the browser
+      tab.unkept = false;
+      location.href = url;
+    }
+  } catch (err) {
+    if (away) away.close();
+    status("Could not hand the game to the player: " + err.message, true);
+  } finally {
+    $("play").disabled = false;
+  }
+}
+
+async function playedAgain(id) {                                     // back from the play page: the game it played, again
+  const url = new URL(location.href);
+  url.searchParams.delete("open");
+  history.replaceState(null, "", url.href);                            // "Open another game" (a reload) starts afresh
+  let g = null;
+  try { g = await shelf("readonly", (games) => games.get(id), TRIED); } catch (err) { /* nothing kept */ }
+  if (g) await openGame(g.title, () => ask("open", { name: g.id, files: g.files }));
+  return !!g;
+}
+
 async function openFolder() {
   if (!CAN_WRITE) return $("open-dir-input").click();
   let dir;
@@ -2883,6 +2958,7 @@ async function welcome() {
       ? ["Inside another page the editor cannot write into your folder: " + stays + " ", el("a", { href: location.href, target: "_blank", rel: "noopener" }, "Open the editor in a tab of its own"), " to save straight into the folder."]
       : ["In this browser a page cannot write into a folder: " + stays + " Chrome and Edge can save straight into the folder."]));
   showKept();
+  if (PARAMS.get("open")) playedAgain(PARAMS.get("open"));
   $("open-folder").addEventListener("click", openFolder);
   $("open-zip").addEventListener("click", () => $("open-zip-input").click());
   $("open-dir-input").addEventListener("change", (e) => { openPicked([...e.target.files]); e.target.value = ""; });
@@ -2933,6 +3009,9 @@ async function begin() {
   }
   $("reopen").hidden = !HOSTED;
   $("reopen").addEventListener("click", () => location.reload());     // the browser asks first when something is not kept
+  $("games").hidden = !HOSTED;
+  $("games").addEventListener("click", () => { location.href = pageUrl("../../../index.html", {}); });
+  $("play").addEventListener("click", playGame);
   if (HOSTED) welcome();
   else begin().catch((err) => status("Could not open the game: " + err.message, true));
 })();

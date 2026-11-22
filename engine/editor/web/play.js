@@ -66,7 +66,7 @@ async function grab(path) {
   return new Uint8Array(await res.arrayBuffer());
 }
 
-async function start({ shared, argv, kept }) {
+async function start({ shared, argv, kept, game }) {
   ctl = new Int32Array(shared, 0, 4);
   ring = new Uint8Array(shared, 16, RING);
   say("Fetching Python…");
@@ -74,13 +74,21 @@ async function start({ shared, argv, kept }) {
   const pyodide = await loadPyodide({ indexURL: INDEX });
   say("Loading CLIo and its games…");
   const manifest = await (await fetch(new URL("manifest.json", self.location.href), { cache: "no-cache" })).json();
-  const paths = manifest.engine.concat(manifest.play);
+  // a game from the editor needs only the engine's own files, not the games that come with CLIo
+  const paths = manifest.engine.concat(game ? manifest.play.filter((p) => !p.startsWith("games/")) : manifest.play);
   const files = await Promise.all(paths.map(grab));
   paths.forEach((path, i) => {
     const to = "/app/" + path;
     pyodide.FS.mkdirTree(to.slice(0, to.lastIndexOf("/")));
     pyodide.FS.writeFile(to, files[i]);
   });
+  for (const [path, data] of game ? game.files : []) {             // the game the editor handed over, as saved there
+    const parts = String(path).split("/").filter((p) => p && p !== "." && p !== "..");
+    if (!parts.length) continue;
+    const to = game.dir + "/" + parts.join("/");
+    pyodide.FS.mkdirTree(to.slice(0, to.lastIndexOf("/")));
+    pyodide.FS.writeFile(to, data);
+  }
   for (const [path, data] of kept || []) {                         // saves and records from earlier visits
     if (!path.startsWith("/data/")) continue;
     pyodide.FS.mkdirTree(path.slice(0, path.lastIndexOf("/")));

@@ -114,6 +114,19 @@ class PlayedTests(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+    def test_a_game_from_the_editor_is_played_from_its_own_folder(self):
+        tmp = tempfile.mkdtemp(prefix="clio-web-edited-")              # play.html?edited=ID: the editor's game, as
+        try:                                                            # saved there, in a folder of its own
+            game = os.path.join(tmp, "edited", "mygame")
+            shutil.copytree(os.path.join(ROOT, "templates", "starter"), game)
+            got = play([game], ["\r", "\r", "look\r", "quit\r", "y\r"])
+            self.assertEqual(got["code"], 0)
+            self.assertIn("Wine Cellar", got["plain"])
+            self.assertNotIn("No game", got["plain"])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 class StandInTests(unittest.TestCase):
     class Page:
         def __init__(self, keys=b""):
@@ -202,11 +215,29 @@ class PageFilesTests(unittest.TestCase):
         self.assertIn('register("coi.js")', script)
         self.assertIn("Cross-Origin-Embedder-Policy", self.read("coi.js"))
 
+    def test_the_editor_hands_its_game_to_the_play_page(self):
+        editor, script, worker, page = self.read("app.js"), self.read("play.mjs"), self.read("play.js"), self.read("play.html")
+        store = '"clio-editor-play"'
+        self.assertIn("const TRIED = " + store, editor)                   # both pages name the same place
+        self.assertIn('indexedDB.open(' + store, script)
+        self.assertIn('pageUrl("play.html", { edited: state.game.id })', editor)
+        self.assertIn('query.get("edited")', script)
+        self.assertIn("if (EDITED) return [EDITED_DIR];", script)          # played by its folder, as clio.py plays one
+        self.assertIn("game.files", worker)
+        self.assertIn('editorUrl({ open: EDITED })', script)              # back in the same frame: opened again there
+        self.assertIn('PARAMS.get("open")', editor)
+        for name in ("bar-title", "bar-again", "bar-back"):
+            self.assertIn('id="%s"' % name, page)
+        index = self.read("index.html")
+        for name in ("play", "games"):
+            self.assertIn('id="%s"' % name, index)
+            self.assertIn('$("%s")' % name, editor)
+
     def test_the_scripts_parse(self):
         node = shutil.which("node")
         if not node:
             self.skipTest("Node.js is not installed")
-        for name in ("play.mjs", "play.js", "coi.js"):
+        for name in ("play.mjs", "play.js", "coi.js", "app.js", "worker.js"):
             run = subprocess.run([node, "--check", os.path.join(self.WEB, name)], capture_output=True)
             self.assertEqual(run.returncode, 0, name + ": " + run.stderr.decode("utf-8", "replace"))
 

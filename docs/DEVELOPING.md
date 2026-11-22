@@ -109,7 +109,7 @@ guide.
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 828 tests, about a minute
+python -m unittest discover -s tests     # 830 tests, about a minute
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 python tests/bot.py 30 cards             # the same with card battles (the Deck mode)
@@ -150,7 +150,9 @@ embed options once - playing needs it (below).
 ### In the browser
 
 `engine/editor/web/play.html` plays CLIo in a web page: `play.html?game=rootless` (or `depths`,
-`derelict`; none: CLIo's own menu; `?demo`: the tech demo). Its worker (`play.js`) runs Python
+`derelict`; none: CLIo's own menu; `?demo`: the tech demo; `?edited=ID`: the game the editor's
+*Play* handed over - the whole game under its id in IndexedDB `clio-editor-play`, written under
+`/edited/ID` and run by its path, without fetching CLIo's own games). Its worker (`play.js`) runs Python
 compiled for the web (Pyodide, from jsDelivr), writes the engine, `clio.py` and the games into
 it (the manifest's `engine` and `play` lists) and runs `engine/web.py`, which gives the engine
 what a terminal gives it on a desktop: standard input and output that are a terminal, a stand-in

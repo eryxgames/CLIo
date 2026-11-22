@@ -18,6 +18,7 @@
   </div>
   <p id="status" role="status" aria-live="polite">Opening the game…</p>
   <button type="button" id="problems-toggle" class="quiet" hidden></button>
+  <button type="button" id="play" disabled title="Play the game as it was last saved">Play</button>
   <button type="button" id="save" class="go" disabled>Save</button>
 </header>
 <section id="problems" class="problems" hidden aria-label="Problems the engine found">
@@ -36,6 +37,7 @@
   <button type="button" id="checkup" class="quiet" title="Rooms nobody can reach, things nothing refers to">Check-up</button>
   <button type="button" id="download" class="quiet" title="The whole game folder as one zip file">Download game</button>
   <button type="button" id="reopen" class="quiet" title="Back to the start, to open a different game" hidden>Open another game</button>
+  <button type="button" id="games" class="quiet" title="CLIo's own games, played in this browser" hidden>CLIo's games</button>
   <button type="button" id="theme" class="quiet"></button>
 </div>
 <section id="found" class="found" hidden aria-label="Places found">
@@ -59,6 +61,7 @@
   <h3>Or start from one of these</h3>
   <ul id="open-games"></ul>
   <p class="note">With CLIo on your computer, <code>python clio.py mygame --edit</code> opens this same editor on the game's own files.</p>
+  <p class="note"><a href="../../../index.html">Or play CLIo's own games</a>, here in the browser.</p>
 </section>
 <main>
   <nav id="kinds" aria-label="What the game is made of"></nav>

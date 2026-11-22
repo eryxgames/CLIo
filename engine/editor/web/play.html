@@ -9,6 +9,11 @@
   html, body { margin: 0; height: 100%; background: #0b0b10; color: #d6ecff; font: 15px/1.4 system-ui, sans-serif; }
   body { display: flex; flex-direction: column; overflow: hidden; }
   #screen { flex: 1; min-height: 0; padding: 4px; box-sizing: border-box; }
+  #bar { display: flex; align-items: center; gap: .5em; padding: 3px 8px; background: #14161f; font-size: 13px; }
+  #bar[hidden] { display: none; }
+  #bar span { flex: 1; color: #9fb8d6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #bar button { font: inherit; color: #d6ecff; background: #22263a; border: 1px solid #3a4060; border-radius: 6px;
+                padding: 2px 10px; cursor: pointer; }
   #screen .xterm { height: 100%; }
   #keys { display: none; gap: 4px; padding: 4px; flex-wrap: wrap; justify-content: center; background: #14161f; }
   body.touch #keys { display: flex; }
@@ -29,6 +34,7 @@
 </style>
 </head>
 <body>
+<div id="bar" hidden><span id="bar-title"></span><button type="button" id="bar-again">Restart</button><button type="button" id="bar-back">Back to the editor</button></div>
 <div id="screen" aria-label="The game's terminal"></div>
 <div id="keys" aria-label="Keys">
   <button data-key="&#27;">Esc</button><button data-key="&#9;">Tab</button><button data-key="&#27;[D">&#8592;</button>

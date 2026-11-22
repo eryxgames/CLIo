@@ -7,6 +7,7 @@
 //
 //   play.html?game=rootless      a game (rootless, depths, derelict); none: CLIo's own menu of games
 //   play.html?demo               the tech demo
+//   play.html?edited=ID          the game the editor hands over (its Play button), as last saved
 //   ?pyodide=URL ?npm=URL        Python and xterm.js from elsewhere than jsDelivr (a local copy, another mirror)
 
 const query = new URLSearchParams(location.search);
@@ -18,6 +19,8 @@ const RING = 65536;
 const GAMES = { rootless: "RØØTLESS", depths: "The Hollow", derelict: "Derelict" };
 const $ = (id) => document.getElementById(id);
 const EMBEDDED = (() => { try { return window.top !== window.self; } catch (err) { return true; } })();
+const EDITED = query.get("edited");
+const EDITED_DIR = "/edited/" + (String(EDITED || "").replace(/[^A-Za-z0-9_.-]+/g, "_").replace(/^\.+/, "") || "game");
 
 function cover(text, choices = [], error = "") {
   $("say").textContent = text;
@@ -35,6 +38,7 @@ function cover(text, choices = [], error = "") {
 }
 
 function argv() {
+  if (EDITED) return [EDITED_DIR];
   if (query.has("demo")) return ["--demo"];
   const game = query.get("game");
   return game && GAMES[game] ? [game] : [];
@@ -54,11 +58,49 @@ async function isolate() {
     } catch (err) { /* fall through */ }
   }
   const here = location.href;
+  if (EDITED && EMBEDDED) {                                  // a new tab would not see the game the editor handed over
+    cover("This frame does not let a game and its keys share memory. Open the editor in a tab of its own, open your game there and press Play.",
+      [["The editor in a new tab", editorUrl()], ["Back to the editor", backToEditor, true]]);
+    return false;
+  }
   cover(EMBEDDED
     ? "This page can play CLIo only in a tab of its own here (the game and its keys share memory, which this frame does not allow)."
     : "This browser did not allow the game and its keys to share memory, which playing needs.",
   EMBEDDED ? [["Play in a new tab", here]] : [["Try again", () => { sessionStorage.removeItem("clio-coi-tried"); location.reload(); }]]);
   return false;
+}
+
+// ---------------------------------------------------------------- the game from the editor
+function editorUrl(more = {}) {
+  const url = new URL("index.html", location.href);
+  for (const [k, v] of Object.entries(more)) url.searchParams.set(k, v);
+  for (const k of ["pyodide", "npm"]) if (query.get(k)) url.searchParams.set(k, query.get(k));
+  return url.href;
+}
+function backToEditor() {
+  let opener = null;
+  try { opener = window.opener && !window.opener.closed ? window.opener : null; } catch (err) { /* another site's */ }
+  if (opener) {                                              // the editor is still open in the tab that opened this one
+    try { opener.focus(); } catch (err) { /* it is there all the same */ }
+    window.close();
+    setTimeout(() => { location.href = editorUrl(); }, 300);   // a tab the browser would not close
+    return;
+  }
+  location.href = editorUrl({ open: EDITED });               // played in the editor's own frame: open the game there again
+}
+function handedOver(id) {
+  return new Promise((resolve) => {
+    let opening;
+    try { opening = indexedDB.open("clio-editor-play", 1); } catch (err) { return resolve(null); }
+    opening.onupgradeneeded = () => opening.result.createObjectStore("games", { keyPath: "id" });
+    opening.onerror = () => resolve(null);
+    opening.onsuccess = () => {
+      let req;
+      try { req = opening.result.transaction("games").objectStore("games").get(id); } catch (err) { opening.result.close(); return resolve(null); }
+      req.onsuccess = () => { opening.result.close(); resolve(req.result || null); };
+      req.onerror = () => { opening.result.close(); resolve(null); };
+    };
+  });
 }
 
 // ---------------------------------------------------------------- saves kept between visits
@@ -143,6 +185,18 @@ function unmute() {                                         // the first key or 
 // ---------------------------------------------------------------- the terminal and the game
 async function main() {
   if (!(await isolate())) return;
+  let edited = null;
+  if (EDITED) {
+    edited = await handedOver(EDITED);
+    if (!edited) {
+      return cover("There is no game from the editor here. Open it in the editor and press Play there.", [["Back to the editor", backToEditor]]);
+    }
+    document.title = edited.title + " - CLIo";
+    $("bar-title").textContent = `${edited.title}, as saved in the editor`;
+    $("bar-again").addEventListener("click", () => location.reload());
+    $("bar-back").addEventListener("click", backToEditor);
+    $("bar").hidden = false;
+  }
   cover("Fetching the terminal…");
   const link = Object.assign(document.createElement("link"), { rel: "stylesheet", href: XTERM + "css/xterm.css" });
   document.head.append(link);
@@ -184,7 +238,7 @@ async function main() {
     Atomics.notify(ctl, 0);
   };
   term.onData(send);
-  term.onTitleChange((title) => { document.title = title || "CLIo"; });
+  term.onTitleChange((title) => { document.title = title || (edited ? edited.title + " - CLIo" : "CLIo"); });
   for (const b of document.querySelectorAll("#keys button[data-key]")) {
     b.addEventListener("pointerdown", (e) => { e.preventDefault(); send(b.dataset.key); });
   }
@@ -203,13 +257,15 @@ async function main() {
     else if (m.type === "removed") forget(m.path);
     else if (m.type === "ended") {
       play({ what: "stop" });
-      cover("The game is over.", [["Play again", () => location.reload()], ["All games", "play.html", true], ["Back", "../../../index.html", true]]);
+      cover("The game is over.", edited ? [["Play again", () => location.reload()], ["Back to the editor", backToEditor, true]]
+        : [["Play again", () => location.reload()], ["All games", "play.html", true], ["Back", "../../../index.html", true]]);
     } else if (m.type === "failed") {
       cover("CLIo could not start here.", [["Try again", () => location.reload()]], m.error);
     }
   };
   worker.onerror = (e) => cover("CLIo could not start here.", [["Try again", () => location.reload()]], e.message || "");
-  worker.postMessage({ cmd: "start", shared, argv: argv(), kept: await keptFiles() });
+  const game = edited ? { dir: EDITED_DIR, files: edited.files } : null;
+  worker.postMessage({ cmd: "start", shared, argv: argv(), kept: await keptFiles(), game });
 }
 
 main().catch((err) => cover("CLIo could not start here.", [["Try again", () => location.reload()]], String(err && err.stack || err)));

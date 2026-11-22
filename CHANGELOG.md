@@ -110,6 +110,11 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   saves kept in the browser, keys for phones under the picture. The site's first page (and
   itch.io's) offers the games and the editor. Needs a cross-origin isolated page: itch.io's
   *SharedArrayBuffer support*; on GitHub Pages a service worker (`coi.js`) does it.
+- **Play from the editor**: on the web, *Play* (beside *Save*) plays the game you are making, as
+  last saved, in a tab of its own while the editor stays open - save again and *Restart* there
+  plays the new version. Inside itch.io's frame it plays in the frame, and *Back to the editor*
+  opens the game in the editor again. With `--edit`, *Play* gives the command for a terminal.
+  *CLIo's games* leads from the editor to the games, and the editor's first screen offers them.
 
 ### Fixed
 

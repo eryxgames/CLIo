@@ -408,7 +408,7 @@ class Atmosphere:
             ok = open_sky.get(cell)
             if ok is None:
                 c = lv.cell(*cell)
-                ok = open_sky[cell] = c is not None and c.sky
+                ok = open_sky[cell] = c is not None and c.sky and not getattr(c, "vacuum", False)   # no air: no rain
             if not ok:
                 continue
             if kind in ("rain", "storm"):

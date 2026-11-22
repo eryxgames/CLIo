@@ -41,6 +41,14 @@ from . import snapshot
 from .firstperson import DIRS, FX, Bits, Picture, View, slide, vslide
 
 FACING = {"n": 0, "north": 0, "e": 1, "east": 1, "s": 2, "south": 2, "w": 3, "west": 3}
+SLOPE_DOT = ((1, 0, -1, 0), (0, 1, 0, -1), (-1, 0, 1, 0), (0, -1, 0, 1))   # [slope][d]: up (1), down (-1), across
+STEEP_RISE = 1.0             # a slope rising more than this across a cell is not walked up
+JUMP = {"high": 0.9, "far": 2, "double": True}     # a level's "jump": true; "double": a second jump in the air
+GAITS = {                    # how the view moves with each step: eye bob (of a wall), sway (cells), frames, a frame's
+    "walk": (0.012, 0.0, 4, 0.03, 0),                    # seconds, a stomp at the footfall (shake)
+    "suit": (0.035, 0.05, 6, 0.045, 0),
+    "mech": (0.05, 0.035, 6, 0.05, 1),
+}
 FACE_NAMES = ("north", "east", "south", "west")
 
 # what the characters of a map mean, unless a level's "legend" says otherwise
@@ -62,7 +70,7 @@ KEYMAP = {
     "space": "f", "insert": "f", "enter": "use", "tab": "map", "center": "w", "delete": "w",
     "1": "1", "2": "2", "3": "3", "4": "4", "5": "5", "6": "6", "7": "7",
     "?": "help", "f1": "help", "f2": "goggles", "f5": "save", "f9": "load", "]": "next",
-    "f3": "mag", "f4": "jet", "f6": "dive",
+    "f3": "mag", "f4": "jet", "f6": "dive", "+": "jump", "f7": "jump", "f8": "jj",
     "shift-up": "look up", "shift-down": "look down", "ctrl-up": "look up", "ctrl-down": "look down",
     "alt-up": "look up", "alt-down": "look down",
 }
@@ -88,11 +96,12 @@ HELP = [
     ("Enter  open, press   Tab  map   1-7 ]  weapons", "text"),
     ("F2  TTY goggles on/off (the battery lasts while off)", "text"),
     ("F3 magboots (on the ceiling: let go)  F4 jetpack  F6 dive / surface", "text"),
+    ("F7 or +  jump (where the level lets you)   F8  jump, and again in the air", "text"),
     ("F5  save   F9  load the last save", "text"),
     ("", "text"),
     ("Typed: k j h l, turn left/right/around, use,", "dim"),
     ("f [x], kill [-9] x, t x, w [n], next, map, ps, man x,", "dim"),
-    ("mag [on|off], jet [on|off], dive, surface,", "dim"),
+    ("mag [on|off], jet [on|off], dive, surface, jump, jj,", "dim"),
     ("goggles [on|off], out (of a vehicle), history,", "dim"),
     ("alias n='...', keys, whoami, sound, q", "dim"),
     ("save [name], load [name], saves, realtime [off|s]", "dim"),
@@ -139,6 +148,7 @@ class Cell:
                  "oil", "slick", "conveyor", "scorched", "exit_kind", "heavy", "switch", "sky", "deep", "steep",
                  "duel", "stairs", "mag", "pit", "bulkhead", "supply", "locker", "opened", "gate", "field", "zap",
                  "open_for", "closes_at", "from_side", "on_open", "height", "ceiling_height", "step",
+                 "slope", "rise", "ceiling_slope", "ceiling_rise", "wet", "vacuum",
                  "ceiling_mag", "mag_off_on", "mag_delay", "high", "hatch", "mag_ceiling", "lamp", "world_up",
                  "sheds")
 
@@ -212,6 +222,15 @@ class Cell:
         self.height = float(spec.get("height") or 0.0)  # in rooms: the floor this high (walls' heights; the mesh view)
         top = spec.get("ceiling_height")                # ... and the ceiling (else a wall's height over the floor)
         self.ceiling_height = float(top) if top is not None else None
+        # sloped floors and ceilings: the height above is at the middle; the face rises "rise" across the cell
+        # towards "slope" (n, e, s, w) - a ramp, a tube's curve
+        sl, cs = spec.get("slope"), spec.get("ceiling_slope")
+        self.slope = FACING.get(str(sl).lower()) if sl else None
+        self.rise = float(spec.get("rise", 0.5)) if self.slope is not None else 0.0
+        self.ceiling_slope = FACING.get(str(cs).lower()) if cs else None
+        self.ceiling_rise = float(spec.get("ceiling_rise", 0.5)) if self.ceiling_slope is not None else 0.0
+        self.wet = bool(spec.get("wet"))                # wet: a slope of it is too slick to stand on
+        self.vacuum = bool(spec.get("vacuum"))          # no air: only a pressure suit keeps one alive
         self.step = spec.get("step")                    # the tile of the risers up to this cell (else the engine's)
         self.found = False
         self.open = 0.0
@@ -262,6 +281,19 @@ class Cell:
     def clear(self):
         """Bars or a force field: what is beyond is seen, and shot at, through it."""
         return self.gate or self.kind == "field"
+
+    def edge(self, d):
+        """The floor's height at the middle of its edge towards DIRS[d] (its own on a slope)."""
+        if self.slope is None:
+            return self.height
+        return self.height + self.rise * 0.5 * SLOPE_DOT[self.slope][d]
+
+    def plane(self, ux, uy):
+        """The floor's height (ux, uy) off the cell's middle (a slope's plane goes on past its edges)."""
+        if self.slope is None:
+            return self.height
+        dx, dy = DIRS[self.slope]
+        return self.height + self.rise * (ux * dx + uy * dy)
 
     def texture(self):
         if self.kind == "door":
@@ -335,8 +367,17 @@ class Field:
                 c = cell(n[0], n[1])
                 if c.solid or (not floats and (c.deep or c.steep or c.pit)):        # as passable() has it
                     continue
-                if up is not None and cell(x, y).height - c.height > up:            # walked from n: a step too high
-                    continue
+                if up is not None:                                                  # walked from n: a step too high
+                    here = cell(x, y)
+                    if here.slope is None and c.slope is None:
+                        if here.height - c.height > up:
+                            continue
+                    else:
+                        k = ((x - n[0]) + 1, (y - n[1]) + 1)
+                        e = {(1, 0): 0, (2, 1): 1, (1, 2): 2, (0, 1): 3}[k]          # the way from n to (x, y)
+                        if (here.slope == e and here.rise > STEEP_RISE + 1e-9) or \
+                                here.edge((e + 2) % 4) - c.edge(e) > up:
+                            continue
                 dist[n] = d
                 nxt.append(n)
             if links:
@@ -491,9 +532,11 @@ class Player:
         self.air = int(cfg.get("breath", 20))        # beats of breath left under water
         self.look = 0                                # looking up (+) or down (-), in steps (the mesh view)
         self.ceiling = False                         # on the ceiling, upside down, held by the magboots
+        self.suit = False                            # in a pressure suit: air in a vacuum, a heavy tread, no jumping
+        self.stride = 0                              # steps taken: which foot comes down (the view sways with it)
 
     DEFAULTS = {"magboots": False, "mag_on": False, "jet": 0, "jet_on": False, "diving": False, "air": 20, "look": 0,
-                "ceiling": False}
+                "ceiling": False, "suit": False, "stride": 0}
 
     @property
     def nightvision(self):
@@ -731,8 +774,10 @@ class Level:
         self.player.x, self.player.y = start
         self.player.facing = FACING.get(str(self.spec.get("facing", "n")).lower(), 0)
         # rooms with floors at heights: a step higher than step_up is not walked up (the mesh view draws them)
-        self.heights = self.land is None and any(c.height or c.ceiling_height is not None
-                                                 for row in self.grid for c in row)
+        self.heights = self.land is None and any(c.height or c.ceiling_height is not None or c.slope is not None
+                                                 or c.ceiling_slope is not None for row in self.grid for c in row)
+        self.slopes = self.land is None and any(c.slope is not None or c.ceiling_slope is not None
+                                                for row in self.grid for c in row)
         self.terraced = self.land is not None and bool(self.land.terrace)    # open land with terraces: steps too
         from .atmosphere import Atmosphere
         self.atmosphere = Atmosphere(self) if Atmosphere.wanted(self) else None    # light and weather
@@ -990,6 +1035,9 @@ class Level:
         cells round the point that are not walls - walking up stairs, the eye rises smoothly."""
         ix, iy = int(math.floor(x)), int(math.floor(y))
         ux, uy = x - ix, y - iy
+        here = self.cell(int(math.floor(x + 0.5)), int(math.floor(y + 0.5)))
+        if here.slope is not None and not here.drawn_as_wall():  # on a slope: its plane, exactly
+            return here.plane(x - here.x, y - here.y)
         total = weight = 0.0
         for cx, cy, w in ((ix, iy, (1 - ux) * (1 - uy)), (ix + 1, iy, ux * (1 - uy)), (ix, iy + 1, (1 - ux) * uy),
                           (ix + 1, iy + 1, ux * uy)):
@@ -998,18 +1046,27 @@ class Level:
             c = self.cell(cx, cy)
             if c.drawn_as_wall():
                 continue
-            total += c.height * w
+            total += (c.height if c.slope is None else c.plane(x - cx, y - cy)) * w
             weight += w
         if weight <= 0.0:
-            return self.cell(int(math.floor(x + 0.5)), int(math.floor(y + 0.5))).height
+            return here.height
         return total / weight
 
-    def step_ok(self, x0, y0, x1, y1, floats=False):
+    def step_ok(self, x0, y0, x1, y1, floats=False, up=None):
         """Can a walker go from (x0, y0) to (x1, y1)? In rooms with heights, not up a step higher than step_up
-        (down any). Floaters and fliers go anywhere."""
+        (``up``: a walking machine's own "climb"; down any). Floaters and fliers go anywhere."""
         if floats or not (getattr(self, "heights", False) or getattr(self, "terraced", False)):
             return True
-        return self.cell(x1, y1).height - self.cell(x0, y0).height <= self.step_up + 1e-9
+        step_up = self.step_up if up is None else up
+        a, b = self.cell(x0, y0), self.cell(x1, y1)
+        if a.slope is None and b.slope is None:
+            return b.height - a.height <= step_up + 1e-9
+        d = DIRS.index((x1 - x0, y1 - y0)) if (x1 - x0, y1 - y0) in DIRS else None
+        if d is None:
+            return b.height - a.height <= step_up + 1e-9
+        if b.slope == d and b.rise > max(STEEP_RISE, step_up) + 1e-9:   # up a slope too steep to walk
+            return False
+        return b.edge((d + 2) % 4) - a.edge(d) <= step_up + 1e-9
 
     def free(self, x, y, skip=None):
         p = self.player
@@ -1492,6 +1549,10 @@ class Level:
             return self.jetpack(m.group(1))
         if t in ("dive", "surface"):
             return self.dive(None if t == "dive" and self.player.diving else ("down" if t == "dive" else "up"))
+        if t in ("jump", "jp"):
+            return self.leap()
+        if t in ("jump jump", "jj", "double jump", "jump 2"):
+            return self.leap(twice=True)
         if t == "whoami":
             self.say("rootless   (uid 1000; root was revoked)" if not self.player.sudo else "root   (for now)", "dim")
             if self.player.boots:
@@ -1928,7 +1989,8 @@ class Level:
                 if not cell.deep:
                     self.say("You are under water: surface first (F6, or surface).", "dim")
                     return False
-        if not flying and not cell.solid and not self.step_ok(p.x, p.y, nx, ny):
+        climb = v.vehicle.get("climb") if v is not None else None
+        if not flying and not cell.solid and not self.step_ok(p.x, p.y, nx, ny, up=climb):
             self.say("Too high a step to climb.", "dim")
             self.sfx("locked")
             return False
@@ -1966,6 +2028,10 @@ class Level:
         ox, oy = p.x, p.y
         was_wet = self.cell(ox, oy).deep
         p.x, p.y = nx, ny
+        down = self.slope_path(nx, ny) if not flying and v is None and not p.mag_on else []
+        if down:                                       # a wet slope: down it, whichever way he came on to it
+            return self.slide_down([(ox, oy), (nx, ny)], down, up=self.cell(nx, ny).slope == DIRS.index(
+                (nx - ox, ny - oy)) if (nx - ox, ny - oy) in DIRS else False)
         slid = self.slide_path(nx, ny, nx - ox, ny - oy)
         if slid and (flying or (p.mag_on and v is None)):  # in the air, or the magboots grip: no slide
             if not flying:
@@ -2000,15 +2066,212 @@ class Level:
             self.sfx("wade", "footstep") if wet else self.sfx("footstep")
             if was_wet:
                 self.say("You climb out of the water.", "dim")
-        drops = (Bits(self.vrng).burst(nx + (nx - ox) * 0.45, ny + (ny - oy) * 0.45, 0.0,
-                                      [(90, 230, 70), (150, 255, 110), (40, 150, 40)], n=10, speed=0.6, up=1.4,
-                                      size=0.8).frames(4, 0.05) if wet else [()] * 4)
-        self.anim([FX(cam=(ox + (nx - ox) * ease(i / 4.0), oy + (ny - oy) * ease(i / 4.0)), parts=drops[i - 1])
-                   for i in range(1, 5)], 0.03)
+        gait = self.gait()
+        if gait is not None and not flying and not cell.deep:  # the view bobs and sways with the stride
+            self.anim(self.stride_frames(ox, oy, nx, ny, gait, wet), GAITS[gait][3])
+        else:
+            drops = (Bits(self.vrng).burst(nx + (nx - ox) * 0.45, ny + (ny - oy) * 0.45, 0.0,
+                                          [(90, 230, 70), (150, 255, 110), (40, 150, 40)], n=10, speed=0.6,
+                                          up=1.4, size=0.8).frames(4, 0.05) if wet else [()] * 4)
+            self.anim([FX(cam=(ox + (nx - ox) * ease(i / 4.0), oy + (ny - oy) * ease(i / 4.0)), parts=drops[i - 1])
+                       for i in range(1, 5)], 0.03)
+        p.stride += 1
         self.update_seen()
         self.arrive()
         self.end_beat()
         return True
+
+    # ---- slopes, jumps, gaits ------------------------------------------- #
+    def raining(self):
+        """Rain (or a storm) falling now."""
+        atm = getattr(self, "atmosphere", None)
+        if atm is None or not atm.weather:
+            return False
+        kind, amount = atm.sky(self.beat)[:2]
+        return kind in ("rain", "storm") and amount > 0
+
+    def slippery(self, c):
+        """A slope too slick to stand on: wet, oiled, slick, or out in the rain."""
+        return c.slope is not None and not c.solid and (c.wet or c.slick or c.oil or
+                                                         (c.sky and not c.vacuum and self.raining()))
+
+    def slope_path(self, x, y):
+        """The cells one slides down to from (x, y), down a slippery slope, until something stops him (or a drop)."""
+        out = []
+        c = self.cell(x, y)
+        while self.slippery(c) and len(out) < 30:
+            dx, dy = DIRS[(c.slope + 2) % 4]               # downhill
+            n = self.cell(x + dx, y + dy)
+            if n.solid or self.monster_at(x + dx, y + dy) is not None or (n.crate and not n.solid):
+                break
+            x, y = x + dx, y + dy
+            out.append((x, y))
+            c = n
+            if n.pit or n.deep:
+                break
+        return out
+
+    def slide_down(self, before, down, up=False, beat=True):
+        """Down a slippery slope along ``down`` (after ``before``, the path that brought him on to it)."""
+        p = self.player
+        path = before + down
+        for (x, y) in down:
+            p.x, p.y = x, y
+            for it in self.items:
+                if not it.taken and (it.x, it.y) == (x, y):
+                    self.take(it)
+        self.sfx("slide", "footstep")
+        n = len(path) - 1
+        self.anim([FX(cam=self.along(path, ease(i / (3.0 * n)))) for i in range(1, 3 * n + 1)], 0.025)
+        end = self.cell(p.x, p.y)
+        self.say("Too slick to climb: you slide back down the wet slope." if up else
+                 "You slide down the wet slope.", "dim")
+        if end.pit:
+            self.hurt(999, "You slide off the wet slope into the drop.")
+            return True
+        self.update_seen()
+        self.arrive()
+        if beat:
+            self.end_beat()
+        return True
+
+    def jumping(self):
+        """What the level lets the player jump (the JUMP numbers, its own over them), or None: no jumping."""
+        spec = self.spec.get("jump") if isinstance(self.spec, dict) else None
+        if spec is None:
+            spec = (self.cfg or {}).get("jump")
+        if not spec:
+            return None
+        out = dict(JUMP)
+        if isinstance(spec, dict):
+            out.update(spec)
+        return out
+
+    def leap(self, twice=False):
+        """``jump``: up on to a ledge ahead, or over a gap - a beat; ``jump jump`` jumps again in the air, twice as
+        high and a cell further (where the level allows it)."""
+        p = self.player
+        spec = self.jumping()
+        if spec is None:
+            self.say("You cannot jump here.", "dim")
+            return False
+        why = ("in the %s" % p.vehicle.name if p.vehicle is not None else "in the pressure suit" if p.suit else
+               "hanging from the ceiling" if p.ceiling else "in the water" if p.diving or self.cell(p.x, p.y).deep
+               else "on the jetpack" if p.jet_on else None)
+        if why:
+            self.say("You cannot jump %s." % why, "dim")
+            return False
+        if twice and not spec.get("double"):
+            self.say("No second jump here: once is all you get.", "dim")
+            twice = False
+        high = float(spec.get("high", 0.9)) * (2 if twice else 1)
+        far = int(spec.get("far", 2)) + (1 if twice else 0)
+        fx, fy = DIRS[p.facing]
+        h0 = self.cell(p.x, p.y).edge(p.facing)
+        here = self.cell(p.x, p.y)
+        if not here.sky and self.top_of(here) - here.height < 0.8:
+            self.say("No room to jump under this ceiling.", "dim")
+            return False
+        land = None
+        for k in range(far, 0, -1):                          # as far as it goes
+            ok = True
+            for j in range(1, k + 1):
+                c = self.cell(p.x + fx * j, p.y + fy * j)
+                if c.solid or self.monster_at(p.x + fx * j, p.y + fy * j) is not None or (c.crate and j < k) or \
+                        (not c.sky and self.top_of(c) - max(c.height, h0) < 0.75) or \
+                        (j < k and max(c.edge(p.facing), c.edge((p.facing + 2) % 4)) - h0 > high * 0.5 + 1e-9):
+                    ok = False
+                    break
+            if not ok:
+                continue
+            c = self.cell(p.x + fx * k, p.y + fy * k)
+            if c.crate or c.pit or c.deep or (c.slope == p.facing and c.rise > STEEP_RISE + 1e-9 and not
+                                                    self.slippery(c)):
+                continue
+            if c.edge((p.facing + 2) % 4) - h0 > high * (1.0 if k == 1 else 0.6 if k == 2 else 0.35) + 1e-9:
+                continue
+            land = k
+            break
+        if land is None:
+            self.say("Nowhere to land that jump.", "dim")
+            self.sfx("locked")
+            return False
+        ox, oy = p.x, p.y
+        nx, ny = p.x + fx * land, p.y + fy * land
+        h1 = self.cell(nx, ny).height
+        p.x, p.y = nx, ny
+        base = fp.EYE_STANDING
+        arc = 0.28 + 0.12 * land + (0.25 if twice else 0.0)
+        frames = []
+        n = 6 + 2 * land
+        for i in range(1, n + 1):
+            k = i / float(n)
+            g0 = self.floor_at(ox + (nx - ox) * k, oy + (ny - oy) * k)
+            line = h0 + (h1 - h0) * k                       # the arc over the line between take-off and landing
+            lift = arc * math.sin(math.pi * k) if not twice else \
+                (arc * 0.55 * math.sin(math.pi * min(1.0, 2 * k)) if k < 0.4 else arc * math.sin(math.pi * k))
+            cx_, cy_ = ox + (nx - ox) * k, oy + (ny - oy) * k
+            under = self.cell(int(round(cx_)), int(round(cy_)))
+            head = 99.0 if under.sky else self.ceiling_at(cx_, cy_) if getattr(self, "heights", False) else 1.0
+            lift = max(0.0, min(lift, head - (line + base) - 0.06))     # not through the ceiling
+            frames.append(FX(cam=(cx_, cy_), eye=line - g0 + base + lift, shake=1 if i == n else 0))
+        self.sfx("jump", "footstep")
+        self.anim(frames, 0.03)
+        self.sfx("land", "footstep")
+        self.say(("You jump - and again in the air - " if twice else "You jump ") +
+                 ("up on to the ledge." if h1 - h0 > self.step_up + 1e-9 else
+                  "over the gap." if land > 1 else "ahead."), "dim")
+        fall = h0 - h1
+        if fall > 1.25:                                    # a long way down
+            self.hurt(int((fall - 1.25) * 25), "You land hard.")
+            if self.over:
+                return True
+        down = self.slope_path(nx, ny) if not p.mag_on else []
+        if down:
+            return self.slide_down([(nx, ny)], down)
+        self.update_seen()
+        self.arrive()
+        self.end_beat()
+        return True
+
+    def gait(self):
+        """How the view moves as he walks: "mech" (a walking machine), "suit" (a pressure suit), "walk" (the level's
+        or the game's "headbob"), or None."""
+        p = self.player
+        v = p.vehicle
+        if v is not None:
+            g = v.vehicle.get("gait")
+            return g if g in GAITS else None
+        if p.suit:
+            return "suit"
+        bob = self.spec.get("headbob") if isinstance(self.spec, dict) else None
+        if bob is None:
+            bob = (self.cfg or {}).get("headbob")
+        return "walk" if bob else None
+
+    def stride_frames(self, ox, oy, nx, ny, gait, wet=False):
+        """A step's frames for a gait: the camera along the way, the eye up and down with the stride, swaying to the
+        side of the foot that comes down, the hands with it; a machine's foot shakes the view as it lands."""
+        bob, sway, n, _dt, stomp = GAITS[gait]
+        p = self.player
+        side = 1 if p.stride % 2 else -1
+        rx, ry = DIRS[(p.facing + 1) % 4]
+        v = p.vehicle
+        base = (v.vehicle.get("eye") if v is not None else None) or fp.EYE_STANDING
+        drops = (Bits(self.vrng).burst(nx + (nx - ox) * 0.45, ny + (ny - oy) * 0.45, 0.0,
+                                      [(90, 230, 70), (150, 255, 110), (40, 150, 40)], n=10, speed=0.6, up=1.4,
+                                      size=0.8).frames(n, 0.05) if wet else [()] * n)
+        out = []
+        for i in range(1, n + 1):
+            k = i / float(n)
+            e = ease(k)
+            up = math.sin(math.pi * k)                     # the body rises over the planted foot, down on the next
+            lean = side * sway * math.sin(math.pi * k)
+            eye = base + bob * (up - 0.5) * 2 if gait != "mech" else base + bob * (up - 0.6) - (0.04 if i == n else 0)
+            out.append(FX(cam=(ox + (nx - ox) * e + rx * lean, oy + (ny - oy) * e + ry * lean), eye=eye,
+                          bob=(side * 6 * math.sin(math.pi * k), 3 * up), parts=drops[i - 1],
+                          shake=(side if stomp and i == n else 0)))
+        return out
 
     @staticmethod
     def along(path, k):
@@ -2509,10 +2772,22 @@ class Level:
         """A cell's ceiling (in walls' heights): its own, else a wall's height over its floor."""
         return cell.ceiling_height if cell.ceiling_height is not None else cell.height + 1.0
 
+    @staticmethod
+    def top_plane(cell, ux, uy):
+        """The ceiling's height (ux, uy) off the cell's middle: its own slope's plane."""
+        top = cell.ceiling_height if cell.ceiling_height is not None else cell.height + 1.0
+        if cell.ceiling_slope is None:
+            return top
+        dx, dy = DIRS[cell.ceiling_slope]
+        return top + cell.ceiling_rise * (ux * dx + uy * dy)
+
     def ceiling_at(self, x, y):
         """How high the ceiling is at (x, y): a cell's own at its middle, blended between cells (1 in flat rooms)."""
         if not getattr(self, "heights", False):
             return self.top_of(self.cell(int(round(x)), int(round(y))))
+        here = self.cell(int(math.floor(x + 0.5)), int(math.floor(y + 0.5)))
+        if here.ceiling_slope is not None and not here.drawn_as_wall():     # under a sloped ceiling: its plane
+            return self.top_plane(here, x - here.x, y - here.y)
         ix, iy = int(math.floor(x)), int(math.floor(y))
         ux, uy = x - ix, y - iy
         total = weight = 0.0
@@ -2521,7 +2796,7 @@ class Level:
             c = self.cell(cx, cy)
             if w <= 0.0 or c.drawn_as_wall():
                 continue
-            total += self.top_of(c) * w
+            total += (self.top_of(c) if c.ceiling_slope is None else self.top_plane(c, x - cx, y - cy)) * w
             weight += w
         if weight <= 0.0:
             return self.top_of(self.cell(int(math.floor(x + 0.5)), int(math.floor(y + 0.5))))
@@ -2966,6 +3241,8 @@ class Level:
             p.fuel += int(pk["fuel"])
         if pk.get("power") == "magboots":
             p.magboots = p.mag_on = True
+        if pk.get("power") == "suit":
+            p.suit = True
         if pk.get("power") == "jetpack":
             p.jet += int(pk.get("beats", 30))
         elif pk.get("jet"):
@@ -3930,6 +4207,11 @@ class Level:
             if self.over:
                 return
         p = self.player
+        here = self.cell(p.x, p.y)
+        if here.vacuum and not p.suit and not (p.vehicle is not None and p.vehicle.vehicle.get("sealed")):
+            self.hurt(12, "No air out here: your lungs burn. (a pressure suit)")
+            if self.over:
+                return
         self.shed()
         if self.world is not None:
             self.world.follow()                          # wake what is near, put what he left to sleep
@@ -5507,6 +5789,13 @@ def validate(data):
             if gun is not None and not (isinstance(gun, dict) and isinstance(gun.get("damage"), list)
                                         and len(gun["damage"]) == 2):
                 problems.append("monster '%s': its vehicle's gun should be a weapon with damage [least, most]" % kind)
+            if veh.get("gait") is not None and veh["gait"] not in GAITS:
+                problems.append("monster '%s': its vehicle's gait should be one of %s" % (kind, ", ".join(GAITS)))
+            for key in ("climb", "eye"):
+                if key in veh and (isinstance(veh[key], bool) or not isinstance(veh[key], (int, float))
+                                   or not 0 < veh[key] <= 3):
+                    problems.append("monster '%s': its vehicle's %s should be over 0, up to 3 (walls' heights)"
+                                    % (kind, key))
         problems += ai.brain.problems(spec.get("brain"), "monster '%s'" % kind)
         if spec.get("squad_tactic") is not None and spec["squad_tactic"] not in ai.squad.TACTICS:
             problems.append("monster '%s': squad_tactic should be one of %s" % (kind, ", ".join(ai.squad.TACTICS)))
@@ -5596,6 +5885,20 @@ def validate(data):
         if lv.get("climb") is not None and (isinstance(lv["climb"], bool) or not isinstance(lv["climb"], (int, float))
                                              or lv["climb"] < 0):
             problems.append("level '%s': climb should be the highest step walked up (walls' heights)" % lid)
+        jmp = lv.get("jump")
+        if jmp is not None and not isinstance(jmp, (bool, dict)):
+            problems.append("level '%s': jump should be true, false or {high, far, double}" % lid)
+        elif isinstance(jmp, dict):
+            if "high" in jmp and (isinstance(jmp["high"], bool) or not isinstance(jmp["high"], (int, float))
+                                  or not 0 < jmp["high"] <= 3):
+                problems.append("level '%s': jump high should be over 0, up to 3 (walls' heights)" % lid)
+            if "far" in jmp and (isinstance(jmp["far"], bool) or not isinstance(jmp["far"], int)
+                                 or not 1 <= jmp["far"] <= 4):
+                problems.append("level '%s': jump far should be 1 to 4 cells" % lid)
+            if "double" in jmp and not isinstance(jmp["double"], bool):
+                problems.append("level '%s': jump double should be true or false" % lid)
+        if "headbob" in lv and not isinstance(lv["headbob"], bool):
+            problems.append("level '%s': headbob should be true or false" % lid)
         rows = lv.get("map")
         if land is not None and rows is None:
             rows = []                                # open land: the map (a camp, a compound) is optional
@@ -5725,6 +6028,18 @@ def validate(data):
             if isinstance(spec.get("ceiling_height"), (int, float)) and \
                     spec["ceiling_height"] <= (spec.get("height") if isinstance(spec.get("height"), (int, float)) else 0):
                 problems.append("level '%s': '%s' has its ceiling at or under its floor" % (lid, ch))
+            for key, rk in (("slope", "rise"), ("ceiling_slope", "ceiling_rise")):
+                if spec.get(key) is not None and str(spec[key]).lower() not in FACING:
+                    problems.append("level '%s': '%s' %s should be n, e, s or w (the way it rises)" % (lid, ch, key))
+                r = spec.get(rk)
+                if r is not None and (isinstance(r, bool) or not isinstance(r, (int, float)) or not 0 < r <= 3):
+                    problems.append("level '%s': '%s' %s should be a number over 0, up to 3 (walls' heights across "
+                                    "the cell)" % (lid, ch, rk))
+                elif r is not None and spec.get(key) is None:
+                    problems.append("level '%s': '%s' has %s but no %s" % (lid, ch, rk, key))
+            for key in ("wet", "vacuum"):
+                if key in spec and not isinstance(spec[key], bool):
+                    problems.append("level '%s': '%s' %s should be true or false" % (lid, ch, key))
             if spec.get("world_up") is not None and str(spec["world_up"]).lower() not in FACING:
                 problems.append("level '%s': '%s' world_up should be n, e, s or w (the way in the map the world's up "
                                 "is)" % (lid, ch))

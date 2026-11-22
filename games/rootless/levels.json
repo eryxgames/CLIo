@@ -3388,5 +3388,303 @@
     235
    ]
   }
+ },
+ "sim13": {
+  "name": "Proving Ground",
+  "title": "SIM-13: Proving Ground",
+  "intro": [
+   "A training program of the simulatron: ground that is not flat. A ramp, a sewer tube, a yard in the rain -",
+   "wet slopes do not hold you; jump the pits (F7), and jump again in the air for the far one (F8). Then a",
+   "pressure suit for the vacuum deck, and the mechwalker in its bay. Watch how each of them walks."
+  ],
+  "par": 140,
+  "music": "swap_partition",
+  "facing": "n",
+  "death_text": "outro_lose",
+  "render": "mesh",
+  "jump": {
+   "high": 0.9,
+   "far": 2,
+   "double": true
+  },
+  "sky": {
+   "top": "#0a0d16",
+   "horizon": "#2c3040",
+   "stars": 0.15,
+   "clouds": {
+    "color": "#22252e",
+    "amount": 0.6
+   }
+  },
+  "lights": {
+   "ambient": 0.55,
+   "tint": [
+    190,
+    200,
+    235
+   ]
+  },
+  "weather": {
+   "kind": "rain",
+   "amount": 0.8,
+   "fog": 0.03
+  },
+  "map": [
+   "###################################",
+   "#ssssssspssppnLLsooooo#vvvvvvvvvv##",
+   "#shssssspskppsLLDooSooAvvvvzvvvvv##",
+   "#ssssssspssppsuUsooooo#vvvvvvvvvv!#",
+   "####www##########ooomo#vvvvvvvvvv##",
+   "####ltq###########111##vvvvvvvzvv##",
+   "####ltq###########222##vvvvvvvvvv##",
+   "####lcq###########333##############",
+   "####ltq############B###############",
+   "####ltq##########bbbbbbbbbPPPPPPP##",
+   "####ltq##########bbMbbbbxbPPPPPPP##",
+   "#gmgggggggg######bbbbbbbbbPPPYPPP##",
+   "#ggggggggag######bbbbbbbbbPPPPPPPE#",
+   "#...RRR....######bbbbbbZbbPPPPPPP##",
+   "#...rrr....######bbbbbbbbbPPPPYPP##",
+   "#..........######bbbbbbbbbPPPPPPP##",
+   "#..........########################",
+   "#..........########################",
+   "#..........########################",
+   "#....@.....########################",
+   "#..........########################",
+   "###################################"
+  ],
+  "legend": {
+   ".": {
+    "ceiling_height": 2.2
+   },
+   "@": {
+    "ceiling_height": 2.2,
+    "start": true
+   },
+   "r": {
+    "ceiling_height": 2.2,
+    "slope": "n",
+    "rise": 0.375,
+    "height": 0.1875,
+    "floor": "stairs"
+   },
+   "R": {
+    "ceiling_height": 2.2,
+    "slope": "n",
+    "rise": 0.375,
+    "height": 0.5625,
+    "floor": "stairs"
+   },
+   "g": {
+    "height": 0.75,
+    "ceiling_height": 2.2
+   },
+   "m": {
+    "height": 0.75,
+    "ceiling_height": 2.2,
+    "item": "medkit"
+   },
+   "a": {
+    "height": 0.75,
+    "ceiling_height": 2.2,
+    "item": "armor"
+   },
+   "l": {
+    "floor": "grate",
+    "ceiling": "shaft",
+    "height": 0.9,
+    "slope": "w",
+    "rise": 0.3,
+    "ceiling_height": 2.3,
+    "ceiling_slope": "e",
+    "ceiling_rise": 0.5,
+    "lamp": {
+     "colour": [
+      120,
+      255,
+      150
+     ],
+     "reach": 3,
+     "power": 0.9,
+     "flicker": 0.25
+    }
+   },
+   "t": {
+    "floor": "grate",
+    "ceiling": "shaft",
+    "height": 0.75,
+    "ceiling_height": 2.65
+   },
+   "c": {
+    "floor": "grate",
+    "ceiling": "shaft",
+    "height": 0.75,
+    "ceiling_height": 2.65,
+    "item": "shells"
+   },
+   "q": {
+    "floor": "grate",
+    "ceiling": "shaft",
+    "height": 0.9,
+    "slope": "e",
+    "rise": 0.3,
+    "ceiling_height": 2.3,
+    "ceiling_slope": "w",
+    "ceiling_rise": 0.5
+   },
+   "w": {
+    "sky": true,
+    "floor": "paving",
+    "slope": "s",
+    "rise": 0.75,
+    "height": 0.375,
+    "wet": true
+   },
+   "s": {
+    "sky": true,
+    "floor": "paving"
+   },
+   "h": {
+    "sky": true,
+    "floor": "paving",
+    "item": "medkit"
+   },
+   "k": {
+    "sky": true,
+    "floor": "paving",
+    "monster": "kworker"
+   },
+   "n": {
+    "sky": true,
+    "floor": "paving",
+    "item": "shells"
+   },
+   "p": {
+    "sky": true,
+    "floor": "paving",
+    "pit": true,
+    "height": -3.0
+   },
+   "L": {
+    "sky": true,
+    "floor": "pad",
+    "height": 1.6
+   },
+   "u": {
+    "sky": true,
+    "floor": "paving",
+    "slope": "e",
+    "rise": 0.8,
+    "height": 0.4
+   },
+   "U": {
+    "sky": true,
+    "floor": "paving",
+    "slope": "e",
+    "rise": 0.8,
+    "height": 1.2
+   },
+   "D": {
+    "door": true,
+    "height": 1.6,
+    "ceiling_height": 2.9,
+    "tile": "bulkhead"
+   },
+   "o": {
+    "height": 1.6,
+    "ceiling_height": 2.9,
+    "floor": "dock"
+   },
+   "S": {
+    "height": 1.6,
+    "ceiling_height": 2.9,
+    "floor": "dock",
+    "item": "pressure_suit"
+   },
+   "A": {
+    "door": true,
+    "height": 1.6,
+    "ceiling_height": 2.9,
+    "tile": "bulkhead",
+    "label": "AIRLOCK"
+   },
+   "v": {
+    "height": 1.6,
+    "sky": true,
+    "vacuum": true,
+    "floor": "pad"
+   },
+   "z": {
+    "height": 1.6,
+    "sky": true,
+    "vacuum": true,
+    "floor": "pad",
+    "monster": "zombie"
+   },
+   "!": {
+    "switch": "bay_open",
+    "label": "BAY"
+   },
+   "1": {
+    "height": 1.333,
+    "ceiling_height": 2.9,
+    "floor": "stairs",
+    "slope": "n",
+    "rise": 0.533
+   },
+   "2": {
+    "height": 0.8,
+    "ceiling_height": 2.6,
+    "floor": "stairs",
+    "slope": "n",
+    "rise": 0.533
+   },
+   "3": {
+    "height": 0.267,
+    "ceiling_height": 2.6,
+    "floor": "stairs",
+    "slope": "n",
+    "rise": 0.534
+   },
+   "B": {
+    "door": true,
+    "opens_on": "bay_open",
+    "ceiling_height": 2.6,
+    "tile": "gate"
+   },
+   "b": {
+    "ceiling_height": 2.6,
+    "floor": "apron"
+   },
+   "M": {
+    "ceiling_height": 2.6,
+    "floor": "apron",
+    "monster": "mechwalker"
+   },
+   "Z": {
+    "ceiling_height": 2.6,
+    "floor": "apron",
+    "monster": "zombie"
+   },
+   "x": {
+    "ceiling_height": 2.6,
+    "floor": "apron",
+    "item": "clip"
+   },
+   "P": {
+    "height": 0.9,
+    "ceiling_height": 2.6,
+    "floor": "pad"
+   },
+   "Y": {
+    "height": 0.9,
+    "ceiling_height": 2.6,
+    "floor": "pad",
+    "monster": "zombie"
+   },
+   "E": {
+    "exit": true
+   }
+  }
  }
 }

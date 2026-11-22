@@ -1174,5 +1174,48 @@
    "ahead - read it, step off it - and forks things to keep you busy. Unlike Cron it has nowhere",
    "to go: this is the end of time it promised."
   ]
+ },
+ "mechwalker": {
+  "name": "mechwalker",
+  "tag": "W",
+  "model": "mechwalker",
+  "hp": 260,
+  "size": 1.4,
+  "kind": "barrel",
+  "attack": {
+   "kind": "barrel",
+   "damage": 30
+  },
+  "vehicle": {
+   "gait": "mech",
+   "climb": 1.0,
+   "eye": 0.8,
+   "stomp": 50,
+   "sealed": true,
+   "canopy": "#3d4450",
+   "gun": {
+    "name": "autocannon",
+    "damage": [
+     10,
+     16
+    ],
+    "burst": 2,
+    "sound": "hopper_gun",
+    "text": "BRRT."
+   },
+   "board": "You climb the ladder into the mechwalker's cab and seal it. Its legs take a step for every one you think. Space: the autocannon. It climbs what you cannot; it does not jump.",
+   "leave": "You crack the cab and climb down the leg.",
+   "wreck": "The mechwalker's knees buckle. You are out of the cab before it hits the deck.",
+   "sounds": {
+    "step": "loader_step",
+    "board": "loader_board"
+   }
+  },
+  "man": [
+   "WK(8) - the mechwalker",
+   "A two-legged walking cab for heavy work: a step for every step you take,",
+   "a deck plate's worth of weight in each. It climbs a step as high as the plate it stands on and",
+   "treads on what is under it. Sealed: it keeps its air."
+  ]
  }
 }

@@ -82,6 +82,27 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   terraces on open land (`clio_land_terraced`), the picture turned over on the ceiling
   (`clio_frame_flip`) and turned up a wall (`clio_tilt`). An older library leaves lit levels and
   terraces to the Python. `--get-picture` still installs 0.7 until 0.8 is released.
+- **Slopes**: a cell's `"slope"` (the way it rises) and `"rise"` tilt its floor, `"ceiling_slope"` and
+  `"ceiling_rise"` its ceiling - ramps, a sewer tube's sides. Steps are measured where cells meet
+  (a ramp's foot is level, its sides are steps), a slope rising more than 1 is too steep, the eye
+  follows the plane, monsters walk ramps. The mesh view draws sloped floors, ceilings and the
+  sloped edges of the faces beside them - CLIo Picture 0.9 too, to the same pixels
+  (`clio_frame_rooms2`; SIM-13 at 160 x 45: 62.8 ms in Python, 18.4 with it; an older library leaves
+  slopes to the Python). The editor's cell form has them.
+- **Wet slopes**: a `"wet"`, slick or oiled slope - or one out in the rain - slides whoever steps on
+  it down to its foot (up it: back down; off an edge: a fall). Magboots grip.
+- **Jumps**: where a level says `"jump"` (`high`, `far`, `double`), `jump` (F7, `+`) leaps up on to a
+  ledge or over a gap, `jj` (F8) jumps again in the air - twice as high, a cell further. A beat each;
+  an arc under the ceiling; a hard landing hurts. Not in a suit, a machine, water, on the jetpack or
+  the ceiling.
+- **Gaits**: the view moves with each step - a pressure suit (`"power": "suit"`) treads heavily (the
+  eye rises and falls, sways to the foot coming down, the hands with it); a walking machine
+  (`"gait": "mech"`, its own `"climb"` and `"eye"`) shakes as each foot lands; `"headbob": true`
+  bobs an ordinary walk. Cells with `"vacuum"` hurt without a suit or a `"sealed"` machine, and no
+  rain falls in them. The loader and the hopper keep their ways.
+- **RØØTLESS SIM-13: Proving Ground** (`--level sim13`, a free program): a ramp to a gallery, a sewer
+  tube, a wet slope into a yard in the rain, pits and a ledge to jump (and jump twice), a pressure
+  suit for a vacuum deck, the mechwalker (a new model) up on to its platform.
 - **Play in the browser** (`engine/editor/web/play.html`, `engine/web.py`): every game and the
   tech demo in a web page, the engine unchanged in Python made for the web (Pyodide) - a
   terminal on the page (xterm.js), keys shared with the game's worker, sound through WebAudio,

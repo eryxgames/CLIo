@@ -372,6 +372,12 @@ def surfaces_ok():
     return lib is not None and hasattr(lib, "clio_frame_surface")
 
 
+def slopes_ok():
+    """Whether the library draws sloped floors, ceilings and edges (the mesh view's slopes) - CLIo Picture 0.9."""
+    lib = load()
+    return lib is not None and hasattr(lib, "clio_frame_rooms2")
+
+
 def frame_for(view):
     """The View's Frame (made when its size changes), or None without a library that has frames."""
     lib = load()

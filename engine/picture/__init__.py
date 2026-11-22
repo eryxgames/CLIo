@@ -268,6 +268,9 @@ def _open(path):
         lib.clio_ggx.argtypes = [P, P, P, D, D]
         lib.clio_frame_flip.restype = None
         lib.clio_frame_flip.argtypes = [ctypes.POINTER(_Frame)]
+        if hasattr(lib, "clio_frame_rooms2"):            # 0.9 and later
+            lib.clio_frame_rooms2.restype = I
+            lib.clio_frame_rooms2.argtypes = [ctypes.POINTER(_Frame), ctypes.POINTER(_Rooms), P, P, ctypes.POINTER(I)]
         lib.clio_tilt.restype = I
         lib.clio_tilt.argtypes = [P, I, I, D, D, ctypes.c_uint32, P]
         lib.clio_land_terraced.restype = I
@@ -1082,6 +1085,9 @@ def rooms(frame, view, mesh_mod, faces, cam, eye, phase, sky_rows):
     lib = load()
     if lib is None or not hasattr(lib, "clio_frame_rooms") or not isinstance(phase, int) or not models_agree():
         return None
+    sloped = any(f.gx or f.gy or f.h0b != f.h0 or f.h1b != f.h1 for f in faces)
+    if sloped and not hasattr(lib, "clio_frame_rooms2"):
+        return None                                       # slopes: the Python draws them (the library: 0.9)
     try:
         ints, geo, xy, tiles = pack_rooms(faces, mesh_mod)
     except (Odd, TypeError, ValueError, OverflowError, IndexError):
@@ -1100,6 +1106,10 @@ def rooms(frame, view, mesh_mod, faces, cam, eye, phase, sky_rows):
                ctypes.addressof(texels), _ptr(tw), _ptr(th))
     later = (ctypes.c_int32 * (2 * view.PW * view.PH))()
     count = ctypes.c_int(0)
-    if lib.clio_frame_rooms(frame.ref, ctypes.byref(r), later, ctypes.byref(count)) != 0:
+    if sloped:                                            # 0.9: each face's hi-end bottom and top, its rise
+        slopes = array("d", [v for f in faces for v in (float(f.h0b), float(f.h1b), float(f.gx), float(f.gy))])
+        if lib.clio_frame_rooms2(frame.ref, ctypes.byref(r), _ptr(slopes), later, ctypes.byref(count)) != 0:
+            return None
+    elif lib.clio_frame_rooms(frame.ref, ctypes.byref(r), later, ctypes.byref(count)) != 0:
         return None
     return [(later[2 * k], later[2 * k + 1]) for k in range(count.value)]

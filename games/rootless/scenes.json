@@ -336,5 +336,23 @@
     "win": "outro_demo"
    }
   ]
+ },
+ {
+  "id": "sim_proving",
+  "name": "Simulatron: Proving Ground",
+  "area": "Free programs",
+  "description": "A training program: slopes, a sewer tube, a yard in the rain to jump across, a pressure suit, a mechwalker.",
+  "level": "sim13",
+  "on_level_exit": [
+   {
+    "story": "sim13_end"
+   },
+   {
+    "pause": true
+   },
+   {
+    "win": "outro_demo"
+   }
+  ]
  }
 ]

@@ -1519,6 +1519,12 @@ The rules move a cell at a time, a beat at a time:
   instead of a cage. Once it lifts, the player sees from higher up - `"eye"`, of a wall's
   height (0.74; standing is 0.52) - swaying a little, rising as it lifts off and sinking
   as it comes down. Its texts add `start` and `empty`, its `sounds` `start` and `empty`.
+- **Walking machines**: `"gait": "mech"` makes every step a machine's - the view rises over
+  the planted foot, sways to the side of the one coming down and shakes as it lands; `"eye"`
+  (here: at once, not on lift-off) puts the cab up high; `"climb"` is the highest step it
+  walks up (over the level's `"climb"`); `"sealed": true` keeps its air in a vacuum. It does
+  not jump. RØØTLESS's **mechwalker** in SIM-13. (The loader and the hopper keep their own
+  ways: no gait.)
 - **Balls** (a monster of `"kind": "ball"`): heavy, and they roll. Walking into one shoves
   it: it rolls `speed` cells a beat (2) for `roll` cells (8), and on until something stops
   it. What it rolls into takes `crush` damage - and if that kills it, the ball rolls on;
@@ -2009,8 +2015,52 @@ the mesh too: `"render": "mesh"`.
 **Terraces on open land.** On a level with `"land"`, a map cell with `"height"` stands that
 much over the pad: steps up a slope, a raised platform, with sharp edges. Walking up them
 keeps to `"climb"`, as in rooms; the ground (and the eye) rises from one to the next, and a
-terrace hides what is behind it from below. (The Python draws a land with terraces; CLIo
-Picture does not yet.)
+terrace hides what is behind it from below. (CLIo Picture draws them from 0.8.)
+
+### Slopes, jumps and gaits
+
+```json
+"r": {"slope": "n", "rise": 0.4, "height": 0.2},
+"l": {"height": 0.9, "slope": "w", "rise": 0.3, "ceiling_height": 2.3, "ceiling_slope": "e", "ceiling_rise": 0.5},
+"w": {"slope": "s", "rise": 0.75, "height": 0.375, "wet": true},
+"v": {"sky": true, "vacuum": true},
+"jump": {"high": 0.9, "far": 2, "double": true}
+```
+
+- **Slopes**: `"slope"` (n, e, s or w: the way it rises) tilts a cell's floor by `"rise"` across
+  the cell (0.5 if not said); its `"height"` is the floor at the cell's middle, so a ramp of
+  two cells from 0 to 0.8 is `{"height": 0.2, "rise": 0.4}` then `{"height": 0.6, "rise": 0.4}`.
+  `"ceiling_slope"` and `"ceiling_rise"` tilt its ceiling the same way. Steps are measured
+  where two cells meet (a ramp's foot is level with the floor before it, its sides are a step
+  as high as the ramp is there); a slope rising more than 1 across a cell is too steep to walk
+  up. The mesh view draws sloped floors, ceilings and the sloped tops and feet of the faces
+  beside them - a sewer tube is three cells across, its sides' floors rising to the walls and
+  their ceilings coming down to them. Monsters walk ramps too.
+- **Wet slopes**: a slope that is `"wet"`, slick or oiled - or out in the rain (open to the sky
+  while it rains, not in a vacuum) - does not hold anyone standing on it: whoever steps on to
+  it slides down to its foot, up it or across it (walking up it, he slides back down); a drop at
+  the bottom is a fall. Magboots grip; a machine does not slide.
+- **Jumps**: where a level says `"jump"` (or game.json's `first_person`), `jump` (F7, or `+`) leaps
+  forward: up on to a ledge as high as `"high"` (0.9) right ahead, or over a gap to a cell up to
+  `"far"` (2) ahead - lower the further (0.6 of `high` two cells off) and over nothing higher than
+  half of `high`. `jj`, `jump jump` (F8) jumps again in the air (`"double": true`): twice as high
+  and a cell further - over two pits, up on to a ledge 1.6 high. A jump is a beat; it needs room
+  (a ceiling at least 0.8 over the floor; under the sky, any), lands on what will hold (no pit,
+  water, crate or monster; a wet slope slides) and hurts if it lands more than 1.25 lower. No
+  jumping in a pressure suit, in a machine, in water, on the jetpack or on the ceiling.
+- **Gaits**: how the view moves with each step. In a **pressure suit** (an item with
+  `"pickup": {"power": "suit"}`) every step is heavy - slower, the eye rising and falling, a sway
+  to the side of the foot coming down, the hands with it; a walking machine stomps
+  (`"gait": "mech"`, above). A level's (or `first_person`'s) `"headbob": true` gives an ordinary
+  walk a light bob too.
+- **No air**: a `"vacuum"` cell hurts every beat (12) unless the player wears a pressure suit or
+  rides a `"sealed"` machine; no rain falls in it.
+
+RØØTLESS's **SIM-13: Proving Ground** (`--level sim13`) has it all: a ramp up to a gallery, a sewer
+tube with sloped sides, a wet slope slid down into a yard in the rain, pits to jump and a ledge to
+jump twice for (a wet ramp beside it will not hold you), a pressure suit for the vacuum deck, and
+the mechwalker in its bay - up on to a platform no one walks up. (CLIo Picture draws slopes from
+0.9; an older one leaves a level with slopes to the Python.)
 
 ### Walls walked as floors
 
@@ -2339,6 +2389,7 @@ with Enter.
 | 1-7 | `1`-`7`, `shovel` | weapons (a key pressed again: the next weapon on it) |
 | `]` | `next` | the next weapon (round to the first) |
 | F3, F4, F6 | `mag`, `jet`, `dive` / `surface` | magboots, the jetpack, under the water and up |
+| F7 or `+`, F8 | `jump`, `jj` | jump; jump and again in the air (where a level lets you) |
 | numpad 5 or Delete | `w`, `w 3` | wait a beat (or three) |
 | | `t z1` | keep aiming at z1 |
 | | `ps`, `man orphan`, `history`, `keys`, `whoami`, `help` | |

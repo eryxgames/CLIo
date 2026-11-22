@@ -281,5 +281,16 @@
    "sound": "unlock",
    "text": "You have read permission: the r-- key."
   }
+ },
+ "pressure_suit": {
+  "name": "pressure suit",
+  "description": "An EVA hardsuit: plated, sealed, with its own air. Heavy - every step a decision.",
+  "pickup": {
+   "power": "suit",
+   "sprite": "pressure_suit",
+   "size": 0.8,
+   "sound": "mag_on",
+   "text": "A pressure suit! Sealed and heavy: air in a vacuum, a slow tread - and no jumping in it."
+  }
  }
 }

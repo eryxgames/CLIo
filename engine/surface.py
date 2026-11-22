@@ -399,8 +399,8 @@ def shade(lv, atm, view, rows, depths, gbuf, cam, Z0, eye, t):
                 wet = wet_of.get(cell)
                 if wet is None:
                     cc = cell_at(cell[0], cell[1])
-                    wet = wet_of[cell] = 0.0 if cc is None else min(0.9, reflect[mi] + wet_all +
-                                                                     (wet_sky if cc.sky else 0.0))
+                    wet = wet_of[cell] = 0.0 if cc is None else min(0.9, reflect[mi] + wet_all + (
+                        wet_sky if cc.sky and not getattr(cc, "vacuum", False) else 0.0))
                 if wet > 0.0:
                     sy = 2 * contact[x] + 1 - y               # mirrored about where the floor meets what stands
                     if 0 <= sy < y:
@@ -479,7 +479,7 @@ def splashes(lv, view, rows, depths, kinds, cam, Z0, eye, t, amount):
             wy = p.y + (_h(i, s, 2) - 0.5) * 14.0
             if land is None:
                 c = lv.cell(int(floor(wx + 0.5)), int(floor(wy + 0.5)))
-                if c is None or not getattr(c, "sky", False) or c.solid:
+                if c is None or not getattr(c, "sky", False) or c.solid or getattr(c, "vacuum", False):
                     continue
                 gh = float(getattr(c, "height", 0.0) or 0.0)
             else:
@@ -638,7 +638,8 @@ def numbers(lv, atm, view, cam, t, Z0, box=None):
             c = lv.cell(x, y)
             if c is not None:
                 i = (y - y0) * w + (x - x0)
-                flags[i] = (2 if getattr(c, "sky", False) else 1) | (4 if c.solid else 0)
+                flags[i] = (2 if getattr(c, "sky", False) and not getattr(c, "vacuum", False) else 1) | \
+                    (4 if c.solid else 0)                     # open to the sky (and its rain; not in a vacuum)
                 heights[i] = float(getattr(c, "height", 0.0) or 0.0)
     cx, cy, fx, fy, rx, ry = cam
     out = {"pw": view.PW, "ph": view.PH, "half": float(view.half), "yh": float(view.yh), "lx": view.LW * Z0,

@@ -1537,5 +1537,195 @@
     "detail": 0
    }
   ]
+ },
+ "mechwalker": {
+  "materials": {
+   "hull": {
+    "color": "#59606b",
+    "metal": 0.75,
+    "rough": 0.4
+   },
+   "paint": {
+    "color": "#c9a227",
+    "metal": 0.1,
+    "rough": 0.55
+   },
+   "glass": {
+    "color": "#7ec8ff",
+    "metal": 0.1,
+    "rough": 0.1,
+    "glow": 1.2
+   },
+   "joint": {
+    "color": "#26292e",
+    "metal": 0.6,
+    "rough": 0.5
+   }
+  },
+  "parts": [
+   {
+    "shape": "box",
+    "size": [
+     0.62,
+     0.5,
+     0.42
+    ],
+    "at": [
+     0,
+     0,
+     1.05
+    ],
+    "material": "hull"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.5,
+     0.06,
+     0.2
+    ],
+    "at": [
+     0,
+     0.27,
+     1.12
+    ],
+    "material": "glass"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.66,
+     0.54,
+     0.06
+    ],
+    "at": [
+     0,
+     0,
+     1.29
+    ],
+    "material": "paint"
+   },
+   {
+    "shape": "cylinder",
+    "axis": "y",
+    "size": [
+     0.09,
+     0.42,
+     0.09
+    ],
+    "at": [
+     -0.4,
+     0.12,
+     0.98
+    ],
+    "material": "joint"
+   },
+   {
+    "shape": "cylinder",
+    "axis": "y",
+    "size": [
+     0.09,
+     0.42,
+     0.09
+    ],
+    "at": [
+     0.4,
+     0.12,
+     0.98
+    ],
+    "material": "joint"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.12,
+     0.14,
+     0.5
+    ],
+    "at": [
+     -0.2,
+     -0.02,
+     0.6
+    ],
+    "material": "hull",
+    "group": "left"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.12,
+     0.14,
+     0.5
+    ],
+    "at": [
+     0.2,
+     -0.02,
+     0.6
+    ],
+    "material": "hull",
+    "group": "right"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.16,
+     0.22,
+     0.32
+    ],
+    "at": [
+     -0.2,
+     0.04,
+     0.17
+    ],
+    "material": "joint",
+    "group": "left"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.16,
+     0.22,
+     0.32
+    ],
+    "at": [
+     0.2,
+     0.04,
+     0.17
+    ],
+    "material": "joint",
+    "group": "right"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.2,
+     0.3,
+     0.04
+    ],
+    "at": [
+     -0.2,
+     0.06,
+     0.02
+    ],
+    "material": "paint",
+    "group": "left"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.2,
+     0.3,
+     0.04
+    ],
+    "at": [
+     0.2,
+     0.06,
+     0.02
+    ],
+    "material": "paint",
+    "group": "right"
+   }
+  ],
+  "break": "parts"
  }
 }

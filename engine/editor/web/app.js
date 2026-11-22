@@ -1696,6 +1696,11 @@ function describe(spec, info) {
   if (spec.secret && k !== "panel") more.push("a secret area");
   if (spec.height) more.push(`its floor ${spec.height} high`);
   if (spec.ceiling_height !== undefined) more.push(`its ceiling ${spec.ceiling_height} high`);
+  const ways = { n: "north", e: "east", s: "south", w: "west" };
+  if (spec.slope) more.push(`its floor rising ${spec.rise === undefined ? 0.5 : spec.rise} to the ${ways[String(spec.slope)[0]] || spec.slope}`);
+  if (spec.ceiling_slope) more.push(`its ceiling rising ${spec.ceiling_rise === undefined ? 0.5 : spec.ceiling_rise} to the ${ways[String(spec.ceiling_slope)[0]] || spec.ceiling_slope}`);
+  if (spec.wet) more.push("wet");
+  if (spec.vacuum) more.push("no air");
   if (spec.oil) more.push("oil on the floor (slippery, burns)");
   else if (spec.slick) more.push("slick floor (things slide)");
   if (spec.conveyor) more.push(`a belt moving ${({ n: "north", e: "east", s: "south", w: "west" })[String(spec.conveyor)[0]] || spec.conveyor}`);
@@ -2059,6 +2064,19 @@ function levelEditor(kind, thing, id) {
         el("input", { type: "number", step: "0.01", value: s.height === undefined ? "" : String(s.height), placeholder: "0", oninput: num("height") })));
       rows.push(field("Ceiling height (empty: a wall's height over the floor)",
         el("input", { type: "number", step: "0.01", value: s.ceiling_height === undefined ? "" : String(s.ceiling_height), oninput: num("ceiling_height") })));
+      const way = (key, rise) => el("select", { onchange: (e) => { if (e.target.value) s[key] = e.target.value; else { delete s[key]; delete s[rise]; } write(); } },
+        ...[["", "flat"], ["n", "rising north"], ["e", "rising east"], ["s", "rising south"], ["w", "rising west"]]
+          .map(([v, label]) => el("option", { value: v, selected: (s[key] || "") === v }, label)));
+      rows.push(field("Floor slope (the height above is at the cell's middle; a ramp, a tube's side)", way("slope", "rise")));
+      if (s.slope) rows.push(field("How much the floor rises across the cell (over 1: too steep to walk up)",
+        el("input", { type: "number", step: "0.01", min: "0.01", max: "3", value: s.rise === undefined ? "0.5" : String(s.rise), oninput: num("rise") })));
+      rows.push(field("Ceiling slope", way("ceiling_slope", "ceiling_rise")));
+      if (s.ceiling_slope) rows.push(field("How much the ceiling rises across the cell",
+        el("input", { type: "number", step: "0.01", min: "0.01", max: "3", value: s.ceiling_rise === undefined ? "0.5" : String(s.ceiling_rise), oninput: num("ceiling_rise") })));
+      rows.push(field("Wet (a slope of it is too slick to stand on)", el("input", { type: "checkbox", checked: !!s.wet,
+        onchange: (e) => { if (e.target.checked) s.wet = true; else delete s.wet; write(); } })));
+      rows.push(field("No air (only a pressure suit, or a sealed machine, keeps one alive)", el("input", { type: "checkbox", checked: !!s.vacuum,
+        onchange: (e) => { if (e.target.checked) s.vacuum = true; else delete s.vacuum; write(); } })));
     }
     const rename = el("input", { type: "text", class: "code short", maxlength: "1", value: ch, "aria-label": "The character", onchange: (e) => {
       const next = e.target.value;

@@ -8,7 +8,7 @@
   "show_once": false
  },
  "outro_demo": {
-  "text": "SIMULATION PAUSED. End of the demo - Episode 1 goes on in the full game.\n\nFree programs of the simulatron, made new each run: --level sim1 (Long Fens, open land without end), sim2 (Deep Swap, floor after floor) and sim3 (Swap Sprawl, rooms without end); and training programs: sim4 (Kill House: squads), sim5 (Bus Run, side on, in real time) and sim6 (Purge, from above, in real time) sim7 (Xantrium Rush, real-time strategy), sim8 (Fen Hopper, flight) sim9 (Coolant Loop, a reactor's systems), sim10 (Root Shell, card duels) sim11 (Deep Works: magboots, stairs, a jetpack, the water and a submarine) and sim12 (Stairwell: real stairs, a mezzanine and a pit, drawn as a mesh).",
+  "text": "SIMULATION PAUSED. End of the demo - Episode 1 goes on in the full game.\n\nFree programs of the simulatron, made new each run: --level sim1 (Long Fens, open land without end), sim2 (Deep Swap, floor after floor) and sim3 (Swap Sprawl, rooms without end); and training programs: sim4 (Kill House: squads), sim5 (Bus Run, side on, in real time) and sim6 (Purge, from above, in real time) sim7 (Xantrium Rush, real-time strategy), sim8 (Fen Hopper, flight) sim9 (Coolant Loop, a reactor's systems), sim10 (Root Shell, card duels) sim11 (Deep Works: magboots, stairs, a jetpack, the water and a submarine), sim12 (Stairwell: real stairs, a mezzanine and a pit, drawn as a mesh) and sim13 (Proving Ground: slopes and a sewer tube, jumps in the rain, a pressure suit and a mechwalker).",
   "show_once": false
  },
  "outro_lose": {
@@ -95,6 +95,10 @@
  },
  "e1m8_end": {
   "text": "The rain comes in through the dome and puts out what is left of the Metacron's light. Down in the city, for the first time since the training began, nothing is scheduled.\n\nYou stand in the door at the top of the spire, magboots ticking as they cool, and look out over the dark. Somewhere down there a terminal blinks: a prompt, waiting for someone to type.\n\nEnd of Episode 1: Roasted in the Shell.",
+  "show_once": false
+ },
+ "sim13_end": {
+  "text": "PROGRAM COMPLETE: PROVING GROUND.\n\nGround that tilts, ground that is wet, ground that is not there; a suit that makes every step heavy and a machine that makes every step shake the deck. The simulatron logs your gait and files it under 'adequate'.",
   "show_once": false
  }
 }

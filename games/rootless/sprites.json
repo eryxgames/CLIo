@@ -2189,5 +2189,29 @@
    "I": "#3e4248",
    "y": "#d8b030"
   }
+ },
+ "pressure_suit": {
+  "pixels": [
+   "....hhhh....",
+   "...hgggGh...",
+   "...hgGGGh...",
+   "....hhhh....",
+   "..ppppppp...",
+   ".pPPpppPPp..",
+   ".pp.pLp.pp..",
+   ".pp.ppp.pp..",
+   "....p.p.....",
+   "...pp.pp....",
+   "...kk.kk...."
+  ],
+  "palette": {
+   "h": "#9aa4b0",
+   "g": "#2a4a66",
+   "G": "#7ec8ff",
+   "p": "#d8dce2",
+   "P": "#ffffff",
+   "L": "#ff7a30",
+   "k": "#3a3e46"
+  }
  }
 }

@@ -643,6 +643,7 @@ def tile_data(name):
     return {"pixels": pixels, "palette": palette}
 
 GLOWING = frozenset(("shot", "boom", "missile", "flame"))   # things that give their own light
+EYE_STANDING = 1 / 1.92      # View.EYE0: the standing eye's height (of a wall's height), whatever the picture's size
 FLOOR_A, FLOOR_B, FLOOR_LINE = (68, 61, 53), (58, 53, 47), (94, 86, 72)
 CEIL, CEIL_LINE, LIGHT = (30, 30, 36), (24, 24, 29), (168, 162, 122)
 TOXIC, TOXIC_HI = (36, 140, 54), (130, 240, 110)
@@ -684,6 +685,7 @@ class FX:
         self.eye = None          # how high the eye is (of a wall's height), in place of the player's: a lift-off
         self.yaw = None          # the mesh view: the way it looks, in radians (0 north, pi/2 east) - a turn drawn
         self.hands = True        # what is in the hands drawn (not in View.rolled's bigger picture)
+        self.bob = None          # (across, down) the hands move with the stride, in their texels
         self.flip = None         # upside down (on the ceiling): None - as the player is; True or False to say
         self.__dict__.update(kw)
 
@@ -903,6 +905,8 @@ class View:
             return 0.24 + 0.01 * math.sin(lv.beat * 1.3)
         if (v is None and hasattr(lv, "swimming") and lv.swimming()) or spec.get("swim"):
             return 0.31 + 0.015 * math.sin(lv.beat * 1.9)
+        if v is not None and not spec.get("fly") and spec.get("eye"):   # a walking machine: up in its cockpit
+            return float(spec["eye"])
         if v is None or not spec.get("fly") or not getattr(v, "started", False):
             return None
         land = getattr(lv, "land", None)
@@ -1471,8 +1475,9 @@ class View:
         self.cur_z = -1e9
         frame = picture_frame.frame_for(self) if self.use_frame else None     # CLIo Picture 0.4: kept in C
         self.gbuf = self.shader = None
-        if meshed and frame is not None and getattr(lv, "surfaces", False) and not picture_frame.surfaces_ok():
-            frame = None                                      # lit surfaces: the Python draws them (the library: 0.8)
+        if meshed and frame is not None and ((getattr(lv, "surfaces", False) and not picture_frame.surfaces_ok()) or
+                                             (getattr(lv, "slopes", False) and not picture_frame.slopes_ok())):
+            frame = None                                      # lit surfaces, slopes: the Python draws them (0.8, 0.9)
         px = None
         mesh_labels = ()
         if meshed:                                            # rooms as faces in a true perspective (engine/mesh.py)
@@ -2354,6 +2359,9 @@ class View:
         sw, sh = pic.w * ws, pic.h * ws
         x0 = int(round(self.half - sw / 2)) + fx.shake * self.sx
         y0 = self.PH - int(round(sh)) + fx.recoil * self.sy
+        if fx.bob:                                     # the hands with the stride
+            x0 += int(round(fx.bob[0] * ws * 0.5))
+            y0 += int(round(fx.bob[1] * ws * 0.5))
         if fx.muzzle:
             mb = lv.sprites.get("muzzle")
             self.glow(px, self.half, y0 - 2 * ws, 10 * ws, (255, 200, 90), 0.5)

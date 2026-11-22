@@ -51,7 +51,7 @@ class Face:
     or an upright face on the line x = ``at`` (XWALL) or y = ``at`` (YWALL), from ``lo`` to ``hi`` along the
     line, ``h0`` to ``h1`` high, turned towards ``side`` (+1 or -1 along x or y)."""
     __slots__ = ("kind", "at", "lo", "hi", "h0", "h1", "side", "tex", "top", "opened", "ix", "iy", "info", "wall",
-                 "label", "cell", "mat")
+                 "label", "cell", "mat", "h0b", "h1b", "gx", "gy")
 
     def __init__(self, kind, at, lo=0.0, hi=0.0, h0=0.0, h1=0.0, side=1, tex=None, top=1.0, opened=0.0, ix=0, iy=0,
                  info=None, wall=False):
@@ -59,16 +59,25 @@ class Face:
         self.tex, self.top, self.opened, self.ix, self.iy, self.info, self.wall = tex, top, opened, ix, iy, info, wall
         self.label = self.cell = None
         self.mat = 0                 # its material (engine/surface.py): an index into the level's materials
+        self.h0b, self.h1b = h0, h1  # an upright face's bottom and top at its ``hi`` end (sloped edges: not h0, h1)
+        self.gx = self.gy = 0.0      # a floor's or ceiling's slope: how much it rises a cell along x and along y
 
     def corners(self):
         """The face's four corners (x, y, height), going round."""
         if self.kind in (FLOOR, CEILING):
             x, y, h = self.ix, self.iy, self.at
+            if self.gx or self.gy:                           # a slope: each corner on its plane
+                gx, gy = self.gx * 0.5, self.gy * 0.5
+                return [(x - 0.5, y - 0.5, h - gx - gy), (x + 0.5, y - 0.5, h + gx - gy),
+                        (x + 0.5, y + 0.5, h + gx + gy), (x - 0.5, y + 0.5, h - gx + gy)]
             return [(x - 0.5, y - 0.5, h), (x + 0.5, y - 0.5, h), (x + 0.5, y + 0.5, h), (x - 0.5, y + 0.5, h)]
         h0 = self.h0 + self.opened * (self.h1 - self.h0) if self.opened else self.h0     # a door slides up
+        h0b = self.h0b + self.opened * (self.h1b - self.h0b) if self.opened else self.h0b
         if self.kind == XWALL:
-            return [(self.at, self.lo, h0), (self.at, self.hi, h0), (self.at, self.hi, self.h1), (self.at, self.lo, self.h1)]
-        return [(self.lo, self.at, h0), (self.hi, self.at, h0), (self.hi, self.at, self.h1), (self.lo, self.at, self.h1)]
+            return [(self.at, self.lo, h0), (self.at, self.hi, h0b), (self.at, self.hi, self.h1b),
+                    (self.at, self.lo, self.h1)]
+        return [(self.lo, self.at, h0), (self.hi, self.at, h0b), (self.hi, self.at, self.h1b),
+                (self.lo, self.at, self.h1)]
 
 
 def heights(cell):
@@ -107,6 +116,34 @@ class Mesh:
             t = getattr(c, "ceiling", None) or getattr(lv, "ceiling_tile", None)
             return mindex.get(t, 0) if t else 1
 
+        def slope_of(c):                                      # how a sloped floor rises a cell along x and along y
+            d = getattr(c, "slope", None)
+            if d is None:
+                return 0.0, 0.0
+            return c.rise * fp.DIRS[d][0], c.rise * fp.DIRS[d][1]
+
+        def ceiling_slope_of(c):
+            d = getattr(c, "ceiling_slope", None)
+            if d is None:
+                return 0.0, 0.0
+            return c.ceiling_rise * fp.DIRS[d][0], c.ceiling_rise * fp.DIRS[d][1]
+
+        def edge_ends(x, y, d):                               # the ends (lo, hi) of cell (x, y)'s edge towards DIRS[d]
+            dx, dy = fp.DIRS[d]
+            if dx:
+                return (x + 0.5 * dx, y - 0.5), (x + 0.5 * dx, y + 0.5)
+            return (x - 0.5, y + 0.5 * dy), (x + 0.5, y + 0.5 * dy)
+
+        def on_floor(c, pt):                                  # a cell's floor at a point (on its plane)
+            h = heights(c)[0]
+            gx, gy = slope_of(c)
+            return h + gx * (pt[0] - c.x) + gy * (pt[1] - c.y) if (gx or gy) else h
+
+        def on_top(c, pt):
+            top = heights(c)[1]
+            gx, gy = ceiling_slope_of(c)
+            return top + gx * (pt[0] - c.x) + gy * (pt[1] - c.y) if (gx or gy) else top
+
         def opened_of(c, x, y):
             return doors.get((x, y), c.open) if c.kind == "door" else 0.0
 
@@ -131,8 +168,11 @@ class Mesh:
             return t
 
         def upright(x, y, d, h0, h1, top, c, opened=0.0, wall=False, name=None):
-            """The face on the edge of cell (x, y) towards DIRS[d], turned back into (x, y)."""
+            """The face on the edge of cell (x, y) towards DIRS[d], turned back into (x, y); h0, h1: its bottom and
+            top - or (at its lo end, at its hi end) where they slope."""
             dx, dy = fp.DIRS[d]
+            h0, h0b = h0 if isinstance(h0, tuple) else (h0, h0)
+            h1, h1b = h1 if isinstance(h1, tuple) else (h1, h1)
             if dx:
                 f = Face(XWALL, x + 0.5 * dx, y - 0.5, y + 0.5, h0, h1, -dx, tex(c, name), top, opened, wall=wall)
                 if (ex - f.at) * f.side <= 0:
@@ -141,8 +181,9 @@ class Mesh:
                 f = Face(YWALL, y + 0.5 * dy, x - 0.5, x + 0.5, h0, h1, -dy, tex(c, name), top, opened, wall=wall)
                 if (ey - f.at) * f.side <= 0:
                     return None
-            if h1 - h0 <= 1e-9:
+            if h1 - h0 <= 1e-9 and h1b - h0b <= 1e-9:
                 return None
+            f.h0b, f.h1b = h0b, h1b
             f.mat = mindex.get(name or c.texture(), 0)
             out.append(f)
             return f
@@ -154,31 +195,62 @@ class Mesh:
                 if c is None or opaque(c, x, y):
                     continue
                 h, top = heights(c)
+                gx, gy = slope_of(c)
+                cgx, cgy = ceiling_slope_of(c)
                 if not walled(c, x, y) or c.kind == "door" or c.clear:      # the floor and ceiling of the cell
-                    if eye > h:
+                    if eye > h + gx * (ex - x) + gy * (ey - y):  # seen from above (a slope's plane, where it goes)
                         info = floor_info.get((x, y))
                         if info is None:
                             info = floor_info[(x, y)] = self.under(lv, c, x, y, phase)
                         f = Face(FLOOR, h, ix=x, iy=y, info=info)
                         f.mat = floor_mat(c)
+                        f.gx, f.gy = gx, gy
                         out.append(f)
-                    if eye < top:
+                    if eye < top + cgx * (ex - x) + cgy * (ey - y):
                         ceil = ceiling_of.get((x, y))
                         if ceil is None:
                             ceil = ceiling_of[(x, y)] = self.above(lv, c, phase)
                         f = Face(CEILING, top, ix=x, iy=y, info=ceil)
                         f.mat = ceiling_mat(c)
+                        f.gx, f.gy = cgx, cgy
                         out.append(f)
+                sloped = gx or gy or cgx or cgy
                 if walled(c, x, y):                           # a door, bars or a field: faces come from the cells beside
                     for d in range(4):
                         nx, ny = x + fp.DIRS[d][0], y + fp.DIRS[d][1]
                         n = cell_at(nx, ny)
                         if opaque(n, nx, ny):
-                            upright(x, y, d, h, top, top, n if n is not None else c, wall=True)
+                            if sloped:
+                                a, b = edge_ends(x, y, d)
+                                upright(x, y, d, (on_floor(c, a), on_floor(c, b)), (on_top(c, a), on_top(c, b)), top,
+                                        n if n is not None else c, wall=True)
+                            else:
+                                upright(x, y, d, h, top, top, n if n is not None else c, wall=True)
                     continue
                 for d in range(4):
                     nx, ny = x + fp.DIRS[d][0], y + fp.DIRS[d][1]
                     n = cell_at(nx, ny)
+                    n_sloped = n is not None and not walled(n, nx, ny) and (
+                        getattr(n, "slope", None) is not None or getattr(n, "ceiling_slope", None) is not None)
+                    if sloped or n_sloped:                    # the edge's two ends, each at its own heights
+                        a, b = edge_ends(x, y, d)
+                        fa = (on_floor(c, a), on_floor(c, b))
+                        ta = (on_top(c, a), on_top(c, b))
+                        if walled(n, nx, ny):
+                            f = upright(x, y, d, fa, ta, max(ta), n if n is not None else c,
+                                        opened_of(n, nx, ny) if n else 0.0, wall=True)
+                            if f is not None and n is not None and n.label:
+                                f.label, f.cell = n.label, n
+                            continue
+                        fb = (on_floor(n, a), on_floor(n, b))
+                        tb = (on_top(n, a), on_top(n, b))
+                        rise = tuple(max(fa[k], min(fb[k], ta[k])) for k in (0, 1))
+                        if rise[0] > fa[0] + 1e-9 or rise[1] > fa[1] + 1e-9:     # a riser, sloped where they are
+                            upright(x, y, d, fa, rise, max(rise), n, name=getattr(n, "step", None) or "step")
+                        if (tb[0] < ta[0] - 1e-9 or tb[1] < ta[1] - 1e-9) and not getattr(n, "sky", False):
+                            low = tuple(min(max(tb[k], fa[k]), ta[k]) for k in (0, 1))
+                            upright(x, y, d, low, ta, max(ta), n)
+                        continue
                     if walled(n, nx, ny):                     # a wall's face, from this cell's floor to its ceiling
                         f = upright(x, y, d, h, top, top, n if n is not None else c, opened_of(n, nx, ny) if n else 0.0,
                                     wall=True)
@@ -507,19 +579,34 @@ class Mesh:
         else:
             tex = face.info
         step = 2 if later is None and not force and getattr(self.view, "detail", "high") == "low" else 1
+        gx, gy = face.gx, face.gy
+        sloped = bool(gx or gy)
+        if sloped:                                           # where the ray meets the slope's plane: c0 / (s + ...)
+            c0 = eye - face.at - gx * (ex - ix) - gy * (ey - iy)
         for y, x0, x1 in spans:                              # low detail: every other pixel, each drawn twice
             s = sb[y]
-            if s == 0.0:
-                continue
-            d = dh / s
-            if d <= NEAR:
-                continue
-            z = d - Z0
-            fog, fade = fog_of(z)
-            q = int(fog * fade * 256.0)
+            if not sloped:
+                if s == 0.0:
+                    continue
+                d = dh / s
+                if d <= NEAR:
+                    continue
+                z = d - Z0
+                fog, fade = fog_of(z)
+                q = int(fog * fade * 256.0)
             row, base = rgb[y], y * PW
             for x in range(x0 - (x0 & 1) if step == 2 else x0, x1, step):    # low: pairs from an even column
                 i = base + x
+                if sloped:                                   # each pixel its own distance (its colour pixel's ray)
+                    den = s + gx * dirx[x if x >= x0 else x + 1] + gy * diry[x if x >= x0 else x + 1]
+                    if den == 0.0:
+                        continue
+                    d = c0 / den
+                    if d <= NEAR:
+                        continue
+                    z = d - Z0
+                    fog, fade = fog_of(z)
+                    q = int(fog * fade * 256.0)
                 if force:
                     if zbuf[i] != z:
                         continue

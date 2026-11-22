@@ -353,7 +353,8 @@ class ProvingGroundTests(unittest.TestCase):
 
     def test_sim13_is_a_free_program(self):
         import json
-        scenes = json.load(open(os.path.join(ROOTLESS, "scenes.json"), encoding="utf-8"))
+        with open(os.path.join(ROOTLESS, "scenes.json"), encoding="utf-8") as f:
+            scenes = json.load(f)
         self.assertTrue(any(s.get("level") == "sim13" for s in scenes))
 
 

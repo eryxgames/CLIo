@@ -112,6 +112,9 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 
 ### Fixed
 
+- Run natively on Windows (as the tests do), the web page's saves and libraries stay in the page's own
+  data folder - they went to the player's `%APPDATA%\clio`, as Windows has no XDG folders. The test
+  of the terminal's glyphs no longer assumes it isn't Windows' own console.
 - Ctrl+C while CLIo's menu waits (or between demo clips, or over the logo) ends CLIo cleanly - the
   terminal as it was, exit code 130 - instead of leaving a Python traceback (seen in Termux).
 

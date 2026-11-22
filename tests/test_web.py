@@ -101,10 +101,17 @@ class PlayedTests(unittest.TestCase):
                 self.assertIsNone(s[2])                       # sent once: after that by its name
 
     def test_a_save_is_handed_to_the_page(self):
-        got = play(["rootless"], ["\r"] * 6 + ["\x1b[15~"])   # F5: save
-        saves = [p for p in got["saves"] if "/saves/rootless/" in p.replace(os.sep, "/")]
-        self.assertTrue(saves, got["saves"])
-        self.assertTrue(all(n > 0 for n in got["saves"].values()))
+        tmp = tempfile.mkdtemp(prefix="clio-web-test-")
+        data = os.path.join(tmp, "data")
+        try:
+            got = play(["rootless"], ["\r"] * 6 + ["\x1b[15~"], data=data)   # F5: save
+            saves = [p for p in got["saves"] if "/saves/rootless/" in p.replace(os.sep, "/")]
+            self.assertTrue(saves, got["saves"])
+            self.assertTrue(all(n > 0 for n in got["saves"].values()))
+            here = os.path.abspath(data) + os.sep
+            self.assertTrue(all(os.path.abspath(p).startswith(here) for p in saves))   # in the page's folder
+        finally:                                                                     # (not the player's own)
+            shutil.rmtree(tmp, ignore_errors=True)
 
 
 class StandInTests(unittest.TestCase):

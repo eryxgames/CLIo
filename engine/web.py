@@ -309,8 +309,10 @@ def run(io, argv=(), data=DATA, cache=CACHE, threads=None):
     os.environ["COLORTERM"] = "truecolor"
     os.environ["XDG_DATA_HOME"] = data
     os.environ["XDG_CACHE_HOME"] = cache
+    os.environ["CLIO_DATA"] = os.path.join(data, "clio")             # where XDG puts them - on Windows too,
+    os.environ["CLIO_SAVES"] = os.path.join(data, "clio", "saves")   # whose own folders are elsewhere
     os.environ["CLIO_WEB"] = "1"
-    for name in ("CLIO_SAVES", "CLIO_CACHE", "NO_COLOR"):
+    for name in ("CLIO_CACHE", "NO_COLOR"):
         os.environ.pop(name, None)
     for d in (data, cache):
         os.makedirs(d, exist_ok=True)

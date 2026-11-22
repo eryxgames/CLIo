@@ -62,7 +62,13 @@ class TermTests(unittest.TestCase):
 
     def test_environment_switches(self):
         make = lambda env, **kw: Term(out=io.StringIO(), width=40, animate=False, env=env, **kw)    # noqa: E731
-        self.assertEqual(make({}, unicode=True).glyph_mode, "full")
+        self.assertEqual(make({"WT_SESSION": "1"}, unicode=True).glyph_mode, "full")    # (not Windows' console)
+        from unittest import mock
+        with mock.patch("engine.term._WINDOWS", True):                # Windows' own console: its fonts' glyphs
+            self.assertEqual(make({}, unicode=True).glyph_mode, "console")
+            self.assertEqual(make({"WT_SESSION": "1"}, unicode=True).glyph_mode, "full")
+        with mock.patch("engine.term._WINDOWS", False):
+            self.assertEqual(make({}, unicode=True).glyph_mode, "full")
         self.assertEqual(make({"CLIO_GLYPHS": "safe"}, unicode=True).glyph_mode, "safe")
         self.assertEqual(make({"CLIO_GLYPHS": "safe"}, unicode=False).glyph_mode, "ascii")
         self.assertEqual(make({}, unicode=True, glyphs="safe").glyphs["heart"], "HP")

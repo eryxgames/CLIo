@@ -2149,5 +2149,45 @@
    "z": "#2c3020"
   },
   "scale": 0.75
+ },
+ "glass": {
+  "pixels": [
+   "....s...",
+   "...sS...",
+   "...sSs..",
+   "..sSSs..",
+   "..sSWs..",
+   ".sSWWSs.",
+   ".sSSSs..",
+   "..sSs...",
+   "...s...."
+  ],
+  "palette": {
+   "s": "#6a8ca8",
+   "S": "#a8d0ec",
+   "W": "#f4fcff"
+  }
+ },
+ "counterweight": {
+  "pixels": [
+   "....cc....",
+   "...cCCc...",
+   "kkkkkkkkkk",
+   "kIIIIIIIIk",
+   "kIyyIIyyIk",
+   "kIIIIIIIIk",
+   "kIIyyIIyyk",
+   "kIIIIIIIIk",
+   "kIyyIIyyIk",
+   "kIIIIIIIIk",
+   "kkkkkkkkkk"
+  ],
+  "palette": {
+   "c": "#8a8e94",
+   "C": "#b4b8be",
+   "k": "#1c1e22",
+   "I": "#3e4248",
+   "y": "#d8b030"
+  }
  }
 }

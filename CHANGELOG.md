@@ -47,6 +47,10 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 - **RØØTLESS E1M7: The Stack**, after E1M6: the overflow hall crossed on its ceiling (hornets
   come up there), a switch reached only from it, a drop to a door, a corridor whose plating dies
   behind you, and a hatch up to the return address - and a first look at Aspiration Central.
+- **RØØTLESS E1M8: Aspiration Central**, the episode's end: a street at night in the rain, the
+  Metacron's glass face climbed in magboots while glass falls from its broken windows, the broken
+  lift shaft inside (the stuck car passed on the far wall, a counterweight dropping), and the
+  spire's top, where the Metacron - the scheduler of schedulers - waits under a broken dome.
 - **Walls walked as floors**: map cells can say which way the world's up is (`"world_up"`) - a
   building's face, a lift shaft walked on magboots. The sky is drawn all round (the city far
   below one way, the sky the other, the horizon between), and shows past the face's edges;

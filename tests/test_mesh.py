@@ -516,7 +516,7 @@ class HeightTests(unittest.TestCase):
         data = GameData(ROOTLESS)
         for lid in data.levels:
             lv = Level(data, lid, seed=1)
-            if lv.land is None and lid not in ("sim12", "e1m6", "e1m7"):     # built on heights
+            if lv.land is None and lid not in ("sim12", "e1m6", "e1m7", "e1m8"):     # built on heights
                 self.assertFalse(lv.heights, lid)
                 self.assertEqual(lv.ground(lv.player.x + 0.3, lv.player.y), 0.0)
 

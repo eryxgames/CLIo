@@ -2839,6 +2839,419 @@
    }
   }
  },
+ "e1m8": {
+  "name": "Aspiration Central",
+  "title": "E1M8   ASPIRATION CENTRAL",
+  "intro": [
+   "Out of the stack, into a city under rain. Over it all stands the Metacron - the spire of collective",
+   "control, the scheduler of schedulers - and its doors are sealed. Its face is glass and steel, a",
+   "storey a breath, all the way up. Your boots hold to steel."
+  ],
+  "par": 200,
+  "music": "aspiration_central",
+  "facing": "n",
+  "death_text": "outro_lose",
+  "render": "mesh",
+  "sky": {
+   "top": "#05070f",
+   "horizon": "#3a2a3c",
+   "stars": 0.0,
+   "clouds": {
+    "color": "#1c1a26",
+    "amount": 0.6
+   }
+  },
+  "lights": {
+   "ambient": 0.5,
+   "tint": [
+    170,
+    185,
+    230
+   ],
+   "events": {
+    "metacron_down": {
+     "ambient": 0.32,
+     "tint": [
+      140,
+      150,
+      200
+     ]
+    }
+   }
+  },
+  "weather": {
+   "kind": "rain",
+   "amount": 0.6,
+   "cycle": [
+    {
+     "beats": 60,
+     "kind": "rain",
+     "amount": 0.6
+    },
+    {
+     "beats": 20,
+     "kind": "storm",
+     "amount": 0.9
+    }
+   ]
+  },
+  "events": {
+   "core": "The core hall. Under the broken dome something vast turns to face you.",
+   "metacron_down": "The Metacron's light goes out of it. Through the dome you see the city's go out too, street by street. Somewhere a door unlocks."
+  },
+  "bot": [
+   "magboots",
+   "1",
+   "3",
+   "^",
+   "<",
+   "6",
+   "rocket_launcher",
+   "rockets",
+   "chaingun",
+   "x",
+   "E"
+  ],
+  "map": [
+   "############3###########6#####################",
+   "#vffffffffffffffffv####sws####################",
+   "#vffffffffffffffffv####sss#####NttttttttttN###",
+   "#vfffffffMffffBfffv####sss#####tttttttttttt###",
+   "#vfffJffffffffffffv####ssc#####ttPt*****tPt###",
+   "#vffffffffffffffffv####sss#####tttt*****ttt###",
+   "#vfuffffffffffffffv####Rss#####tttt***X*tttDyE",
+   "#vffffffffKfffofffv####sss<####tttt*****ttt###",
+   "#vffffffffffffffffv####sss#####tttt*****ttt###",
+   "#vfffffffffffffuffv####sss#####tttttttttttt###",
+   "#vfffffuufffffffffv####CCC#####ttPtttttttPt###",
+   "#vffffffffffffffnfv####CCC#####ttttttxttttt###",
+   "#vffffhfffffffffffv####sss#####tttttttttttt###",
+   "#vffffffffffuuffffv###^sss#####tttttttttttt###",
+   "#vffffffffffffffffv####sss#####eee#######eee##",
+   "#vffffffffffffffffv####sss#####ttttttttttttt##",
+   "#vffuuffffffffffffv####sHs#####ttttttVtttttt##",
+   "#vffffffffffffffufv####sss#####ttttttttttttt##",
+   "#vfffffffffoffffffv####sss#####tttttNtNttttt##",
+   "#vffffffffffffffffv####sss#####ttttttttttttt##",
+   "#vffffffffffffffffv####sss#####tLrrttttttqQt##",
+   "#vffffffffffffffffv####sss#####ttttttttttttt##",
+   "#########2##############4############5########",
+   "#FFFFFFFF1FFFF=FFFFFFFFFFFFFF#################",
+   "#AAAAAAAAAAAAAAAAAAAAAAAAAAAA#################",
+   "#AAAAzAAAAAAAAAAAAAAAAAAAAAAA#################",
+   "#AAAAAAAAAAAAAAAAAAAAAzAAAAAA#################",
+   "#aaaaaaaaaaaaaaaaaaaaaaaaaaaa#################",
+   "#............................#################",
+   "#......k..................z..#################",
+   "#............................#################",
+   "#...|.........|.........|....#################",
+   "#...................m........#################",
+   "#.............@.G............#################",
+   "#............................#################",
+   "##############################################"
+  ],
+  "legend": {
+   ".": {
+    "sky": true,
+    "floor": "paving",
+    "ceiling_height": 4.5
+   },
+   "a": {
+    "sky": true,
+    "floor": "paving",
+    "ceiling_height": 4.7,
+    "height": 0.2
+   },
+   "A": {
+    "sky": true,
+    "floor": "paving",
+    "ceiling_height": 4.9,
+    "height": 0.4
+   },
+   "|": {
+    "sky": true,
+    "floor": "paving",
+    "ceiling_height": 4.5,
+    "lamp": {
+     "colour": [
+      255,
+      196,
+      120
+     ],
+     "reach": 5,
+     "power": 1.3
+    }
+   },
+   "=": {
+    "wall": "spire",
+    "label": "SEALED"
+   },
+   "F": {
+    "wall": "facade"
+   },
+   "1": {
+    "mag": "face"
+   },
+   "2": {
+    "mag": "face"
+   },
+   "3": {
+    "mag": "window"
+   },
+   "4": {
+    "mag": "window"
+   },
+   "5": {
+    "mag": "top"
+   },
+   "6": {
+    "mag": "top"
+   },
+   "@": {
+    "sky": true,
+    "floor": "paving",
+    "ceiling_height": 4.5,
+    "start": true
+   },
+   "G": {
+    "sky": true,
+    "floor": "paving",
+    "ceiling_height": 4.5,
+    "item": "magboots"
+   },
+   "m": {
+    "sky": true,
+    "floor": "paving",
+    "ceiling_height": 4.5,
+    "item": "medkit"
+   },
+   "k": {
+    "sky": true,
+    "floor": "paving",
+    "ceiling_height": 4.5,
+    "monster": "kworker"
+   },
+   "z": {
+    "sky": true,
+    "floor": "paving",
+    "ceiling_height": 4.9,
+    "height": 0.4,
+    "monster": "zombie"
+   },
+   "f": {
+    "world_up": "n",
+    "sky": true,
+    "floor": "facade"
+   },
+   "v": {
+    "world_up": "n",
+    "sky": true,
+    "floor": "facade",
+    "pit": true,
+    "height": -40
+   },
+   "u": {
+    "wall": "press",
+    "world_up": "n"
+   },
+   "o": {
+    "world_up": "n",
+    "sky": true,
+    "floor": "facade",
+    "monster": "scout"
+   },
+   "h": {
+    "world_up": "n",
+    "sky": true,
+    "floor": "facade",
+    "monster": "hornet"
+   },
+   "M": {
+    "world_up": "n",
+    "sky": true,
+    "floor": "facade",
+    "item": "medkit"
+   },
+   "n": {
+    "world_up": "n",
+    "sky": true,
+    "floor": "facade",
+    "item": "shells"
+   },
+   "s": {
+    "world_up": "n",
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "floor": "shaft",
+    "ceiling": "shaft"
+   },
+   "C": {
+    "world_up": "n",
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "floor": "shaft",
+    "ceiling": "shaft",
+    "crate": "heavy",
+    "tile": "car",
+    "lamp": {
+     "colour": [
+      255,
+      80,
+      60
+     ],
+     "reach": 3,
+     "power": 0.8
+    }
+   },
+   "^": {
+    "mag_ceiling": true
+   },
+   "<": {
+    "mag_ceiling": true
+   },
+   "w": {
+    "world_up": "n",
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "floor": "shaft",
+    "ceiling": "shaft",
+    "sheds": {
+     "monster": "counterweight",
+     "every": 6,
+     "near": 24
+    }
+   },
+   "c": {
+    "wall": "racks",
+    "world_up": "n"
+   },
+   "H": {
+    "world_up": "n",
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "floor": "shaft",
+    "ceiling": "shaft",
+    "monster": "hornet"
+   },
+   "R": {
+    "world_up": "n",
+    "ceiling_mag": true,
+    "ceiling_height": 2.4,
+    "floor": "shaft",
+    "ceiling": "shaft",
+    "item": "medkit"
+   },
+   "t": {
+    "ceiling_height": 2.6,
+    "floor": "grate"
+   },
+   "*": {
+    "ceiling_height": 2.6,
+    "floor": "grate",
+    "sky": true
+   },
+   "P": {
+    "wall": "spire",
+    "lamp": {
+     "colour": [
+      90,
+      230,
+      255
+     ],
+     "reach": 5,
+     "power": 1.0
+    }
+   },
+   "L": {
+    "ceiling_height": 2.6,
+    "floor": "grate",
+    "item": "rocket_launcher"
+   },
+   "r": {
+    "ceiling_height": 2.6,
+    "floor": "grate",
+    "item": "rockets"
+   },
+   "Q": {
+    "ceiling_height": 2.6,
+    "floor": "grate",
+    "item": "chaingun"
+   },
+   "q": {
+    "ceiling_height": 2.6,
+    "floor": "grate",
+    "item": "clip"
+   },
+   "N": {
+    "ceiling_height": 2.6,
+    "floor": "grate",
+    "item": "medkit"
+   },
+   "V": {
+    "ceiling_height": 2.6,
+    "floor": "grate",
+    "item": "armor"
+   },
+   "X": {
+    "ceiling_height": 2.6,
+    "floor": "grate",
+    "monster": "metacron",
+    "wake_on": "core",
+    "on_death": "metacron_down"
+   },
+   "x": {
+    "ceiling_height": 2.6,
+    "floor": "grate"
+   },
+   "e": {
+    "ceiling_height": 2.6,
+    "floor": "grate",
+    "on_enter": "core"
+   },
+   "y": {
+    "ceiling_height": 2.6,
+    "floor": "grate"
+   },
+   "D": {
+    "door": true,
+    "opens_on": "metacron_down",
+    "tile": "spire"
+   },
+   "E": {
+    "exit": true
+   },
+   "J": {
+    "wall": "window_broken",
+    "world_up": "n",
+    "sheds": {
+     "monster": "glass",
+     "every": 5,
+     "first": 0,
+     "near": 14
+    }
+   },
+   "K": {
+    "wall": "window_broken",
+    "world_up": "n",
+    "sheds": {
+     "monster": "glass",
+     "every": 6,
+     "first": 2,
+     "near": 14
+    }
+   },
+   "B": {
+    "wall": "window_broken",
+    "world_up": "n",
+    "sheds": {
+     "monster": "glass",
+     "every": 7,
+     "first": 4,
+     "near": 14
+    }
+   }
+  }
+ },
  "sim12": {
   "name": "Stairwell",
   "title": "SIM-12: Stairwell",

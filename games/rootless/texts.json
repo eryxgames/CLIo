@@ -92,5 +92,9 @@
  "e1m7_end": {
   "text": "The hatch drops shut under you and the stack goes quiet. Up here the return address is a room with a window, and through the window, for the first time, a city: towers in a haze, and over them all one spire, lit from inside, turning slowly as if it were looking for someone.\n\nOn the glass, in frost, someone has written: ASPIRATION CENTRAL.\n\nNext: Aspiration Central.",
   "show_once": false
+ },
+ "e1m8_end": {
+  "text": "The rain comes in through the dome and puts out what is left of the Metacron's light. Down in the city, for the first time since the training began, nothing is scheduled.\n\nYou stand in the door at the top of the spire, magboots ticking as they cool, and look out over the dark. Somewhere down there a terminal blinks: a prompt, waiting for someone to type.\n\nEnd of Episode 1: Roasted in the Shell.",
+  "show_once": false
  }
 }

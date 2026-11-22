@@ -182,7 +182,7 @@ class PlayTests(Saves):
         self.assertIn("SWAP PARTITION", self.out.getvalue())
 
     def test_star_jumps_to_a_level_with_dev_only(self):
-        g = self.game(["*e1m9", "*", "*e1m8", "q"], dev=True)
+        g = self.game(["*e1m9", "*", "*e9m9", "q"], dev=True)
         g.world.scene_id = "boot_sector"
         from engine import level
         level.play_scene(g, g.world.scene)
@@ -190,7 +190,7 @@ class PlayTests(Saves):
         self.assertEqual(g.world.scene_id, "swap_partition")
         self.assertIn("SWAP PARTITION", out)
         self.assertIn("e1m2 (Dynamic Loader)", out)
-        self.assertIn("There is no level 'e1m8'", out)
+        self.assertIn("There is no level 'e9m9'", out)
         g = self.game(["*e1m9", "q"])
         g.world.scene_id = "boot_sector"
         level.play_scene(g, g.world.scene)

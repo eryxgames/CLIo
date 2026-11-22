@@ -439,5 +439,13 @@
    "seed": 77,
    "bars": 16
   }
+ },
+ "aspiration_central": {
+  "title": "Aspiration Central",
+  "generate": {
+   "mood": "dark",
+   "seed": 81,
+   "bars": 16
+  }
  }
 }

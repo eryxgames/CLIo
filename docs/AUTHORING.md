@@ -2040,6 +2040,12 @@ player's magboots hold, and its cells say which way in the map the world's up is
 - The level bot waits rather than step into the way of something falling, and does not shoot
   at it.
 
+RØØTLESS's **E1M8: Aspiration Central** is built on it: a street in the rain, the Metacron's
+glass face climbed in magboots (glass falls from its broken windows), the broken lift shaft
+inside (its stuck car passed on the far wall, its counterweight dropping down it), and the
+spire's top. A boss's `"fork"` job can be kept to its hall (`"in_arena": true`: only while the
+player is in it).
+
 ### Light and weather
 
 ```json

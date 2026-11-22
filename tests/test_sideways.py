@@ -146,5 +146,72 @@ class CheckTests(unittest.TestCase):
             self.assertIn(want, got)
 
 
+class AspirationCentralTests(unittest.TestCase):
+    """RØØTLESS E1M8 Aspiration Central: the plaza, the Metacron's face climbed in magboots, the broken lift
+    shaft inside (its stuck car passed on the far wall, its counterweight falling), and the spire's top."""
+
+    def setUp(self):
+        from engine.data import GameData
+        from test_levels import ROOTLESS
+        self.data = GameData(ROOTLESS)
+
+    def level(self):
+        lv = Level(self.data, "e1m8", seed=1)
+        lv.console = Quiet()
+        return lv
+
+    def test_it_is_checked_and_ends_the_episode(self):
+        self.assertEqual([q for q in validate(self.data) if "e1m8" in q], [])
+        scenes = {s["id"]: s for s in self.data.scenes} if isinstance(self.data.scenes, list) else self.data.scenes
+        self.assertIn({"goto": "aspiration_central"}, scenes["the_stack"]["on_level_exit"])
+        self.assertIn({"win": "outro_demo"}, scenes["aspiration_central"]["on_level_exit"])
+        self.assertTrue(View(60, 20).meshed(self.level()))
+
+    def test_the_face_is_reached_only_on_the_plating(self):
+        lv = self.level()
+        face = [(c.x, c.y) for row in lv.grid for c in row if c.world_up is not None and not c.solid and not c.pit]
+        self.assertGreater(len(face), 200)
+        ways = lv.distances(lv.player.x, lv.player.y)
+        self.assertFalse(any(xy in ways for xy in face))      # no walking there from the street
+        rides = sorted(c.mag for row in lv.grid for c in row if c.mag)
+        self.assertEqual(rides, ["face", "face", "top", "top", "window", "window"])
+
+    def test_the_car_is_passed_on_the_far_wall(self):
+        lv = self.level()
+        car = [c for row in lv.grid for c in row if c.crate and c.heavy]
+        self.assertEqual(len(car), 6)
+        x, y = car[0].x, max(c.y for c in car) + 1             # just under the car
+        self.assertFalse(lv.cell(x, y - 1).world_up is None)
+        self.assertTrue(lv.ceiling_ok(x, y, x, y - 1))        # over it, on the far wall
+        self.assertTrue(lv.cell(x, y - 1).solid)              # not past it on the near one
+
+    def test_glass_and_the_counterweight_fall(self):
+        lv = self.level()
+        sheds = sorted(c.sheds["monster"] for row in lv.grid for c in row if c.sheds)
+        self.assertEqual(sheds, ["counterweight", "glass", "glass", "glass"])
+        self.assertTrue(self.data.monsters["counterweight"]["falls"]["fills"])
+
+    def test_the_metacron_wakes_in_its_hall_and_its_death_opens_the_way(self):
+        lv = self.level()
+        boss = lv.boss
+        self.assertEqual(boss.kind, "metacron")
+        self.assertNotIn("escape", boss.attack)               # unlike Cron, it has nowhere to go
+        door = next(c for row in lv.grid for c in row if c.opens_on == "metacron_down")
+        self.assertTrue(door.solid)
+        lv.damage([(boss, 50)])
+        self.assertEqual(boss.hp, self.data.monsters["metacron"]["hp"])     # asleep: not yet
+        lv.event("core")                                       # into its hall: it wakes
+        self.assertTrue(boss.awake)
+        lv.damage([(boss, boss.hp + 5)])
+        self.assertIn("metacron_down", lv.events)
+        self.assertFalse(door.solid)
+
+    def test_the_bot_plays_it_through(self):
+        for seed in (1, 4):
+            out, lv = levelbot.play(self.data, "e1m8", seed=seed)
+            self.assertEqual(out, "exit", seed)
+            self.assertLessEqual(lv.beat, 200)
+
+
 if __name__ == "__main__":
     unittest.main()

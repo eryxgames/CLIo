@@ -533,9 +533,23 @@ class Bot(TextConsole):
         w = lv.weapons.get(p.weapon) or {}
         if w.get("kind") == "melee":                     # fists or a blade: only what is in reach
             cone = [m for m in cone if lv.dist(m) <= 1]
+        boss = next((m for m in cone if m.spec.get("boss")), None)
+        if boss is not None and not any(lv.dist(m) <= 1 for m in cone if m is not boss):
+            return "f %s" % boss.tag                     # the boss first, unless something is at his throat
+        if boss is None:                                 # what a boss forked far off: let it come; go on
+            cone = [m for m in cone if lv.dist(m) <= 3 or not getattr(getattr(m, "owner", None), "spec", {}).get("boss")]
         if cone:
             m = cone[0]
             return "f %s" % m.tag
+        b = getattr(lv, "boss", None)
+        if b is not None and b.awake and not b.dead and not b.gone and not b.seen and not b.spec.get("falls") \
+                and (b.attack or {}).get("kind") == "cron" and (p.x, p.y) in getattr(lv, "arena", ()):
+            ways = lv.distances(b.x, b.y)                # a boss in its hall, out of sight: round to where it is
+            here = ways.get((p.x, p.y))
+            for dx, dy in DIRS:
+                n = (p.x + dx, p.y + dy)
+                if here is not None and ways.get(n, here) < here and lv.free(*n) and n not in lv.marks:
+                    return self.wary(lv, self.step(lv, dx, dy))     # a step, not a turn: turns cost no beat
         # something awake and near but not in front: face it
         near = sorted([m for m in lv.monsters if not m.dead and not m.gone and m.awake and not m.barrel
                        and lv.dist(m) <= 6 and lv.line_of_sight(p.x, p.y, m.x, m.y)], key=lv.dist)

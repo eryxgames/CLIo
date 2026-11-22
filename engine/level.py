@@ -3523,6 +3523,9 @@ class Level:
             return
         if not m.spec.get("boss") and not m.spec.get("falls"):
             self.stats["kills"] += 1
+        if m is self.boss and self.marks:                # its schedule dies with it: no more fire marked
+            self.marks = {}
+            self.marks_version += 1
         gore = self.sprites.get(m.spec.get("remains", None if m.model in self.models else "gore"))
         if gore is not None:
             self.decals.append((m.x, m.y, gore))
@@ -4532,6 +4535,8 @@ class Level:
             if what == "rain" and not warned:
                 self.rain(job)
             elif what == "fork":
+                if job.get("in_arena") and (p.x, p.y) not in getattr(self, "arena", ()):
+                    continue                             # it forks only while he is in its hall
                 alive = [c for c in self.monsters if c.owner is b and not c.dead]
                 n = max(0, min(int(job.get("count", 2)), int(job.get("max", 4)) - len(alive)))
                 if n:

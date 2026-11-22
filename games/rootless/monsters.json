@@ -1041,5 +1041,138 @@
    "",
    "It does not move and does not fight. Shoot it - through its own field - and the field drops."
   ]
+ },
+ "glass": {
+  "name": "falling glass",
+  "tag": "i",
+  "sprite": "glass",
+  "size": 0.6,
+  "hp": 1,
+  "float": 0.5,
+  "attack": {
+   "kind": "none"
+  },
+  "falls": {
+   "speed": 2,
+   "damage": [
+    6,
+    10
+   ]
+  },
+  "remains": "none",
+  "sounds": {
+   "death": "crate"
+  },
+  "man": [
+   "A pane from a broken window, falling.",
+   "",
+   "It falls the world's way down, two cells a beat, and cuts what it meets."
+  ]
+ },
+ "counterweight": {
+  "name": "counterweight",
+  "tag": "Y",
+  "sprite": "counterweight",
+  "size": 1.3,
+  "hp": 999,
+  "float": 0.3,
+  "attack": {
+   "kind": "none"
+  },
+  "falls": {
+   "speed": 3,
+   "damage": [
+    28,
+    36
+   ],
+   "fills": true
+  },
+  "remains": "none",
+  "sounds": {
+   "death": "hit"
+  },
+  "man": [
+   "Tons of iron on a cut cable, down the shaft every few beats.",
+   "",
+   "It fills the shaft: on either wall it hits. Wait for it to pass."
+  ]
+ },
+ "metacron": {
+  "name": "Metacron",
+  "role": "the scheduler of schedulers",
+  "tag": "X",
+  "sprite": "cron",
+  "size": 2.3,
+  "float": 0.2,
+  "hp": 190,
+  "boss": true,
+  "music": {
+   "generate": {
+    "mood": "battle",
+    "seed": 88,
+    "sound": "rich",
+    "bars": 16
+   }
+  },
+  "sounds": {
+   "sight": "cron_wake",
+   "death": "teleport"
+  },
+  "attack": {
+   "kind": "cron",
+   "arena": 9,
+   "rain_damage": [
+    10,
+    16
+   ],
+   "wake_text": "The Metacron turns its many faces to you. Every crontab in the city is open in front of it:",
+   "crontab": [
+    {
+     "every": 3,
+     "do": "rain"
+    },
+    {
+     "every": 7,
+     "do": "fork",
+     "spawn": "hornet",
+     "count": 1,
+     "max": 2,
+     "in_arena": true
+    }
+   ],
+   "enraged": {
+    "below": 0.4,
+    "text": "The Metacron forks everything it has left.",
+    "crontab": [
+     {
+      "every": 3,
+      "do": "rain"
+     },
+     {
+      "every": 5,
+      "do": "fork",
+      "spawn": "soul",
+      "count": 1,
+      "max": 2,
+      "in_arena": true
+     },
+     {
+      "every": 7,
+      "do": "fork",
+      "spawn": "hornet",
+      "count": 1,
+      "max": 2,
+      "in_arena": true
+     }
+    ]
+   }
+  },
+  "man": [
+   "METACRON(8) - the scheduler of schedulers, at the top of the spire of collective control.",
+   "",
+   "Every crontab in the city runs through it. Like Cron it schedules fire on the floor, a beat",
+   "ahead - read it, step off it - and forks things to keep you busy. Unlike Cron it has nowhere",
+   "to go: this is the end of time it promised."
+  ]
  }
 }

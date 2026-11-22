@@ -132,6 +132,24 @@
     "pause": true
    },
    {
+    "goto": "aspiration_central"
+   }
+  ]
+ },
+ {
+  "id": "aspiration_central",
+  "name": "Aspiration Central",
+  "area": "Episode 1",
+  "description": "A city under rain, and the Metacron's spire over it: up its glass face in magboots, up the broken lift shaft inside, to the scheduler of schedulers.",
+  "level": "e1m8",
+  "on_level_exit": [
+   {
+    "story": "e1m8_end"
+   },
+   {
+    "pause": true
+   },
+   {
     "win": "outro_demo"
    }
   ]

@@ -34,7 +34,7 @@ game and the tech demo play.
 
 | Game | What it is |
 | --- | --- |
-| **RØØTLESS** (`rootless`) | A first-person shooter drawn in the terminal, a beat at a time: you step, the monsters step. A recruit's battle simulation: **E1M1** *Boot Sector*, **E1M2** *Dynamic Loader* (ride a cargo loader across the acid), **E1M3** *Drone Refit Assembly*, **E1M4** *Xantrium Fens* (open land to the horizon, a hopper to fly), **E1M5** *User Space* (lockers, supply crates, force fields, a race through a door that will not stay open), **E1M6** *Kernel Space* (a hall of many floors, drawn in the mesh view: a gallery a storey up, the scheduler's dais, the interrupt well), **E1M7** *The Stack* (magboots on the ceiling, upside down over the overflow) and a secret level. Shotguns, chainsaws, rockets, grenades that bounce, drones in 3D, barrels, crates, oil that burns, keys, secrets to punch and shoot - and Cron, who rains fire on a schedule. |
+| **RØØTLESS** (`rootless`) | A first-person shooter drawn in the terminal, a beat at a time: you step, the monsters step. A recruit's battle simulation: **E1M1** *Boot Sector*, **E1M2** *Dynamic Loader* (ride a cargo loader across the acid), **E1M3** *Drone Refit Assembly*, **E1M4** *Xantrium Fens* (open land to the horizon, a hopper to fly), **E1M5** *User Space* (lockers, supply crates, force fields, a race through a door that will not stay open), **E1M6** *Kernel Space* (a hall of many floors, drawn in the mesh view: a gallery a storey up, the scheduler's dais, the interrupt well), **E1M7** *The Stack* (magboots on the ceiling, upside down over the overflow), **E1M8** *Aspiration Central* (up a building's face and a broken lift shaft to the Metacron) and a secret level. Shotguns, chainsaws, rockets, grenades that bounce, drones in 3D, barrels, crates, oil that burns, keys, secrets to punch and shoot - and Cron, who rains fire on a schedule. |
 | **The Hollow** (`depths`) | A dungeon crawler that is different every time: three classes, tactical fights where every enemy shows what it is about to do, loot, shrines, a peddler. **Rogue mode** (`--mode rogue`): one life, no bottom, a table of the best runs. **Deck mode** (`--mode cards`): every fight is a card battle. |
 | **Derelict** (`derelict`) | A short sci-fi text adventure aboard an abandoned cargo hauler: puzzles, conversations, a fight that can be talked around, three endings. |
 | **Tech demo** | `python clio.py --demo`: CLIo shows what it can do, by itself. Any key goes back. |
@@ -173,7 +173,7 @@ python clio.py [game] [options]
   --demo          play the game's demo (or, with no game named, CLIo's tech demo) and exit
   --attract       the same, over and over until a key
   --level ID      start a new game in a first-person level (or arcade stage, skirmish or sim)
-                  (rootless: e1m1 ... e1m7, e1m9, sim1 ... sim12)
+                  (rootless: e1m1 ... e1m9, sim1 ... sim12)
   --mode NAME     game mode, for games that have several (depths: story, rogue, cards)
   --seed N        reproducible random numbers (same seed, same dungeon)
   --style NAME    default, elegant, minimal, modern, retro, techno, console

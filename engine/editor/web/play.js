@@ -13,7 +13,8 @@ const INDEX = new URL(query.get("pyodide") || `https://cdn.jsdelivr.net/pyodide/
 const ROOT = new URL("../../../", self.location.href).href;       // the repository root, as served
 const RING = 65536;                                                // the keys' buffer (bytes)
 
-let ctl = null;     // Int32Array: [0] bytes the page has written, [1] bytes read here, [2] columns, [3] rows
+let ctl = null;     // Int32Array: [0] bytes the page has written, [1] bytes read here, [2] columns, [3] rows,
+                    // [4] how often the terminal changed size (back to the same size too: its rows moved all the same)
 let ring = null;    // Uint8Array: the keys
 const nap = new Int32Array(new SharedArrayBuffer(4));              // waited on to sleep
 
@@ -48,6 +49,7 @@ const io = {
     return out;
   },
   size() { return [Atomics.load(ctl, 2) || 80, Atomics.load(ctl, 3) || 24]; },
+  changes() { return Atomics.load(ctl, 4); },
   sleep(ms) { if (ms > 0) Atomics.wait(nap, 0, 0, ms); },
   sound(what, path, data, volume) {
     const bytes = bytesOf(data);
@@ -67,8 +69,8 @@ async function grab(path) {
 }
 
 async function start({ shared, argv, kept, game }) {
-  ctl = new Int32Array(shared, 0, 4);
-  ring = new Uint8Array(shared, 16, RING);
+  ctl = new Int32Array(shared, 0, 8);
+  ring = new Uint8Array(shared, 32, RING);
   say("Fetching Python…");
   const { loadPyodide } = await import(INDEX + "pyodide.mjs");
   const pyodide = await loadPyodide({ indexURL: INDEX });

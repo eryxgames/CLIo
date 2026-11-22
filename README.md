@@ -27,8 +27,10 @@ There is nothing to install: no packages, no accounts. Saves stay on your machin
 [eryxgames.github.io/CLIo](https://eryxgames.github.io/CLIo/) (and on the game's itch.io page).
 The same engine runs there in Python made for the web: the first visit fetches about 12 MB,
 saves stay in that browser, and a phone gets keys for moving and firing under the picture.
-It is slower than a terminal and has no downloads (CLIo Picture, Ballistic's sounds); every
-game and the tech demo play.
+It is slower than a terminal: Python made for the web runs at about half the speed, and the
+browser cannot use CLIo Picture, so a lit level such as E1M8 takes about 130 ms a picture on a
+desktop where a terminal with CLIo Picture takes about 8 - and a phone is slower still. It has no
+downloads (CLIo Picture, Ballistic's sounds); every game and the tech demo play.
 
 ## The games
 

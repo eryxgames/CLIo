@@ -201,7 +201,7 @@ async function main() {
   const link = Object.assign(document.createElement("link"), { rel: "stylesheet", href: XTERM + "css/xterm.css" });
   document.head.append(link);
   const [{ Terminal }, { FitAddon }] = await Promise.all([import(XTERM + "lib/xterm.mjs"), import(FIT)]);
-  const touch = matchMedia("(pointer: coarse)").matches;
+  const touch = matchMedia("(pointer: coarse)").matches;      // a phone: keys under the picture, no keyboard on a tap
   if (touch) document.body.classList.add("touch");
   const size = Math.max(9, Math.min(17, Math.floor(window.innerWidth / (touch ? 60 : 105) / 0.6)));
   const term = new Terminal({
@@ -212,20 +212,33 @@ async function main() {
   const fit = new FitAddon();
   term.loadAddon(fit);
   term.open($("screen"));
-  try {                                                      // blocks and braille drawn exactly, where WebGL is there
-    const { WebglAddon } = await import(WEBGL);
-    term.loadAddon(new WebglAddon());
-  } catch (err) { /* the DOM renderer draws them with the font */ }
+  if (query.get("renderer") !== "dom") {                     // ?renderer=dom: without WebGL, to compare on a phone
+    try {                                                    // blocks and braille drawn exactly, where WebGL is there
+      const { WebglAddon } = await import(WEBGL);
+      const gl = new WebglAddon();
+      gl.onContextLoss(() => gl.dispose());                  // a phone took the GPU back: the DOM renderer goes on
+      term.loadAddon(gl);
+    } catch (err) { /* the DOM renderer draws them with the font */ }
+  }
   fit.fit();
+  if (touch && term.textarea) term.textarea.setAttribute("inputmode", "none");   // "abc" opens the keyboard
   term.focus();
   window.clio = { term };                                    // for a look from the browser's console, and tests
 
-  const shared = new SharedArrayBuffer(16 + RING);
-  const ctl = new Int32Array(shared, 0, 4);
-  const ring = new Uint8Array(shared, 16, RING);
-  const sizeTo = () => { Atomics.store(ctl, 2, term.cols); Atomics.store(ctl, 3, term.rows); Atomics.notify(ctl, 0); };
+  const shared = new SharedArrayBuffer(32 + RING);
+  const ctl = new Int32Array(shared, 0, 8);                  // as play.js reads it
+  const ring = new Uint8Array(shared, 32, RING);
+  const sizeTo = () => {
+    Atomics.store(ctl, 2, term.cols);
+    Atomics.store(ctl, 3, term.rows);
+    Atomics.add(ctl, 4, 1);                                  // the game draws the whole screen again: a smaller terminal
+    Atomics.notify(ctl, 0);                                  // moved its rows, even if it is back to the size it had
+  };
   sizeTo();
-  term.onResize(sizeTo);
+  term.onResize(() => {
+    sizeTo();
+    try { term.clearTextureAtlas(); } catch (err) { /* no WebGL */ }   // its glyphs drawn afresh: a full cache garbles them
+  });
   new ResizeObserver(() => fit.fit()).observe($("screen"));
   const encode = new TextEncoder();
   const send = (text) => {
@@ -239,10 +252,38 @@ async function main() {
   };
   term.onData(send);
   term.onTitleChange((title) => { document.title = title || (edited ? edited.title + " - CLIo" : "CLIo"); });
+  // The keys under the picture. Moving and firing first clear a line half typed (Ctrl+U): the game does not take them
+  // as moves while a line is being typed, and a phone's keyboard can leave letters there. An arrow held down walks on,
+  // a key at a time once the game has taken the last one. A click without a touch (assistive tools) counts too.
+  const QUIET = /^(\x1b\[[ABCD]|[ ,.\]])$/;
+  const ARROW = /^\x1b\[[ABCD]$/;
+  const idle = () => Atomics.load(ctl, 0) === Atomics.load(ctl, 1);
   for (const b of document.querySelectorAll("#keys button[data-key]")) {
-    b.addEventListener("pointerdown", (e) => { e.preventDefault(); send(b.dataset.key); });
+    const key = b.dataset.key, press = () => send((QUIET.test(key) ? "\x15" : "") + key);
+    let held = null, at = 0;
+    const lift = () => { clearTimeout(held); clearInterval(held); held = null; };
+    b.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      at = Date.now();
+      press();
+      if (ARROW.test(key)) {
+        lift();
+        held = setTimeout(() => { held = setInterval(() => { if (idle()) press(); }, 90); }, 380);
+      }
+    });
+    for (const end of ["pointerup", "pointercancel", "pointerleave"]) b.addEventListener(end, lift);
+    b.addEventListener("click", () => { if (Date.now() - at > 700) press(); });
   }
-  $("type").addEventListener("click", () => term.focus());
+  $("type").addEventListener("click", () => {                // the phone's keyboard, for typing a command
+    const area = term.textarea;
+    if (touch && area) {
+      const open = area.getAttribute("inputmode") !== "none";
+      area.setAttribute("inputmode", open ? "none" : "text");
+      area.blur();
+      $("type").textContent = open ? "abc" : "hide";
+    }
+    term.focus();
+  });
   $("screen").addEventListener("pointerdown", unmute);
 
   cover("Fetching Python… (about 10 MB the first time; the browser keeps it after)");

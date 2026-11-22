@@ -127,6 +127,31 @@ class PlayedTests(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+class SizeTests(unittest.TestCase):
+    def test_the_page_says_how_often_its_terminal_changed_size(self):
+        from unittest import mock
+        from engine import web
+
+        class Page:
+            def size(self):
+                return [72, 40]
+
+            def changes(self):
+                return 7
+
+        class OlderPage:
+            def size(self):
+                return [80, 24]
+
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("CLIO_TERM_CHANGES", None)
+            web._note_size(OlderPage())
+            self.assertEqual((os.environ["COLUMNS"], os.environ["LINES"]), ("80", "24"))
+            self.assertNotIn("CLIO_TERM_CHANGES", os.environ)
+            web._note_size(Page())
+            self.assertEqual((os.environ["COLUMNS"], os.environ["LINES"], os.environ["CLIO_TERM_CHANGES"]), ("72", "40", "7"))
+
+
 class StandInTests(unittest.TestCase):
     class Page:
         def __init__(self, keys=b""):
@@ -226,6 +251,17 @@ class PageFilesTests(unittest.TestCase):
         self.assertIn("game.files", worker)
         self.assertIn('editorUrl({ open: EDITED })', script)              # back in the same frame: opened again there
         self.assertIn('PARAMS.get("open")', editor)
+        self.assertIn("new Int32Array(shared, 0, 8)", script)            # the page and the worker share one layout
+        self.assertIn("new Int32Array(shared, 0, 8)", worker)
+        self.assertIn("new Uint8Array(shared, 32, RING)", script)
+        self.assertIn("new Uint8Array(shared, 32, RING)", worker)
+        self.assertIn("changes() { return Atomics.load(ctl, 4); }", worker)
+        self.assertIn('setAttribute("inputmode", "none")', script)          # a phone: no keyboard on a tap
+        self.assertIn('send((QUIET.test(key) ? "\\x15" : "") + key)', script)   # moves clear a half-typed line
+        self.assertIn("term.clearTextureAtlas()", script)
+        self.assertIn("gl.onContextLoss(() => gl.dispose())", script)
+        self.assertIn('query.get("renderer") !== "dom"', script)
+        self.assertIn("Atomics.add(ctl, 4, 1)", script)
         for name in ("bar-title", "bar-again", "bar-back"):
             self.assertIn('id="%s"' % name, page)
         index = self.read("index.html")

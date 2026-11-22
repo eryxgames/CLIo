@@ -2,6 +2,21 @@
 
 Notable changes to CLIo. Versions follow [semantic versioning](https://semver.org).
 
+## Unreleased
+
+### Fixed
+
+- On a phone (the web page, itch.io's too) the keys under the picture work while letters are left in
+  the command line - a phone's keyboard can leave them there, and the game took no moves while a line
+  was half typed: moving and firing clear it first (Ctrl+U). An arrow held down walks on, a step at
+  a time as the game takes them. A tap on the picture no longer opens the phone's keyboard, which
+  covered those keys; *abc* opens it, *hide* closes it.
+- The page's terminal says how often it changed size, and the next frame is drawn whole: a phone's
+  keyboard or address bar shrinks the terminal and gives the size back, and the rows that moved
+  showed as stripes and stray blocks in the picture, the status line and the messages until the
+  next key. Its WebGL glyph cache is cleared then too, a lost WebGL context (a phone taking its GPU
+  back) leaves the plain renderer drawing, and `?renderer=dom` plays without WebGL, to compare.
+
 ## 3.5.0 - 2026-11-22
 
 ### Added

@@ -48,6 +48,29 @@ class ScreenTests(unittest.TestCase):
         sc = self.screen(["f", "space", "z", "1", "enter"])
         self.assertEqual(sc.read(lambda: None), "f z1")
 
+    def test_ctrl_u_clears_a_half_typed_line_so_a_move_acts(self):
+        sc = self.screen(["j", "u", "up", "ctrl-u", "up"])          # the phone's touch keys send Ctrl+U first
+        self.assertEqual(sc.read(lambda: None), "k")
+
+    def test_a_counted_change_of_size_draws_the_whole_frame(self):
+        from unittest import mock
+        sc = self.screen([])
+        row = [(None, (200, 0, 0), (0, 0, 200))] * 30
+        with mock.patch.dict(os.environ, {"CLIO_TERM_CHANGES": "3"}):
+            sc.frame([row, "a line"], prompt=None, status="")
+            sc.out.seek(0)
+            sc.out.truncate()
+            sc.frame([list(row), "a line"], prompt=None, status="")
+            self.assertNotIn("\u2580", sc.out.getvalue())
+            self.assertFalse(sc.resized())
+            os.environ["CLIO_TERM_CHANGES"] = "5"                   # smaller and back: the same size, rows moved
+            self.assertTrue(sc.resized())
+            sc.frame([list(row), "a line"], prompt=None, status="")
+            out = sc.out.getvalue()
+            self.assertIn("\x1b[2J", out)
+            self.assertIn("\u2580", out)
+            self.assertIn("a line", out)
+
     def test_line_editing(self):
         sc = self.screen(["x", "y", "backspace", "esc", "w", "enter"])
         self.assertEqual(sc.read(lambda: None), "w")

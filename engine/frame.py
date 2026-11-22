@@ -19,6 +19,7 @@ again at once when it changes (Windows has no signal for that, so it looks).
 from __future__ import annotations
 
 import contextlib
+import os
 import shutil
 import sys
 import time
@@ -186,6 +187,13 @@ def tapped(name):
         return False
 
 
+def term_changes():
+    """How often the terminal has changed size, where its host counts that ("" elsewhere). The web page does: a phone's
+    keyboard shrinks the terminal and gives the size back, and the rows it held have moved all the same - so the
+    next frame is drawn whole, as after any new size."""
+    return os.environ.get("CLIO_TERM_CHANGES", "")
+
+
 class Screen:
     """The terminal as one frame: rows written in place, a prompt, keys, pages."""
 
@@ -210,6 +218,7 @@ class Screen:
         self.prompt_row = 1
         self.prompt_text = ""
         self.last_size = None
+        self.last_changes = None
         self.started = False
         self.shown = {}                   # what each row of the screen holds now: written again only if it changed
         self.now = time.monotonic         # the clock a beat in real time is kept by (tests set their own)
@@ -244,7 +253,7 @@ class Screen:
         return max(20, s.columns), max(10, s.lines)
 
     def resized(self):
-        return self.size() != self.last_size
+        return self.size() != self.last_size or term_changes() != self.last_changes
 
     # ---- drawing -------------------------------------------------------- #
     def frame(self, rows, prompt=None, status=None, footer=None, whole=False):
@@ -257,10 +266,11 @@ class Screen:
         its last - in an animation most of the screen often stays as it was.  ``whole`` writes
         everything (as a new size does)."""
         W, H = self.size()
+        changes = term_changes()
         clear = ""
-        if (W, H) != self.last_size:
+        if (W, H) != self.last_size or changes != self.last_changes:
             clear = CSI + "2J"
-            self.last_size = (W, H)
+            self.last_size, self.last_changes = (W, H), changes
         if clear or whole:
             self.shown = {}
         rows = list(rows)

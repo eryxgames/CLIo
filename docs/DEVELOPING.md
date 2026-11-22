@@ -109,7 +109,7 @@ guide.
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 830 tests, about a minute
+python -m unittest discover -s tests     # 833 tests, about a minute
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get
 python tests/bot.py 30 cards             # the same with card battles (the Deck mode)
@@ -162,12 +162,16 @@ keeps saves in IndexedDB and hands them back next visit). The page shows the ter
 xterm.js (jsDelivr; its WebGL renderer draws blocks and braille exactly).
 
 The keys go through memory the page and the worker share (SharedArrayBuffer), so a game waits
-for a key as in a terminal - which needs a cross-origin isolated page: itch.io's
+for a key as in a terminal (32 bytes of counters - bytes written, bytes read, columns, rows, and
+how often the terminal changed size, which makes the next frame whole: a phone's keyboard shrinks
+it and gives the size back, and its rows have moved all the same - then the keys' ring). That
+needs a cross-origin isolated page: itch.io's
 *SharedArrayBuffer support*, or the headers `Cross-Origin-Opener-Policy: same-origin` and
 `Cross-Origin-Embedder-Policy: require-corp` from the server; on a host that cannot send them
 (GitHub Pages) `coi.js`, a service worker, adds them and the page reloads once. In a frame that
 is not isolated the page offers a tab of its own. `?pyodide=` and `?npm=` take Python and
-xterm.js from elsewhere (a local copy). `tests/test_web.py` runs the games on a page made of a
+xterm.js from elsewhere (a local copy); `?renderer=dom` leaves WebGL out (to compare, where a
+phone's GPU garbles the glyph cache: each colour pair of a picture's cell is a glyph there). `tests/test_web.py` runs the games on a page made of a
 script; in a real browser:
 
 ```

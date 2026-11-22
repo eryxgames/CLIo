@@ -171,6 +171,10 @@ def _note_size(io):
     except Exception:
         return
     os.environ["COLUMNS"], os.environ["LINES"] = str(cols), str(rows)
+    try:                                                  # how often it changed size: the next frame is drawn whole
+        os.environ["CLIO_TERM_CHANGES"] = str(int(io.changes()))
+    except Exception:                                     # (a page without the count)
+        pass
 
 
 class _Termios:

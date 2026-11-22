@@ -18,8 +18,7 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   has them.
 - **CLIo Picture 0.7** draws the mesh view when it is installed (`clio_frame_rooms`): at 150 x 34,
   E1M1 in 3.2 ms (21.7 in Python), 5.0 in braille (52.2). Every face and floor kind is compared
-  with the Python's picture, to the pixel (`tests/test_mesh.py`'s features room). `--get-picture`
-  still installs 0.6 until 0.7 is released.
+  with the Python's picture, to the pixel (`tests/test_mesh.py`'s features room).
 - **Looking up and down, and turning, in the mesh view**: Shift+Up and Shift+Down (or Ctrl, Alt;
   `look up`, `look down`, `look`), two steps each way, free as turning is; a turn is drawn at
   angles between the two facings instead of sliding. CLIo Picture 0.7 draws both.
@@ -81,7 +80,7 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   E1M8 at 160 x 45 in 8.5 ms (46 in Python), E1M6 in 6.8 (42) - and the mesh view's low detail,
   terraces on open land (`clio_land_terraced`), the picture turned over on the ceiling
   (`clio_frame_flip`) and turned up a wall (`clio_tilt`). An older library leaves lit levels and
-  terraces to the Python. `--get-picture` still installs 0.7 until 0.8 is released.
+  terraces to the Python.
 - **Slopes**: a cell's `"slope"` (the way it rises) and `"rise"` tilt its floor, `"ceiling_slope"` and
   `"ceiling_rise"` its ceiling - ramps, a sewer tube's sides. Steps are measured where cells meet
   (a ramp's foot is level, its sides are steps), a slope rising more than 1 is too steep, the eye
@@ -89,6 +88,8 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   sloped edges of the faces beside them - CLIo Picture 0.9 too, to the same pixels
   (`clio_frame_rooms2`; SIM-13 at 160 x 45: 62.8 ms in Python, 18.4 with it; an older library leaves
   slopes to the Python). The editor's cell form has them.
+- `--get-picture` (and the launcher's Downloads) installs **CLIo Picture 0.9.0** - it was 0.6.0 -
+  checked by its SHA-256, for Linux, macOS, Windows and Android (Termux).
 - **Wet slopes**: a `"wet"`, slick or oiled slope - or one out in the rain - slides whoever steps on
   it down to its foot (up it: back down; off an edge: a fall). Magboots grip.
 - **Jumps**: where a level says `"jump"` (`high`, `far`, `double`), `jump` (F7, `+`) leaps up on to a

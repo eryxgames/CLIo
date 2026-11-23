@@ -1005,7 +1005,7 @@ class Runner:
                 models = model.load(getattr(sim.data, "models", None) or {})
             except Exception:
                 models = {}
-            self.view = panels.View(sim.panels, formula, models)
+            self.view = panels.View(sim.panels, formula, models, getattr(sim.data, "planets", None))
         level = sheet = None
         try:                                             # the track that plays, for panels that move with it
             sheet, now = self.audio.cues(), self.audio.clock()
@@ -1307,7 +1307,7 @@ def problems(data):
         if spec.get("panels") is not None:
             from . import panels
             out += panels.problems(spec["panels"], names, "%s: panels" % where, formula,
-                                   getattr(data, "models", None) or {})
+                                   getattr(data, "models", None) or {}, getattr(data, "planets", None) or {})
     for sid, sc in (getattr(data, "scenes", None) or {}).items():
         if sc.get("sim") and sc["sim"] not in sims:
             out.append("scene '%s': unknown sim '%s'" % (sid, sc["sim"]))

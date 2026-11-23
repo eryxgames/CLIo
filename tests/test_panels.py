@@ -212,7 +212,7 @@ class SimTests(unittest.TestCase):
         before = sim.state_hash()
         rows = runner.rows(100, 33, 3, True)
         text = "\n".join("".join(c[0] or "▀" for c in r) if isinstance(r, list) else strip_ansi(r) for r in rows)
-        for part in ("REACTOR  bring the core to power", "─ CORE ─", "─ TRENDS ─", "RODS OUT ↑/↓", "HOLDING", "○ AT POWER",
+        for part in ("REACTOR  bring the core to power", "─ CORE ─", "─ SHIP  heat ─", "RODS OUT ↑/↓", "HOLDING", "○ AT POWER",
                      "HEAT ", "POWER "):
             self.assertIn(part, text)
         self.assertEqual(sim.state_hash(), before)                           # a screen changes nothing under it

@@ -98,6 +98,21 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   simulator with its own screen: the helm (a hopper flown to a pad, with its map), the reactor
   (a core brought to power) and the scan (a beam held on a drifting target while a mast comes
   into the scope). The autopilot wins all three.
+- **Views** (`engine/viewer.py`): one thing seen several ways. A 3D model: `shaded` (its
+  materials under a light), `wire`, `solid` (hidden lines removed), `structure` (what is
+  inside: each group of parts in its own colour, the hull faint, and a `cut` that takes the
+  near part away along an axis), `plan` (from above, as a map; floor by floor with `levels`
+  and `level`) and `heat` (each group in the colour of a value, the hull seen through). A
+  **planet** (`planets.json`: a field of ground from pole to pole, a legend, a tilt, a sun,
+  sites): `surface` (lit, with its night side), `heat`, `grid`. A panel's scope takes a
+  `view`, and there is a `planet` widget; values, the cut and the level can be names, so a
+  screen shows a ship's heat or its decks as they are.
+- **`clio.py GAME --view-model [NAME]`**: a viewer for a game's models and planets (arrows,
+  `+` `-`, `V` for the view, `C` to cut, `L` for levels, Tab for the next);
+  `python -m engine.viewer FILE.glb` looks at a glTF file; `--print VIEW` writes a picture.
+- The station starter has a hauler with decks, a hold, a reactor, a bridge and engines, and a
+  moon: the reactor console shows the ship by its heat, the scan console the moon below and a
+  deck plan. A panel's solid scope now hides the lines behind (it drew them all).
 
 ## 3.5.2 - 2026-11-23
 

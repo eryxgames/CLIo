@@ -1,0 +1,71 @@
+{
+ "moon": {
+  "name": "Gordian Moon",
+  "tilt": 22,
+  "spin": 5,
+  "sun": 55,
+  "colour": "cyan",
+  "legend": {
+   "i": {
+    "name": "methane ice",
+    "colour": "#cfe8f0",
+    "heat": 0.05
+   },
+   "s": {
+    "name": "swamp",
+    "colour": "#4a6b4a",
+    "heat": 0.3
+   },
+   "~": {
+    "name": "sea",
+    "colour": "#1f4f78",
+    "heat": 0.4
+   },
+   "g": {
+    "name": "grassland",
+    "colour": "#7d9a4a",
+    "heat": 0.6
+   },
+   "d": {
+    "name": "dry land",
+    "colour": "#b8935a",
+    "heat": 0.8
+   },
+   "m": {
+    "name": "mountains",
+    "colour": "#8a7f78",
+    "heat": 0.45
+   },
+   "v": {
+    "name": "hot ground",
+    "colour": "#a8452e",
+    "heat": 1.0
+   }
+  },
+  "field": [
+   "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii",
+   "iiissiiiiiisssiiiiiiiiissiiiiiiiisii",
+   "ssss~~ssssssss~~~sssssss~~sssssss~~s",
+   "~~gggg~~~mmgggg~~~~~ggggmm~~~gggg~~~",
+   "~ggddgg~~mmgddgg~~~gggddmmg~~ggdgg~~",
+   "gddvddgg~~gdddddg~~ggddvddgg~gdddgg~",
+   "~ggddgg~~~gggddg~~~~ggdddgg~~ggdgg~~",
+   "~~ggg~~~~mm~ggg~~~~~~gggmm~~~~ggg~~~",
+   "sss~~~sssssss~~~ssssss~~~ssssss~~~ss",
+   "iissiiiiiissiiiiiiiisssiiiiiiissiiii",
+   "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii"
+  ],
+  "sites": [
+   {
+    "name": "EREBUS",
+    "lat": 8,
+    "lon": 40
+   },
+   {
+    "name": "FER",
+    "lat": -20,
+    "lon": 150
+   }
+  ]
+ }
+}

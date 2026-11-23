@@ -530,6 +530,8 @@ def main(argv=None):
     ap.add_argument("--scale", type=int, default=4, help="with --sheet: how many times as big the pictures are (4)")
     ap.add_argument("--import-model", metavar="FILE",
                     help="bring a glTF model (.glb or .gltf, e.g. from Blender) into the game's models.json and exit")
+    ap.add_argument("--view-model", nargs="?", const="", metavar="NAME",
+                    help="look at the game's 3D models and planets: shaded, in lines, cut open, as a plan, by heat")
     ap.add_argument("--model-name", metavar="NAME", help="with --import-model: its name (default: the file's)")
     ap.add_argument("--model-scale", type=float, default=0.4,
                     help="with --import-model: cells per metre (0.4: a 2.5 m room is a cell high)")
@@ -601,6 +603,9 @@ def main(argv=None):
         return read_sheet(game_dir, args.import_sheet)
     if args.import_model:
         return import_model(game_dir, args.import_model, args.model_name, args.model_scale)
+    if args.view_model is not None:
+        from engine import viewer
+        return viewer.main([game_dir] + ([args.view_model] if args.view_model else []))
     if args.bake_sounds:
         try:
             return bake_sounds(game_dir, args.bake_sounds)

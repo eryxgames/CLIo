@@ -154,6 +154,12 @@
     "start": 0,
     "min": 0,
     "max": 10
+   },
+   "power_heat": {
+    "value": "power * 9"
+   },
+   "spread": {
+    "value": "max(0, heat - 500) * 0.35"
    }
   },
   "chart": [
@@ -242,27 +248,30 @@
        ]
       },
       {
-       "title": "TRENDS",
+       "title": "SHIP  heat",
        "widgets": [
         {
          "plot": [
-          "heat"
-         ],
-         "rows": 6,
-         "min": 280,
-         "max": 1400
-        },
-        {
-         "plot": [
+          "heat",
           "power"
          ],
-         "rows": 6,
-         "min": 0,
-         "max": 120
+         "rows": 6
         },
         {
          "scope": {
-          "scene": "signals"
+          "model": "hauler",
+          "view": "heat",
+          "max": 1400,
+          "turn": 10,
+          "values": {
+           "reactor": "heat",
+           "engines": "power_heat",
+           "decks": "spread",
+           "hold": "spread",
+           "bridge": "spread",
+           "body": "spread"
+          },
+          "pitch": -18
          }
         }
        ]
@@ -304,6 +313,9 @@
     "start": 0,
     "min": 0,
     "max": 100
+   },
+   "deck": {
+    "value": "floor(time / 6) % 2"
    }
   },
   "win_if": "scan >= 100",
@@ -387,16 +399,58 @@
      ]
     },
     {
-     "title": "OBJECT 7  RELAY MAST",
-     "pulse": "bar",
-     "widgets": [
+     "rows": [
       {
-       "scope": {
-        "model": "mast",
-        "reveal": "scan",
-        "whole": 100,
-        "turn": 14
-       }
+       "title": "OBJECT 7  RELAY MAST",
+       "pulse": "bar",
+       "widgets": [
+        {
+         "scope": {
+          "model": "mast",
+          "reveal": "scan",
+          "whole": 100,
+          "turn": 14
+         }
+        }
+       ]
+      },
+      {
+       "size": 13,
+       "cols": [
+        {
+         "title": "BELOW  surface",
+         "widgets": [
+          {
+           "planet": "moon",
+           "view": "surface"
+          }
+         ]
+        },
+        {
+         "title": "BELOW  heat",
+         "colour": "amber",
+         "widgets": [
+          {
+           "planet": "moon",
+           "view": "heat"
+          }
+         ]
+        },
+        {
+         "title": "HAULER  decks",
+         "colour": "green",
+         "widgets": [
+          {
+           "scope": {
+            "model": "hauler",
+            "view": "plan",
+            "levels": 2,
+            "level": "deck"
+           }
+          }
+         ]
+        }
+       ]
       }
      ]
     }

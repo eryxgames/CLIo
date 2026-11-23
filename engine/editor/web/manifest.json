@@ -50,6 +50,7 @@
   "engine/theme.py",
   "engine/ui.py",
   "engine/vector.py",
+  "engine/viewer.py",
   "engine/web.py",
   "engine/world.py",
   "engine/ai/__init__.py",

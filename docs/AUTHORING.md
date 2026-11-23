@@ -110,7 +110,8 @@ That is a finished game: `take corkscrew`, `use corkscrew on barrel`, `up`. It s
 
 Files are looked up by these default names: `scenes.json`, `items.json`,
 `characters.json`, `texts.json`, `dialogues.json`, `quests.json`, `triggers.json`,
-`music.json`, `sounds.json`, `sprites.json`, `dungeon.json`, `menus.json`, and the folder `art/`.
+`music.json`, `sounds.json`, `sprites.json`, `dungeon.json`, `menus.json`, `planets.json`, and the
+folder `art/`.
 Only scenes and items are required.
 
 ## Scenes and exits
@@ -2948,6 +2949,7 @@ that show the sim's values by name:
 | `{"text": "..."}` | Words, with values in them: `{heat}`, `{heat:.1f}`; `tone`, `"bright": true`, `"align": "center"`. |
 | `{"plot": [NAMES]}` | The values over time as lines of dots, `rows` high, between `min` and `max` (else what they have reached). |
 | `{"scope": ...}` | A vector display (things in three dimensions, drawn in lines): a scene by name (`hauler`, `approach`, `orbit`, `scan`, `signals`), or `{"model": ID}` - one of the game's 3D models turning in lines (`turn` degrees a second, `fov`, `far`, `height`); with `"reveal": NAME` only as much of it is drawn, from the ground up, as the value is of `whole`, and when it is whole it is drawn solid. |
+| `{"planet": ID}` | One of the game's planets (below), in a `view`. |
 | `{"map": true}` | The sim's map (a vehicle's). |
 | `{"rule": true}`, `{"space": 1}` | A line; empty rows. |
 
@@ -2959,6 +2961,43 @@ its phosphor (`green`, `amber`, `cyan`, `white`, `red`, `blue`, `violet`), `bord
 too. Widgets fill a panel from the top; a scope or a map takes what room is left. On a screen
 under 60 columns, or piped, the sim is shown as ever. `--check` checks the layout and the names
 in it. `templates/station` has three such screens to copy; `python -m engine.panels` shows one.
+
+**Views.** A scope with a `model` can show it in one of the viewer's views - `"view"`:
+
+| View | Shows |
+| --- | --- |
+| `shaded` | The model as a level draws it: its materials under a light. |
+| `wire`, `solid` | Every line; only the lines in front. |
+| `structure` | What is inside: every line, each `group` of the model's parts in a colour of its own, the hull (the first group) faint. `"cut"` (a number or a name, of `whole`) takes the near part away along `"axis"` (`x`, `y`, `z`). |
+| `plan` | From straight above, as a map of it. `"levels"` cuts it into that many floors or decks and `"level"` (a number or a name, from 0) says which is shown. |
+| `heat` | Each group in the colour of a value from cold to hot: `"values": {"reactor": "heat", "engines": 40}` (names or numbers, of `max`). The hull is seen through, so what is hot inside shows. |
+
+`"turn"` (degrees a second), `"yaw"`, `"pitch"` and `"zoom"` place the eye. A model's parts are
+put in groups with `"group": "reactor"` in `models.json`.
+
+**Planets** are in `planets.json`, and a panel shows one with `{"planet": "moon", "view": "surface"}`:
+
+```json
+{"moon": {"name": "Gordian Moon", "tilt": 22, "spin": 5, "sun": 55,
+  "legend": {"i": {"name": "ice", "colour": "#cfe8f0", "heat": 0.05},
+             "~": {"name": "sea", "colour": "#1f4f78", "heat": 0.4},
+             "d": {"name": "dry land", "colour": "#b8935a", "heat": 0.8}},
+  "field": ["iiiiiiiiiiii", "~~dd~~~ddd~~", "~dddd~~dddd~", "~~dd~~~~dd~~", "iiiiiiiiiiii"],
+  "sites": [{"name": "EREBUS", "lat": 8, "lon": 40}]}}
+```
+
+`field` is the ground from the north pole to the south, each row all the way round; `legend`
+says what each character is; `tilt` leans its axis towards the eye, `spin` turns it (degrees a
+second; a widget's `"turn"`, a number or a name, sets how far round it is instead), `sun` is how
+far round from the eye its sun stands. Views: `surface` (lit by the sun, the night side dark),
+`heat` (each kind of ground by its `heat`), `grid` (circles of latitude and longitude in lines).
+Sites on the near side are named.
+
+`python clio.py GAME --view-model [NAME]` looks at a game's models and planets on the terminal:
+the arrows turn and tilt, `+` `-` come nearer and go back, `V` (or a digit) changes the view,
+`C` cuts it open (`[` `]` move the cut, `X` its axis), `L` and `,` `.` the levels of a plan, `Tab`
+the next thing, Space lets it turn by itself. `python -m engine.viewer FILE.glb` looks at a glTF
+file as CLIo would have it; `--print VIEW` writes one picture as text.
 
 **Playing it.** At 20 ticks a second; the map follows the vehicle (north up), an arrow at its
 edge points to what is next, and the instruments stand beside it. Piped, or on a small screen,

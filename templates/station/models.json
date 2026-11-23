@@ -669,5 +669,341 @@
    }
   ],
   "break": "parts"
+ },
+ "hauler": {
+  "materials": {
+   "hull": {
+    "color": "#8d949c",
+    "metal": 0.6,
+    "rough": 0.5
+   },
+   "deck": {
+    "color": "#5f6a70",
+    "metal": 0.2,
+    "rough": 0.8
+   },
+   "cargo": {
+    "color": "#b0733a",
+    "metal": 0.1,
+    "rough": 0.8
+   },
+   "core": {
+    "color": "#7fe0ff",
+    "glow": 2.5
+   },
+   "glass": {
+    "color": "#ffd27a",
+    "glow": 1.5
+   },
+   "engine": {
+    "color": "#4a4f57",
+    "metal": 0.8,
+    "rough": 0.35
+   }
+  },
+  "parts": [
+   {
+    "shape": "box",
+    "size": [
+     2.4,
+     6.0,
+     0.12
+    ],
+    "at": [
+     0,
+     0,
+     0.06
+    ],
+    "material": "hull"
+   },
+   {
+    "shape": "box",
+    "size": [
+     2.4,
+     6.0,
+     0.12
+    ],
+    "at": [
+     0,
+     0,
+     1.74
+    ],
+    "material": "hull"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.12,
+     6.0,
+     1.8
+    ],
+    "at": [
+     -1.14,
+     0,
+     0.9
+    ],
+    "material": "hull"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.12,
+     6.0,
+     1.8
+    ],
+    "at": [
+     1.14,
+     0,
+     0.9
+    ],
+    "material": "hull"
+   },
+   {
+    "shape": "box",
+    "size": [
+     2.4,
+     0.12,
+     1.8
+    ],
+    "at": [
+     0,
+     -2.94,
+     0.9
+    ],
+    "material": "hull"
+   },
+   {
+    "shape": "wedge",
+    "size": [
+     2.4,
+     1.4,
+     1.8
+    ],
+    "at": [
+     0,
+     3.7,
+     0.9
+    ],
+    "material": "hull"
+   },
+   {
+    "shape": "box",
+    "size": [
+     2.1,
+     5.6,
+     0.06
+    ],
+    "at": [
+     0,
+     0,
+     0.9
+    ],
+    "material": "deck",
+    "group": "decks"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.06,
+     1.2,
+     0.8
+    ],
+    "at": [
+     0,
+     1.6,
+     0.5
+    ],
+    "material": "deck",
+    "group": "decks"
+   },
+   {
+    "shape": "box",
+    "size": [
+     2.1,
+     0.06,
+     0.8
+    ],
+    "at": [
+     0,
+     0.4,
+     0.5
+    ],
+    "material": "deck",
+    "group": "decks"
+   },
+   {
+    "shape": "box",
+    "size": [
+     2.1,
+     0.06,
+     0.8
+    ],
+    "at": [
+     0,
+     -1.4,
+     1.3
+    ],
+    "material": "deck",
+    "group": "decks"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.8,
+     0.8,
+     0.7
+    ],
+    "at": [
+     -0.55,
+     1.5,
+     0.5
+    ],
+    "material": "cargo",
+    "group": "hold"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.8,
+     0.8,
+     0.7
+    ],
+    "at": [
+     0.55,
+     1.5,
+     0.5
+    ],
+    "material": "cargo",
+    "group": "hold"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.8,
+     0.8,
+     0.7
+    ],
+    "at": [
+     -0.55,
+     -0.5,
+     0.5
+    ],
+    "material": "cargo",
+    "group": "hold"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.8,
+     0.8,
+     0.7
+    ],
+    "at": [
+     0.55,
+     -0.5,
+     0.5
+    ],
+    "material": "cargo",
+    "group": "hold"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.8,
+     0.8,
+     0.5
+    ],
+    "at": [
+     0.0,
+     0.5,
+     1.25
+    ],
+    "material": "cargo",
+    "group": "hold"
+   },
+   {
+    "shape": "sphere",
+    "size": [
+     0.55,
+     0.55,
+     0.55
+    ],
+    "at": [
+     0,
+     -2.1,
+     0.5
+    ],
+    "material": "core",
+    "group": "reactor",
+    "detail": 1
+   },
+   {
+    "shape": "ring",
+    "size": [
+     0.8,
+     0.8,
+     0.5
+    ],
+    "at": [
+     0,
+     -2.1,
+     0.5
+    ],
+    "material": "engine",
+    "group": "reactor",
+    "sides": 8,
+    "thick": 0.15,
+    "tube": 4
+   },
+   {
+    "shape": "box",
+    "size": [
+     1.6,
+     1.0,
+     0.6
+    ],
+    "at": [
+     0,
+     2.2,
+     1.35
+    ],
+    "material": "glass",
+    "group": "bridge"
+   },
+   {
+    "shape": "cylinder",
+    "size": [
+     0.45,
+     0.45,
+     1.0
+    ],
+    "at": [
+     -0.7,
+     -3.4,
+     0.9
+    ],
+    "material": "engine",
+    "group": "engines",
+    "axis": "y",
+    "sides": 8
+   },
+   {
+    "shape": "cylinder",
+    "size": [
+     0.45,
+     0.45,
+     1.0
+    ],
+    "at": [
+     0.7,
+     -3.4,
+     0.9
+    ],
+    "material": "engine",
+    "group": "engines",
+    "axis": "y",
+    "sides": 8
+   }
+  ]
  }
 }

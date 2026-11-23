@@ -39,8 +39,9 @@ import string
 from . import vector
 from .menu import BORDERS, border as border_of, wrap
 
-WIDGETS = ("gauge", "center", "number", "control", "compass", "lamps", "text", "plot", "scope", "map", "rule", "space")
-FLEX = ("scope", "map")                                  # these take what room is left
+WIDGETS = ("gauge", "center", "number", "control", "compass", "lamps", "text", "plot", "scope", "planet", "map", "rule",
+           "space")
+FLEX = ("scope", "planet", "map")                        # these take what room is left
 TONES = {"good": (110, 240, 130), "warn": (255, 176, 40), "hot": (255, 84, 64), "off": None}
 BITS = ((1, 8), (2, 16), (4, 32), (64, 128))             # braille: the dot at (row, column) of a character
 KEEP = 600                                               # values kept of what is plotted
@@ -114,10 +115,12 @@ class View:
     """A layout, drawn. ``formula(text)`` makes a function of the values out of a condition (a
     simulator's formulas); ``models``: the game's 3D models by name, for scopes."""
 
-    def __init__(self, spec, formula=None, models=None):
+    def __init__(self, spec, formula=None, models=None, planets=None):
         self.spec = spec if isinstance(spec, dict) else {}
         self.formula = formula
         self.models = models or {}
+        self.planets = planets or {}                     # a game's planets.json, for planet widgets
+        self.subjects, self.worlds = {}, {}
         self.scopes = {}                                 # a scope each, kept for its afterglow
         self.wires = {}
         self.conds = {}
@@ -225,7 +228,7 @@ class View:
             yy += rows
 
     def _tall(self, wd, w, env):
-        if "scope" in wd or "map" in wd:
+        if "scope" in wd or "map" in wd or "planet" in wd:
             return int(wd["rows"]) if wd.get("rows") else None
         if "plot" in wd:
             return max(2, int(wd.get("rows", 4)))
@@ -330,6 +333,17 @@ class View:
             self._plot(cv, wd, x, y, w, h, uni, ink)
         elif kind == "scope":
             self._scope(cv, wd, x, y, w, h, env, t, uni, sheet, ink, owner)
+        elif kind == "planet":
+            from . import viewer
+            name = wd["planet"]
+            world = self.worlds.get(name) if isinstance(name, str) else None
+            if world is None:
+                world = viewer.Planet(self.planets.get(name) if isinstance(name, str) else name, str(name))
+                if isinstance(name, str):
+                    self.worlds[name] = world
+            turn = wd.get("turn")
+            cv.paste(x, y, viewer.draw_planet(world, wd.get("view", "surface"), w, h, t,
+                                              value(turn) if isinstance(turn, str) else turn, uni))
         elif kind == "map":
             fn = parts.get("map")
             if fn is not None:
@@ -385,6 +399,31 @@ class View:
         scene = spec.get("scene")
         if scene in vector.SCENES:
             vector.scene(scene, t, scope, sheet)
+        elif spec.get("view"):                           # one of the viewer's views of a model
+            from . import viewer
+
+            def of(v, default):
+                if isinstance(v, str):
+                    return float(env.get(v, 0.0))
+                return default if v is None else float(v)
+            name = spec.get("model")
+            subject = self.subjects.get(name)
+            if subject is None and name in self.models:
+                subject = self.subjects[name] = viewer.Subject(self.models[name])
+            if subject is None:
+                cv.put(x, y, "NO MODEL", shade(ink, 0.45))
+                return
+            view = spec["view"]
+            top = float(spec.get("max", 1) or 1)
+            vals = None
+            if isinstance(spec.get("values"), dict):
+                vals = {g: max(0.0, min(1.0, of(src, 0.0) / top)) for g, src in spec["values"].items()}
+            cut_at = None if spec.get("cut") is None else of(spec["cut"], 0.5) / float(spec.get("whole", 1) or 1)
+            yaw = float(spec.get("yaw", 0.0 if view == "plan" else 30.0)) + (0.0 if view == "plan" else float(spec.get("turn", 12)) * t)
+            cv.paste(x, y, viewer.draw(subject, view, w, h, yaw, float(spec.get("pitch", 20)), float(spec.get("zoom", 1)),
+                                       ink, uni, cut_at, {"x": 0, "y": 1, "z": 2}.get(spec.get("axis"), 1),
+                                       int(of(spec.get("levels"), 1)), int(of(spec.get("level"), 0)), vals, t, scope))
+            return
         else:
             wire = self._wire(spec.get("model"))
             reveal = spec.get("reveal")
@@ -397,7 +436,7 @@ class View:
             cam = vector.Camera((far * math.sin(turn), -far * math.cos(turn), wire.mid + far * float(spec.get("height", 0.25))),
                                 (0.0, 0.0, wire.mid), fov=fov)
             if shown >= 1.0:
-                scope.draw(cam, wire, solid=bool(spec.get("solid", True)))
+                scope.render(cam, [wire], solid=bool(spec.get("solid", True)))
             else:                                        # as far as it is known: from the ground up
                 z = wire.low + (wire.high - wire.low) * shown
                 scope.draw(cam, below(wire, z), bright=0.8)
@@ -475,7 +514,7 @@ def _fill(text, env):
         return str(text or "")
 
 
-def problems(spec, names=None, where="panels", formula=None, models=None):
+def problems(spec, names=None, where="panels", formula=None, models=None, planets=None):
     """What is wrong in a layout. ``names``: the values there are to show; ``formula``: checks a condition."""
     out = []
     if not isinstance(spec, dict):
@@ -545,6 +584,20 @@ def problems(spec, names=None, where="panels", formula=None, models=None):
                     out.append("%s: there is no model called '%s'" % (wat, sc["model"]))
                 if sc.get("reveal"):
                     name_ok(wat, sc["reveal"])
+                if sc.get("view") is not None:
+                    from .viewer import VIEWS
+                    if sc["view"] not in VIEWS:
+                        out.append("%s: unknown view '%s' (%s)" % (wat, sc["view"], ", ".join(VIEWS)))
+                    for key in ("cut", "level", "levels"):
+                        name_ok(wat, sc.get(key))
+                    for src in (sc.get("values") or {}).values() if isinstance(sc.get("values"), dict) else []:
+                        name_ok(wat, src)
+            elif kind == "planet":
+                from .viewer import PLANET_VIEWS
+                if isinstance(wd["planet"], str) and planets is not None and wd["planet"] not in planets:
+                    out.append("%s: there is no planet called '%s'" % (wat, wd["planet"]))
+                if wd.get("view") not in (None,) + PLANET_VIEWS:
+                    out.append("%s: unknown view '%s' (%s)" % (wat, wd["view"], ", ".join(PLANET_VIEWS)))
     walk(spec, where)
     return out
 

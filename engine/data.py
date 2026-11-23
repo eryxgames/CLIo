@@ -90,7 +90,7 @@ class GameData:
                     "monsters": "monsters.json", "tiles": "tiles.json", "weapons": "weapons.json",
                     "models": "models.json", "cards": "cards.json", "stages": "stages.json",
                     "skirmishes": "skirmishes.json", "sims": "sims.json", "realms": "realms.json",
-                    "demo": "demo.json"}
+                    "demo": "demo.json", "menus": "menus.json"}
 
         def load(key, required=False):
             name = files.get(key, defaults[key])
@@ -126,6 +126,7 @@ class GameData:
         self.sims = load("sims") or {}                 # vehicles and systems in fixed steps (engine/sim.py)
         self.realms = load("realms") or {}             # turn-based strategy, a season at a time (engine/realm.py)
         self.demo = load("demo") or {}                 # clips that play themselves (engine/demo.py)
+        self.menus = load("menus") or {}               # the game's own menus (engine/menu.py)
         self.art_dir = os.path.join(self.dir, cfg.get("art_dir", "art"))
 
         self.theme = cfg.get("style") or cfg.get("style_config") or "default"
@@ -341,6 +342,9 @@ class GameData:
         if self.demo:
             from . import demo
             problems += demo.problems(self.demo, self)
+        if self.menus:
+            from . import menu
+            problems += menu.problems(self)
         return problems
 
     def _validate_looks(self):

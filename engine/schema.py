@@ -87,6 +87,7 @@ EFFECTS = [
     V("add_card", "Put a card in the player's deck", {"ref": "cards"}),
     V("remove_card", "Take a card out of the player's deck", {"ref": "cards"}),
     V("upgrade_card", "Make a card in the deck better: choose, random, or a card's id", "text"),
+    V("menu", "Open the menu (of menus.json)", "text"),
 ]
 
 CONDITIONS = [
@@ -162,6 +163,7 @@ KINDS = [
         R("title_effect", "choice", "Animation of the title picture", options=list(_fx.NAMES)),
         R("music_sound", "choice", "Generated music is played on", options=["chip", "rich"]),
         R("music_form", "text", "Form of generated music (long, or as (A) A B- A+)"),
+        R("menus", "choice", "Lists of choices are answered", options=["lines", "bar"]),
         R("sound_set", "text", "Sound effects from another set (sounds.NAME.json), unless the player picks one"),
         R("logo", "choice", "CLIo logo on the title screen", options=_logo_names()),
         R("win_banner", "banner", "Banner when the player wins", fields=BANNER),

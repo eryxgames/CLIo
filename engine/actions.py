@@ -1417,6 +1417,7 @@ class Actions:
                 "{key}records{/} lists the best runs, if the game keeps score",
                 "{key}style [name]{/} changes the look; {key}sound{/}, {key}music off{/}, {key}volume 40{/}",
                 "{key}speed fast{/}|{key}normal{/}|{key}slow{/}|{key}off{/} sets text animation; {key}art off{/}",
+                "{key}options{/} has all of these as a menu; {key}menu{/} is the game's own (save, load, leave)",
                 "{key}again{/} ({key}g{/}) repeats; {key}quit{/} leaves. Ctrl-C skips an animation."]),
         }
         alias = {"go": "move", "movement": "move", "walk": "move", "map": "move", "look": "items",
@@ -1572,6 +1573,23 @@ class Actions:
         self.term.speed = table[want]
         self.say("Text speed: {key}%s{/}." % want, "system")
 
+    def do_options(self, cmd):
+        """Sound and screen as a menu (engine/menu.py): what the commands above do, a line each."""
+        from . import menu as menus
+        menus.show(self.ui, menus.options(self))
+        return False
+
+    def do_menu(self, cmd):
+        """The game's menu: options, save, load, help, leaving."""
+        from . import menu as menus
+        can = ["save", "load", "help"] + (["records"] if self.cfg.get("score") else []) + ["about", "quit"]
+        got = menus.show(self.ui, menus.game_menu(self, can))
+        if got is not None and got.id == "quit":
+            self.do_quit(cmd, sure=True)                 # the menu has asked
+        elif got is not None and got.id != "resume":
+            self._execute_one(got.id)
+        return False
+
     def do_art(self, cmd):
         want = (cmd.obj or "").strip().lower()
         on = {"on": True, "off": False}.get(want, not self.settings.get("art", True))
@@ -1599,13 +1617,14 @@ class Actions:
             return
         self.load_slot(cmd.obj.strip() or None)
 
-    def do_quit(self, cmd):
+    def do_quit(self, cmd, sure=False):
         if self.permadeath:
-            if self.term.interactive and not self.ui.confirm("Leave the run? It is saved and will wait for you."):
+            if self.term.interactive and not sure \
+                    and not self.ui.confirm("Leave the run? It is saved and will wait for you."):
                 self.say("On with the adventure.", "system")
                 return
             self.save_slot(quiet=True)
-        elif self.term.interactive:
+        elif self.term.interactive and not sure:
             if not self.ui.confirm("Quit the game? Unsaved progress will be lost."):
                 self.say("On with the adventure.", "system")
                 return

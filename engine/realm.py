@@ -40,7 +40,7 @@ ODDS = ((0.95, "sure to hold"), (0.7, "likely to hold"), (0.4, "it could go eith
 HELP = ("{key}end{/} the season {hint}(e){/} " "{key}build{/} [work] " "{key}find{/} [finding] "
         "{key}put{/} N work {hint}(hands to a work){/} " "{key}works{/} " "{key}sky{/} " "{key}news{/} "
         "{key}steward{/} [N] {hint}(the steward plays N seasons){/} " "{key}save{/} " "{key}load{/} "
-        "{key}quit{/}")
+        "{key}menu{/} " "{key}quit{/}")
 
 
 def name_of(text):
@@ -894,7 +894,7 @@ def tell(ui, lines):
                 ui.line(l)
 
 
-def play(realm, ui, read, save=None, audio=None, after=None):
+def play(realm, ui, read, save=None, audio=None, after=None, menu=None):
     """A realm at a prompt: orders typed, a season at a time. Returns won, lost, quit or load."""
     s = realm.state
 
@@ -1037,6 +1037,14 @@ def play(realm, ui, read, save=None, audio=None, after=None):
                     after(realm)
             if not s["result"]:
                 tell(ui, status_lines(realm))
+        elif verb in ("menu", "options", "settings") and menu:
+            act = menu("menu" if verb == "menu" else "options")
+            if act in ("quit", "load"):
+                return act
+            if act == "save" and save:
+                save()
+            elif act == "help":
+                say(HELP, "hint")
         elif verb == "save":
             if save:
                 save()
@@ -1081,6 +1089,14 @@ def play_scene(game, scene):
                 return None
             raise
 
+    def menu(word):                                      # the game's menu, or its options: what was chosen
+        from . import menu as menus
+        if word == "options":
+            menus.show(ui, menus.options(game))
+            return None
+        got = menus.show(ui, menus.game_menu(game, ("save", "load", "help", "quit")))
+        return got.id if got is not None else None
+
     def after(r):                                        # a season is a turn of the game: its triggers and quests
         while r.outbox and not game.over:
             conditions.run(r.outbox.pop(0), game)
@@ -1090,7 +1106,7 @@ def play_scene(game, scene):
             r.state["result"] = "quit"
 
     while True:
-        outcome = play(realm, ui, read, save=game.save_slot, audio=game.audio, after=after)
+        outcome = play(realm, ui, read, save=game.save_slot, audio=game.audio, after=after, menu=menu)
         if outcome != "load":
             break
         if getattr(game, "permadeath", False):

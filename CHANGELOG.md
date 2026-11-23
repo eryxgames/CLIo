@@ -49,6 +49,23 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   that is playing has a clock and a sheet: `audio.clock()`, `audio.cues()` (`cue_offset` evens
   out a slow player). The vector reel ends with "signals", which moves to its track. `--check`
   checks a song's cue rules.
+- **Menus** (`engine/menu.py`): a menu is said once - things to do, other menus, and values
+  (on or off, a slider, one of a few, a typed line, a key), each with a hint, a note, a key of
+  its own, a condition to be there and a reason it cannot be chosen now - and shown in a
+  **look**: `bar` (a lit line that moves, in the theme's frame), `tabs` (pages across the top),
+  `find` (a long list narrowed by typing), or `lines` (numbered lines answered by typing, which
+  every terminal, a pipe and a reader can take and the others fall back to). In a game that
+  scrolls it is a few lines redrawn in place; over a frame kind's picture it is a box, the
+  picture dark behind it, with clicks, taps and the wheel (not on Windows yet).
+- Every game has **`options`** (sound and screen as pages of values, heard and seen as they
+  change) and **`menu`** (resume, options, save, load, help, leaving - which asks first). In a
+  first-person level `Esc` opens it over the picture; a realm has both at its prompt.
+- A game's own menus are data: **`menus.json`**, opened by the effect `{"menu": "camp"}`. Items
+  run effects, are there `when` a condition holds, are `locked` with a `why`, ask first with
+  `confirm`, come back with `again`, and keep values in a `var` or a `flag`. `--check` checks it.
+- Lists of choices (dialogue, shops, "which do you mean?") stay typed numbers unless asked:
+  `"menus": "bar"` in `game.json`, `--menus bar`, a theme's `ui.menus`, or the player's choice
+  in `options`. `python -m engine.menu [THEME] [--over]` shows the looks on a terminal.
 
 ## 3.5.2 - 2026-11-23
 

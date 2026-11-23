@@ -31,6 +31,7 @@ class UI:
         self._skip = False          # player pressed Ctrl-C during an effect
         self.effects_on = True
         self.menu_number = None     # trailing number typed into a "numbered" menu
+        self.menus = None           # how lists of choices are answered: None or "lines" typed, "bar" with keys
         self.apply_theme(theme)
 
     # ------------------------------------------------------------------ #
@@ -493,6 +494,14 @@ class UI:
         self.menu_number = None
         if not options:
             return None
+        if self.menus == "bar" and not (aliases or compact or numbered):
+            from . import menu as menus                  # with keys, where they can be read (engine/menu.py)
+            if menus.able(self):
+                self.gap()
+                self._skip = False
+                pick = menus.choose(self, options, title, cancel, cancel_label, idle)
+                self._last = "text"
+                return pick
         if self._last == "frame":
             self.gap()
         margin = " " * int(self.theme.ui.get("margin", 1))

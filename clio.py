@@ -491,6 +491,8 @@ def main(argv=None):
                     help="first-person levels: low draws the floor and ceiling at half width (faster in a big "
                          "window); auto (the default) does so only for a very big picture")
     ap.add_argument("--lines", action="store_true", help="in first-person levels: typed lines only, no single keys")
+    ap.add_argument("--menus", choices=("lines", "bar"),
+                    help="lists of choices: typed numbers (lines), or the arrow keys and Enter (bar)")
     ap.add_argument("--touch", choices=("on", "off"),
                     help="first-person levels: taps on the picture turn, step, fire and use, swipes step "
                          "(on by default in Termux; it takes the mouse, so text cannot be selected)")
@@ -637,6 +639,8 @@ def main(argv=None):
             settings["lines"] = True
         if args.realtime is not None:
             settings["realtime"] = max(0.0, args.realtime)
+        if args.menus:
+            settings["menus"] = args.menus
         if args.touch:
             settings["touch"] = args.touch == "on"
         if args.scroll:

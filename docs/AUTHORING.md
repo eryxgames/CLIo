@@ -86,6 +86,7 @@ That is a finished game: `take corkscrew`, `use corkscrew on barrel`, `up`. It s
 | `initial_scene` | Where the player starts. |
 | `player_stats` | `health`, `max_health`, `attack`, `defense`, `critical_hit_chance`, `evasion`, plus any stat of your own. |
 | `style` | Theme name (see [themes](#text-colour-and-themes)). |
+| `menus` | `"bar"`: lists of choices are answered with the arrow keys (see [menus](#menus)); `"lines"`: every menu is typed. |
 | `title_banner` | The title drawn in a graphic style: `{"style": "reflect", "palette": "ice"}` - see [banners](#title-screens-banners-and-animation). |
 | `title_effect` | How the title picture animates: `"glitch"`, `"shine"`, `"none"`... |
 | `logo` | Which CLIo logo the title screen shows when the game has no title art or banner (`python clio.py --looks`). |
@@ -108,7 +109,7 @@ That is a finished game: `take corkscrew`, `use corkscrew on barrel`, `up`. It s
 
 Files are looked up by these default names: `scenes.json`, `items.json`,
 `characters.json`, `texts.json`, `dialogues.json`, `quests.json`, `triggers.json`,
-`music.json`, `sounds.json`, `sprites.json`, `dungeon.json`, and the folder `art/`.
+`music.json`, `sounds.json`, `sprites.json`, `dungeon.json`, `menus.json`, and the folder `art/`.
 Only scenes and items are required.
 
 ## Scenes and exits
@@ -249,6 +250,7 @@ Effects (one dict may hold several; they run in order):
 | `{"sfx": "name"}`, `{"music": "track"}`, `{"art": "name"}` (add `"effect": "glitch"`), `{"pause": 0.5}` | presentation |
 | `{"banner": "Chapter II", "style": "led", "palette": "amber", "effect": "flicker"}` | big text in a [graphic style](#title-screens-banners-and-animation) |
 | `{"save": true}` (the mode's own slot; a string names another), `{"win": "text or key"}`, `{"lose": "text or key"}` | the game |
+| `{"menu": "camp"}` | opens one of the game's own [menus](#menus) |
 | `{"deepen": true}` | builds the next floor of an [endless dungeon](#endless-dungeons) (the generator does this itself) |
 | `{"if": cond, "then": [...], "else": [...]}`, `{"random": [[...], [...]]}` | control |
 
@@ -452,6 +454,71 @@ and the terminal stays shut; fled, nothing happens. A won challenger dies. The g
 fought off the level's screen and the level comes back after it; its outcome is written into
 the level's journal (`use =won:57`), so a load plays the level back without the duel being
 fought again. The level bot, with no game round it, takes duels as won.
+
+## Menus
+
+Every game has two menus without writing a line: **`options`** (sound and screen: what `sound`,
+`style`, `speed` and `art` do when typed, as pages of values) and **`menu`** (resume, options, save,
+load, help, leaving - which asks first). In a first-person level `Esc` opens the menu over the
+picture, which goes dark behind it.
+
+A menu is shown in the best way the terminal allows. Where single keys can be read it is a box
+with a lit line that moves: arrows (or `j` `k`), Enter, Esc to go back, Tab for the next page, a
+digit for the item of that number, a letter for the item that begins with it, left and right to
+change a value, and over a picture a click or a tap on anything (not on Windows yet). In a game
+that scrolls, the box is a few lines redrawn in place, and gone when it is done. On a pipe, a
+plain terminal or with `--lines`, the same menu is numbered lines answered by typing.
+
+**Lists of choices** - dialogue replies, shops, "which do you mean?" - stay numbered lines unless
+the game asks otherwise: `"menus": "bar"` in `game.json` (or `--menus bar`, or the player's own
+choice in `options`) answers them with the arrow keys too; a list of more than twelve is found by
+typing. Fights keep their typed line (`strike 2`).
+
+**A game's own menus** go in `menus.json`, and an effect opens one: `{"menu": "camp"}`.
+
+```json
+{
+  "camp": {
+    "title": "Camp",
+    "items": [
+      {"label": "Rest", "hint": "Until morning.", "effects": [{"heal": "full"}, {"set": "rested"}]},
+      {"label": "Cook", "when": "has:pot", "effects": [{"say": "Stew."}], "again": true},
+      {"label": "Keep watch", "locked": "!rested", "why": "You are too tired.",
+       "effects": [{"var": ["watches", "+=", 1]}]},
+      {"label": "Orders", "items": [
+        {"kind": "cycle", "label": "Pace", "var": "pace", "choices": ["slow", "fast"]},
+        {"kind": "check", "label": "Post a guard", "flag": "guarded"},
+        {"kind": "slide", "label": "Rations", "var": "ration", "low": 1, "high": 3}
+      ]},
+      {"label": "Break camp", "confirm": "Leave the fire?", "effects": [{"goto": "road"}]}
+    ]
+  }
+}
+```
+
+| An item's key | Meaning |
+| --- | --- |
+| `label` | What it says. `id` names it (the label in small letters, unless given). |
+| `kind` | `do` (the default: its `effects` run and the menu closes), `go` (it has `items`: another menu), `check` (on or off), `slide` (`low`, `high`, `step`, `unit`), `cycle` (`choices`: values, or `[value, "label"]`), `text` (a typed line, `long` characters at most), `bind` (a key), `head` (a heading; a rule if it has no label). |
+| `hint`, `note` | A line shown while the cursor is on it; a word at its right. |
+| `key` | A letter that chooses it at once. |
+| `when` | A [condition](#conditions-and-effects): the item is there only while it holds. |
+| `locked`, `why` | A condition: while it holds the item is shown but cannot be chosen, and `why` is said. |
+| `confirm` | `true`, or a question: it asks first. |
+| `again` | After its effects the menu comes back. |
+| `var`, `flag` | Where a value is kept: a variable (any kind of value) or a flag (a `check`). It is read when the menu opens and written as it changes. |
+| `look` | For the items under it: `bar`, `tabs` (its menus become pages across the top), `find` (a long list, narrowed by typing). A menu's own `look` is beside its `title`. |
+
+`--check` says what is wrong in `menus.json`. A theme may name the box its menus are drawn in
+(`"ui": {"menu_frame": "DOUBLE"}`; else its descriptions' frame) and ask for keys
+(`"ui": {"menus": "bar"}`); the colours are the theme's `menu`, `key`, `hint`, `item` and
+`list_title`.
+
+In code: `from engine import menu`; `menu.Menu(title=..., items=[...])` takes the same items
+(with `on`, a function called with the item and the menu when it is chosen or changed, and
+`stay`, which keeps the menu open after); `menu.show(game.ui, m)` gives back the item chosen, or
+None; `menu.over(screen, m, rows, game.ui)` shows it over a frame; `m.values()` is every value
+by its id. `python -m engine.menu [THEME] [--over]` shows the looks on your terminal.
 
 ## Text, colour and themes
 

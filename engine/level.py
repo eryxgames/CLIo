@@ -69,7 +69,7 @@ KEYMAP = {
     "home": "h", "pgup": "l", "end": "turn around", "pgdn": "use",
     "space": "f", "insert": "f", "enter": "use", "tab": "map", "center": "w", "delete": "w",
     "1": "1", "2": "2", "3": "3", "4": "4", "5": "5", "6": "6", "7": "7",
-    "?": "help", "f1": "help", "f2": "goggles", "f5": "save", "f9": "load", "]": "next",
+    "?": "help", "f1": "help", "f2": "goggles", "f5": "save", "f9": "load", "]": "next", "esc": "menu",
     "f3": "mag", "f4": "jet", "f6": "dive", "+": "jump", "f7": "jump", "f8": "jj",
     "shift-up": "look up", "shift-down": "look down", "ctrl-up": "look up", "ctrl-down": "look down",
     "alt-up": "look up", "alt-down": "look down",
@@ -97,14 +97,15 @@ HELP = [
     ("F2  TTY goggles on/off (the battery lasts while off)", "text"),
     ("F3 magboots (on the ceiling: let go)  F4 jetpack  F6 dive / surface", "text"),
     ("F7 or +  jump (where the level lets you)   F8  jump, and again in the air", "text"),
-    ("F5  save   F9  load the last save", "text"),
+    ("F5  save   F9  load the last save   Esc  the menu", "text"),
     ("", "text"),
     ("Typed: k j h l, turn left/right/around, use,", "dim"),
     ("f [x], kill [-9] x, t x, w [n], next, map, ps, man x,", "dim"),
     ("mag [on|off], jet [on|off], dive, surface, jump, jj,", "dim"),
     ("goggles [on|off], out (of a vehicle), history,", "dim"),
     ("alias n='...', keys, whoami, sound, q", "dim"),
-    ("save [name], load [name], saves, realtime [off|s]", "dim"),
+    ("save [name], load [name], saves, realtime [off|s],", "dim"),
+    ("menu, options", "dim"),
     ("a; b   a && b   a || b   !!  !3  !f   as in a shell", "dim"),
     ("A surprise stops a line, as ^C would.", "dim"),
 ]
@@ -1290,6 +1291,9 @@ class Level:
                 if line is None:
                     self.over = "quit"
                     break
+                if line.strip().lower() in ("menu", "options"):      # about the game, not in it: never in a save
+                    self.menu(line.strip().lower())
+                    continue
                 with console.busy():
                     self.run_line(line)
             if self.over in ("exit", "dead"):
@@ -1576,6 +1580,37 @@ class Level:
             return True
         self.say("rootless: %s: command not found" % tok.strip(), "hurt")
         raise StopLine()
+
+    # ---- the game's menu ---------------------------------------------------- #
+    def menu(self, word="menu"):
+        """The game's menu, over the picture where there is one (Esc, ``menu``): options, save, load,
+        help, leaving. ``options``: straight to sound and screen."""
+        from . import menu as menus
+        game = getattr(self.host, "game", None)
+        con = self.console
+        if game is None:
+            self.say("The menu needs the game round the level.", "dim")
+            return None
+
+        def resume():
+            self.music(self.spec.get("music"))
+        m = menus.options(game, resume) if word == "options" \
+            else menus.game_menu(game, ("save", "load", "help", "quit"), resume=resume)
+        screen = getattr(con, "screen", None)
+        if screen is not None and getattr(screen, "started", False):
+            got = menus.over(screen, m, lambda: con.rows(self), game.ui,
+                             after=menus.MOUSE_ON if getattr(con, "mouse_on", False) else "")
+        else:
+            got = menus.show(game.ui, m)
+        act = got.id if got is not None else None
+        if act in ("save", "load"):
+            with con.busy():
+                self.run_line(act)
+        elif act == "help":
+            con.page(self, HELP + (TOUCH_HELP if getattr(con, "touch", False) else []))
+        elif act == "quit":
+            self.over = "quit"
+        return act
 
     # ---- saving, loading, jumping ------------------------------------------- #
     def meta(self, t):

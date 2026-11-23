@@ -52,6 +52,8 @@ VERBS = {
     "sound": ["sound", "audio", "music", "sfx", "volume", "mute", "unmute"],
     "speed": ["speed", "text speed", "textspeed"],
     "art": ["art", "graphics", "images"],
+    "options": ["options", "option", "settings", "preferences", "setup"],
+    "menu": ["menu", "game menu", "pause"],
     "save": ["save", "save game"],
     "load": ["load", "restore", "load game"],
     "quit": ["quit", "q", "bye", "exit game", "quit game"],

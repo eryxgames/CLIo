@@ -28,6 +28,7 @@
   "engine/levelbot.py",
   "engine/levelgen.py",
   "engine/maze.py",
+  "engine/menu.py",
   "engine/mesh.py",
   "engine/model.py",
   "engine/parser.py",

@@ -25,7 +25,8 @@ ENGINE_ART = os.path.join(os.path.dirname(os.path.abspath(__file__)), "art")
 
 # verbs that do not advance the world clock
 FREE_VERBS = {"look", "examine", "inventory", "map", "journal", "stats", "help", "hint", "style",
-              "sound", "speed", "art", "save", "load", "quit", "restart", "about", "again", "records", None}
+              "sound", "speed", "art", "save", "load", "quit", "restart", "about", "again", "records",
+              "options", "menu", None}
 
 
 class Game(Actions):
@@ -51,6 +52,9 @@ class Game(Actions):
         if want and not self.audio.set_sound_set(want):
             self.audio.last_error = "no sound set called '%s'" % want
         self.ui.audio = self.audio
+        # lists of choices: typed numbers as ever, or with keys (--menus, the game's "menus", the theme's)
+        want = self.settings.get("menus") or self.data.config.get("menus") or self.ui.theme.ui.get("menus")
+        self.ui.menus = "lines" if self.settings.get("lines") else (want if want in ("bar", "lines") else None)
         self.art = ArtLibrary(self.data.art_dir, ENGINE_ART, sprites=self.data.sprites)
         self.parser = Parser(self.data.config.get("verbs"))
         self.abilities = {k: dict(v) for k, v in ABILITIES.items()}

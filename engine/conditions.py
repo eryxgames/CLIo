@@ -467,6 +467,11 @@ def _e_shop(g, arg, eff, ctx):
     g.open_shop(arg)
 
 
+def _e_menu(g, arg, eff, ctx):
+    from . import menu
+    menu.play(g, str(arg))
+
+
 def _e_story(g, arg, eff, ctx):
     g.story_text(arg)
 
@@ -533,5 +538,5 @@ _EFFECTS = {
     "random": _e_random, "do": _e_do, "learn": _e_learn, "end_dialogue": _e_end_dialogue,
     "turns": _e_turns, "shop": _e_shop, "story": _e_story, "transition": _e_transition,
     "look": _e_look, "save": _e_save, "deepen": _e_deepen, "add_card": _e_add_card, "remove_card": _e_remove_card,
-    "upgrade_card": _e_upgrade_card,
+    "upgrade_card": _e_upgrade_card, "menu": _e_menu,
 }

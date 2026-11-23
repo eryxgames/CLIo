@@ -460,12 +460,19 @@ class BorderTests(unittest.TestCase):
         self.assertEqual(M.board(keys(m, "esc"), 60, 12).plain()[0][0], "╔")
 
     def test_a_game_and_a_theme_name_the_frame(self):
-        ui = ui_of(theme="techno")
+        ui = ui_of(theme="techno", glyphs="full")            # (a font with every character, wherever this runs)
         self.assertEqual(M.frame_of(ui), "double")
         ui.menu_border = "cut shadow"
         self.assertEqual(M.frame_of(ui), "cut shadow")
         M.inline(ui, self.small(), ScriptedKeys(["esc"]))
         self.assertIn("╱─ Box ", strip_ansi(ui.term.out.getvalue()))
+        with mock.patch("engine.term._WINDOWS", True):       # Windows' own console: the corners its fonts have
+            old = ui_of(theme="techno")
+        self.assertEqual(old.term.font, "console")
+        old.menu_border = "cut shadow"
+        M.inline(old, self.small(), ScriptedKeys(["esc"]))
+        self.assertIn("/─ Box ", strip_ansi(old.term.out.getvalue()))
+        self.assertNotIn("╱", old.term.out.getvalue())
         ui.theme.ui["menu_frame"] = "dos"
         ui.menu_border = None
         self.assertEqual(M.frame_of(ui), "dos")

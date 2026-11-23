@@ -268,6 +268,8 @@ class Sim:
 
     def __init__(self, spec, sid="sim", data=None, rate=RATE):
         self.id, self.spec, self.rate = sid, spec, rate
+        self.data = data
+        self.panels = spec.get("panels") if isinstance(spec.get("panels"), dict) else None   # its screen (engine/panels.py)
         self.dt = 1.0 / rate
         self.name = spec.get("title") or spec.get("name") or sid
         cfg = settings_of(data)
@@ -991,6 +993,28 @@ class Runner:
 
     def __init__(self, sim, screen=None, audio=None):
         self.sim, self.screen, self.audio = sim, screen, audio
+        self.view = None
+
+    def panel_rows(self, W, H, depth, unicode, arrows):
+        """The sim's own screen of panels (its ``"panels"``): rows of cells."""
+        from . import panels
+        sim = self.sim
+        if self.view is None:
+            try:
+                from . import model
+                models = model.load(getattr(sim.data, "models", None) or {})
+            except Exception:
+                models = {}
+            self.view = panels.View(sim.panels, formula, models)
+        level = sheet = None
+        try:                                             # the track that plays, for panels that move with it
+            sheet, now = self.audio.cues(), self.audio.clock()
+            if sheet is not None and now is not None:
+                level = lambda action: sheet.level(action, now)   # noqa: E731
+        except Exception:
+            sheet = None
+        parts = {"map": lambda w, h: map_cells(sim, w, h, color=bool(depth), unicode=unicode, arrows=arrows)}
+        return self.view.rows(W, H, sim.env(), sim.ticks / float(sim.rate), parts, unicode, level, sheet)
 
     @property
     def over(self):
@@ -1011,6 +1035,15 @@ class Runner:
         sim = self.sim
         paint = self.screen.paint if self.screen is not None else Painter(depth)
         mh = max(4, H - 3)
+        if sim.panels and W >= 60 and mh >= 14:          # a screen of its own, where there is room for one
+            rows = [paint.text([(sim.name, "title")], W)] + self.panel_rows(W, mh, depth, unicode, arrows)
+            for i, (text, role) in enumerate(banner(sim)):       # what it says in the middle, over the panels
+                r = 1 + mh // 2 - 1 + i
+                if r < len(rows) and isinstance(rows[r], list):
+                    word = "  %s  " % text[:W - 4]
+                    pad = max(0, (W - len(word)) // 2)
+                    rows[r][pad:pad + len(word)] = text_cells(paint, word, role, len(word), depth)
+            return rows
         pw = min(40, max(26, W // 3)) if sim.mode == "vehicle" else min(W, 72)
         mw = W - pw - 1 if sim.mode == "vehicle" else 0
         cells = map_cells(sim, mw, mh, color=bool(depth), unicode=unicode, arrows=arrows) if mw > 0 else []
@@ -1271,6 +1304,10 @@ def problems(data):
             out.append("%s: a survive goal needs a time" % where)
         if mode == "systems" and not (spec.get("win_if") or spec.get("time")):
             out.append("%s: a systems sim needs win_if or a time" % where)
+        if spec.get("panels") is not None:
+            from . import panels
+            out += panels.problems(spec["panels"], names, "%s: panels" % where, formula,
+                                   getattr(data, "models", None) or {})
     for sid, sc in (getattr(data, "scenes", None) or {}).items():
         if sc.get("sim") and sc["sim"] not in sims:
             out.append("scene '%s': unknown sim '%s'" % (sid, sc["sim"]))

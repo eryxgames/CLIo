@@ -1,0 +1,408 @@
+{
+ "helm": {
+  "title": "HELM  hopper to the pad",
+  "map": [
+   "####################",
+   "#@....,,,,....TT...#",
+   "#.....====.....T...#",
+   "#..::.=..=..BB.....#",
+   "#..::.=..=======.H.#",
+   "#.....1........2...#",
+   "####################"
+  ],
+  "vehicle": {
+   "model": "hover",
+   "fuel": 40
+  },
+  "land": true,
+  "time": 120,
+  "systems": {
+   "heat": {
+    "rate": "thrust * 9 - (heat - 20) * 0.25",
+    "start": 20,
+    "min": 20,
+    "damage_over": 95
+   }
+  },
+  "panels": {
+   "colour": "amber",
+   "rows": [
+    {
+     "cols": [
+      {
+       "title": "SURFACE",
+       "widgets": [
+        {
+         "map": true
+        }
+       ]
+      },
+      {
+       "size": 34,
+       "rows": [
+        {
+         "title": "FLIGHT",
+         "size": 9,
+         "widgets": [
+          {
+           "compass": "heading"
+          },
+          {
+           "gauge": "speed",
+           "max": "max_speed",
+           "unit": ""
+          },
+          {
+           "gauge": "height",
+           "label": "height",
+           "max": 6
+          },
+          {
+           "center": "climb",
+           "max": 3
+          },
+          {
+           "gauge": "fuel",
+           "max": "fuel_max",
+           "warn": -0.25,
+           "hot": -0.1
+          },
+          {
+           "gauge": "heat",
+           "max": 120,
+           "warn": 0.7,
+           "hot": 0.8
+          },
+          {
+           "gauge": "damage",
+           "max": 100,
+           "warn": 0.4,
+           "hot": 0.7
+          }
+         ]
+        },
+        {
+         "title": "NEXT",
+         "size": 5,
+         "widgets": [
+          {
+           "number": "next",
+           "label": "to the mark",
+           "big": true
+          }
+         ]
+        },
+        {
+         "title": "APPROACH",
+         "colour": "green",
+         "pulse": "bar",
+         "widgets": [
+          {
+           "scope": {
+            "scene": "approach"
+           }
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "reactor": {
+  "title": "REACTOR  bring the core to power",
+  "mode": "systems",
+  "time": 90,
+  "controls": {
+   "rods": {
+    "label": "Rods out",
+    "keys": [
+     "up",
+     "down"
+    ],
+    "min": 0,
+    "max": 100,
+    "start": 10,
+    "step": 25
+   },
+   "flow": {
+    "label": "Flow",
+    "keys": [
+     "right",
+     "left"
+    ],
+    "min": 0,
+    "max": 100,
+    "start": 30,
+    "step": 30
+   }
+  },
+  "systems": {
+   "heat": {
+    "rate": "rods * 6 - flow * 3.2 - (heat - 300) * 0.05",
+    "start": 300,
+    "min": 280,
+    "max": 1400
+   },
+   "power": {
+    "value": "clamp((heat - 400) / 5, 0, 120) * (0.4 + flow / 170)"
+   },
+   "steady": {
+    "rate": "1 if power >= 80 and heat < 1000 else -2",
+    "start": 0,
+    "min": 0,
+    "max": 10
+   }
+  },
+  "chart": [
+   "heat",
+   "power"
+  ],
+  "win_if": "steady >= 10",
+  "fail_if": "heat >= 1300",
+  "fail_text": "The core is past its limit.",
+  "score": "steady * 20 + min(power, 100) - max(0, heat - 1000) / 5",
+  "panels": {
+   "colour": "green",
+   "rows": [
+    {
+     "size": 4,
+     "widgets": [
+      {
+       "text": "Pull the rods out and the core heats; coolant flow carries the heat off and turns the turbines. Hold 80% for ten seconds.",
+       "align": "center"
+      }
+     ]
+    },
+    {
+     "cols": [
+      {
+       "title": "CORE",
+       "size": 40,
+       "pulse": "bar",
+       "widgets": [
+        {
+         "gauge": "heat",
+         "max": 1400,
+         "warn": 0.7,
+         "hot": 0.85,
+         "unit": "K"
+        },
+        {
+         "control": "rods",
+         "max": 100,
+         "keys": [
+          "up",
+          "down"
+         ],
+         "label": "rods out"
+        },
+        {
+         "control": "flow",
+         "max": 100,
+         "keys": [
+          "right",
+          "left"
+         ]
+        },
+        {
+         "space": 1
+        },
+        {
+         "number": "power",
+         "big": true,
+         "unit": "%"
+        },
+        {
+         "gauge": "steady",
+         "label": "holding",
+         "max": 10,
+         "unit": "s"
+        },
+        {
+         "lamps": [
+          {
+           "label": "CRITICAL",
+           "if": "heat > 400"
+          },
+          {
+           "label": "AT POWER",
+           "if": "power >= 80",
+           "tone": "good"
+          },
+          {
+           "label": "OVERHEAT",
+           "if": "heat >= 1000",
+           "tone": "hot"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "title": "TRENDS",
+       "widgets": [
+        {
+         "plot": [
+          "heat"
+         ],
+         "rows": 6,
+         "min": 280,
+         "max": 1400
+        },
+        {
+         "plot": [
+          "power"
+         ],
+         "rows": 6,
+         "min": 0,
+         "max": 120
+        },
+        {
+         "scope": {
+          "scene": "signals"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "scan": {
+  "title": "SCAN  hold the beam on the mast",
+  "mode": "systems",
+  "time": 90,
+  "controls": {
+   "beam": {
+    "label": "Beam",
+    "keys": [
+     "right",
+     "left"
+    ],
+    "min": 0,
+    "max": 100,
+    "start": 50,
+    "step": 35
+   }
+  },
+  "systems": {
+   "target": {
+    "value": "50 + 30 * (abs((time * 5) % 40 - 20) - 10) / 10"
+   },
+   "off": {
+    "value": "abs(beam - target)"
+   },
+   "lock": {
+    "value": "clamp(100 - off * 4, 0, 100)"
+   },
+   "scan": {
+    "rate": "lock / 100 * 4.0 if lock > 40 else 0",
+    "start": 0,
+    "min": 0,
+    "max": 100
+   }
+  },
+  "win_if": "scan >= 100",
+  "score": "scan + lock / 10",
+  "panels": {
+   "colour": "cyan",
+   "cols": [
+    {
+     "size": 36,
+     "rows": [
+      {
+       "title": "BEAM",
+       "size": 8,
+       "widgets": [
+        {
+         "gauge": "target",
+         "max": 100,
+         "label": "mast"
+        },
+        {
+         "control": "beam",
+         "max": 100,
+         "keys": [
+          "right",
+          "left"
+         ]
+        },
+        {
+         "gauge": "lock",
+         "max": 100,
+         "warn": -0.4
+        },
+        {
+         "space": 1
+        },
+        {
+         "lamps": [
+          {
+           "label": "LOCK",
+           "if": "lock > 40",
+           "tone": "good"
+          },
+          {
+           "label": "DRIFT",
+           "if": "lock <= 40",
+           "tone": "warn"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "title": "SURVEY",
+       "size": 7,
+       "widgets": [
+        {
+         "number": "scan",
+         "big": true,
+         "unit": "%"
+        },
+        {
+         "gauge": "scan",
+         "max": 100,
+         "label": "known"
+        }
+       ]
+      },
+      {
+       "title": "LOCK",
+       "widgets": [
+        {
+         "plot": [
+          "lock"
+         ],
+         "min": 0,
+         "max": 100,
+         "rows": 5
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "title": "OBJECT 7  RELAY MAST",
+     "pulse": "bar",
+     "widgets": [
+      {
+       "scope": {
+        "model": "mast",
+        "reveal": "scan",
+        "whole": 100,
+        "turn": 14
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "fail_if": "time >= 89 and scan < 100",
+  "fail_text": "The pass is over, and the picture is not whole."
+ }
+}

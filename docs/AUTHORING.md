@@ -2918,6 +2918,48 @@ raises it, the other lowers it, `step` a second), `systems`, `gauges`, `chart` (
 lines over time), `win_if`, `fail_if`, `time`, and `score` (a formula: better when higher, for
 the autopilot below). An economy, an ecology, a reactor: whatever stocks and flows say.
 
+**A screen of its own** (`"panels"`): instead of the instruments in a column, a sim can lay its
+screen out as panels - a bridge console, an engineering station. Panels stand side by side
+(`"cols"`) or one over another (`"rows"`), each in a frame with a `title`, each with `widgets`
+that show the sim's values by name:
+
+```json
+"panels": {"colour": "green", "rows": [
+  {"size": 4, "widgets": [{"text": "CORE {heat:.0f} K   OUTPUT {power:.0f} %", "align": "center"}]},
+  {"cols": [
+    {"title": "CORE", "size": 40, "pulse": "bar", "widgets": [
+      {"gauge": "heat", "max": 1400, "warn": 0.7, "hot": 0.85, "unit": "K"},
+      {"control": "rods", "max": 100, "keys": ["up", "down"]},
+      {"number": "power", "big": true, "unit": "%"},
+      {"lamps": [{"label": "AT POWER", "if": "power >= 80", "tone": "good"},
+                 {"label": "OVERHEAT", "if": "heat >= 1000", "tone": "hot"}]},
+      {"plot": ["heat", "power"], "rows": 6}]},
+    {"title": "HULL", "colour": "cyan", "widgets": [{"scope": {"model": "mast", "reveal": "scan", "whole": 100}}]}]}]}
+```
+
+| Widget | Shows |
+| --- | --- |
+| `{"gauge": NAME}` | A bar: `max` and `min` (numbers, or names), `label`, `unit`, `scale`; `warn` and `hot` turn it amber and red at that part of the way and above - or, below zero, at that part and below (`"warn": -0.25`: a quarter left). |
+| `{"center": NAME}` | A bar either way from zero (a climb, a drift), `max` either way. |
+| `{"control": NAME}` | A gauge with the `keys` that move it beside its name. |
+| `{"number": NAME}` | The number, with `label` and `unit`; `"big": true` writes it in letters of lines, three rows high. |
+| `{"compass": NAME}` | A strip of the compass round a heading. |
+| `{"lamps": [...]}` | A lamp for each `{"label", "if", "tone"}`: lit while the formula holds, in `good`, `warn` or `hot`. |
+| `{"text": "..."}` | Words, with values in them: `{heat}`, `{heat:.1f}`; `tone`, `"bright": true`, `"align": "center"`. |
+| `{"plot": [NAMES]}` | The values over time as lines of dots, `rows` high, between `min` and `max` (else what they have reached). |
+| `{"scope": ...}` | A vector display (things in three dimensions, drawn in lines): a scene by name (`hauler`, `approach`, `orbit`, `scan`, `signals`), or `{"model": ID}` - one of the game's 3D models turning in lines (`turn` degrees a second, `fov`, `far`, `height`); with `"reveal": NAME` only as much of it is drawn, from the ground up, as the value is of `whole`, and when it is whole it is drawn solid. |
+| `{"map": true}` | The sim's map (a vehicle's). |
+| `{"rule": true}`, `{"space": 1}` | A line; empty rows. |
+
+Any widget may have `"when"` (a formula: shown only while it holds). A panel takes `size` (cells:
+its width among `cols`, its height among `rows`) or shares what is left by `weight`; `colour` is
+its phosphor (`green`, `amber`, `cyan`, `white`, `red`, `blue`, `violet`), `border` one of the
+[menus' frames](#menus), and `"pulse": "bar"` brightens its frame with a cue of the music
+(`bar`, `beat`, `punch`... - see [cues](#sound-and-music)); a `signals` scope moves to the track
+too. Widgets fill a panel from the top; a scope or a map takes what room is left. On a screen
+under 60 columns, or piped, the sim is shown as ever. `--check` checks the layout and the names
+in it. `templates/station` has three such screens to copy; `python -m engine.panels` shows one.
+
 **Playing it.** At 20 ticks a second; the map follows the vehicle (north up), an arrow at its
 edge points to what is next, and the instruments stand beside it. Piped, or on a small screen,
 it is played a typed line at a time: keys held for seconds - `up 2; up right 1.5; w 1; wait 3`,

@@ -65,6 +65,7 @@ For people working on the engine itself. Making a game needs none of this: see
       strokes, with afterglow - a hauler, a corridor, an orbit and a surface scan as a reel
 - [x] Cues: screens that move with the sound, from Playhead's cue sheets or a song's own notes
 - [x] Menus: one menu in several looks, options and a game menu in every game, a game's own as data
+- [x] Panels: a simulator's own screen of instruments (a bridge, an engineering console)
 - [x] Three demo games, two starter templates, several hundred automated tests
 - [x] Game editor in the browser: `python clio.py mygame --edit`, or
       [on the web](https://eryxgames.github.io/CLIo/) with nothing installed - forms for
@@ -102,11 +103,13 @@ engine/
   vector.py          vector displays: 3D in lines (wire and hidden-line), dots or strokes, afterglow
   cues.py            cue sheets (Playhead's): what a screen does with the sound, from a file or a song's notes
   menu.py            menus: items and values, looks (bar, tabs, find, line, terminal, cards, lines), frames
+  panels.py          screens of instruments: panels in frames, gauges, big numbers, lamps, plots, scopes
   demo.py            the demos (engine/demos/clio.json, a game's demo.json)
   editor/            the editor (a page in the browser, also served as a web site)
 games/               derelict/  depths/  rootless/
 templates/starter/   a tiny complete game to copy (Apache-2.0)
 templates/realm/     a tiny complete realm to copy (Apache-2.0)
+templates/station/   three simulators with screens of panels to copy: helm, reactor, scan (Apache-2.0)
 game_files/          the original CLIo 1 sandbox
 tests/               python -m unittest discover -s tests
 utils/               Tkinter data editor (desktop, alpha)
@@ -121,7 +124,7 @@ guide.
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 955 tests, about a minute
+python -m unittest discover -s tests     # 968 tests, about a minute
 python -m engine.vector                  # the vector display's reel (Ctrl-C ends)
 python -m engine.realm templates/realm 8 # a steward plays the realm starter over eight seeds
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class

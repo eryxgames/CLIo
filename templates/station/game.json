@@ -1,0 +1,20 @@
+{
+ "id": "station",
+ "title": "Erebus: Last Watch",
+ "subtitle": "A station to copy",
+ "author": "Your Name",
+ "version": "0.1.0",
+ "license": "Apache-2.0 (free to copy, change and sell)",
+ "initial_scene": "bridge",
+ "style": "techno",
+ "menus": "bar",
+ "menu_look": "terminal",
+ "menu_border": "single",
+ "music": {
+  "generate": {
+   "mood": "tense",
+   "seed": 7
+  }
+ },
+ "about": "Three screens of a ship's bridge, each a simulator with its own panels: copy the folder and change them."
+}

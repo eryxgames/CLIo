@@ -475,9 +475,12 @@ class Scope:
             self.line2(px, py, qx, qy, bright, colour)
             px, py = qx, qy
 
+    captions = True                                      # False: text() writes nothing (a scope too small for words)
+
     def text(self, col, row, text, colour=None, bright=1.0):
         """Words over the picture, in characters."""
-        self.words.append((int(col), int(row), str(text), colour_of(colour, self.colour), bright))
+        if self.captions:
+            self.words.append((int(col), int(row), str(text), colour_of(colour, self.colour), bright))
 
     def label(self, cam, p, text, colour=None, bright=1.0, dx=1, dy=0):
         """Words beside a point in space (nothing when it is behind the eye or off the display)."""

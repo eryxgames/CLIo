@@ -219,7 +219,8 @@ For making games:
 ## Make your own game
 
 A game is a folder of JSON files under `games/`. Copy `templates/starter/` (an adventure) or
-`templates/realm/` (strategy by turns: a village through its seasons) to `games/yourgame/` and edit it - by hand, or in the editor in your browser: `python clio.py yourgame --edit` (also
+`templates/realm/` (strategy by turns: a village through its seasons) or `templates/station/` (a
+ship's bridge: three simulators, each with a screen of panels) to `games/yourgame/` and edit it - by hand, or in the editor in your browser: `python clio.py yourgame --edit` (also
 [on the web](https://eryxgames.github.io/CLIo/), with nothing installed). The guide is
 **[docs/AUTHORING.md](docs/AUTHORING.md)**: scenes, items, characters, conversations, quests,
 first-person levels, monsters, realms, music, art. Working on the engine itself:
@@ -233,7 +234,7 @@ CLIo is open source so that anyone can make games with it, including games they 
 | --- | --- |
 | The engine: `engine/`, `clio.py`, `tests/`, `utils/`, `docs/` | [Apache-2.0](LICENSE) |
 | Everything the engine ships for games to use: the themes, the built-in sound effects, the music composer, the sprite generator, the CLIo logo art | Apache-2.0 - reuse and edit freely |
-| `templates/starter/`, `templates/realm/` and the sandbox in `game_files/` | Apache-2.0 - copy them as a starting point |
+| `templates/starter/`, `templates/realm/`, `templates/station/` and the sandbox in `game_files/` | Apache-2.0 - copy them as a starting point |
 | The demo games `games/derelict/`, `games/depths/` and `games/rootless/` (story, text, characters, art, sprites, levels, music) | Copyright Daniel Sandner, all rights reserved - see the `LICENSE.md` in each folder |
 
 **What you make is yours.** A game you write for CLIo is your own work under whatever

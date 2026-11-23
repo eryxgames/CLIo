@@ -82,6 +82,22 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 - A banner style **`line`**: letters of heavy lines, three rows high (the alphabet of the line
   look). Heavy joints and line ends are drawn double in the Windows console's font, as heavy
   lines are.
+- **Panels** (`engine/panels.py`): a screen of instruments - the bridge of a ship, an
+  engineering console. Panels stand side by side or one over another, each in a frame (the
+  menus' frames) with a title and a phosphor colour, each with widgets that show values by
+  name: `gauge` (with parts of the way where it turns amber and red), `center`, `control`
+  (with its keys), `number` (`big`: in letters of lines), `compass`, `lamps` (lit while a
+  formula holds), `text` with values in it, `plot` (lines over time, in dots), `scope` (a
+  vector display: a scene, or one of the game's 3D models turning in lines, drawn from the
+  ground up as far as a value says and solid when whole), `map`, `rule`, `space`. A frame can
+  brighten with a cue of the music (`"pulse": "bar"`).
+- **A simulator's own screen**: `"panels"` in a sim lays its screen out this way where there is
+  room (60 columns), and as ever where there is not; the word in the middle (ready, paused,
+  how it ended) lies over the panels. `--check` checks the layout and the names in it.
+- **`templates/station`**: a station starter to copy - a bridge with three consoles, each a
+  simulator with its own screen: the helm (a hopper flown to a pad, with its map), the reactor
+  (a core brought to power) and the scan (a beam held on a drifting target while a mast comes
+  into the scope). The autopilot wins all three.
 
 ## 3.5.2 - 2026-11-23
 

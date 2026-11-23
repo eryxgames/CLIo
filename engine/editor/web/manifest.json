@@ -31,6 +31,7 @@
   "engine/menu.py",
   "engine/mesh.py",
   "engine/model.py",
+  "engine/panels.py",
   "engine/parser.py",
   "engine/pixels.py",
   "engine/quests.py",

@@ -1,0 +1,114 @@
+[
+ {
+  "name": "The Bridge",
+  "description": "Three consoles are lit: the {exit}helm{/}, the {exit}reactor{/} and the {exit}scan{/} station. The rest of the deck is dark. {hint}(go helm, go reactor, go scan){/}",
+  "exits": [
+   {
+    "door_name": "Helm",
+    "scene_id": "helm"
+   },
+   {
+    "door_name": "Reactor",
+    "scene_id": "reactor"
+   },
+   {
+    "door_name": "Scan",
+    "scene_id": "scan"
+   }
+  ],
+  "id": "bridge"
+ },
+ {
+  "name": "Helm",
+  "description": "The hopper's controls, slaved to this console.",
+  "sim": "helm",
+  "on_sim_done": [
+   {
+    "say": "The hopper is down on the pad."
+   },
+   {
+    "set": "helm_done"
+   },
+   {
+    "goto": "bridge"
+   }
+  ],
+  "on_sim_fail": [
+   {
+    "say": "The console goes dark, and comes back with the hopper where it started."
+   },
+   {
+    "goto": "bridge"
+   }
+  ],
+  "on_sim_quit": [
+   {
+    "goto": "bridge"
+   }
+  ],
+  "exits": [],
+  "id": "helm"
+ },
+ {
+  "name": "Reactor",
+  "description": "The core's console.",
+  "sim": "reactor",
+  "on_sim_done": [
+   {
+    "say": "The core holds at power. The lights on the deck come up."
+   },
+   {
+    "set": "reactor_done"
+   },
+   {
+    "goto": "bridge"
+   }
+  ],
+  "on_sim_fail": [
+   {
+    "say": "The core scrams itself. It will take a while to coax back."
+   },
+   {
+    "goto": "bridge"
+   }
+  ],
+  "on_sim_quit": [
+   {
+    "goto": "bridge"
+   }
+  ],
+  "exits": [],
+  "id": "reactor"
+ },
+ {
+  "name": "Scan",
+  "description": "The survey console.",
+  "sim": "scan",
+  "on_sim_done": [
+   {
+    "say": "The mast below is whole in the scope: somebody built it, and it is still standing."
+   },
+   {
+    "set": "scan_done"
+   },
+   {
+    "goto": "bridge"
+   }
+  ],
+  "on_sim_fail": [
+   {
+    "say": "The pass is over and the picture is not whole. Next orbit."
+   },
+   {
+    "goto": "bridge"
+   }
+  ],
+  "on_sim_quit": [
+   {
+    "goto": "bridge"
+   }
+  ],
+  "exits": [],
+  "id": "scan"
+ }
+]

@@ -118,20 +118,44 @@ class ScreenTests(unittest.TestCase):
         self.assertEqual((plain[0], len(plain), "\x1b" in plain), ("a", 2, False))   # no colours: a shade of ink
 
     def test_an_animation_keeps_its_time(self):
-        import time
-        sc = self.screen([])
-        sc.animate, drawn = True, []
+        import engine.frame as frame_mod
 
-        def slow(fx):
-            drawn.append(fx)
-            time.sleep(0.03)
-        sc.play(range(8), slow, 0.01)                           # each frame takes three turns to draw
-        self.assertEqual(drawn[0], 0)
-        self.assertEqual(drawn[-1], 7)                           # the last is never left out
-        self.assertLess(len(drawn), 8)
-        drawn[:] = []
-        sc.play(range(5), drawn.append, 0.01)
+        class Clock:                                             # a clock of its own: a machine's sleep runs long
+            def __init__(self, late=0.0):
+                self.now, self.late = 100.0, late
+
+            def monotonic(self):
+                return self.now
+
+            def sleep(self, seconds):
+                self.now += max(0.0, seconds) + self.late
+
+        def play(count, cost, late=0.0):
+            clock, drawn = Clock(late), []
+
+            def draw(fx):
+                drawn.append(fx)
+                clock.now += cost
+            sc = self.screen([])
+            sc.animate = True
+            real, frame_mod.time = frame_mod.time, clock
+            try:
+                sc.play(range(count), draw, 0.01)
+            finally:
+                frame_mod.time = real
+            return drawn, clock.now - 100.0
+
+        drawn, took = play(8, 0.027)                             # each frame takes nearly three turns to draw
+        self.assertEqual(drawn, [0, 2, 5, 7])                    # the last is never left out
+        self.assertAlmostEqual(took, 0.108)
+        drawn, took = play(5, 0.0)
         self.assertEqual(drawn, [0, 1, 2, 3, 4])                 # in time: every frame
+        self.assertAlmostEqual(took, 0.05)
+        drawn, took = play(5, 0.002)                             # what a frame took comes off the wait after it
+        self.assertEqual((drawn, round(took, 3)), ([0, 1, 2, 3, 4], 0.05))
+        drawn, took = play(5, 0.0, late=0.012)                   # a sleep that runs long: a late frame is left out
+        self.assertEqual(drawn, [0, 2, 4])
+        self.assertLess(took, 0.07)
 
 
 class SpriteTests(unittest.TestCase):

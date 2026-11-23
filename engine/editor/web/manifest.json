@@ -11,6 +11,7 @@
   "engine/chunks.py",
   "engine/combat.py",
   "engine/conditions.py",
+  "engine/cues.py",
   "engine/data.py",
   "engine/demo.py",
   "engine/dialogue.py",

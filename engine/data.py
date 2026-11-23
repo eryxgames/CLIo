@@ -331,6 +331,10 @@ class GameData:
         if self.sims or any(sc.get("sim") for sc in self.scenes.values()):
             from . import sim
             problems += sim.problems(self)
+        for name, song in self.songs.items():            # a song's own rules for its cue sheet
+            if isinstance(song, dict) and "cues" in song:
+                from . import cues
+                problems += cues.problems(song["cues"], "song '%s' cues" % name)
         if self.realms or any(sc.get("realm") for sc in self.scenes.values()):
             from . import realm
             problems += realm.problems(self)

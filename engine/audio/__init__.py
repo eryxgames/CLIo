@@ -19,6 +19,7 @@ import json
 import os
 import tempfile
 import threading
+import time
 
 from . import ballistic, synth
 from .backends import INSTALL_HINTS, NullBackend, detect, platform_name
@@ -77,6 +78,9 @@ class Audio:
         self.wanted = None              # the track the game asked for (canonical key)
         self._wanted_track = None
         self.playing = None
+        self.cue_offset = 0.0           # seconds a player takes to make its first sound: taken off clock()
+        self._sounding = None           # what is playing: (key, kind, path, song)
+        self._sheet = (None, None)      # its cue sheet, looked for once
         self.last_error = ""
 
     # ------------------------------------------------------------------ #
@@ -363,6 +367,33 @@ class Audio:
     def stop_music(self):
         self.music(None)
 
+    def clock(self):
+        """Seconds into the track that is playing - the time to ask its cue sheet with - or None while
+        nothing plays. It is the time since this round of the loop was started, less ``cue_offset``
+        (what a player takes to make its first sound)."""
+        began = getattr(self._backend, "loop_began", None) if self._backend is not None else None
+        if began is None or not self.playing:
+            return None
+        return max(0.0, time.monotonic() - began - self.cue_offset)
+
+    def cues(self):
+        """The cue sheet of the track that is playing (engine/cues.py): the one beside a sound file
+        (``name.cues.json``, as Playhead writes it), or the one a song's own notes give. None when
+        nothing plays or a file has none."""
+        sounding = getattr(self, "_sounding", None)
+        if not sounding or sounding[0] != self.playing:
+            return None
+        key, kind, path, song = sounding
+        if self._sheet[0] != key:
+            from .. import cues
+            try:
+                sheet = cues.beside(path) if kind == "file" else cues.from_song(song)
+            except Exception as e:
+                self.last_error = "%s: %s" % (e.__class__.__name__, e)
+                sheet = None
+            self._sheet = (key, sheet)
+        return self._sheet[1]
+
     def _start(self):
         with self._lock:
             self._token += 1
@@ -377,6 +408,7 @@ class Audio:
         def work():
             try:
                 key, kind, payload = resolved
+                song = None
                 if kind == "file":
                     path, vol = payload, self.music_volume
                 else:
@@ -393,6 +425,7 @@ class Audio:
                     return
                 self.backend.loop(path, vol)
                 self.playing = key
+                self._sounding = (key, kind, path, song)
             except Exception as e:
                 self.last_error = "%s: %s" % (e.__class__.__name__, e)
 

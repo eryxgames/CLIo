@@ -82,6 +82,8 @@ class Backend:
     name = "none"
     description = "silent"
 
+    loop_began = None                                    # when the round of the loop that is playing began
+
     def can_play(self, path):
         return False
 
@@ -116,8 +118,10 @@ class NullBackend(Backend):
     def loop(self, path, volume=1.0):
         if self.record:
             self.log.append(("loop", path))
+            self.loop_began = time.monotonic()
 
     def stop_loop(self):
+        self.loop_began = None
         if self.record:
             self.log.append(("stop", None))
 
@@ -193,6 +197,7 @@ class CliBackend(Backend):
                         return
                     proc = self._spawn(path, volume)
                     self._loop_proc = proc
+                    self.loop_began = time.monotonic() if proc is not None else None     # this round's start
                 if proc is None:
                     return
                 started = time.time()
@@ -217,6 +222,7 @@ class CliBackend(Backend):
         with self._lock:
             self._loop_token += 1
             proc, self._loop_proc = self._loop_proc, None
+            self.loop_began = None
         _kill(proc)
 
     def shutdown(self):
@@ -272,6 +278,7 @@ class TermuxMediaBackend(Backend):
         def run():
             while token == self._token:
                 self._run("play", path)
+                self.loop_began = time.monotonic()
                 time.sleep(1.0)
                 while token == self._token:
                     r = self._run("info")
@@ -284,6 +291,7 @@ class TermuxMediaBackend(Backend):
     def stop_loop(self):
         with self._lock:
             self._token += 1
+        self.loop_began = None
         self._run("stop")
 
 
@@ -321,10 +329,12 @@ class PygameBackend(Backend):
             self.pg.mixer.music.load(path)
             self.pg.mixer.music.set_volume(max(0.0, min(1.0, volume)))
             self.pg.mixer.music.play(-1, fade_ms=400)
+            self.loop_began = time.monotonic()           # it goes round by itself: the sheet takes the time within
         except Exception:
             pass
 
     def stop_loop(self):
+        self.loop_began = None
         try:
             self.pg.mixer.music.fadeout(300)
         except Exception:
@@ -374,6 +384,7 @@ class WindowsBackend(Backend):
             kind, path, volume = job
             try:
                 if kind == "stop":
+                    self.loop_began = None
                     if self._music:
                         self._mci("close %s" % self._music)
                         if self._music in self._open:
@@ -399,6 +410,7 @@ class WindowsBackend(Backend):
                             self._open.remove(self._music)
                     self._music = alias
                     self._mci("play %s repeat" % alias)
+                    self.loop_began = time.monotonic()
                 else:
                     self._mci("play %s" % alias)
             except Exception:
@@ -428,6 +440,10 @@ class ChainBackend(Backend):
         self.name = "+".join(b.name for b in backends)
         self.description = "; ".join(b.description for b in backends)
         self._looping = None
+
+    @property
+    def loop_began(self):
+        return self._looping.loop_began if self._looping else None
 
     def _pick(self, path, for_loop=False):
         for b in self.backends:

@@ -23,7 +23,7 @@ lines that cross add up towards white), dimmed by distance when the scope has a 
 
 Nothing here is random and nothing reads the clock: the same scene gives the same picture.
 
-    python -m engine.vector            # a reel: a hauler, an approach corridor, an orbit, a surface scan
+    python -m engine.vector            # a reel: a hauler, an approach, an orbit, a surface scan, signals
     python -m engine.vector scan 3.5   # one picture of a scene at a time, as text (strokes when piped)
 """
 from __future__ import annotations
@@ -667,13 +667,55 @@ def _height(x, y):
     return h
 
 
-SCENES = ("hauler", "approach", "orbit", "scan")
-GLOW = {"hauler": 0.25, "approach": 0.45, "orbit": 0.3, "scan": 0.0}     # the afterglow that suits each
+SCENES = ("hauler", "approach", "orbit", "scan", "signals")
+GLOW = {"hauler": 0.25, "approach": 0.45, "orbit": 0.3, "scan": 0.0, "signals": 0.4}     # the afterglow that suits each
+TRACK = {"mood": "tense", "seed": 7, "bars": 8}          # the reel's music, and what "signals" moves to
+_sheet = []
 
 
-def scene(name, t, scope):
-    """Draw a scene of the reel at time ``t`` (seconds) on a scope. Returns a caption."""
+def reel_sheet():
+    """The cue sheet of the reel's own track (engine/cues.py), made once."""
+    if not _sheet:
+        from . import cues
+        from .audio.compose import compose
+        _sheet.append(cues.from_song(compose(TRACK["seed"], TRACK["mood"], TRACK["bars"])))
+    return _sheet[0]
+
+
+def scene(name, t, scope, sheet=None):
+    """Draw a scene of the reel at time ``t`` (seconds) on a scope. Returns a caption. ``sheet``: the
+    cue sheet "signals" moves to (the reel's own track's unless given)."""
     cols, rows = scope.cols, scope.rows_n
+    if name == "signals":
+        sheet = sheet or reel_sheet()
+        scope.cue = None
+        punch, shock, sparks = sheet.level("punch", t), sheet.level("shockwave", t), sheet.level("sparks", t)
+        hue = ("green", "amber", "cyan", "violet")[int(sheet.turns("palette", t)) % 4]
+        cx, cy = scope.W // 2, scope.H // 2 - 6
+        unit = scope.H / 96.0
+        scope.circle2(cx, cy, (11 + 8 * punch) * unit, 0.55 + 0.9 * punch, hue)            # the low hits: a ring that jumps
+        if shock > 0.02:                                                                 # the middle: a ring going out
+            scope.circle2(cx, cy, (22 + 24 * (1 - shock)) * unit, shock, "white")
+        for i in range(16):                                                              # the high: sparks round it
+            a = 2 * math.pi * i / 16 + 0.2
+            r0, r1 = 30 * unit, (31 + 12 * sparks) * unit
+            scope.line2(cx + r0 * math.cos(a), cy + r0 * math.sin(a), cx + r1 * math.cos(a), cy + r1 * math.sin(a),
+                        0.35 + 0.9 * sparks, hue)
+        base, back = scope.H - 5, 0.02                                                   # the last seconds, as traces
+        for action, lift, colour in (("punch", 0, hue), ("sparks", 9, "white")):
+            px = py = None
+            for x in range(0, scope.W, 2):
+                y = base - lift * unit - 7 * unit * sheet.level(action, t - (scope.W - x) * back)
+                if px is not None:
+                    scope.line2(px, py, x, y, 0.75, colour)
+                px, py = x, y
+        for x in range(0, scope.W, 2):
+            if sheet.level("bar", t - (scope.W - x) * back) > 0.9:
+                scope.line2(x, base + 1, x, base + 4, 0.6, hue)
+        scope.text(1, 0, "SIGNALS  %s" % (sheet.doc.get("source") or {}).get("name", "").upper()[:40], hue)
+        scope.text(1, 1, "LOW %3d  MID %3d  HIGH %3d" % (punch * 100, shock * 100, sparks * 100), hue, 0.6)
+        scope.text(cols - 12, 0, "T %7.2f" % sheet.when(t), hue, 0.7)
+        return "Signals: the screen moves with the sound, from a cue sheet - nothing is listened to while it plays"
     if name == "hauler":
         solid = int(t / 6.0) % 2 == 1
         cam = Camera(eye=(6.5, -7.5, 3.2), look=(0, 0.3, 0), fov=44)
@@ -742,11 +784,20 @@ def scene(name, t, scope):
     return "A surface scan: profiles of the ground, each hiding what lies behind it, and a sweep"
 
 
-def reel(term=None, seconds=8.0, style=None, colours=("green", "amber", "cyan", "green")):
-    """Play the scenes in turn on a terminal, in frame mode (Ctrl-C ends)."""
+def reel(term=None, seconds=8.0, style=None, colours=("green", "amber", "cyan", "green", "green"), sound=True):
+    """Play the scenes in turn on a terminal, in frame mode (Ctrl-C ends), with their track when
+    this machine can play one: "signals" then moves by the sound's own clock."""
     from .frame import Screen
     from .term import Term
     term = term or Term()
+    audio = None
+    if sound:
+        try:
+            from .audio import Audio
+            audio = Audio()
+            audio.music({"generate": dict(TRACK)})
+        except Exception:
+            audio = None
     screen = Screen(term)
     style = style or ("dots" if term.unicode and not getattr(term, "subst", None) else "strokes")
     screen.start()
@@ -758,6 +809,8 @@ def reel(term=None, seconds=8.0, style=None, colours=("green", "amber", "cyan", 
 
             def draw(t, scope=scope, name=name, caption=caption):
                 scope.clear()
+                if name == "signals" and audio is not None and audio.clock() is not None:
+                    t = audio.clock()                    # the sound's own time, not the picture's
                 caption[0] = scene(name, t, scope)
                 screen.frame(scope.rows(style, term.unicode), status=" " + caption[0])
             screen.play([i / 15.0 for i in range(int(seconds * 15))], draw, 1 / 15.0)
@@ -765,6 +818,8 @@ def reel(term=None, seconds=8.0, style=None, colours=("green", "amber", "cyan", 
                 break
     finally:
         screen.stop()
+        if audio is not None:
+            audio.shutdown()
 
 
 def main(argv=None):

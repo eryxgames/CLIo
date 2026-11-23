@@ -839,6 +839,53 @@ gives Ballistic's sounds to its weapons, hits, fire, souls, explosions and Cron:
 python clio.py rootless --sounds ballistic
 ```
 
+### Cues: screens that move with the sound
+
+A **cue sheet** says what a screen does when in a track: a flash on the kick, sparks on the hats,
+another palette with each part, a darkening that lands on the drop. It is
+[Playhead](https://github.com/eigensoundlab/playhead)'s cue sheet (`"format": "playhead-cues"`):
+named actions, each with a time, a length, an amount and a shape. What an action *means* is the
+screen's own business - a sheet only says `punch` is at 0.8 now.
+
+- **A song in CLIo's notation** has its sheet for nothing: its kicks (`k`, `t`: `hit.low`),
+  snares and claps (`s`, `c`: `hit.mid`), hats (`h`, `o`: `hit.high`), beats, bars and parts
+  (`section.new`, `section.repeat`, with the pattern's name as `label`) are in its notes. Unless
+  the song says otherwise the rules are `punch` on low hits, `shockwave` on middle ones, `sparks`
+  on high ones, `palette` on each part, `bar` and `beat`. A song's own `"cues"` are its rules:
+
+  ```json
+  "cues": [
+    {"on": "hit.low", "do": "punch", "length": 0.14},
+    {"on": "section.new", "where": {"label": "B"}, "do": "darken", "at": -1, "unit": "bars",
+     "length": 1, "lengthUnit": "bars", "shape": "ramp"},
+    {"on": "bar", "every": 4, "do": "event", "name": "sweep"}
+  ]
+  ```
+
+  `on` (an event, or the first part of its name: `section`, `hit`), `where` (`label`), `every`
+  (each n-th), `at` and `unit` (before or after it, in `s`, `beats`, `bars`), `do` (the action;
+  `event` with a `name` is something that happens once), `amount` (times the hit's own strength
+  unless `"scale": false`), `length` and `lengthUnit` (`s`, `beats`, `bars`, or `event`: so many
+  times the event's own length), `shape` (`pulse` dying away, `hold`, `ramp` rising to its end,
+  `swell`, `fade`).
+- **A recording** gets its sheet from Playhead, which listens to it once when the game is made
+  (it needs Node.js; the game does not) and finds far more: builds and drops, fills, breaks,
+  slides, a sound's attack and tail. Put the sheet beside the file under the same name:
+
+  ```
+  playhead analyze music/bridge.wav --profile music --out music/bridge.playhead.json
+  playhead cues music/bridge.playhead.json --preset playhead --out music/bridge.cues.json
+  ```
+
+While a track plays, `game.audio.cues()` is its sheet (None when it has none) and
+`game.audio.clock()` the seconds into it; `sheet.level("punch", t)` is an action's level then (0
+to 1, the greatest of the cues that are on), `sheet.levels(t)` all of them, `sheet.turns("palette",
+t)` how many parts have begun, `sheet.events(before, now)` what happened once in between. Nothing
+is listened to while the game runs. The clock is the time since the player was started for this
+round of the loop: a player that is slow to make its first sound is evened out by
+`game.audio.cue_offset` (seconds). `python -m engine.vector` ends its reel with a screen that
+moves this way.
+
 ## Generated dungeons
 
 ```json

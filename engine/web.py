@@ -211,6 +211,8 @@ class WebBackend:
     description = "the browser"
     record = False
 
+    loop_began = None
+
     def __init__(self, io):
         self.io = io
         self.sent = set()
@@ -230,9 +232,12 @@ class WebBackend:
         self.io.sound("play", path, self._data(path), float(volume))
 
     def loop(self, path, volume=1.0):
+        import time
         self.io.sound("loop", path, self._data(path), float(volume))
+        self.loop_began = time.monotonic()               # for the track's clock (engine.audio.Audio.clock)
 
     def stop_loop(self):
+        self.loop_began = None
         self.io.sound("stop", "", None, 0.0)
 
     def shutdown(self):

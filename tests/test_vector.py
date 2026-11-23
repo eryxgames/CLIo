@@ -305,6 +305,21 @@ class ReelTests(unittest.TestCase):
             counts.append(lit(s))
         self.assertGreater(len(V.hauler().edges), 100)
 
+    def test_signals_move_with_a_cue_sheet(self):
+        from engine import cues
+        sheet = cues.Sheet({"format": "playhead-cues", "version": 1, "source": {"name": "test", "duration": 4.0},
+                            "cues": [{"t": 1.0, "length": 0.5, "action": "punch", "amount": 1.0, "shape": "hold"},
+                                     {"t": 2.0, "length": 0.5, "action": "shockwave", "amount": 1.0, "shape": "fade"}]})
+        quiet, kick, snare = Scope(60, 20), Scope(60, 20), Scope(60, 20)
+        for s, t in ((quiet, 0.5), (kick, 1.1), (snare, 2.1)):
+            s.clear()
+            V.scene("signals", t, s, sheet)
+        self.assertNotEqual(quiet.plain("dots", True), kick.plain("dots", True))
+        self.assertGreater(lit(snare), lit(quiet) + 40)                      # the ring going out
+        self.assertIn("LOW 100", kick.plain())
+        self.assertIn("SIGNALS  TEST", quiet.plain())
+        self.assertGreater(V.reel_sheet().duration, 5)
+
     def test_a_scene_from_the_command_line(self):
         out, old = io.StringIO(), sys.stdout
         sys.stdout = out

@@ -39,6 +39,16 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   the picture and words that follow a point in space. `python -m engine.vector` plays a reel (a
   hauler, an approach corridor, an orbit, a surface scan); `python -m engine.vector scan 3.5`
   prints one picture.
+- **Cues: screens that move with the sound** (`engine/cues.py`). A cue sheet says what happens
+  when in a track - named actions with a time, a length, an amount and a shape - and a screen
+  asks it for their levels at the sound's own time; nothing is listened to while a game runs.
+  The sheet is [Playhead](https://github.com/eigensoundlab/playhead)'s (`playhead-cues`): made
+  by Playhead from a recording when the game is built and put beside the file
+  (`bridge.cues.json`), or made here from a song's own notes (its kicks, snares, hats, beats,
+  bars and parts) by the same kind of rules - a song's `"cues"`, or the usual ones. The track
+  that is playing has a clock and a sheet: `audio.clock()`, `audio.cues()` (`cue_offset` evens
+  out a slow player). The vector reel ends with "signals", which moves to its track. `--check`
+  checks a song's cue rules.
 
 ## 3.5.2 - 2026-11-23
 

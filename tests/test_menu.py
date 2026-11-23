@@ -382,6 +382,321 @@ class BoardTests(unittest.TestCase):
         self.assertEqual(roomy.h, 10 + 7)                                    # a blank row between, above and below
 
 
+def console(**more):
+    return Menu(title="Engineering", look="terminal", status="REACTOR 62%", items=[
+        {"id": "probe", "label": "Survey probe", "state": "ready", "tone": "good", "note": "3 aboard", "key": "f2",
+         "hint": "A probe to the surface."},
+        {"id": "beacon", "label": "Relay beacon", "state": "ready", "hold": True, "key": "f3"},
+        {"id": "scan", "label": "Hull scan", "state": "running", "tone": "warn", "note": "41%"},
+        {"id": "cage", "label": "Field cage", "locked": "The reactor is under 80%."},
+        {"id": "boat", "label": "Lifeboat 2", "state": "gone", "tone": "off"}], **more)
+
+
+class Clock:
+    def __init__(self):
+        self.t = 100.0
+
+    def __call__(self):
+        return self.t
+
+
+class BorderTests(unittest.TestCase):
+    def small(self, border=None, **more):
+        return Menu(title="Box", border=border, items=[{"label": "Resume", "hint": "Back."}, {"label": "More", "items": [
+            {"label": "Deeper"}]}], **more)
+
+    def test_every_frame_draws_a_box_of_the_same_size(self):
+        sizes = set()
+        for name, chars in M.BORDERS.items():
+            self.assertEqual(len(chars), 11, name)
+            b = M.board(self.small(name), 60, 12)
+            sizes.add((b.w, b.h))
+            text = b.plain()
+            self.assertIn("Box", text[0])
+            self.assertIn("Resume", text[1])
+            self.assertIn("Back.", text[4])
+        self.assertEqual(len(sizes), 1)
+        text = M.board(self.small("dos"), 60, 12).plain()
+        self.assertEqual((text[0][0], text[0][-1], text[3], text[5]), ("╒", "╕", "╞" + "═" * 24 + "╡", "╘" + "═" * 24 + "╛"))
+        self.assertEqual(M.board(self.small("corners"), 60, 12).plain()[::5], ["┌  Box                   ┐", "└                        ┘"])
+        self.assertEqual(M.board(self.small("cut"), 60, 12).plain()[5], "╲" + "─" * 24 + "╱")
+        self.assertEqual(M.board(self.small("block"), 60, 12).plain()[5], "▙" + "▄" * 24 + "▟")
+        self.assertEqual(M.board(self.small("nonsense"), 60, 12).plain(), M.board(self.small("single"), 60, 12).plain())
+        self.assertEqual(M.board(self.small(), 60, 12, frame="═║╔╗╚╝").plain()[3], "╟" + "─" * 24 + "╢")   # an engine frame
+        self.assertEqual(M.board(self.small(), 60, 12, frame="heavy").plain()[0][0], "┏")
+        self.assertEqual(M.board(self.small("double"), 60, 12, frame="heavy").plain()[0][0], "╔")           # its own wins
+
+    def test_a_shadow_a_centred_title_and_caps(self):
+        plain, shade = M.board(self.small("double"), 60, 12), M.board(self.small("double shadow"), 60, 12)
+        self.assertEqual((shade.w, shade.h), (plain.w + 1, plain.h + 1))
+        self.assertEqual(shade.plain()[1][-1], "░")
+        self.assertEqual(shade.plain()[-1], " " + "░" * plain.w)
+        self.assertEqual(shade.plain()[0], plain.plain()[0])
+        self.assertEqual(shade.at(4, 1), ("item", 0))
+        self.assertEqual(shade.rows[1][-1][1], "shade")
+        self.assertLessEqual(M.board(self.small("double shadow"), 27, 12).w, 27)
+        self.assertEqual(M.board(self.small("single caps center"), 60, 12).plain()[0], "┌────────┤ Box ├─────────┐")
+        self.assertEqual(M.board(self.small("single center"), 60, 12).plain()[0], "┌───────── Box ──────────┐")
+        self.assertEqual(M.board(self.small("heavy caps"), 60, 12).plain()[0], "┏┫ Box ┣━━━━━━━━━━━━━━━━━┓")
+
+    def test_a_terminal_without_the_characters_gets_the_nearest(self):
+        for name in M.BORDERS:
+            b = M.board(self.small(name + " shadow"), 60, 12, term(uni=False))
+            self.assertTrue(all(ch.isascii() for row in b.rows for ch, _s, _l in row), name)
+        self.assertEqual(M.board(self.small("cut"), 60, 12, term(uni=False)).plain()[0], "+- Box ------------------+")
+        self.assertEqual(M.board(self.small("none"), 60, 12, term(uni=False)).plain()[3].strip(), "-" * 24)
+        linux = term()
+        linux.limited_glyphs = True
+        self.assertEqual(M.border("heavy", linux).name, "single")
+        self.assertEqual(M.border("double shadow", linux).name, "double")
+        self.assertTrue(M.border("double shadow", linux).shadow)
+        self.assertIs(M.border(M.border("dots")).__class__, M.Border)
+
+    def test_a_menu_within_a_menu_keeps_the_frame_unless_it_names_its_own(self):
+        m = self.small("double")
+        self.assertEqual(M.board(keys(m, "down", "enter"), 60, 12).plain()[0][0], "╔")
+        m = Menu(border="double", items=[{"label": "More", "border": "heavy", "items": [{"label": "Deeper"}]}])
+        self.assertEqual(M.board(keys(m, "enter"), 60, 12).plain()[0][0], "┏")
+        self.assertEqual(M.board(keys(m, "esc"), 60, 12).plain()[0][0], "╔")
+
+    def test_a_game_and_a_theme_name_the_frame(self):
+        ui = ui_of(theme="techno")
+        self.assertEqual(M.frame_of(ui), "double")
+        ui.menu_border = "cut shadow"
+        self.assertEqual(M.frame_of(ui), "cut shadow")
+        M.inline(ui, self.small(), ScriptedKeys(["esc"]))
+        self.assertIn("╱─ Box ", strip_ansi(ui.term.out.getvalue()))
+        ui.theme.ui["menu_frame"] = "dos"
+        ui.menu_border = None
+        self.assertEqual(M.frame_of(ui), "dos")
+        self.assertIsNone(M.frame_of(None))
+        from engine.game import Game
+        g = Game(STARTER, term=term(), audio=Session("templates/starter").audio,
+                 settings={"menu_border": "heavy", "menu_look": "line"})
+        self.assertEqual((g.ui.menu_border, g.ui.menu_look), ("heavy", "line"))
+        self.assertEqual(M.game_menu(g).look, "line")
+        self.assertIsNone(Game(STARTER, term=term(), audio=Session("templates/starter").audio,
+                               settings={"menu_look": "wheel"}).ui.menu_look)
+
+        class Data:
+            menus = {"m": {"border": "wavy", "items": [{"label": "A", "border": "double shadow"}, {"label": "B", "border": ""}]}}
+            config = {"menu_look": "wheel", "menu_border": "wavy shadow"}
+        text = "\n".join(M.problems(Data()))
+        for part in ("game.json: unknown menu_look 'wheel' (bar, line, terminal, cards)", "game.json: unknown menu_border 'wavy shadow'",
+                     "menu 'm': unknown border 'wavy' (single, rounded, double, dos, heavy, block, cut, dots, ascii, corners,",
+                     "menu 'm' item 2: unknown border ''"):
+            self.assertIn(part, text)
+        self.assertNotIn("item 1: unknown border", text)
+        Data.config = {"menu_look": "cards", "menu_border": "rule"}
+        Data.menus = {}
+        self.assertEqual(M.problems(Data()), [])
+
+
+class LineTests(unittest.TestCase):
+    def realm(self):
+        return Menu(title="Gordian Moon", look="line", items=[
+            {"id": "continue", "label": "Continue", "note": "Fer, Year 19", "hint": "Go on."},
+            {"kind": "head", "label": "Or"}, {"id": "new", "label": "New realm"},
+            {"id": "lamp", "kind": "check", "label": "The lamp", "value": True},
+            {"id": "old", "label": "The old road", "locked": "It is under water."}])
+
+    def test_letters_of_lines_rules_and_a_rail(self):
+        b = M.board(keys(self.realm(), "down"), 76, 24)
+        text = b.plain()
+        self.assertEqual(text[:3], ["┏━╸┏━┓┏━┓╺┳┓╻┏━┓┏┓╻  ┏┳┓┏━┓┏━┓┏┓╻", "┃╺┓┃ ┃┣┳┛ ┃┃┃┣━┫┃┗┫  ┃┃┃┃ ┃┃ ┃┃┗┫",
+                                    "┗━┛┗━┛╹┗╸╺┻┛╹╹ ╹╹ ╹  ╹ ╹┗━┛┗━┛╹ ╹"])
+        self.assertEqual(text[4], "━" * b.w)
+        self.assertEqual(text[5:12], ["┏━╸", "┃   CONTINUE         Fer, Year 19", "┃   OR", "┣━╸ NEW REALM",
+                                      "┃   THE LAMP              [■] on", "┃   THE OLD ROAD", "┗━╸"])
+        self.assertEqual((b.rows[8][0][1], b.rows[8][4][1], b.rows[6][4][1], b.rows[10][4][1], b.rows[0][0][1]),
+                         ("sel", "sel", "item", "dim", "title"))
+        self.assertEqual((b.at(6, 6), b.at(6, 9), b.at(6, 7)), (("item", 0), ("item", 3), None))
+        roomy = M.board(self.realm(), 76, 30, roomy=True).plain()
+        self.assertEqual(roomy[6:9], ["┣━╸ CONTINUE         Fer, Year 19", "┃", "┃   OR"])
+        self.assertIn("Go on.", roomy[-1])
+        said = M.board(keys(self.realm(), "end", "enter"), 76, 24)
+        self.assertIn("It is under water.", said.plain()[-1])
+
+    def test_where_it_does_not_fit_or_the_font_has_not_the_lines(self):
+        narrow = M.board(self.realm(), 30, 24).plain()
+        self.assertEqual(narrow[0], "GORDIAN MOON")                          # no room for the letters
+        self.assertEqual(narrow[2][0], "━")
+        plain = M.board(self.realm(), 76, 24, term(uni=False)).plain()
+        self.assertEqual((plain[0], plain[2][:3], plain[3], plain[4][:12]), ("GORDIAN MOON", "---", "+--", "+-> CONTINUE"))
+        linux = term()
+        linux.limited_glyphs = True
+        self.assertEqual(M.board(self.realm(), 76, 24, linux).plain()[3:5], ["┌─", "├─  CONTINUE       Fer, Year 19"])
+        many = Menu(title="Many", look="line", items=[{"label": "Item %d" % i} for i in range(1, 31)])
+        b = M.board(keys(many, "pgdn", "pgdn"), 60, 14)
+        self.assertLessEqual(b.h, 14)
+        self.assertIn("┣━╸ ITEM 17", "\n".join(b.plain()))
+        self.assertIn("↑ 17 OF 30 ↓", "\n".join(b.plain()))
+        self.assertIn("3. NEW", "\n".join(M.board(self.realm(), 76, 24, numbers=True).plain()).replace("2. NEW", "3. NEW"))
+
+    def test_a_banner_in_letters_of_lines(self):
+        from engine import banner
+        art = banner.make({"text": "Fer 2049", "style": "line"}, 60)
+        self.assertEqual(art.style, "line")
+        rows, owner = banner.line_rows("Fer")
+        self.assertEqual((rows, owner), (["┏━╸┏━╸┏━┓", "┣╸ ┣╸ ┣┳┛", "╹  ┗━╸╹┗╸"], [0, 0, 0, 1, 1, 1, 2, 2, 2]))
+        self.assertEqual(banner.line_width("I I"), 4)
+        self.assertEqual(len({len(r) for r in banner.line_rows("The quick brown fox, 0123456789: yes - no? a/b + c!")[0]}), 1)
+        self.assertEqual(banner.make({"text": "A very long title that cannot fit", "style": "line"}, 30).style, "line")   # wrapped
+        self.assertNotEqual(banner.make({"text": "Unbreakablelongword", "style": "line"}, 20).style, "line")
+        for g in banner.LINE.values():
+            self.assertEqual((len(g), len({len(r) for r in g})), (3, 1))
+
+
+class TerminalTests(unittest.TestCase):
+    def test_functions_with_how_they_stand(self):
+        b = M.board(console(), 76, 24)
+        self.assertEqual(b.plain(), [
+            "ENGINEERING                      REACTOR 62%",
+            "─" * 44,
+            "▌1 SURVEY PROBE  READY             3 aboard",
+            " 2 RELAY BEACON  READY",
+            " 3 HULL SCAN     RUNNING                41%",
+            " 4 FIELD CAGE    LOCKED",
+            " 5 LIFEBOAT 2    GONE",
+            "─" * 44,
+            " A probe to the surface.",
+            " F2  SURVEY PROBE   F3  RELAY BEACON"])
+        self.assertEqual([b.rows[y][17][1] for y in (2, 3, 4, 5, 6)], ["good", "val", "warn", "dim", "dim"])
+        self.assertEqual({on for _c, _s, on in b.rows[2]}, {True})
+        self.assertEqual((b.at(5, 4), b.at(2, 9), b.at(25, 9)), (("item", 2), ("item", 0), ("item", 1)))
+        self.assertEqual(M.board(console(), 76, 24, term(uni=False)).plain()[2][:3], "|1 ")
+        self.assertIn("NO FUNCTIONS.", "\n".join(M.board(Menu(look="terminal", items=[]), 60, 10).plain()))
+        inner = Menu(items=[{"label": "Deck", "look": "terminal", "status": "FLUX HIGH", "items": [{"label": "Pump"}]}])
+        self.assertIn("FLUX HIGH", M.board(keys(inner, "enter"), 76, 24).plain()[0])   # a menu within, with its own word
+        sc = screen(["esc"])
+        M.over(sc, console(), [[(None, (200, 100, 50), (20, 40, 60))] * 80 for _ in range(22)], ui_of(color=3))
+        self.assertIn("\x1b[48;2;8;9;12m  \x1b[38;2", sc.out.getvalue())     # no box of its own: room round it
+        many = Menu(title="Many", look="terminal", items=[{"label": "Item %d" % i} for i in range(1, 31)])
+        b = M.board(keys(many, "end"), 60, 12)
+        self.assertEqual(b.h, 12)
+        self.assertIn("ITEM 30", b.plain()[-2])
+
+    def test_a_key_with_a_name_does_its_item(self):
+        self.assertEqual(keys(console(), "f2").result.id, "probe")
+        m = keys(console(), "f9", "ctrl-left")
+        self.assertEqual((m.done, m.current().id), (False, "probe"))
+        m = keys(console(), "f3")                                            # held to be done: only armed
+        self.assertEqual((m.done, m.armed.id), (False, "beacon"))
+
+    def test_held_to_be_done(self):
+        clock = Clock()
+        with mock.patch.object(M, "now", clock):
+            m = keys(console(), "down", "enter")
+            self.assertEqual((m.armed.id, m.charge, m.done), ("beacon", 0, False))
+            b = M.board(m, 76, 24)
+            text = "\n".join(b.plain())
+            self.assertIn("RELAY BEACON  ARMED", text)
+            self.assertIn("ARMED hold Enter ░░░░░ Esc lets go", text)
+            self.assertEqual(b.keys, "Hold Enter to do it   Esc lets go")
+            self.assertEqual((b.rows[3][0][0], b.rows[3][0][1], b.rows[3][17][1], b.rows[8][1][1]), ("▌", "hot", "hot", "hot"))
+            keys(m, "enter", "enter")
+            self.assertIn("██░░░", "\n".join(M.board(m, 76, 24).plain()))
+            clock.t += 5                                                     # let go for too long: from the start
+            keys(m, "enter")
+            self.assertEqual((m.charge, m.done), (1, False))
+            keys(m, "enter", "enter", "enter")
+            self.assertFalse(m.done)
+            keys(m, "enter")
+            self.assertEqual((m.done, m.result.id, m.armed), (True, "beacon", None))
+            m = keys(console(), "down", "enter", "enter", "esc")             # Esc lets go, and no more
+            self.assertEqual((m.armed, m.done, m.charge), (None, False, 0))
+            m = keys(console(), "down", "enter", "enter", "down")
+            self.assertEqual((m.armed, m.current().id), (None, "scan"))
+            m = keys(console(), "down", "enter")
+            m.click(("item", 0))
+            self.assertEqual((m.armed, m.result.id), (None, "probe"))
+            self.assertIn("Enter arm", M.board(keys(console(), "down"), 76, 24).keys)
+            box = Menu(items=[{"id": "fire", "label": "Fire", "hold": True}])
+            self.assertIn("ARMED", M.board(keys(box, "enter", "enter"), 60, 12).plain()[3])   # in a box too
+
+    def test_where_keys_are_typed_it_asks_instead(self):
+        ui = ui_of(["2", "1", "2", "2"])
+        got = M.lines(ui, console())
+        text = strip_ansi(ui.term.out.getvalue())
+        self.assertEqual(got.id, "beacon")
+        for part in ("1. Survey probe (3 aboard)", "4. Field cage - The reactor is under 80%.", "Relay beacon?", "1. No", "2. Yes"):
+            self.assertIn(part, text)
+        sc = screen(None)
+        with mock.patch("builtins.input", side_effect=["2", "2"]):
+            self.assertEqual(M.over(sc, console(), None, ui_of(color=3)).id, "beacon")
+        self.assertIn("Relay beacon?", strip_ansi(sc.out.getvalue()))
+
+
+class CardTests(unittest.TestCase):
+    def slots(self, n=5, pictures=True):
+        pic = [[(10 * x, 20 * y, 200) for x in range(8)] for y in range(4)]
+        return Menu(title="Saved realms", look="cards", items=[
+            {"id": "s%d" % i, "label": "Realm %d" % i, "note": "Year %d" % i, "hint": "Kept.",
+             "picture": pic if pictures else None, "locked": "Lost." if i == 4 else None} for i in range(1, n + 1)])
+
+    def test_tiles_in_rows_and_arrows_four_ways(self):
+        m = self.slots()
+        b = M.board(m, 60, 30)
+        self.assertEqual((m.columns, b.w, b.h), (3, 50, 2 + 2 * 6 + 1))
+        text = b.plain()
+        self.assertEqual(text[0], "Saved realms")
+        self.assertEqual(text[2], "┏━━━━━━━━━━ 1 ━┓ ┌────────── 2 ─┐ ┌────────── 3 ─┐")
+        self.assertEqual(text[5][:16], "┃ ► Realm 1    ┃")
+        self.assertEqual(text[6][:16], "┃ Year 1       ┃")
+        self.assertIn("Kept.", text[-1])
+        self.assertEqual(b.keys, "↑↓ ←→ move   Enter choose   Esc back")
+        self.assertEqual((b.at(20, 4), b.at(40, 9), b.at(0, 0)), (("item", 1), None, None))
+        self.assertEqual(b.at(20, 10), ("item", 4))
+        keys(m, "right", "right", "right")                                   # no further than the row's end
+        self.assertEqual(m.current().id, "s3")
+        keys(m, "down")                                                      # nothing under it
+        self.assertEqual(m.current().id, "s3")
+        keys(m, "left", "down")
+        self.assertEqual(m.current().id, "s5")
+        keys(m, "up", "up", "left", "left")
+        self.assertEqual(m.current().id, "s1")
+        self.assertEqual(keys(m, "4").said, "Lost.")
+        self.assertEqual(keys(self.slots(), "2").result.id, "s2")
+        m.click(("item", 2))
+        self.assertEqual(m.result.id, "s3")
+
+    def test_pictures_in_cells_and_in_text(self):
+        m = self.slots()
+        b = M.board(m, 60, 30)
+        self.assertEqual(b.rows[3][4], ("▀", ("px", (0, 0, 200), (0, 20, 200)), False))       # the card chosen: as it is
+        self.assertEqual(b.rows[3][21][1][1], (0, 0, 110))                   # the others: darker
+        ui = ui_of(color=3)
+        cells = M.cells(b, M.palette(ui))
+        self.assertEqual(cells[3][4], (None, (0, 0, 200), (0, 20, 200)))
+        self.assertIn("38;2;0;0;200;48;2;0;20;200m▀", M.painted(b, ui)[3])
+        plain = M.painted(b, ui_of())[3]
+        self.assertNotIn("\x1b", plain)
+        self.assertNotIn("▀", plain)                                         # no colours: shades in characters
+        self.assertEqual(len(strip_ansi(plain)), b.w)
+        sc = screen(["right", "enter"])
+        self.assertEqual(M.over(sc, self.slots(), None, ui).id, "s2")
+        self.assertIn("38;2;10;0;200;48;2;10;20;200m▀", sc.out.getvalue())
+
+    def test_narrow_tall_and_plain(self):
+        m = self.slots(pictures=False)
+        b = M.board(m, 30, 12)
+        self.assertEqual((m.columns, b.h), (1, 2 + 2 * 4 + 1))               # one a row, two rows of them in sight
+        keys(m, "down", "down", "down")
+        text = M.board(m, 30, 12).plain()
+        self.assertIn("↑ 4 of 5 ↓", text[0])
+        self.assertIn("Realm 4", "\n".join(text))
+        self.assertNotIn("Realm 1 ", "\n".join(text))
+        wide = self.slots(9)
+        M.board(wide, 120, 30)
+        self.assertEqual(wide.columns, 4)                                    # four a row at most
+        plain = M.board(self.slots(), 60, 30, term(uni=False))
+        self.assertEqual(plain.plain()[2][:16], "#========== 1 =#")
+        self.assertTrue(all(ch.isascii() for row in plain.rows for ch, s_, _l in row if not isinstance(s_, tuple)))
+        ui = ui_of(["2"])
+        self.assertEqual(M.lines(ui, self.slots()).id, "s2")
+        self.assertIn("2. Realm 2 (Year 2)", strip_ansi(ui.term.out.getvalue()))
+
+
 class ColourTests(unittest.TestCase):
     def test_a_colour_spec_as_a_colour(self):
         self.assertEqual(M.rgb_of("amber"), (255, 176, 0))
@@ -404,8 +719,8 @@ class ColourTests(unittest.TestCase):
             self.assertTrue(all(len(pal[s][1]) == 3 for s in M.STYLES), name)
             self.assertLess(sum(pal["lit"]), sum(pal["item"][1]))
             frames[name] = M.frame_of(ui)
-        self.assertEqual((frames["default"], frames["techno"], frames["retro"], frames["minimal"]),
-                         ("─│╭╮╰╯", "═║╔╗╚╝", "-|++++", "─│┌┐└┘"))
+        self.assertEqual((frames["default"], frames["techno"], frames["retro"], frames["minimal"], frames["modern"]),
+                         ("rounded", "double", "ascii", "single", "heavy"))
         b = M.board(menu(), 60, 20, frame=frames["techno"])
         self.assertEqual((b.plain()[0][0], b.plain()[7][0], b.plain()[7][-1]), ("╔", "╟", "╢"))
         heavy = M.board(menu(), 60, 20, frame=frames["modern"]).plain()[7]
@@ -611,12 +926,17 @@ class GameTests(unittest.TestCase):
         self.assertFalse(m.done)                                             # the test stays in the menu
         self.assertTrue(m.said)
         keys(m, "tab")
-        self.assertEqual([r.id for r in m.rows()], ["style", "speed", "art", "menus"])
+        self.assertEqual([r.id for r in m.rows()], ["style", "speed", "art", "frame", "menus"])
         before = g.ui.theme.name
         keys(m, "right")
         self.assertNotEqual(g.ui.theme.name, before)
-        keys(m, "left", "down", "left", "down", "enter", "down", "right")
-        self.assertEqual((g.ui.theme.name, g.term.speed, g.settings["art"], g.ui.menus), (before, 0.4, False, "bar"))
+        keys(m, "left", "down", "left", "down", "enter", "down", "right", "right")
+        self.assertEqual((g.ui.theme.name, g.term.speed, g.settings["art"], g.ui.menu_border), (before, 0.4, False, "rounded"))
+        self.assertEqual(M.frame_of(g.ui), "rounded")
+        keys(m, "left", "left")
+        self.assertIsNone(g.ui.menu_border)                                  # the style's own again
+        keys(m, "down", "right")
+        self.assertEqual(g.ui.menus, "bar")
         keys(m, "left")
         self.assertEqual(g.ui.menus, "")
         resumed = []
@@ -630,7 +950,8 @@ class GameTests(unittest.TestCase):
         text = s.do("options", "1", "3", "0", "2", "3", "0", "0")
         self.assertFalse(g.audio.sfx_on)
         self.assertFalse(g.settings["art"])
-        for part in ("Options", "1. Sound", "2. Screen", "3. Effects: on", "3. Effects: off", "3. Pictures: on"):
+        for part in ("Options", "1. Sound", "2. Screen", "3. Effects: on", "3. Effects: off", "3. Pictures: on",
+                     "4. Menu frame: the style's"):
             self.assertIn(part, text)
         turn = g.world.turn
         text = s.do("menu", "6")
@@ -724,7 +1045,7 @@ class DataTests(unittest.TestCase):
             {"kind": "do"}, 7, {"label": "F", "items": []}, {"label": "G", "look": "ring"}]},
             "empty": {}, "list": []}
         text = "\n".join(GameData(self.game(bad)).validate())
-        for part in ("menu 'camp': unknown look 'wheel' (lines, bar, tabs, find)",
+        for part in ("menu 'camp': unknown look 'wheel' (lines, bar, tabs, find, line, terminal, cards)",
                      "menu 'camp' item 2: the id 'a' is used twice in this menu",
                      "menu 'camp' item 3: unknown kind 'dial'", "menu 'camp' item 4: a cycle needs \"choices\"",
                      "menu 'camp' item 5: a slide needs \"low\" under \"high\"",
@@ -737,6 +1058,13 @@ class DataTests(unittest.TestCase):
         class Odd:
             menus = []
         self.assertEqual(M.problems(Odd()), ["menus.json should be a map of menus by name"])
+        folder = self.game({})                                               # no menus of its own: game.json is still read
+        with open(os.path.join(folder, "game.json"), encoding="utf-8") as f:
+            cfg = json.load(f)
+        cfg.update(menu_look="wheel", menu_border="double shadow")
+        with open(os.path.join(folder, "game.json"), "w", encoding="utf-8") as f:
+            json.dump(cfg, f)
+        self.assertEqual(GameData(folder).validate(), ["game.json: unknown menu_look 'wheel' (bar, line, terminal, cards)"])
 
 
 class LevelTests(unittest.TestCase):

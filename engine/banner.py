@@ -31,13 +31,46 @@ STYLES = {
     "synthwave": "sunset letters standing on a perspective grid",
     "led": "a dot-matrix LED display, unlit dots and all",
     "dots": "fine letters in braille dots",
+    "line": "letters of heavy lines, three rows high",
     "plain": "spaced capitals in a gradient - fits anywhere",
 }
 STYLE_DEFAULTS = {        # palette, effect
     "pixel": ("clio", None), "shadow": ("clio", None), "chrome": ("steel", "shine"),
     "glitch": ("mono", "glitch"), "reflect": ("ice", "shine"), "synthwave": ("sunset", "cycle"),
-    "led": ("amber", "flicker"), "dots": ("clio", None), "plain": ("clio", None),
+    "led": ("amber", "flicker"), "dots": ("clio", None), "plain": ("clio", None), "line": ("amber", None),
 }
+# Letters of heavy lines, three rows high and mostly three wide (the "line" style; engine/menu.py's line look)
+LINE = {
+    "A": ("┏━┓", "┣━┫", "╹ ╹"), "B": ("┏┓ ", "┣┻┓", "┗━┛"), "C": ("┏━╸", "┃  ", "┗━╸"), "D": ("╺┳┓", " ┃┃", "╺┻┛"),
+    "E": ("┏━╸", "┣╸ ", "┗━╸"), "F": ("┏━╸", "┣╸ ", "╹  "), "G": ("┏━╸", "┃╺┓", "┗━┛"), "H": ("╻ ╻", "┣━┫", "╹ ╹"),
+    "I": ("╻", "┃", "╹"), "J": ("  ╻", "  ┃", "┗━┛"), "K": ("╻┏ ", "┣┻┓", "╹ ╹"), "L": ("╻  ", "┃  ", "┗━╸"),
+    "M": ("┏┳┓", "┃┃┃", "╹ ╹"), "N": ("┏┓╻", "┃┗┫", "╹ ╹"), "O": ("┏━┓", "┃ ┃", "┗━┛"), "P": ("┏━┓", "┣━┛", "╹  "),
+    "Q": ("┏━┓", "┃┓┃", "┗┻┛"), "R": ("┏━┓", "┣┳┛", "╹┗╸"), "S": ("┏━╸", "┗━┓", "╺━┛"), "T": ("╺┳╸", " ┃ ", " ╹ "),
+    "U": ("╻ ╻", "┃ ┃", "┗━┛"), "V": ("╻ ╻", "┃┏┛", "┗┛ "), "W": ("╻ ╻", "┃╻┃", "┗┻┛"), "X": ("╻ ╻", "┏╋┛", "╹ ╹"),
+    "Y": ("╻ ╻", "┗┳┛", " ╹ "), "Z": ("╺━┓", "┏━┛", "┗━╸"),
+    "0": ("┏━┓", "┃ ┃", "┗━┛"), "1": ("╺┓ ", " ┃ ", "╺┻╸"), "2": ("╺━┓", "┏━┛", "┗━╸"), "3": ("╺━┓", " ━┫", "╺━┛"),
+    "4": ("╻ ╻", "┗━┫", "  ╹"), "5": ("┏━╸", "┗━┓", "╺━┛"), "6": ("┏━╸", "┣━┓", "┗━┛"), "7": ("╺━┓", "  ┃", "  ╹"),
+    "8": ("┏━┓", "┣━┫", "┗━┛"), "9": ("┏━┓", "┗━┫", "╺━┛"),
+    " ": ("  ", "  ", "  "), ".": (" ", " ", "╹"), ",": (" ", " ", "╹"), ":": ("╻", " ", "╹"), "-": ("  ", "╺╸", "  "),
+    "'": ("╹", " ", " "), "!": ("╻", "┃", "╹"), "?": ("╺━┓", " ┏┛", " ╹ "), "/": ("  ╻", "┏━┛", "╹  "),
+    "+": (" ╻ ", "╺╋╸", " ╹ "),
+}
+
+
+def line_rows(text):
+    """A text in line letters: three rows of characters, and for each column the number of its letter in
+    the text (to colour it by)."""
+    rows, owner = ["", "", ""], []
+    for n, ch in enumerate(str(text)):
+        g = LINE.get(unicodedata.normalize("NFKD", ch)[:1].upper(), LINE[" "])
+        for i in range(3):
+            rows[i] += g[i]
+        owner += [n] * len(g[0])
+    return rows, owner
+
+
+def line_width(text):
+    return len(line_rows(text)[1])
 # name: (colours top to bottom, accent colours for lower case or None)
 PALETTES = {
     "clio": (["#b8f4ff", "#5fd7ff", "#2fa8ff", "#2f6bff"], ["#fff2a8", "#ffd23f", "#ffa51a", "#d9700a"]),
@@ -292,6 +325,19 @@ def _cells(lines, style, main, accent, scale, solid=False):
                 accented = ch.islower() and accent
                 cv.put(left + step * i, y, ch, "%s b" % ((accent or main)[0] if accented else cols[i]))
         return cv
+    if style == "line":
+        drawn = [line_rows(t) for t in lines]
+        w = max(len(owner) for _r, owner in drawn)
+        cv = Canvas(w, 4 * len(lines) - 1)
+        for n, (text, (rows, owner)) in enumerate(zip(lines, drawn)):
+            left = (w - len(owner)) // 2
+            cols = ramp(main, max(1, len(text)))
+            for i in range(3):
+                for x, ch in enumerate(rows[i]):
+                    if ch != " ":
+                        low = text[owner[x]].islower() and accent
+                        cv.put(left + x, 4 * n + i, ch, (accent[0] if low else cols[owner[x]]) + " b")
+        return cv
     if style == "led":
         bits = _stack([[[(1 if c else 0) for c in row] for row in line_bitmap(t)] for t in lines], gap=1)
         bits = [[c or None for c in row] for row in bits]
@@ -441,6 +487,8 @@ def make(spec, max_width=78, max_height=None, text=None, theme=None, palettes=No
         elif st == "tight":
             layouts = [[words], _wrap(words, len, max_width),
                        [w[:max_width] for w in words.split()]]
+        elif st == "line":
+            layouts = [[words], _wrap(words, line_width, max_width)]
         else:
             per = 1 if st in ("led", "dots") else sc
             gap = 3 if st == "glitch" else 1

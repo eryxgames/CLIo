@@ -32,6 +32,8 @@ class UI:
         self.effects_on = True
         self.menu_number = None     # trailing number typed into a "numbered" menu
         self.menus = None           # how lists of choices are answered: None or "lines" typed, "bar" with keys
+        self.menu_look = None       # the look of the game's menus (engine/menu.py): bar unless the game says
+        self.menu_border = None     # and the frame they are drawn in: the theme's unless the game says
         self.apply_theme(theme)
 
     # ------------------------------------------------------------------ #

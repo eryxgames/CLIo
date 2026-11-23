@@ -342,7 +342,7 @@ class GameData:
         if self.demo:
             from . import demo
             problems += demo.problems(self.demo, self)
-        if self.menus:
+        if self.menus or self.config.get("menu_look") or self.config.get("menu_border"):
             from . import menu
             problems += menu.problems(self)
         return problems

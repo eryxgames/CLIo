@@ -66,6 +66,22 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 - Lists of choices (dialogue, shops, "which do you mean?") stay typed numbers unless asked:
   `"menus": "bar"` in `game.json`, `--menus bar`, a theme's `ui.menus`, or the player's choice
   in `options`. `python -m engine.menu [THEME] [--over]` shows the looks on a terminal.
+- **Menu frames**: thirteen of them - `single`, `rounded`, `double`, `dos`, `heavy`, `block`,
+  `cut`, `dots`, `ascii`, `corners`, `brackets`, `rule`, `none` - each with `shadow`, `center`
+  and `caps` if asked (`"border": "double shadow"`). A menu names its own, an item the frame of
+  the items under it, a game its house frame (`"menu_border"`), a theme its usual one
+  (`ui.menu_frame`), and the player may pick one in `options`. A font without the characters
+  gets the nearest. `python -m engine.menu --borders` shows them all.
+- **Three more looks**: `line` (the title in letters of heavy lines, rules, a rail with an arm to
+  the cursor), `terminal` (a console's functions with how each stands - READY, RUNNING, LOCKED,
+  ARMED - and soft keys F1... on a strip) and `cards` (tiles in rows, a picture on each if it
+  has one, the arrows going four ways). `"menu_look"` in `game.json` gives a game's own menu and
+  its lists of choices one of them.
+- **Held to be done** (`"hold": true`): the first Enter arms a thing, holding Enter fills a bar
+  and does it, Esc lets go - for what cannot be taken back. Where answers are typed it asks.
+- A banner style **`line`**: letters of heavy lines, three rows high (the alphabet of the line
+  look). Heavy joints and line ends are drawn double in the Windows console's font, as heavy
+  lines are.
 
 ## 3.5.2 - 2026-11-23
 

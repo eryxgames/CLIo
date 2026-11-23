@@ -101,7 +101,7 @@ engine/
   realm.py           realms: strategy by turns (seasons, stocks, works, threats), and its steward
   vector.py          vector displays: 3D in lines (wire and hidden-line), dots or strokes, afterglow
   cues.py            cue sheets (Playhead's): what a screen does with the sound, from a file or a song's notes
-  menu.py            menus: items and values, the looks (bar, tabs, find, lines), in the text or over a frame
+  menu.py            menus: items and values, looks (bar, tabs, find, line, terminal, cards, lines), frames
   demo.py            the demos (engine/demos/clio.json, a game's demo.json)
   editor/            the editor (a page in the browser, also served as a web site)
 games/               derelict/  depths/  rootless/
@@ -121,7 +121,7 @@ guide.
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 940 tests, about a minute
+python -m unittest discover -s tests     # 955 tests, about a minute
 python -m engine.vector                  # the vector display's reel (Ctrl-C ends)
 python -m engine.realm templates/realm 8 # a steward plays the realm starter over eight seeds
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class

@@ -87,6 +87,7 @@ That is a finished game: `take corkscrew`, `use corkscrew on barrel`, `up`. It s
 | `player_stats` | `health`, `max_health`, `attack`, `defense`, `critical_hit_chance`, `evasion`, plus any stat of your own. |
 | `style` | Theme name (see [themes](#text-colour-and-themes)). |
 | `menus` | `"bar"`: lists of choices are answered with the arrow keys (see [menus](#menus)); `"lines"`: every menu is typed. |
+| `menu_look`, `menu_border` | The look of the game's menus (`bar`, `line`, `terminal`, `cards`) and the frame they are drawn in (`"double shadow"`): see [menus](#menus). |
 | `title_banner` | The title drawn in a graphic style: `{"style": "reflect", "palette": "ice"}` - see [banners](#title-screens-banners-and-animation). |
 | `title_effect` | How the title picture animates: `"glitch"`, `"shine"`, `"none"`... |
 | `logo` | Which CLIo logo the title screen shows when the game has no title art or banner (`python clio.py --looks`). |
@@ -507,18 +508,44 @@ typing. Fights keep their typed line (`strike 2`).
 | `confirm` | `true`, or a question: it asks first. |
 | `again` | After its effects the menu comes back. |
 | `var`, `flag` | Where a value is kept: a variable (any kind of value) or a flag (a `check`). It is read when the menu opens and written as it changes. |
-| `look` | For the items under it: `bar`, `tabs` (its menus become pages across the top), `find` (a long list, narrowed by typing). A menu's own `look` is beside its `title`. |
+| `hold` | Done only by holding Enter: the first Enter arms it, holding (or pressing on) fills a bar and does it, Esc or any other key lets go. Where answers are typed it asks first instead. |
+| `state`, `tone` | In the `terminal` look: a word for how it stands (`READY`, `RUNNING`...), and how the word is painted: `good`, `warn`, `hot`, `off`. What is locked says `LOCKED`, what is armed `ARMED`. |
+| `look`, `border` | For the items under it: a look and a frame of their own (below). A menu's own are beside its `title`, with `status` (a word at the top right of a `terminal`). |
 
-`--check` says what is wrong in `menus.json`. A theme may name the box its menus are drawn in
-(`"ui": {"menu_frame": "DOUBLE"}`; else its descriptions' frame) and ask for keys
-(`"ui": {"menus": "bar"}`); the colours are the theme's `menu`, `key`, `hint`, `item` and
-`list_title`.
+**Looks.** `"look"` says how a menu, or the items under an item, are shown:
+
+| Look | What it is |
+| --- | --- |
+| `bar` | A box with a lit line that moves (the default). |
+| `tabs` | Its menus become pages across the top: settings. |
+| `find` | A long list, narrowed by typing. |
+| `line` | The title in letters of heavy lines, rules, and a rail down the items with an arm out to the one the cursor is on. |
+| `terminal` | A console's functions: a number, a name, how it stands, a note; items whose `key` is `f1`...`f12` are soft keys on a strip under the list. |
+| `cards` | Tiles in rows, the arrows going all four ways; a tile shows a picture if the item has one (in code: `picture`, rows of `(r, g, b)`, two to a cell's height). |
+
+`"menu_look"` in `game.json` (`bar`, `line`, `terminal`, `cards`) is the look of the game's own
+`menu` and of its lists of choices.
+
+**Frames.** A box is drawn in a frame: `single`, `rounded`, `double`, `dos` (double across, single
+down), `heavy`, `block`, `cut` (cut corners), `dots`, `ascii`, `corners` (the corners alone),
+`brackets` (the sides and corners), `rule` (a line above and below), `none`. After the name may
+come `shadow` (a shadow at its right and under it), `center` (the title in the middle) and `caps`
+(the line broken off either side of the title): `"border": "double shadow"`. The frame is, in
+this order: the menu's own `"border"` (an item's, for the items under it), the game's
+(`"menu_border"` in `game.json`), the player's choice in `options`, the theme's
+(`"ui": {"menu_frame": "dos"}`; else the frame of its descriptions). A terminal whose font has
+not a frame's characters gets `single`, or `ascii`.
+
+`--check` says what is wrong in `menus.json`. A theme may also ask for keys
+(`"ui": {"menus": "bar"}`) and a look (`"ui": {"menu_look": "terminal"}`); the colours are the
+theme's `menu`, `key`, `hint`, `item`, `list_title`, `warning` and `success`.
 
 In code: `from engine import menu`; `menu.Menu(title=..., items=[...])` takes the same items
 (with `on`, a function called with the item and the menu when it is chosen or changed, and
 `stay`, which keeps the menu open after); `menu.show(game.ui, m)` gives back the item chosen, or
 None; `menu.over(screen, m, rows, game.ui)` shows it over a frame; `m.values()` is every value
-by its id. `python -m engine.menu [THEME] [--over]` shows the looks on your terminal.
+by its id. `python -m engine.menu [THEME] [--over] [--look NAME] [--border NAME]` shows the looks
+on your terminal, and `python -m engine.menu --borders` every frame.
 
 ## Text, colour and themes
 
@@ -608,7 +635,7 @@ usual one, so a game can have a title screen of its own without drawing anything
 | Field | Meaning |
 | --- | --- |
 | `text` | What to draw; the game's `title` when left out. |
-| `style` | `pixel`, `shadow`, `chrome`, `glitch`, `reflect`, `synthwave`, `led`, `dots`, `plain` |
+| `style` | `pixel`, `shadow`, `chrome`, `glitch`, `reflect`, `synthwave`, `led`, `dots`, `line` (letters of heavy lines, three rows high), `plain` |
 | `palette` | `clio`, `sunset`, `ice`, `fire`, `toxic`, `gold`, `steel`, `amber`, `phosphor`, `blood`, `royal`, `forest`, `mono` |
 | `colors`, `accent` | Your own colours instead: `["#fff07a", "#ff6f91", "#9b5cff"]` top to bottom; `accent` for lower-case letters. |
 | `effect` | Its animation (each style has a default: `glitch` for glitch, `shine` for chrome...; `"none"` for none). |

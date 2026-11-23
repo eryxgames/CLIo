@@ -86,7 +86,7 @@
   "sim": "scan",
   "on_sim_done": [
    {
-    "say": "The mast below is whole in the scope: somebody built it, and it is still standing."
+    "say": "The mast below is whole in the scope: somebody built it, and it is still standing. A beacon marks it now."
    },
    {
     "set": "scan_done"
@@ -97,7 +97,7 @@
   ],
   "on_sim_fail": [
    {
-    "say": "The pass is over and the picture is not whole. Next orbit."
+    "say": "The pass is over and no beacon is down. Next orbit."
    },
    {
     "goto": "bridge"

@@ -17,6 +17,15 @@ Models: ``car`` (and ``boat``, on water): throttle, brakes, steering, grip that 
 it drift; ``hover``: thrust along its heading, lift, yaw, gravity when the fuel is gone, landing soft or
 hard; ``plane``: throttle, climb and dive, turns that need speed, stalling, runways.
 
+**Functions** (``"functions"``) are what a console does when asked, each at a key: at once, when the key
+has been held for ``hold`` seconds (a scram, a beacon deployed), or switched on and off (``toggle``).
+One may be locked until a formula holds (``if``), last a while (``lasts``), need time before it is done
+again (``cooldown``), run out (``uses``); done, it sets and adds to controls and stocks, and formulas
+read it by name. ::
+
+    "functions": {"scram": {"label": "Scram", "key": "x", "hold": 1, "lasts": 8, "keeps": {"rods": 0}},
+                  "beacon": {"label": "Deploy beacon", "key": "b", "hold": 2, "if": "scan >= 100", "uses": 1}}
+
 It runs at 20 ticks a second. Floats, but only + - * / and square roots (the same on every machine)
 and the sines and cosines of a table made with whole numbers: the same keys at the same ticks fly
 the same flight.
@@ -263,6 +272,106 @@ class System:
         self.calc = formula(spec["value"]) if self.is_value else None
 
 
+VEHICLE_KEYS = ("up", "down", "left", "right", "w", "s", "space")
+KEPT_KEYS = ("p", "esc", "q", "enter", "ctrl-c", "ctrl-d")      # the simulator's own
+FUNCTION_KEYS = "123456789"                              # a function with no key: these, in order
+SHORT_HOLD = 0.75                                        # a hold shorter than this a tap would do (seconds)
+FUNCTION_VALUES = ("done", "left", "charge", "wait")     # NAME_done ...: what formulas read of a function
+FUNCTION_TONES = ("good", "warn", "hot")
+STATE_WORDS = {"ready": "READY", "off": "OFF", "on": "ON", "hold": "HOLD", "done": "DONE", "wait": "WAIT",
+               "locked": "LOCKED", "spent": "SPENT"}
+
+
+def _seconds(v):
+    try:
+        return max(0.0, float(v or 0))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+class Function:
+    """Something a console does when asked, at its key: at once; when the key has been held for
+    ``hold`` seconds; or - a switch (``toggle``) - on at a press and off at the next. It can be locked
+    until its ``if`` holds, last (``lasts``), wait before the next time (``cooldown``) and run out
+    (``uses``). What it has done is in the sim's values: ``NAME`` (1 while it is on), ``NAME_done`` (how
+    many times), ``NAME_left`` and ``NAME_wait`` (seconds), ``NAME_charge`` (how far its key is held, 0-1)."""
+
+    def __init__(self, name, spec, key, rate):
+        spec = spec if isinstance(spec, dict) else {}
+        self.name, self.spec, self.rate = name, spec, rate
+        self.key = str(spec.get("key") or key).lower()
+        self.label = str(spec.get("label") or name.replace("_", " ").capitalize())
+        self.toggle = bool(spec.get("toggle"))
+        self.hold = 0 if self.toggle else int(round(_seconds(spec.get("hold")) * rate))
+        self.lasts = int(round(_seconds(spec.get("lasts")) * rate))
+        self.cooldown = int(round(_seconds(spec.get("cooldown")) * rate))
+        self.uses = int(_seconds(spec.get("uses"))) or None
+        self.cond = formula(spec["if"]) if spec.get("if") not in (None, "") else None
+        self.sets, self.adds, self.keeps = [[(k, formula(v)) for k, v in (spec.get(part) or {}).items()]
+                                            if isinstance(spec.get(part), dict) else []
+                                            for part in ("set", "add", "keeps")]
+        self.tone = spec.get("tone") if spec.get("tone") in FUNCTION_TONES else None
+        self.done = 0                                # times it has been done
+        self.on = False                              # switched on, or still lasting
+        self.left = 0                                # ticks it still lasts
+        self.wait = 0                                # ticks until it can be done again
+        self.charge = 0                              # ticks its key has been held towards ``hold``
+        self.down = False                            # its key, the tick before
+        self.block = False                           # its key has to be let go before it counts again
+        self.open = True                             # its ``if`` held, the last tick
+        self.fired = -10 ** 6                        # the tick it was last done
+
+    def can(self):
+        """Whether it would be done now if asked."""
+        return self.open and not self.on and self.wait <= 0 and (self.uses is None or self.done < self.uses)
+
+    def state(self, tick=None):
+        if self.on:
+            return "on"
+        if self.charge > 0:
+            return "hold"
+        if tick is not None and 0 <= tick - self.fired < self.rate and not self.toggle:
+            return "done"                            # just done: said for a second
+        if self.uses is not None and self.done >= self.uses:
+            return "spent"
+        if self.wait > 0:
+            return "wait"
+        if not self.open:
+            return "locked"
+        return "off" if self.toggle else "ready"
+
+    def why_not(self):
+        """Why it cannot be done now, in words (none: it can, or it is on)."""
+        if self.uses is not None and self.done >= self.uses:
+            return str(self.spec.get("spent_text") or "there is no more of it")
+        if self.wait > 0:
+            return "ready in %d s" % int(math.ceil(self.wait / float(self.rate)))
+        if not self.open:
+            return str(self.spec.get("why") or "not now")
+        return None
+
+    def values(self):
+        r = float(self.rate)
+        return {self.name: 1.0 if self.on else 0.0, self.name + "_done": float(self.done),
+                self.name + "_left": self.left / r, self.name + "_wait": self.wait / r,
+                self.name + "_charge": (self.charge / float(self.hold)) if self.hold else 0.0}
+
+    def shown(self, tick=None):
+        """What a screen needs to show it: a dict."""
+        state = self.state(tick)
+        r = float(self.rate)
+        words = self.spec.get("words") if isinstance(self.spec.get("words"), dict) else {}
+        return {"id": self.name, "label": self.label, "key": self.key, "state": state,
+                "word": str(words.get(state) or STATE_WORDS[state]),
+                "charge": (self.charge / float(self.hold)) if self.hold else 0.0,
+                "left": int(math.ceil(self.left / r)), "wait": int(math.ceil(self.wait / r)),
+                "hold": self.hold / r, "toggle": self.toggle, "tone": self.tone, "why": self.why_not(),
+                "flash": tick is not None and 0 <= tick - self.fired < max(2, self.rate // 4)}
+
+    def snapshot(self):
+        return (self.done, self.on, self.left, self.wait, self.charge, self.down, self.block)
+
+
 class Sim:
     """One sim being played: :meth:`step` with :class:`engine.realtime.Controls` a tick at a time."""
 
@@ -334,10 +443,21 @@ class Sim:
             c = dict(c)
             c["value"] = float(c.get("start", c.get("min", 0)))
             self.controls[k] = c
+        self.functions = []                          # what the console does when asked (its "functions")
+        fns = spec.get("functions") if isinstance(spec.get("functions"), dict) else {}
+        spare = [k for k in FUNCTION_KEYS if k not in [str((f or {}).get("key", "")).lower() for f in fns.values()
+                                                       if isinstance(f, dict)]]
+        for k, f in fns.items():
+            if isinstance(f, dict):
+                self.functions.append(Function(k, f, spare.pop(0) if not f.get("key") and spare else "", rate))
         self.win_if = formula(spec["win_if"]) if spec.get("win_if") else None
         self.fail_if = formula(spec["fail_if"]) if spec.get("fail_if") else None
         self.score = formula(spec["score"]) if spec.get("score") else None
         self.history = {k: [] for k in (spec.get("chart") or [])}
+        if any(f.cond is not None for f in self.functions):  # locked or not, before the first tick too
+            env = self.env()
+            for f in self.functions:
+                f.open = f.cond is None or bool(f.cond(env))
         self.gauges = spec.get("gauges") or (GAUGES.get(self.model, []) if self.mode == "vehicle" else
                                              [{"show": k, "label": k.upper()} for k in self.history])
 
@@ -372,6 +492,8 @@ class Sim:
             e[c] = spec["value"]
         for s in self.systems:
             e[s.name] = s.value
+        for f in self.functions:
+            e.update(f.values())
         return e
 
     def speed(self):
@@ -408,6 +530,7 @@ class Sim:
                 self.over = self.result
             return
         if self.paused:
+            self._keys_seen(c)
             if c.hit("q"):
                 self.result = self.over = "quit"
             elif c.pressed and (self.paused == "ready" or c.hit("p", "esc", "enter", "space")):
@@ -415,11 +538,14 @@ class Sim:
             return
         if c.hit("p", "esc"):
             self.paused = "paused"
+            self._keys_seen(c)
             return
         self.ticks += 1
+        self._functions(c)
         if self.mode == "vehicle":
             self._drive(c)
         self._controls(c)
+        self._kept()
         self._systems()
         if self.mode == "vehicle":
             self._checkpoints()
@@ -607,6 +733,122 @@ class Sim:
                 spec["value"] -= step
             spec["value"] = max(float(spec.get("min", 0)), min(float(spec.get("max", 100)), spec["value"]))
 
+    # ---- functions: what the console does when asked ---------------------- #
+    def function(self, name):
+        return next((f for f in self.functions if f.name == name), None)
+
+    def shown_functions(self, names=None):
+        """The functions as a screen shows them (dicts), all or those named, in their order."""
+        return [f.shown(self.tick) for f in self.functions if names is None or f.name in names]
+
+    def _keys_seen(self, c):
+        """While nothing moves (paused, not begun): a function's key that is down has to be let go first -
+        the key that begins it does nothing else."""
+        for f in self.functions:
+            f.down = c.down(f.key)
+            f.block = f.block or f.down
+            f.charge = 0
+
+    def _functions(self, c):
+        if not self.functions:
+            return
+        env = None
+        for f in self.functions:
+            down = bool(f.key) and c.down(f.key)
+            edge, f.down = down and not f.down, down
+            if not down:
+                f.block = False
+            if f.left > 0:                               # it lasts so long, and then it is over
+                f.left -= 1
+                if f.left == 0:
+                    self._stop(f)
+            elif f.wait > 0:
+                f.wait -= 1
+            if f.cond is not None:
+                env = env if env is not None else self.env()
+                f.open = bool(f.cond(env))
+            if f.toggle:
+                if f.on and not f.open:                  # what it needs is gone: it goes off
+                    self._stop(f)
+                    self.tell("%s: off - %s." % (f.label, f.why_not() or "not now"), "hurt", 2.0)
+                elif edge and not f.block:
+                    if f.on:
+                        self._stop(f, f.spec.get("says_off"))
+                    elif f.can():
+                        env = self._do(f, env)
+                    else:
+                        self._refuse(f)
+                continue
+            if f.hold:
+                if down and not f.block and f.can():
+                    f.charge += 1
+                    if f.charge >= f.hold:
+                        f.charge, f.block = 0, True      # let go before the next
+                        env = self._do(f, env)
+                else:
+                    if edge and not f.block and not f.on and not f.can():
+                        self._refuse(f)
+                    f.charge = max(0, f.charge - 2)      # let go early: it falls back
+            elif edge and not f.block:
+                if f.can():
+                    env = self._do(f, env)
+                elif not f.on:
+                    self._refuse(f)
+
+    def _do(self, f, env=None):
+        """Do a function now: what it sets and adds (worked out from the values as they were), its word."""
+        env = env if env is not None else self.env()
+        changes = [(k, fn(env), False) for k, fn in f.sets] + [(k, fn(env), True) for k, fn in f.adds]
+        for k, v, add in changes:
+            self._put(k, v, add)
+        f.done += 1
+        f.fired = self.tick
+        if f.toggle or f.lasts:
+            f.on, f.left = True, f.lasts
+        else:
+            f.wait = f.cooldown
+        self.events.append(str(f.spec.get("sound") or "function"))
+        says = f.spec.get("says")
+        self.tell(str(says) if says else "%s." % f.label, {"hot": "hurt", "warn": "alert"}.get(f.tone, "good"), 3.0)
+        return None                                      # the values have changed: read them again
+
+    def _stop(self, f, says=None):
+        f.on, f.left, f.wait = False, 0, f.cooldown
+        self.events.append("function_off")
+        if says:
+            self.tell(str(says), "text", 2.0)
+
+    def _refuse(self, f):
+        self.events.append("refused")
+        self.tell("%s: %s." % (f.label, f.why_not() or "not now"), "hurt", 2.0)
+
+    def _put(self, name, v, add=False):
+        """Set (or add to) a control, a stock, the fuel or the damage, within its bounds."""
+        if name in self.controls:
+            c = self.controls[name]
+            c["value"] = max(float(c.get("min", 0)), min(float(c.get("max", 100)), (c["value"] if add else 0.0) + v))
+            return
+        if name == "fuel":
+            self.fuel = max(0.0, min(self.fuel_max, (self.fuel if add else 0.0) + v))
+        elif name == "damage":
+            self.damage = max(0.0, min(100.0, (self.damage if add else 0.0) + v))
+        for s in self.systems:
+            if s.name == name and not s.is_value:
+                s.value = (s.value if add else 0.0) + v
+                if s.lo is not None:
+                    s.value = max(float(s.lo), s.value)
+                if s.hi is not None:
+                    s.value = min(float(s.hi), s.value)
+
+    def _kept(self):
+        """What the functions that are on keep where it is (their ``keeps``)."""
+        env = None
+        for f in self.functions:
+            if f.on and f.keeps:
+                env = env if env is not None else self.env()
+                for k, fn in f.keeps:
+                    self._put(k, fn(env))
+
     def _systems(self):
         if not self.systems:
             return
@@ -684,18 +926,28 @@ class Sim:
         return (self.tick, self.ticks, round(self.x, 9), round(self.y, 9), round(self.z, 9), round(self.vx, 9),
                 round(self.vy, 9), round(self.vz, 9), round(self.heading, 9), round(self.fuel, 9),
                 round(self.damage, 9), self.passed, self.landed, self.result,
-                [round(s.value, 9) for s in self.systems], [round(c["value"], 9) for c in self.controls.values()])
+                [round(s.value, 9) for s in self.systems], [round(c["value"], 9) for c in self.controls.values()]) \
+            + ((tuple(f.snapshot() for f in self.functions),) if self.functions else ())
 
     def state_hash(self):
         return hashlib.sha1(repr(self.state()).encode()).hexdigest()[:16]
 
     def clone(self):
         import copy
-        return copy.deepcopy(self)
+        data, self.data = self.data, None            # the game's data is not this sim's to copy
+        try:
+            twin = copy.deepcopy(self)
+        finally:
+            self.data = data
+        twin.data = data
+        return twin
 
     def stats(self):
-        return {"result": self.result, "why": self.why, "seconds": round(self.ticks / float(self.rate), 1),
-                "damage": round(self.damage), "fuel": round(self.fuel), "passed": self.passed}
+        out = {"result": self.result, "why": self.why, "seconds": round(self.ticks / float(self.rate), 1),
+               "damage": round(self.damage), "fuel": round(self.fuel), "passed": self.passed}
+        if self.functions:
+            out["functions"] = {f.name: f.done for f in self.functions}
+        return out
 
 
 def make(data, sid, rate=RATE):
@@ -765,9 +1017,20 @@ def autopilot_keys(sim):
     return keys
 
 
+def pilot_keys(sim):
+    """The keys of the functions the autopilot is told to do (``"pilot": true``) as soon as it can: held
+    while one is ready or its key is on the way, let go when it is done."""
+    keys = set()
+    for f in sim.functions:
+        if f.spec.get("pilot") and f.key and not f.block and f.can():
+            keys.add(f.key)
+    return keys
+
+
 def fly(sim, seconds=600, systems_every=2.0):
     """Let the autopilot do the sim; the journal of key events it made, as the real-time Recorder keeps
-    them. Systems sims are run by trying the controls ahead (as far as ``seconds`` allows)."""
+    them. Systems sims are run by trying the controls - and the functions, one at a time - ahead (as far
+    as ``seconds`` allows); a function with ``"pilot": true`` is done as soon as it can be."""
     from .keys import PRESS, RELEASE, REPEAT
     journal = [[0, [["enter", PRESS]]]]
     held = set()
@@ -781,6 +1044,7 @@ def fly(sim, seconds=600, systems_every=2.0):
             keys = set(plan_keys)
         else:
             keys = autopilot_keys(sim)
+        keys |= pilot_keys(sim)
         evs = [[k, RELEASE] for k in sorted(held - keys)] + [[k, PRESS] for k in sorted(keys - held)]
         if tick % 10 == 0:                                # held keys repeat, as a terminal sends them
             evs += [[k, REPEAT] for k in sorted(keys & held)]
@@ -796,19 +1060,24 @@ def fly(sim, seconds=600, systems_every=2.0):
 
 def best_controls(sim, horizon):
     """For a systems sim: which keys to hold the next ``horizon`` seconds - each control up, down or left,
-    tried a little further ahead on a copy, the best by the sim's ``score`` (and not failing)."""
+    with none of the functions or one of them (those it could do, or has begun), tried a little further
+    ahead on a copy, the best by the sim's ``score`` (and not failing)."""
     import itertools
     names = list(sim.controls)
     choices = []
     for k in names:
         keys = sim.controls[k].get("keys") or []
         choices.append([()] + [(key,) for key in keys[:2]])
+    asked = [(f.key,) for f in sim.functions if f.key and not f.spec.get("pilot")
+             and (f.down or (f.toggle and f.on) or f.can())]
+    if asked:
+        choices.append([()] + asked)
     best, bs = set(), None
     for combo in itertools.product(*choices):
         keys = frozenset(k for c in combo for k in c)
         trial = sim.clone()
         for _ in range(int(horizon * 3 * sim.rate)):
-            trial.step(Controls(trial.tick, keys, (), ()))
+            trial.step(Controls(trial.tick, keys | pilot_keys(trial), (), ()))
             if trial.result:
                 break
         env = trial.env()
@@ -969,19 +1238,56 @@ def panel_lines(sim, width, unicode=True):
         out.append(gauge_line(sim, g, env, width, unicode))
     for name, vals in sim.history.items():
         out.append(("%-8s%s" % (name.upper()[:7], sparkline(vals, max(4, width - 9), unicode)), "dim"))
+    if sim.functions:
+        out.append(("", "text"))
+        for f in sim.shown_functions():
+            out.append(function_line(f, width, unicode))
     return out
 
 
+def function_word(f, unicode=True, bar=6):
+    """What a function's line ends with: its state in a word, the seconds left, or how far its key is held."""
+    state = f.get("state", "ready")
+    if state == "hold":
+        full, empty = ("█", "░") if unicode else ("#", "-")
+        k = max(0, min(bar, int(round(float(f.get("charge") or 0) * bar))))
+        return full * k + empty * (bar - k) + " HOLD"
+    word = str(f.get("word") or STATE_WORDS.get(state, state.upper()))
+    if state == "on" and f.get("left"):
+        return "%s %d s" % (word, f["left"])
+    if state == "wait" and f.get("wait"):
+        return "%s %d s" % (word, f["wait"])
+    return word
+
+
+def key_name(k):
+    return {"up": "Up", "down": "Dn", "left": "Lt", "right": "Rt", "space": "Spc"}.get(k, str(k).upper())
+
+
+def function_line(f, width, unicode=True):
+    """A function as ``(text, role)`` for the column of instruments: its key, its name, its state."""
+    word = function_word(f, unicode)
+    head = "%-4s%s" % (key_name(f["key"]), f["label"])
+    room = max(1, width - len(word) - 1)
+    role = {"on": "good", "hold": "alert", "done": "good", "locked": "dim", "wait": "dim",
+            "spent": "dim"}.get(f["state"], "text")
+    if f["state"] in ("on", "hold", "done") and f["tone"] == "hot":
+        role = "hurt"
+    return (head[:room].ljust(room) + " " + word, role)
+
+
 def help_line(sim):
+    does = "".join("  %s%s %s" % ("hold " if f.hold else "", key_name(f.key), f.label.lower())
+                   for f in sim.functions if f.key)
     if sim.mode == "systems":
         keys = ", ".join("%s %s/%s" % (c.get("label", k), *(list(c.get("keys", [])) + ["", ""])[:2])
                          for k, c in sim.controls.items())
-        return keys + "   P pause"
+        return keys + does + "   P pause"
     if sim.model == "hover":
-        return "↑↓ thrust  ←→ turn  W/S climb, descend   P pause"
+        return "↑↓ thrust  ←→ turn  W/S climb, descend" + does + "   P pause"
     if sim.model == "plane":
-        return "↑↓ throttle  ←→ turn  W/S climb, dive  Space brakes   P pause"
-    return "↑ go  ↓ brake  ←→ steer  Space handbrake   P pause"
+        return "↑↓ throttle  ←→ turn  W/S climb, dive  Space brakes" + does + "   P pause"
+    return "↑ go  ↓ brake  ←→ steer  Space handbrake" + does + "   P pause"
 
 
 class Runner:
@@ -989,7 +1295,9 @@ class Runner:
 
     SOUNDS = {"empty": ("hopper_stop", "locked"), "refuel": ("refuel", "pickup"), "checkpoint": ("checkpoint", "pin"),
               "land": ("land", "plate"), "lift_off": ("hopper_start", "tick"), "crash": ("crash", "hurt"),
-              "bump": ("bump", "hit"), "done": ("done", "win"), "fail": ("fail", "lose")}
+              "bump": ("bump", "hit"), "done": ("done", "win"), "fail": ("fail", "lose"),
+              "function": ("function", "pin"), "function_off": ("function_off", "tick"),
+              "refused": ("refused", "locked")}
 
     def __init__(self, sim, screen=None, audio=None):
         self.sim, self.screen, self.audio = sim, screen, audio
@@ -1014,7 +1322,8 @@ class Runner:
         except Exception:
             sheet = None
         parts = {"map": lambda w, h: map_cells(sim, w, h, color=bool(depth), unicode=unicode, arrows=arrows)}
-        return self.view.rows(W, H, sim.env(), sim.ticks / float(sim.rate), parts, unicode, level, sheet)
+        return self.view.rows(W, H, sim.env(), sim.ticks / float(sim.rate), parts, unicode, level, sheet,
+                              functions=sim.shown_functions())
 
     @property
     def over(self):
@@ -1037,6 +1346,10 @@ class Runner:
         mh = max(4, H - 3)
         if sim.panels and W >= 60 and mh >= 14:          # a screen of its own, where there is room for one
             rows = [paint.text([(sim.name, "title")], W)] + self.panel_rows(W, mh, depth, unicode, arrows)
+            if sim.paused and not sim.result:            # not begun, or paused: the screen dark behind the words
+                rows[1:] = [[(ch, fg and (fg[0] * 2 // 5, fg[1] * 2 // 5, fg[2] * 2 // 5),
+                              bg and (bg[0] * 2 // 5, bg[1] * 2 // 5, bg[2] * 2 // 5)) for ch, fg, bg in r]
+                            for r in rows[1:]]
             for i, (text, role) in enumerate(banner(sim)):       # what it says in the middle, over the panels
                 r = 1 + mh // 2 - 1 + i
                 if r < len(rows) and isinstance(rows[r], list):
@@ -1130,6 +1443,15 @@ def play_text(sim, write, read):
     for t in intro if isinstance(intro, list) else [intro]:
         write(t)
     write(TEXT_HELP)
+    asked = {}                                           # a function by its name, as a word: its key
+    for f in sim.functions:
+        if f.key:
+            for word in (f.name.lower(), f.label.lower().replace(" ", "_"), f.label.lower().split()[0]):
+                asked.setdefault(word, f)
+    if sim.functions:
+        write("Functions: " + ", ".join("%s (%s%s)" % (f.name, f.key, ", held %g s" % (f.hold / float(sim.rate))
+                                                         if f.hold else "") for f in sim.functions if f.key)
+              + ". Type a function's name, or its key.")
     held = frozenset()
     while not sim.result:
         line = read("> ")
@@ -1152,15 +1474,22 @@ def play_text(sim, write, read):
                 for t in lines:
                     write(t if isinstance(t, str) else t[0])
                 continue
-            secs = 1.0
+            secs, need = None, 0.0
             keys = []
             for w in words:
                 try:
                     secs = max(0.05, min(60.0, float(w)))
                 except ValueError:
-                    if w != "wait":
+                    f = asked.get(w.lower())
+                    if f is not None and w.lower() not in VEHICLE_KEYS:
+                        keys.append(f.key)               # by its name: held as long as it takes
+                        need = max(need, f.hold / float(sim.rate) + 0.1)
+                    elif w != "wait":
                         keys.append(w)
+            secs = max(1.0, need) if secs is None else secs
             now = frozenset(keys)
+            for f in sim.functions:                      # each line typed is a key pressed afresh
+                f.down = f.block = False
             for i in range(int(round(secs * sim.rate))):
                 sim.step(Controls(sim.tick, now, tuple(sorted(now - held)) if i == 0 else (),
                                   tuple(sorted(held - now)) if i == 0 else ()))
@@ -1177,7 +1506,8 @@ def play_text(sim, write, read):
             if text and sim.tick < until + sim.rate * 5:
                 write(text)
     if sim.result in ("won", "lost"):
-        write(banner(sim)[0][0] + ".")
+        word = banner(sim)[0][0]
+        write(word if word[-1:] in ".!?" else word + ".")
     sim.over = sim.result
     return sim.result
 
@@ -1216,6 +1546,11 @@ def play_scene(game, scene):
         play_text(sim, term.line, read)
     outcome = sim.result
     w.vars.setdefault("sims", {})[sid] = sim.stats()
+    for f in sim.functions:                              # what was done at the console, whatever came of it
+        if f.done:
+            w.flags["%s_%s" % (sid, f.name)] = True
+            if f.spec.get("effects"):
+                conditions.run(f.spec["effects"], game)
     if outcome == "won":
         w.flags["%s_done" % sid] = True
         effects = scene.get("on_sim_done") or spec.get("on_done")
@@ -1281,6 +1616,10 @@ def problems(data):
                                                                   "damage", "time", "landed", "passed", "x", "y",
                                                                   "next"}
         names |= set(spec.get("systems") or {}) | set(spec.get("controls") or {})
+        fns = spec.get("functions") if isinstance(spec.get("functions"), dict) else {}
+        given = set(names)                               # what there is without the functions
+        for k in fns:
+            names |= {k} | {"%s_%s" % (k, part) for part in FUNCTION_VALUES}
         texts = [("systems %s rate" % k, (v if isinstance(v, dict) else {"rate": v}).get("rate"))
                  for k, v in (spec.get("systems") or {}).items()]
         texts += [("systems %s value" % k, v.get("value")) for k, v in (spec.get("systems") or {}).items()
@@ -1300,6 +1639,7 @@ def problems(data):
         for k, c in (spec.get("controls") or {}).items():
             if not isinstance(c, dict) or not c.get("keys"):
                 out.append("%s: control '%s' needs keys (up, down)" % (where, k))
+        out += function_problems(spec, where, names, given, mode)
         if spec.get("goal") == "survive" and not spec.get("time"):
             out.append("%s: a survive goal needs a time" % where)
         if mode == "systems" and not (spec.get("win_if") or spec.get("time")):
@@ -1307,10 +1647,97 @@ def problems(data):
         if spec.get("panels") is not None:
             from . import panels
             out += panels.problems(spec["panels"], names, "%s: panels" % where, formula,
-                                   getattr(data, "models", None) or {}, getattr(data, "planets", None) or {})
+                                   getattr(data, "models", None) or {}, getattr(data, "planets", None) or {},
+                                   functions=set(fns))
     for sid, sc in (getattr(data, "scenes", None) or {}).items():
         if sc.get("sim") and sc["sim"] not in sims:
             out.append("scene '%s': unknown sim '%s'" % (sid, sc["sim"]))
+    return out
+
+
+def function_problems(spec, where, names, given, mode):
+    """What is wrong in a sim's ``functions``. ``names``: every value there is to read; ``given``: those
+    that are not the functions' own."""
+    out = []
+    fns = spec.get("functions")
+    if fns is None:
+        return out
+    if not isinstance(fns, dict):
+        return ["%s: functions should be a map of names to functions" % where]
+    systems = spec.get("systems") or {}
+    stocks = {k for k, v in systems.items() if not (isinstance(v, dict) and "value" in v)}
+    settable = stocks | set(spec.get("controls") or {}) | ({"fuel", "damage"} if mode == "vehicle" else set())
+    taken = {}
+    for k in KEPT_KEYS:
+        taken[k] = "the simulator's own"
+    if mode == "vehicle":
+        for k in VEHICLE_KEYS:
+            taken[k] = "the vehicle's"
+    for cn, c in (spec.get("controls") or {}).items():
+        for k in (c.get("keys") or []) if isinstance(c, dict) else []:
+            taken[str(k).lower()] = "control '%s''s" % cn
+    spare = [k for k in FUNCTION_KEYS if k not in [str((f or {}).get("key", "")).lower() for f in fns.values()
+                                                   if isinstance(f, dict)]]
+    for name, f in fns.items():
+        at = "%s: function '%s'" % (where, name)
+        if not isinstance(f, dict):
+            out.append("%s should be a map" % at)
+            continue
+        if not str(name).isidentifier():
+            out.append("%s: its name should be a word formulas can read (letters, digits, _)" % at)
+        own = {name} | {"%s_%s" % (name, part) for part in FUNCTION_VALUES}
+        clash = sorted(own & given)
+        if clash:
+            out.append("%s: there is already a value called %s" % (at, ", ".join(clash)))
+        given = given | own
+        key = str(f.get("key") or (spare.pop(0) if spare else "")).lower()
+        if not key:
+            out.append("%s needs a \"key\"" % at)
+        elif key in taken:
+            out.append("%s: the key '%s' is %s" % (at, key, taken[key]))
+        else:
+            taken[key] = "function '%s''s" % name
+        for part in ("hold", "lasts", "cooldown", "uses"):
+            v = f.get(part)
+            if v is not None and (isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0):
+                out.append("%s: \"%s\" should be a number, 0 or more" % (at, part))
+        hold = f.get("hold")
+        if isinstance(hold, (int, float)) and not isinstance(hold, bool) and 0 < hold < SHORT_HOLD:
+            out.append("%s: a hold under %g seconds is done by a tap (a terminal takes a key for held that long)"
+                       % (at, SHORT_HOLD))
+        if f.get("toggle") and f.get("hold"):
+            out.append("%s: a switch (\"toggle\") is not held; one or the other" % at)
+        if f.get("tone") not in (None,) + FUNCTION_TONES:
+            out.append("%s: unknown tone '%s' (%s)" % (at, f["tone"], ", ".join(FUNCTION_TONES)))
+        words = f.get("words")
+        if words is not None and (not isinstance(words, dict) or set(words) - set(STATE_WORDS)):
+            out.append("%s: \"words\" gives a word for some of %s" % (at, ", ".join(STATE_WORDS)))
+        texts = [("if", f.get("if"))] if f.get("if") not in (None, "") else []
+        for part in ("set", "add", "keeps"):
+            what = f.get(part)
+            if what is None:
+                continue
+            if not isinstance(what, dict):
+                out.append("%s: \"%s\" should be a map of names to values" % (at, part))
+                continue
+            for target, v in what.items():
+                if target not in settable:
+                    out.append("%s: %s '%s' - it can change a control%s or a stock (a system with a rate)"
+                               % (at, part, target, ", the fuel, the damage" if mode == "vehicle" else ""))
+                texts.append(("%s %s" % (part, target), v))
+        if f.get("keeps") and not (f.get("toggle") or f.get("lasts")):
+            out.append("%s: \"keeps\" is for a function that is on a while (\"toggle\" or \"lasts\")" % at)
+        for what, text in texts:
+            try:
+                fn = formula(text)
+            except FormulaError as e:
+                out.append("%s: %s: %s" % (at, what, e))
+                continue
+            unknown = sorted(getattr(fn, "names", set()) - names)
+            if unknown:
+                out.append("%s: %s reads %s, which nothing gives" % (at, what, ", ".join(unknown)))
+        if f.get("effects") is not None and not isinstance(f["effects"], (list, dict)):
+            out.append("%s: \"effects\" should be a list of effects" % at)
     return out
 
 

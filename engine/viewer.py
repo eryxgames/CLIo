@@ -272,9 +272,9 @@ def _rgb(c):
     return c
 
 
-def draw_planet(planet, view="surface", cols=40, rows=20, t=0.0, turn=None, unicode=True, scope=None):
+def draw_planet(planet, view="surface", cols=40, rows=20, t=0.0, turn=None, unicode=True, scope=None, sites=None):
     """A planet in a view, as rows of cells. ``turn``: how far round it has turned (degrees; else by its
-    ``spin`` and the time ``t``)."""
+    ``spin`` and the time ``t``); ``sites``: more places to name on it than its own."""
     view = view if view in PLANET_VIEWS else "surface"
     turn = planet.spin * t if turn is None else float(turn)
     tilt = math.radians(planet.tilt)
@@ -337,7 +337,7 @@ def draw_planet(planet, view="surface", cols=40, rows=20, t=0.0, turn=None, unic
                     line.append((" .:-=+*#%@"[min(9, int(sum(c) / 765.0 * 10 * 1.4))], None, None))
             out.append(line)
     radius = (min(cols * 2, rows * 4) / 2.0 - 2) / 2.0 if view == "grid" else min(cols, rows * 2) / 2.0 - 0.5
-    for s in planet.sites:                               # the places on the near side, by name
+    for s in list(planet.sites) + [x for x in sites or [] if isinstance(x, dict)]:   # the places on the near side
         try:
             x, y, z = seen(float(s["lat"]), float(s["lon"]))
         except (TypeError, ValueError):
@@ -346,7 +346,10 @@ def draw_planet(planet, view="surface", cols=40, rows=20, t=0.0, turn=None, unic
             continue
         col = int(cols / 2.0 + x * radius)
         line = int(rows / 2.0 - y * radius / 2.0)
-        text = ("+ " if not unicode else "┼ ") + str(s.get("name", ""))
+        mark, name = "+" if not unicode else "┼", str(s.get("name", ""))
+        text = mark + " " + name
+        if name and col + len(text) > cols and col - len(name) - 1 >= 0:
+            text, col = name + " " + mark, col - len(name) - 1   # no room after its mark: its name before it
         if 0 <= line < rows:
             for i, ch in enumerate(text):
                 if 0 <= col + i < cols:

@@ -24,6 +24,19 @@
     "damage_over": 95
    }
   },
+  "functions": {
+   "flush": {
+    "label": "Flush coolant",
+    "key": "f",
+    "if": "heat > 40",
+    "why": "the coils are cool",
+    "add": {
+     "heat": -30
+    },
+    "cooldown": 10,
+    "says": "Coolant flushed."
+   }
+  },
   "panels": {
    "colour": "amber",
    "rows": [
@@ -42,7 +55,7 @@
        "rows": [
         {
          "title": "FLIGHT",
-         "size": 9,
+         "size": 10,
          "widgets": [
           {
            "compass": "heading"
@@ -78,6 +91,9 @@
            "max": 100,
            "warn": 0.4,
            "hot": 0.7
+          },
+          {
+           "functions": true
           }
          ]
         },
@@ -139,6 +155,35 @@
     "step": 30
    }
   },
+  "functions": {
+   "scram": {
+    "label": "Scram",
+    "key": "x",
+    "hold": 1,
+    "lasts": 8,
+    "cooldown": 6,
+    "keeps": {
+     "rods": 0
+    },
+    "tone": "hot",
+    "words": {
+     "on": "RODS IN"
+    },
+    "says": "SCRAM. The rods are in, and stay in for eight seconds."
+   },
+   "vent": {
+    "label": "Vent steam",
+    "key": "v",
+    "if": "heat > 700",
+    "why": "the core is not hot enough to vent",
+    "add": {
+     "heat": -220
+    },
+    "cooldown": 15,
+    "tone": "warn",
+    "says": "Steam vented to space."
+   }
+  },
   "systems": {
    "heat": {
     "rate": "rods * 6 - flow * 3.2 - (heat - 300) * 0.05",
@@ -177,7 +222,7 @@
      "size": 4,
      "widgets": [
       {
-       "text": "Pull the rods out and the core heats; coolant flow carries the heat off and turns the turbines. Hold 80% for ten seconds.",
+       "text": "Pull the rods out and the core heats; coolant flow carries the heat off and turns the turbines. Hold 80% for ten seconds. Too hot: vent steam (V), or hold X to scram.",
        "align": "center"
       }
      ]
@@ -214,9 +259,6 @@
          ]
         },
         {
-         "space": 1
-        },
-        {
          "number": "power",
          "big": true,
          "unit": "%"
@@ -242,8 +284,19 @@
            "label": "OVERHEAT",
            "if": "heat >= 1000",
            "tone": "hot"
+          },
+          {
+           "label": "SCRAM",
+           "if": "scram",
+           "tone": "hot"
           }
          ]
+        },
+        {
+         "rule": true
+        },
+        {
+         "functions": true
         }
        ]
       },
@@ -282,8 +335,12 @@
   }
  },
  "scan": {
-  "title": "SCAN  hold the beam on the mast",
+  "title": "SCAN  the mast, and a beacon beside it",
   "mode": "systems",
+  "intro": [
+   "Hold the beam on the mast until the picture is whole.",
+   "Then leave a beacon beside it: hold B."
+  ],
   "time": 90,
   "controls": {
    "beam": {
@@ -298,6 +355,36 @@
     "step": 35
    }
   },
+  "functions": {
+   "narrow": {
+    "label": "Narrow beam",
+    "key": "n",
+    "toggle": true,
+    "tone": "warn",
+    "says": "Beam narrowed: it reads faster, and forgives less.",
+    "says_off": "Beam wide."
+   },
+   "beacon": {
+    "label": "Deploy beacon",
+    "key": "b",
+    "hold": 2,
+    "if": "scan >= 100",
+    "why": "the picture is not whole yet",
+    "uses": 1,
+    "lasts": 4,
+    "tone": "good",
+    "words": {
+     "on": "DESCENT",
+     "spent": "DOWN"
+    },
+    "says": "Beacon away.",
+    "effects": [
+     {
+      "set": "beacon_down"
+     }
+    ]
+   }
+  },
   "systems": {
    "target": {
     "value": "50 + 30 * (abs((time * 5) % 40 - 20) - 10) / 10"
@@ -306,20 +393,23 @@
     "value": "abs(beam - target)"
    },
    "lock": {
-    "value": "clamp(100 - off * 4, 0, 100)"
+    "value": "clamp(100 - off * (4 + 4 * narrow), 0, 100)"
    },
    "scan": {
-    "rate": "lock / 100 * 4.0 if lock > 40 else 0",
+    "rate": "lock / 100 * (4.0 + 3.0 * narrow) if lock > 40 else 0",
     "start": 0,
     "min": 0,
     "max": 100
    },
    "deck": {
     "value": "floor(time / 6) % 2"
+   },
+   "below": {
+    "value": "time * 2"
    }
   },
-  "win_if": "scan >= 100",
-  "score": "scan + lock / 10",
+  "win_if": "beacon_done >= 1 and not beacon",
+  "score": "scan + lock / 10 + 40 * beacon_charge + 100 * beacon_done",
   "panels": {
    "colour": "cyan",
    "cols": [
@@ -328,7 +418,7 @@
      "rows": [
       {
        "title": "BEAM",
-       "size": 8,
+       "size": 7,
        "widgets": [
         {
          "gauge": "target",
@@ -369,7 +459,7 @@
       },
       {
        "title": "SURVEY",
-       "size": 7,
+       "size": 9,
        "widgets": [
         {
          "number": "scan",
@@ -380,6 +470,12 @@
          "gauge": "scan",
          "max": 100,
          "label": "known"
+        },
+        {
+         "rule": true
+        },
+        {
+         "functions": true
         }
        ]
       },
@@ -422,7 +518,16 @@
          "widgets": [
           {
            "planet": "moon",
-           "view": "surface"
+           "view": "surface",
+           "sites": [
+            {
+             "name": "BEACON",
+             "lat": -6,
+             "lon": -113,
+             "if": "beacon_done >= 1 and not beacon"
+            }
+           ],
+           "turn": "below"
           }
          ]
         },
@@ -432,7 +537,8 @@
          "widgets": [
           {
            "planet": "moon",
-           "view": "heat"
+           "view": "heat",
+           "turn": "below"
           }
          ]
         },
@@ -456,7 +562,7 @@
     }
    ]
   },
-  "fail_if": "time >= 89 and scan < 100",
-  "fail_text": "The pass is over, and the picture is not whole."
+  "fail_if": "time >= 86 and beacon_done < 1",
+  "fail_text": "Too late for a beacon: the pass is over."
  }
 }

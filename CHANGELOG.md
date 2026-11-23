@@ -113,6 +113,35 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 - The station starter has a hauler with decks, a hold, a reactor, a bridge and engines, and a
   moon: the reactor console shows the ship by its heat, the scan console the moon below and a
   deck plan. A panel's solid scope now hides the lines behind (it drew them all).
+- **Functions** (a simulator's `"functions"`): what a console does when asked, each at a key
+  of its own - at once (vent the steam), when the key has been held for `hold` seconds (a
+  scram, a beacon deployed: the line fills as it is held and falls back when it is let go), or
+  switched on and off (`toggle`). A function can be locked until a formula holds (`if`, with
+  `why`), stay on for `lasts` seconds, need a `cooldown`, and run out (`uses`). Done, it sets
+  and adds to controls, stocks, fuel and damage (`set`, `add`), keeps them where it wants them
+  while it is on (`keeps`), says a line and plays a sound; formulas read it (`scram`: 1 while
+  on, `scram_done`, `scram_left`, `scram_wait`, `scram_charge`). It works off the keys of a
+  tick alone, so a run still plays back the same.
+- A panel lists them with **`{"functions": true}`** (or some, by name): key, name and state -
+  READY, LOCKED, held so far as a bar, ON with the seconds left, WAIT, SPENT, or words of the
+  function's own - in its `tone`, the line lit for a moment when it is done. Without panels
+  they are in the column of instruments; typed, a function is asked for by its name
+  (`scram`), held as long as it takes. The key line names them.
+- After a simulator, what was done at its console is the game's: the flag `<sim>_<function>`,
+  the function's own `effects`, and the counts in the variable `sims`.
+- The autopilot tries a systems simulator's functions ahead with its controls (one at a time),
+  and does one marked `"pilot": true` as soon as it can - so a simulator that is only done by
+  a function is still proved. `--check` checks functions: keys taken twice or by the vehicle,
+  a control or the simulator; names that are values already; formulas and what they read;
+  what `set`, `add` and `keeps` may change; a hold a tap would do.
+- A panel's planet takes `"sites"` of the screen's own, each shown while its `if` holds (a
+  beacon, once it is down); a site at a planet's edge has its name before its mark, not cut
+  off. While a simulator with panels has not begun or is paused, its screen is dark behind the
+  words.
+- The station starter's consoles do things: the reactor vents steam and scrams (hold `X`); the
+  scan narrows its beam (faster, and less forgiving) and is done by deploying a beacon (hold
+  `B`) once the picture is whole - it descends, and is named on the moon below; the helm
+  flushes its coolant.
 
 ## 3.5.2 - 2026-11-23
 

@@ -23,7 +23,8 @@ lines), ``control`` (a gauge with the keys that move it), ``compass``, ``lamps``
 ``if`` holds), ``text`` (with ``{name}`` and ``{name:.1f}`` in it; ``"align": "center"``), ``plot`` (lines over time, in dots),
 ``scope`` (a vector display: one of the reel's scenes, or a 3D model of the game's turning in lines,
 drawn as far as ``reveal`` says and solid when it is whole), ``map`` (what the host draws there),
-``rule`` and ``space``. A panel's ``colour`` is its phosphor (green, amber, cyan, white, red, blue,
+``functions`` (what the console does when asked: each with its key and its state - ready, locked, held
+so far, on for so long), ``rule`` and ``space``. A panel's ``colour`` is its phosphor (green, amber, cyan, white, red, blue,
 violet); its ``border`` one of the menus' frames (engine/menu.py); ``pulse`` names a cue the frame
 brightens with (engine/cues.py).
 
@@ -39,8 +40,8 @@ import string
 from . import vector
 from .menu import BORDERS, border as border_of, wrap
 
-WIDGETS = ("gauge", "center", "number", "control", "compass", "lamps", "text", "plot", "scope", "planet", "map", "rule",
-           "space")
+WIDGETS = ("gauge", "center", "number", "control", "compass", "lamps", "text", "plot", "scope", "planet", "map",
+           "functions", "rule", "space")
 FLEX = ("scope", "planet", "map")                        # these take what room is left
 TONES = {"good": (110, 240, 130), "warn": (255, 176, 40), "hot": (255, 84, 64), "off": None}
 BITS = ((1, 8), (2, 16), (4, 32), (64, 128))             # braille: the dot at (row, column) of a character
@@ -126,6 +127,7 @@ class View:
         self.conds = {}
         self.history = {}
         self.plotted = sorted({n for w in self.widgets(self.spec) for n in _names(w.get("plot"))})
+        self.functions = []                              # the host's functions as they are now (dicts)
 
     def widgets(self, node):
         for w in node.get("widgets") or []:
@@ -153,10 +155,13 @@ class View:
             return False
 
     # ---- drawing -------------------------------------------------------- #
-    def rows(self, W, H, env, t=0.0, parts=None, unicode=True, level=None, sheet=None):
+    def rows(self, W, H, env, t=0.0, parts=None, unicode=True, level=None, sheet=None, functions=None):
         """The layout in ``W`` by ``H`` cells for the values ``env`` at time ``t`` (seconds). ``parts``:
         what the host draws (``{"map": fn(w, h) -> rows of cells}``); ``level(action)``: how strongly a cue
-        is on now, for panels that pulse; ``sheet``: the cue sheet a ``signals`` scope moves to."""
+        is on now, for panels that pulse; ``sheet``: the cue sheet a ``signals`` scope moves to;
+        ``functions``: what the host does when asked, as it is now - a list of ``{"id", "label", "key",
+        "state", "word", "charge", "left", "wait", "tone", "flash"}`` (a simulator's ``shown_functions()``)."""
+        self.functions = list(functions or [])
         for n in self.plotted:
             h = self.history.setdefault(n, [])
             h.append(float(env.get(n, 0.0)))
@@ -241,7 +246,17 @@ class View:
             return max(1, len(_flow([len(str(lm.get("label", ""))) + 2 for lm in lamps], w, 2)))
         if "text" in wd:
             return max(1, len(_lines(_fill(wd.get("text"), env), w)))
+        if "functions" in wd:
+            return max(1, len(self._listed(wd)))
         return 1
+
+    def _listed(self, wd):
+        """The functions a ``functions`` widget lists: all of them, or those it names, in its order."""
+        names = wd.get("functions")
+        if isinstance(names, (list, tuple, str)):
+            by = {f.get("id"): f for f in self.functions}
+            return [by[n] for n in _names(names) if n in by]
+        return list(self.functions)
 
     def _widget(self, cv, wd, x, y, w, h, env, t, parts, uni, sheet, ink, lw, owner):
         dim, hi = shade(ink, 0.45), bright(ink)
@@ -342,16 +357,47 @@ class View:
                 if isinstance(name, str):
                     self.worlds[name] = world
             turn = wd.get("turn")
+            sites = [st for st in wd.get("sites") or [] if isinstance(st, dict) and self.holds(st.get("if"), env)]
             cv.paste(x, y, viewer.draw_planet(world, wd.get("view", "surface"), w, h, t,
-                                              value(turn) if isinstance(turn, str) else turn, uni))
+                                              value(turn) if isinstance(turn, str) else turn, uni, sites=sites))
         elif kind == "map":
             fn = parts.get("map")
             if fn is not None:
                 cv.paste(x, y, fn(w, h))
             else:
                 cv.put(x, y, "NO MAP", dim)
+        elif kind == "functions":
+            for i, f in enumerate(self._listed(wd)[:h]):
+                self._function(cv, f, x, y + i, w, uni, ink, wd.get("keys", True))
         elif kind == "rule":
             cv.put(x, y, ("─" if uni else "-") * w, dim)
+
+    def _function(self, cv, f, x, y, w, uni, ink, keys=True):
+        """A function on a line: ``[X] SCRAM ......... READY`` - its key, its name, dots, and its state in
+        a word, the seconds it has left, or how far its key has been held."""
+        from .sim import function_word
+        dim, hi = shade(ink, 0.45), bright(ink)
+        state = f.get("state", "ready")
+        tone = TONES.get(f.get("tone")) or hi
+        word = function_word(f, uni, bar=max(4, min(10, w // 5)))
+        key = ("[%s] " % _key(str(f.get("key") or "?"), uni)) if keys else ""
+        label = str(f.get("label") or f.get("id") or "").upper()
+        room = max(0, w - len(key) - len(word) - 2)
+        label = label[:room]
+        live = state in ("on", "hold", "done")
+        idle = state in ("locked", "wait", "spent")
+        cv.put(x, y, key, dim if idle else ink)
+        cv.put(x + len(key), y, label, dim if idle else (tone if live else hi))
+        dots = w - len(key) - len(label) - len(word) - 2
+        if dots > 0:
+            cv.put(x + len(key) + len(label) + 1, y, ("·" if uni else ".") * dots, dim)
+        spent = TONES.get(f.get("tone")) if state == "spent" else None   # used up, and it has left its mark
+        cv.put(x + w - len(word), y, word, spent or (dim if idle else (tone if live else ink)))
+        if f.get("flash"):                               # just done: the line lit for a moment
+            lit = TONES.get(f.get("tone")) or ink
+            for xx in range(max(0, x), min(cv.w, x + w)):
+                if 0 <= y < cv.h:
+                    cv.rows[y][xx] = (cv.rows[y][xx][0], (8, 10, 12), lit)
 
     def _plot(self, cv, wd, x, y, w, h, uni, ink):
         names = _names(wd.get("plot"))
@@ -514,8 +560,9 @@ def _fill(text, env):
         return str(text or "")
 
 
-def problems(spec, names=None, where="panels", formula=None, models=None, planets=None):
-    """What is wrong in a layout. ``names``: the values there are to show; ``formula``: checks a condition."""
+def problems(spec, names=None, where="panels", formula=None, models=None, planets=None, functions=None):
+    """What is wrong in a layout. ``names``: the values there are to show; ``formula``: checks a condition;
+    ``functions``: the names of what the host does when asked."""
     out = []
     if not isinstance(spec, dict):
         return ["%s: it should be a map" % where]
@@ -598,6 +645,23 @@ def problems(spec, names=None, where="panels", formula=None, models=None, planet
                     out.append("%s: there is no planet called '%s'" % (wat, wd["planet"]))
                 if wd.get("view") not in (None,) + PLANET_VIEWS:
                     out.append("%s: unknown view '%s' (%s)" % (wat, wd["view"], ", ".join(PLANET_VIEWS)))
+                if wd.get("sites") is not None and not isinstance(wd["sites"], list):
+                    out.append("%s: \"sites\" should be a list" % wat)
+                for st in wd["sites"] if isinstance(wd.get("sites"), list) else []:
+                    if not isinstance(st, dict) or not all(isinstance(st.get(k), (int, float)) for k in ("lat", "lon")):
+                        out.append("%s: a site needs \"lat\" and \"lon\" (and a \"name\")" % wat)
+                    else:
+                        cond_ok("%s site '%s'" % (wat, st.get("name", "")), st.get("if"))
+            elif kind == "functions":
+                listed = wd["functions"]
+                if listed is not True and not isinstance(listed, (list, str)):
+                    out.append("%s: \"functions\" should be true (all of them) or a list of their names" % wat)
+                elif functions is not None:
+                    if listed is True and not functions:
+                        out.append("%s: there are no functions to list" % wat)
+                    for n in _names(listed) if listed is not True else []:
+                        if n not in functions:
+                            out.append("%s: there is no function called '%s'" % (wat, n))
     walk(spec, where)
     return out
 
@@ -615,7 +679,9 @@ SAMPLE = {"colour": "green", "rows": [
             {"number": "power", "big": True, "unit": "%"},
             {"lamps": [{"label": "COOLANT", "if": "flow"}, {"label": "GRID", "if": "power"},
                        {"label": "SCRAM", "if": "scram", "tone": "hot"}]},
-            {"plot": ["heat", "power"], "rows": 5}]},
+            {"plot": ["heat", "power"], "rows": 5},
+            {"rule": True},
+            {"functions": True}]},
         {"title": "HULL SCAN", "colour": "cyan", "widgets": [{"scope": {"scene": "hauler"}}]}]}]}
 
 
@@ -628,10 +694,20 @@ def main(argv=None):
     def env(t):
         return {"heat": 640 + 300 * math.sin(t / 3.0), "flow": 60 + 30 * math.cos(t / 2.0), "rods": 40.0,
                 "drift": 6 * math.sin(t), "power": 62 + 20 * math.sin(t / 4.0), "scram": 0, "time": t}
+    def does(t):                                         # what a console does when asked, as a host gives it
+        held = (t % 8.0) / 2.0 if t % 8.0 < 2.0 else 0.0
+        return [{"id": "scram", "label": "Scram", "key": "x", "state": "ready", "word": "READY", "tone": "hot"},
+                {"id": "vent", "label": "Vent steam", "key": "v", "state": "wait", "word": "WAIT",
+                 "wait": 1 + int(12 - t % 12)},
+                {"id": "pumps", "label": "Reserve pumps", "key": "r", "state": "on", "word": "ON", "tone": "good"},
+                {"id": "beacon", "label": "Deploy beacon", "key": "b", "state": "hold" if held else "locked",
+                 "word": "HOLD" if held else "LOCKED", "charge": held}]
     if "--live" not in argv:
         for i in range(60):
             view.rows(96, 28, env(i / 4.0), i / 4.0)
-        print("\n".join(view.plain(96, 28, env(15.0), 15.0, unicode="--ascii" not in argv)))
+        cv = Canvas(96, 28)
+        cv.rows = view.rows(96, 28, env(15.0), 15.0, unicode="--ascii" not in argv, functions=does(17.0))
+        print("\n".join(cv.plain()))
         return 0
     import time
     from .frame import Screen
@@ -643,7 +719,8 @@ def main(argv=None):
         while True:
             t = time.monotonic() - start
             W, H = screen.size()
-            screen.frame(view.rows(W, H - 2, env(t), t, unicode=screen.unicode), status="Ctrl-C ends")
+            screen.frame(view.rows(W, H - 2, env(t), t, unicode=screen.unicode, functions=does(t)),
+                         status="Ctrl-C ends")
             time.sleep(0.08)
     except KeyboardInterrupt:
         pass

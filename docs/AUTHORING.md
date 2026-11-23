@@ -2919,6 +2919,44 @@ raises it, the other lowers it, `step` a second), `systems`, `gauges`, `chart` (
 lines over time), `win_if`, `fail_if`, `time`, and `score` (a formula: better when higher, for
 the autopilot below). An economy, an ecology, a reactor: whatever stocks and flows say.
 
+**Functions** (`"functions"`) are what a console does when asked - vent the steam, scram the
+core, deploy a beacon, switch the reserve pumps on. Each has a key of its own:
+
+```json
+"functions": {
+  "vent":   {"label": "Vent steam", "key": "v", "if": "heat > 700", "why": "the core is not hot enough",
+             "add": {"heat": -220}, "cooldown": 15, "tone": "warn", "says": "Steam vented to space."},
+  "scram":  {"label": "Scram", "key": "x", "hold": 1, "lasts": 8, "keeps": {"rods": 0}, "tone": "hot",
+             "words": {"on": "RODS IN"}},
+  "pumps":  {"label": "Reserve pumps", "key": "r", "toggle": true, "if": "reserve > 0"},
+  "beacon": {"label": "Deploy beacon", "key": "b", "hold": 2, "if": "scan >= 100", "uses": 1,
+             "effects": [{"set": "beacon_down"}]}
+}
+```
+
+| Key | Meaning |
+| --- | --- |
+| `label`, `key` | Its name on the screen; its key (a letter, a digit, `f1`...; none: `1`-`9` in order). Not a key the vehicle, a control or the simulator (`p`, `q`, Esc, Enter) uses. |
+| `hold` | Seconds the key has to be held (0.75 or more) - for what should not be done by a slip. The line fills while it is held and falls back when it is let go. None: done at once, once a press. |
+| `toggle` | A switch: on at a press, off at the next. It goes off by itself when its `if` stops holding. |
+| `if`, `why` | A formula that has to hold, or it is LOCKED; `why` is said when it is asked for all the same. |
+| `lasts`, `cooldown`, `uses` | Seconds it stays on once done; seconds before it can be done again (after it is over); how many times it can be done at all. |
+| `set`, `add` | What it does: controls, stocks (systems with a `rate`), and a vehicle's `fuel` and `damage`, set to or changed by a number or a formula (worked out from the values as they were), within their bounds. |
+| `keeps` | While it is on (`lasts`, or a switch): these are kept at these values, whatever the keys do. |
+| `says`, `says_off`, `sound`, `tone` | A line when it is done (and when a switch goes off); a sound of the game's (else `function`); `good`, `warn` or `hot` - its colour while it is held, on and just done. |
+| `words` | Words of its own for its states: `{"on": "DESCENT", "spent": "DOWN"}` (`ready`, `off`, `on`, `hold`, `done`, `wait`, `locked`, `spent`). |
+| `effects` | The game's [effects](#conditions-and-effects), run after the simulator if it was done - however the simulator ended. |
+| `pilot` | `true`: the autopilot does it as soon as it can. |
+
+Formulas read a function by its name: `scram` is 1 while it is on (a switch, or what `lasts`),
+`scram_done` how many times it has been done, `scram_left` and `scram_wait` the seconds it has
+left and has to wait, `scram_charge` how far its key is held (0 to 1). So a stock can drain
+while the pumps run (`"rate": "-10 * pumps"`), a sim can be done by a deployment (`"win_if":
+"beacon_done >= 1"`), and a lamp or a gauge can show any of it. After the simulator the flag
+`<sim>_<function>` is set for each one that was done, and the variable `sims` has the counts.
+The key line under the screen names the functions; without panels they stand in the column of
+instruments with their states.
+
 **A screen of its own** (`"panels"`): instead of the instruments in a column, a sim can lay its
 screen out as panels - a bridge console, an engineering station. Panels stand side by side
 (`"cols"`) or one over another (`"rows"`), each in a frame with a `title`, each with `widgets`
@@ -2950,6 +2988,7 @@ that show the sim's values by name:
 | `{"plot": [NAMES]}` | The values over time as lines of dots, `rows` high, between `min` and `max` (else what they have reached). |
 | `{"scope": ...}` | A vector display (things in three dimensions, drawn in lines): a scene by name (`hauler`, `approach`, `orbit`, `scan`, `signals`), or `{"model": ID}` - one of the game's 3D models turning in lines (`turn` degrees a second, `fov`, `far`, `height`); with `"reveal": NAME` only as much of it is drawn, from the ground up, as the value is of `whole`, and when it is whole it is drawn solid. |
 | `{"planet": ID}` | One of the game's planets (below), in a `view`. |
+| `{"functions": true}` | The sim's functions (above), a line each: `[X] SCRAM ...... READY` - its key, its name and its state: READY (a switch: OFF), LOCKED, a bar that fills while its key is held, ON with the seconds left, WAIT with the seconds to go, SPENT. A list of names shows those, in that order; `"keys": false` leaves the keys out. |
 | `{"map": true}` | The sim's map (a vehicle's). |
 | `{"rule": true}`, `{"space": 1}` | A line; empty rows. |
 
@@ -2991,7 +3030,9 @@ says what each character is; `tilt` leans its axis towards the eye, `spin` turns
 second; a widget's `"turn"`, a number or a name, sets how far round it is instead), `sun` is how
 far round from the eye its sun stands. Views: `surface` (lit by the sun, the night side dark),
 `heat` (each kind of ground by its `heat`), `grid` (circles of latitude and longitude in lines).
-Sites on the near side are named.
+Sites on the near side are named. A planet widget may have `"sites"` of its own, each with an
+`"if"` (a formula): `{"name": "BEACON", "lat": -6, "lon": -113, "if": "beacon_done"}` is on the
+moon from when the beacon is down.
 
 `python clio.py GAME --view-model [NAME]` looks at a game's models and planets on the terminal:
 the arrows turn and tilt, `+` `-` come nearer and go back, `V` (or a digit) changes the view,
@@ -3002,12 +3043,13 @@ file as CLIo would have it; `--print VIEW` writes one picture as text.
 **Playing it.** At 20 ticks a second; the map follows the vehicle (north up), an arrow at its
 edge points to what is next, and the instruments stand beside it. Piped, or on a small screen,
 it is played a typed line at a time: keys held for seconds - `up 2; up right 1.5; w 1; wait 3`,
-`status`, `map`.
+`status`, `map`; a function by its name or its key (`scram`, `x 1`), held as long as it takes.
 
 Floats, but only + - * / and square roots - the same on every machine - and the sines and
 cosines of a table made with whole numbers: the same keys at the same ticks fly the same flight.
 **The autopilot** flies, drives or runs each sim (a systems sim by trying the controls ahead on
-copies) and its keys play the run back:
+copies, with one of its functions or none; a function with `"pilot": true` is done as soon as
+it can be, in a vehicle too) and its keys play the run back:
 
 ```
 python -m engine.sim rootless       # sim8: won (done) at 33.7 seconds, damage 0, fuel 22

@@ -61,6 +61,8 @@ For people working on the engine itself. Making a game needs none of this: see
 - [x] Optional C libraries, exactly as fast as the Python is right: CLIo Picture (the
       first-person picture; models kept as meshes for crowds) and Ballistic's C engine (sound)
 - [x] Demos that play by themselves: CLIo's tech demo and a game's own
+- [x] Vector displays: 3D in lines, wire frame or solid with hidden lines, in braille dots or
+      strokes, with afterglow - a hauler, a corridor, an orbit and a surface scan as a reel
 - [x] Three demo games, two starter templates, several hundred automated tests
 - [x] Game editor in the browser: `python clio.py mygame --edit`, or
       [on the web](https://eryxgames.github.io/CLIo/) with nothing installed - forms for
@@ -95,6 +97,7 @@ engine/
   model.py           3D models in levels      gltf.py     glTF from Blender
   frame.py  keys.py  the redrawn screen and single keys
   realm.py           realms: strategy by turns (seasons, stocks, works, threats), and its steward
+  vector.py          vector displays: 3D in lines (wire and hidden-line), dots or strokes, afterglow
   demo.py            the demos (engine/demos/clio.json, a game's demo.json)
   editor/            the editor (a page in the browser, also served as a web site)
 games/               derelict/  depths/  rootless/
@@ -114,7 +117,8 @@ guide.
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 862 tests, about a minute
+python -m unittest discover -s tests     # 883 tests, about a minute
+python -m engine.vector                  # the vector display's reel (Ctrl-C ends)
 python -m engine.realm templates/realm 8 # a steward plays the realm starter over eight seeds
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
 python tests/bot.py 30 rogue             # the same in rogue mode: how deep does it get

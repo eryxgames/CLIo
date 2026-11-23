@@ -46,6 +46,7 @@
   "engine/term.py",
   "engine/theme.py",
   "engine/ui.py",
+  "engine/vector.py",
   "engine/web.py",
   "engine/world.py",
   "engine/ai/__init__.py",

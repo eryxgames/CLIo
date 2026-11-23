@@ -26,6 +26,19 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   threats, names used twice); `--level ID` starts a game in the scene that plays realm ID; the
   editor lists `realms.json`.
 - **`templates/realm`**: a realm starter to copy - a village at a ford through sixteen seasons.
+- **Vector displays** (`engine/vector.py`): things in three dimensions drawn in lines, as the
+  terminals of old films drew them - as a wire frame (every line) or solid (hidden lines removed:
+  faces are filled into a depth buffer and a line shows only where nothing is in front of it, so
+  one thing hides another and ground hides what lies behind a hill). Shapes: box, grid, ring,
+  gate, tube and cone, globe, ground from heights (a net, or profiles one behind another), orbit,
+  any polyline, and CLIo's own 3D models as outlines (`from_model`). A camera with a field of
+  view and roll; lines cut at the eye and at the display's rim. The display (`Scope`) draws in
+  braille dots, or in strokes (`─ │ ╱ ╲ ┼`, in ASCII `- | / \ +`) for a terminal without braille;
+  a colour a line, brighter where lines cross, dimmer with distance, an afterglow that fades over
+  the next frames, a faint glow behind lit characters; lines and circles on the glass, words over
+  the picture and words that follow a point in space. `python -m engine.vector` plays a reel (a
+  hauler, an approach corridor, an orbit, a surface scan); `python -m engine.vector scan 3.5`
+  prints one picture.
 
 ## 3.5.2 - 2026-11-23
 

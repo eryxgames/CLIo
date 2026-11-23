@@ -37,11 +37,12 @@ function cover(text, choices = [], error = "") {
   $("cover").hidden = false;
 }
 
-function argv() {
-  if (EDITED) return [EDITED_DIR];
+function argv(touch) {
+  const taps = touch ? ["--touch", "on"] : [];              // a phone: taps on the picture turn, step, fire, use
+  if (EDITED) return [EDITED_DIR, ...taps];
   if (query.has("demo")) return ["--demo"];
   const game = query.get("game");
-  return game && GAMES[game] ? [game] : [];
+  return game && GAMES[game] ? [game, ...taps] : taps;
 }
 
 // ---------------------------------------------------------------- shared memory: needs cross-origin isolation
@@ -221,8 +222,20 @@ async function main() {
     } catch (err) { /* the DOM renderer draws them with the font */ }
   }
   fit.fit();
-  if (touch && term.textarea) term.textarea.setAttribute("inputmode", "none");   // "abc" opens the keyboard
-  term.focus();
+  // On a touch screen the terminal's input field keeps no focus unless "abc" asked for the keyboard (or a real
+  // keyboard is used): a phone opens its keyboard whenever that field has the focus, whatever inputmode says, and
+  // xterm takes the focus on every touch. Keys come from the buttons and taps on the picture as mouse reports.
+  const area = term.textarea;
+  let typing = !touch, keyboard = false;
+  if (touch && area) {
+    area.setAttribute("inputmode", "none");
+    area.addEventListener("focus", () => { if (!typing && !keyboard) area.blur(); });
+    document.addEventListener("keydown", () => {              // a real keyboard: it may have the field
+      if (!typing && !keyboard) { keyboard = true; term.focus(); }
+    }, true);
+  }
+  const focus = () => { if (typing || keyboard) term.focus(); };
+  focus();
   window.clio = { term };                                    // for a look from the browser's console, and tests
 
   const shared = new SharedArrayBuffer(32 + RING);
@@ -275,16 +288,37 @@ async function main() {
     b.addEventListener("click", () => { if (Date.now() - at > 700) press(); });
   }
   $("type").addEventListener("click", () => {                // the phone's keyboard, for typing a command
-    const area = term.textarea;
-    if (touch && area) {
-      const open = area.getAttribute("inputmode") !== "none";
-      area.setAttribute("inputmode", open ? "none" : "text");
-      area.blur();
-      $("type").textContent = open ? "abc" : "hide";
-    }
-    term.focus();
+    if (!touch || !area) return term.focus();
+    typing = !typing;
+    area.setAttribute("inputmode", typing ? "text" : "none");
+    $("type").textContent = typing ? "hide" : "abc";
+    if (typing) term.focus();
+    else area.blur();
   });
   $("screen").addEventListener("pointerdown", unmute);
+  // A swipe up or down on the picture steps forward or back: xterm reports a finger's tap as a click but not its
+  // drag, so the page reports the drag as the wheel, as Termux does (a finger moving up scrolls down) - only while
+  // the game takes the mouse (--touch on).
+  if (touch) {
+    const box = $("screen");
+    let from = null;
+    const cell = (t) => {
+      const r = box.querySelector(".xterm-screen").getBoundingClientRect();
+      const c = Math.floor((t.clientX - r.left) / (r.width / term.cols)) + 1;
+      const w = Math.floor((t.clientY - r.top) / (r.height / term.rows)) + 1;
+      return [Math.max(1, Math.min(term.cols, c)), Math.max(1, Math.min(term.rows, w))];
+    };
+    box.addEventListener("touchstart", (e) => { from = e.touches.length === 1 ? e.touches[0].clientY : null; }, { passive: true });
+    box.addEventListener("touchmove", (e) => {
+      if (from === null || !term.modes || term.modes.mouseTrackingMode === "none") return;
+      const t = e.touches[0], dy = t.clientY - from;
+      if (Math.abs(dy) < 36) return;                       // a step of the wheel per 36 px; the game paces the steps
+      from = t.clientY;
+      const [c, w] = cell(t);
+      send(`\x1b[<${dy < 0 ? 65 : 64};${c};${w}M`);
+    }, { passive: true });
+    box.addEventListener("touchend", () => { from = null; }, { passive: true });
+  }
 
   cover("Fetching Python… (about 10 MB the first time; the browser keeps it after)");
   const worker = new Worker("play.js" + location.search, { type: "module" });
@@ -292,7 +326,7 @@ async function main() {
     const m = event.data;
     if (m.type === "out") term.write(m.text);
     else if (m.type === "status") { if (m.text) cover(m.text); }
-    else if (m.type === "started") { $("cover").hidden = true; term.focus(); }
+    else if (m.type === "started") { $("cover").hidden = true; focus(); }
     else if (m.type === "sound") play(m);
     else if (m.type === "saved") keep(m.path, m.data);
     else if (m.type === "removed") forget(m.path);
@@ -306,7 +340,7 @@ async function main() {
   };
   worker.onerror = (e) => cover("CLIo could not start here.", [["Try again", () => location.reload()]], e.message || "");
   const game = edited ? { dir: EDITED_DIR, files: edited.files } : null;
-  worker.postMessage({ cmd: "start", shared, argv: argv(), kept: await keptFiles(), game });
+  worker.postMessage({ cmd: "start", shared, argv: argv(touch), kept: await keptFiles(), game });
 }
 
 main().catch((err) => cover("CLIo could not start here.", [["Try again", () => location.reload()]], String(err && err.stack || err)));

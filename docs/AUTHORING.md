@@ -2407,7 +2407,7 @@ with Enter.
 | | `ps`, `man orphan`, `history`, `keys`, `whoami`, `help` | |
 
 The numpad works with NumLock off: 8 2 step, 4 6 turn, 7 9 strafe, 0 fires, 1 turns round.
-**Taps** (on by default in Termux, `--touch on` elsewhere): the picture's left and right thirds
+**Taps** (on by default in Termux and in the browser on a phone, `--touch on` elsewhere): the picture's left and right thirds
 turn, their bottom corners strafe, the top of the middle steps forward, the centre fires, the
 bottom uses; a swipe up or down steps forward or back; the status line readies the next weapon
 and the lines under the picture show the map. `--termux-keys` prints a row of extra keys for

@@ -2,6 +2,22 @@
 
 Notable changes to CLIo. Versions follow [semantic versioning](https://semver.org).
 
+## Unreleased
+
+### Added
+
+- On a phone the browser page plays with taps, as Termux does: the picture's left and right thirds
+  turn, its bottom corners strafe, the top of the middle steps, the centre fires, the bottom uses,
+  a swipe up or down steps forward or back (the page reports a finger's drag as the wheel, which
+  xterm does not), the status line readies the next weapon (`--touch on` on touch screens).
+
+### Fixed
+
+- On a phone the keyboard no longer opens with every key under the picture: the terminal's input
+  field keeps no focus there unless *abc* asked for the keyboard (or a real keyboard is typed on).
+  A phone opened its keyboard whenever that field had the focus, which xterm takes on every touch,
+  whatever `inputmode` said; and *hide* gave it the focus back.
+
 ## 3.5.1 - 2026-11-22
 
 ### Fixed

@@ -247,7 +247,7 @@ class PageFilesTests(unittest.TestCase):
         self.assertIn('indexedDB.open(' + store, script)
         self.assertIn('pageUrl("play.html", { edited: state.game.id })', editor)
         self.assertIn('query.get("edited")', script)
-        self.assertIn("if (EDITED) return [EDITED_DIR];", script)          # played by its folder, as clio.py plays one
+        self.assertIn("if (EDITED) return [EDITED_DIR, ...taps];", script)  # played by its folder, as clio.py plays one
         self.assertIn("game.files", worker)
         self.assertIn('editorUrl({ open: EDITED })', script)              # back in the same frame: opened again there
         self.assertIn('PARAMS.get("open")', editor)
@@ -257,6 +257,10 @@ class PageFilesTests(unittest.TestCase):
         self.assertIn("new Uint8Array(shared, 32, RING)", worker)
         self.assertIn("changes() { return Atomics.load(ctl, 4); }", worker)
         self.assertIn('setAttribute("inputmode", "none")', script)          # a phone: no keyboard on a tap
+        self.assertIn('if (!typing && !keyboard) area.blur();', script)        # ... nor on a key: no focus at all
+        self.assertIn('const taps = touch ? ["--touch", "on"] : [];', script)  # taps on the picture act
+        self.assertIn('argv: argv(touch)', script)
+        self.assertIn("send(`\\x1b[<${dy < 0 ? 65 : 64};${c};${w}M`);", script)   # a swipe: the wheel, as Termux
         self.assertIn('send((QUIET.test(key) ? "\\x15" : "") + key)', script)   # moves clear a half-typed line
         self.assertIn("term.clearTextureAtlas()", script)
         self.assertIn("gl.onContextLoss(() => gl.dispose())", script)

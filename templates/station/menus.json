@@ -1,15 +1,15 @@
 {
  "bay": {
   "title": "Launch bay",
-  "look": "ring",
-  "status": "BAY 2",
+  "look": "wheel",
+  "status": "OPEN",
   "items": [
    {
     "id": "probe",
-    "label": "Survey probe",
+    "label": "Probe",
     "state": "ready",
     "tone": "good",
-    "hint": "A probe to the surface.",
+    "hint": "A survey probe to the surface.",
     "locked": "probe_away",
     "why": "It is on its way down.",
     "effects": [
@@ -24,11 +24,11 @@
    },
    {
     "id": "buoy",
-    "label": "Relay buoy",
+    "label": "Buoy",
     "state": "ready",
     "tone": "good",
     "hold": true,
-    "hint": "Enter arms it; hold Enter and it goes. It cannot be taken back.",
+    "hint": "A relay buoy over the mast. Enter arms it; hold Enter and it goes. It cannot be taken back.",
     "locked": "!scan_done",
     "why": "Nothing below is marked for it yet: finish the scan.",
     "effects": [
@@ -43,7 +43,7 @@
    {
     "id": "lamps",
     "kind": "check",
-    "label": "Bay lamps",
+    "label": "Lamps",
     "flag": "bay_lamps",
     "hint": "On or off."
    },
@@ -60,7 +60,7 @@
    },
    {
     "id": "drone",
-    "label": "Tow drone",
+    "label": "Drone",
     "state": "ready",
     "tone": "good",
     "locked": "!reactor_done",
@@ -70,13 +70,15 @@
       "say": "The drone unfolds and goes out along the hull."
      }
     ],
-    "again": true
+    "again": true,
+    "hint": "The tow drone, out along the hull."
    },
    {
     "id": "close",
-    "label": "Close the bay",
-    "hint": "Back to the bridge."
+    "label": "Close",
+    "hint": "Close the bay, and back to the bridge."
    }
-  ]
+  ],
+  "hub": "Bay 2"
  }
 }

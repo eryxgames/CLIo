@@ -44,7 +44,8 @@ from .term import FRAMES, PALETTE, QuitGame, char_width, idx256_to_rgb, parse_he
 
 KINDS = ("do", "go", "check", "slide", "cycle", "text", "bind", "head")
 VALUES = ("check", "slide", "cycle", "text", "bind")
-LOOKS = ("lines", "bar", "tabs", "find", "line", "terminal", "cards", "ring")
+LOOKS = ("lines", "bar", "tabs", "find", "line", "terminal", "cards", "ring", "wheel")
+GAME_LOOKS = ("bar", "line", "terminal", "cards", "ring", "wheel")       # what a game's "menu_look" may be
 CSI = "\x1b["
 MOUSE_ON, MOUSE_OFF = CSI + "?1000h" + CSI + "?1006h", CSI + "?1000l" + CSI + "?1006l"
 FIND_OVER = 12                    # a plain list longer than this is found by typing
@@ -109,6 +110,7 @@ class Item:
         self.title = str(d.get("title") or self.label)
         self.state, self.tone = str(d.get("state") or ""), d.get("tone")   # a word for how it stands (a console)
         self.status = str(d.get("status") or "")         # as a menu: a word at its top right
+        self.hub = str(d.get("hub") or "")               # as a wheel: the word in its middle (what is done there)
         self.hold = bool(d.get("hold"))                  # done only by holding Enter: armed first, then executed
         self.picture = d.get("picture")                  # rows of (r, g, b), two to a cell's height (cards)
         self.when, self.locked, self.why = d.get("when"), d.get("locked"), str(d.get("why") or "")
@@ -156,6 +158,7 @@ class Menu:
         self.border = d.get("border")
         self.hint = str(d.get("hint") or "")
         self.status = str(d.get("status") or "")         # a word at the top right (a console)
+        self.hub = str(d.get("hub") or "")               # the word in the middle of a wheel (what is done there)
         self.items = [x if isinstance(x, Item) else Item(x) for x in (items if items is not None else d.get("items") or [])]
         self.test, self.on_change, self.cancel = test, on_change, cancel
         self.plain = False                               # tabs as a list of pages (the lines look)
@@ -473,7 +476,7 @@ class Menu:
             d = 1 if k == "right" else -1
             if cur is not None and cur.kind in ("check", "slide", "cycle"):
                 self.change(cur, d)
-            elif self.ringed and self.look_now() == "ring":                  # round the ring
+            elif self.ringed and self.look_now() in ("ring", "wheel"):       # round the ring
                 self.move(d)
             elif tabs:
                 self.turn(d)
@@ -787,7 +790,7 @@ def keys_line(menu, g, numbers=False):
     if menu.armed is not None:
         return "Hold Enter to do it   Esc lets go"
     parts = ["type to find"] if look == "find" else []
-    if look == "ring" and menu.ringed:
+    if look in ("ring", "wheel") and menu.ringed:
         parts.append("%s turn" % (g["ud"] if cur is not None and cur.kind in ("slide", "cycle", "check") else g["lr"]))
     else:
         parts.append("%s %s move" % (g["ud"], g["lr"]) if look == "cards" and menu.columns > 1 else "%s move" % g["ud"])
@@ -824,7 +827,9 @@ def board(menu, cols=80, lines=24, term=None, frame=None, numbers=False, roomy=F
     item (for a screen that reads typed lines); ``roomy``: a blank row between items when they fit so."""
     g = glyphs_of(term)
     look = menu.look_now()
-    b = _ring(menu, cols, lines, term, g) if look == "ring" and not numbers else None
+    b = _wheel(menu, cols, lines, term, g) if look == "wheel" and not numbers else None
+    if b is None and look in ("ring", "wheel") and not numbers:              # no room for a wheel: a dial
+        b = _ring(menu, cols, lines, term, g)
     menu.ringed = b is not None
     if b is not None:
         pass
@@ -1337,6 +1342,145 @@ def _ring(menu, cols, lines, term, g):
     return b
 
 
+WHEEL_ROWS = (21, 17)             # a wheel's rows: as it is best, and at the least
+
+
+def _wheel(menu, cols, lines, term, g):
+    """The wheel look: a ring cut into parts, a thing in each - its name and a word under it (how many,
+    how it stands); the part the cursor is on stands out from the ring, lit; in the hub what is done
+    there (the menu's ``hub``) and to what; beside it what the thing is. None when it cannot be drawn
+    so here (then it is a dial, or a bar)."""
+    rows = menu.rows()
+    ok = [n for n, r in enumerate(rows) if r.kind != "head"]
+    if not 3 <= len(ok) <= RING_MOST or not ring_able(term, g) or menu.tabs():
+        return None
+    count, at = len(ok), menu.at
+    here = ok.index(at) if at in ok else 0
+    cur = rows[ok[here]]
+    holder = menu.holder()
+    title, status = menu.title_now().upper(), holder.status
+    hub = (holder.hub or "").upper()
+    armed = menu.armed is cur
+    hints = [rows[n].hint for n in ok if rows[n].hint] + [menu.why_not(rows[n]) for n in ok if menu.why_not(rows[n])] \
+        + ([menu.said] if menu.said else [])
+    pop = 3.0                                            # how far the chosen part stands out (dots)
+    step = 360.0 / count
+    gap = 3.5 if count <= 6 else 2.5                     # degrees left open either side of a part
+    told = bool(hints or any(rows[n].note for n in ok))
+    rh = min(WHEEL_ROWS[0], lines - 2)
+    rh -= 1 - rh % 2
+    while True:                                          # as big as there is room for, with what it says of a thing
+        if rh < WHEEL_ROWS[1]:
+            return None
+        rw = rh * 2 + 2                                  # the wheel's columns (dots are as wide as they are high)
+        side_w = min(30, cols - rw - 3) if told else 0
+        beside = side_w >= 20                            # room for what it is at its right; else under it
+        under = 0 if beside or not told else (3 if lines - 2 - rh >= 3 else -1)
+        if under >= 0 and rw <= cols:
+            break
+        rh -= 2
+    R2 = rh * 2 - 1.5 - pop                              # the rim, in dots
+    R1 = max(15.0, R2 * 0.42)                            # the hub's edge
+    W = max(rw + (3 + side_w if beside else 0), cells_wide(title) + cells_wide(status) + 4)
+    W = min(max(W, rw), cols)
+    b = Board(W, 2 + rh + max(0, under))
+    b.put(0, 0, title[:W], "title")
+    if status:
+        b.put(max(cells_wide(title) + 2, W - cells_wide(status)), 0, status[:W], "dim")
+    b.put(0, 1, g["rule"] * W, "frame")
+    x0, y0 = (0 if beside else (W - rw) // 2), 2
+    cx, cy = rw - 0.5, rh * 2 - 0.5
+    d = Dots(rw, rh)
+
+    def part(k, out, style, rank, thick):
+        a0, a1 = k * step - step / 2.0 + gap, k * step + step / 2.0 - gap
+        mid = math.radians(k * step)
+        ox, oy = cx + out * math.sin(mid), cy - out * math.cos(mid)
+        for r in ((R2, R2 - 1.5) if thick else (R2,)):
+            d.arc(ox, oy, r, a0, a1, style, rank)
+        d.arc(ox, oy, R1 + 3, a0 - gap * 0.5, a1 + gap * 0.5, style, rank)
+        for a in (a0, a1):
+            a = math.radians(a)
+            d.line(ox + (R1 + 3) * math.sin(a), oy - (R1 + 3) * math.cos(a), ox + R2 * math.sin(a), oy - R2 * math.cos(a),
+                   style, rank)
+
+    lit = "hot" if armed else ("dim" if menu.why_not(cur) else "sel")
+    for k, n in enumerate(ok):
+        if k != here:
+            part(k, 0.0, "dim" if menu.why_not(rows[n]) else "frame", 1, False)
+    part(here, pop, lit, 4, True)
+    d.arc(cx, cy, R1, 0, 360, "frame", 2)                # the hub
+    d.arc(cx, cy, R1 - 4, 0, 360, "dim", 1, 2)
+    fill = None                                          # round the hub: how far it is held, or a value
+    if armed:
+        fill = (menu.charge / float(HOLD), "hot")
+    elif cur.kind == "slide":
+        fill = ((cur.value - cur.low) / (float(cur.high - cur.low) or 1.0), "val")
+    elif cur.kind == "check":
+        fill = (1.0 if cur.value else 0.0, "val")
+    elif cur.kind == "cycle" and cur.choices:
+        values = [v for v, _l in cur.choices]
+        fill = ((values.index(cur.value) + 1 if cur.value in values else 0) / float(len(values)), "val")
+    if fill is not None and fill[0] > 0:
+        for r in (R1 - 4, R1 - 5):
+            d.arc(cx, cy, r, 0, 360 * max(0.0, min(1.0, fill[0])), fill[1], 5)
+    d.onto(b, x0, y0)
+    mx, my = x0 + rw // 2, y0 + rh // 2                  # the middle cell
+    rm = (R1 + 3 + R2) / 2.0                             # where a part's name stands: half way out
+    room = max(4, int(2 * rm * math.sin(math.radians(step / 2.0 - gap)) / 2.0) - 2)
+    inside = False                                       # how the chosen one stands is said in its part
+    for k, n in enumerate(ok):
+        r = rows[n]
+        a = math.radians(k * step)
+        out = pop if k == here else 0.0
+        px = mx + int(round((rm - 2 + out) * math.sin(a) / 2.0))     # (a little in: a name lies flat, a part leans)
+        py = my - int(round((rm + out) * math.cos(a) / 4.0))
+        sel, why = n == at, menu.why_not(r)
+        name = r.label.upper()
+        name = name if cells_wide(name) <= room else name[:room - 1] + g["ell"]
+        word = "locked" if why else ("armed" if menu.armed is r else
+                                     (r.says() if r.kind in ("check", "slide", "cycle") else (r.state or r.note)))
+        word = word if cells_wide(word) <= room else ""
+        inside = inside or (sel and bool(word) and word == r.state)
+        b.put(px - cells_wide(name) // 2, py - (1 if word else 0), name, "dim" if why else ("sel" if sel else "item"))
+        if word:
+            b.put(px - cells_wide(word) // 2, py, word, "dim" if why or not sel else lit)
+        b.hit(px - room // 2 - 1, py - 2, px + room // 2 + 2, py + 2, ("item", n))
+    inner = max(4, int((R1 - 6) * 2 / 2.0) - 1)          # the hub's words: what is done, and to what
+    words = [(hub[:inner], "title")] if hub else []
+    words.append((cur.label.upper()[:inner], lit))
+    for i, (text, style) in enumerate(words):
+        b.put(mx - cells_wide(text) // 2, my - len(words) // 2 + i + (0 if len(words) > 1 else 0), text, style)
+    text, how = hint_of(menu, g)
+    if menu.why_not(cur) and not menu.said:
+        text, how = menu.why_not(cur), "dim"
+    state, tone = state_of(menu, cur)
+    if beside:                                           # at its right: what it is, how it stands, its value
+        sx = x0 + rw + 3
+        parts = [(line, how) for line in wrap(text, side_w)[:6]] if text else []
+        if cur.note:
+            parts += [("", "item"), (cur.note[:side_w], "val")]
+        if state and not inside and not armed:
+            parts += [("", "item"), (state[:side_w], tone)]
+        y = max(y0, my - len(parts) // 2)
+        for i, (line, style) in enumerate(parts[:rh]):
+            b.put(sx, y + i, line, style)
+        if cur.kind in ("check", "slide", "cycle") and value_wide(cur, g) <= side_w:
+            draw_value(b, sx, min(b.h - 1, y + len(parts) + 1), cur, ok[here], True, False, g, menu, value_wide(cur, g))
+    elif under:
+        y = y0 + rh
+        b.put(0, y, g["rule"] * W, "frame")
+        x = b.put(1, y + 1, cur.label.upper()[:W - 2], "dim" if menu.why_not(cur) else "sel")
+        if state:
+            b.put(x + 2, y + 1, state, tone)
+        vw = value_wide(cur, g)
+        if vw and vw < W - x - 4 and (cur.kind != "do" or cur.note):
+            draw_value(b, W - vw - 1, y + 1, cur, ok[here], True, False, g, menu, vw)
+        if under > 2 and text:
+            b.put(1, y + 2, wrap(text, W - 1)[0], how)
+    return b
+
+
 def _needle(sw):
     """Where a ring's needle is now (degrees), on its way the short way round."""
     _key, a, to, since = sw
@@ -1698,7 +1842,7 @@ def over(screen, menu, backdrop=None, ui=None, mouse=True, after=""):
         behind = backdrop() if callable(backdrop) else backdrop
         rows = dimmed(behind, W, H - 2)
         x0, y0 = max(0, (W - b.w) // 2), max(0, (H - 2 - b.h) // 2)
-        if menu.look_now() in ("line", "terminal", "cards", "ring") and (menu.look_now() != "ring" or menu.ringed) or \
+        if menu.look_now() in ("line", "terminal", "cards") or (menu.look_now() in ("ring", "wheel") and menu.ringed) or \
                 border(menu.border_now() or frame_of(ui), term).name in ("none", "rule", "corners", "brackets"):
             for yy in range(max(0, y0 - 1), min(len(rows), y0 + b.h + 1)):       # no box of its own: room round it
                 for xx in range(max(0, x0 - 2), min(W, x0 + b.w + 2)):
@@ -1931,8 +2075,8 @@ def problems(data):
     """What is wrong in a game's ``menus.json`` (for ``--check``)."""
     out = []
     cfg = getattr(data, "config", None) or {}
-    if cfg.get("menu_look") not in (None, "bar", "line", "terminal", "cards", "ring"):
-        out.append("game.json: unknown menu_look '%s' (bar, line, terminal, cards)" % cfg.get("menu_look"))
+    if cfg.get("menu_look") not in (None,) + GAME_LOOKS:
+        out.append("game.json: unknown menu_look '%s' (%s)" % (cfg.get("menu_look"), ", ".join(GAME_LOOKS)))
     if cfg.get("menu_border") is not None and str(cfg["menu_border"]).split()[:1] not in [[n] for n in BORDERS]:
         out.append("game.json: unknown menu_border '%s' (%s)" % (cfg["menu_border"], ", ".join(BORDERS)))
     menus = getattr(data, "menus", None)
@@ -2038,6 +2182,15 @@ def sample():
              "unit": "%", "hint": "Left and right."},
             {"id": "drone", "label": "Tow drone", "locked": "The drone is out with the hopper."},
             {"id": "close", "label": "Close the bay", "hint": "And back."}]},
+        {"label": "Orbit", "title": "Orbit  Gordian Moon  pass 14", "look": "wheel", "hub": "Deploy",
+         "status": "WINDOW 02:41", "hint": "The wheel look.", "items": [
+            {"id": "w_probe", "label": "Probe", "note": "3 aboard", "state": "3", "hint": "A survey probe to the surface."},
+            {"id": "w_beacon", "label": "Beacon", "note": "1 aboard", "state": "1", "hold": True,
+             "hint": "A relay beacon: the ground party hears the ship for one season."},
+            {"id": "w_lander", "label": "Lander", "note": "1 aboard", "state": "1", "hint": "Four people and their stores."},
+            {"id": "w_relay", "label": "Relay", "note": "2 aboard", "state": "2", "hint": "A relay left in orbit."},
+            {"id": "w_cage", "label": "Cage", "locked": "The reactor is under 80%."},
+            {"id": "w_recall", "label": "Recall", "hint": "Everything that is out comes back."}]},
         {"label": "Saved realms", "look": "cards", "hint": "The cards look.", "items": [
             {"id": "s%d" % n, "label": name, "note": when, "picture": land(n), "hint": "A realm kept."}
             for n, (name, when) in enumerate((("Fer", "Year 19, Deep"), ("Taros", "Year 4, Ember"),
@@ -2074,7 +2227,7 @@ def main(argv=None):
         return 0
     if "--print" in argv:
         for keys in ((), ("down", "enter"), ("down", "down", "enter", "f", "o"), ("3", "down"), ("4", "enter"), ("5",),
-                     ("6",)):
+                     ("6",), ("7", "right")):
             m = sample()
             for k in keys:
                 m.key(k)

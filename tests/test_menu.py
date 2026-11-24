@@ -483,13 +483,13 @@ class BorderTests(unittest.TestCase):
         self.assertEqual((g.ui.menu_border, g.ui.menu_look), ("heavy", "line"))
         self.assertEqual(M.game_menu(g).look, "line")
         self.assertIsNone(Game(STARTER, term=term(), audio=Session("templates/starter").audio,
-                               settings={"menu_look": "wheel"}).ui.menu_look)
+                               settings={"menu_look": "carousel"}).ui.menu_look)
 
         class Data:
             menus = {"m": {"border": "wavy", "items": [{"label": "A", "border": "double shadow"}, {"label": "B", "border": ""}]}}
-            config = {"menu_look": "wheel", "menu_border": "wavy shadow"}
+            config = {"menu_look": "carousel", "menu_border": "wavy shadow"}
         text = "\n".join(M.problems(Data()))
-        for part in ("game.json: unknown menu_look 'wheel' (bar, line, terminal, cards)", "game.json: unknown menu_border 'wavy shadow'",
+        for part in ("game.json: unknown menu_look 'carousel' (bar, line, terminal, cards, ring, wheel)", "game.json: unknown menu_border 'wavy shadow'",
                      "menu 'm': unknown border 'wavy' (single, rounded, double, dos, heavy, block, cut, dots, ascii, corners,",
                      "menu 'm' item 2: unknown border ''"):
             self.assertIn(part, text)
@@ -879,20 +879,20 @@ class RingTests(unittest.TestCase):
 
         s = Session("templates/station").start()             # the station starter's launch bay
         self.assertEqual(s.game.data.validate(), [])
-        m = M.from_data(s.game, "bay")
-        text = M.board(m, 79, 28).plain()
+        m = M.from_data(s.game, "bay")                       # (a wheel; where there is less room, a dial)
+        text = M.board(m, 52, 20).plain()
         self.assertTrue(m.ringed)
-        self.assertEqual(text[2].strip(), "► SURVEY PROBE")
-        self.assertEqual(text[16].strip(), "SURVEY PROBE  READY")
+        self.assertEqual(text[2].strip(), "► PROBE")
+        self.assertEqual(text[16].strip(), "PROBE  READY")
         keys(m, "right")
-        text = M.board(m, 79, 28).plain()
-        self.assertEqual((text[16].strip(), text[17].strip()),
-                         ("RELAY BUOY  LOCKED", "Nothing below is marked for it yet: finish the scan."))
+        text = M.board(m, 52, 20).plain()
+        self.assertEqual((text[16].strip(), text[17].strip()[:38]),
+                         ("BUOY  LOCKED", "Nothing below is marked for it yet: fi"))
         s.game.world.flags["scan_done"] = True
         m = keys(M.from_data(s.game, "bay"), "down")
-        self.assertEqual(M.board(m, 79, 28).plain()[16].strip(), "RELAY BUOY  READY")
+        self.assertEqual(M.board(m, 52, 20).plain()[16].strip(), "BUOY  READY")
         said = s.do("bay", "1", "6")                         # typed: its numbered lines, and what it does
-        self.assertIn("1. Survey probe", said)
+        self.assertIn("1. Probe", said)
         self.assertIn("The probe drops away, turning.", said)
         self.assertTrue(s.game.world.flags.get("probe_away"))
 
@@ -901,6 +901,109 @@ class RingTests(unittest.TestCase):
                                                                         "items": [{"label": "In"}]}]}}
             config = {"menu_look": "ring"}
         self.assertEqual(M.problems(D()), ["menu 'bay' item 2: unknown look 'rings' (%s)" % ", ".join(M.LOOKS)])
+
+
+def orbit(**more):
+    return Menu(title="Orbit", look="wheel", hub="Deploy", status="PASS 14", items=[
+        {"id": "probe", "label": "Probe", "state": "3", "note": "3 aboard", "hint": "A probe to the surface."},
+        {"id": "beacon", "label": "Beacon", "note": "1 aboard", "hold": True, "hint": "Held to go."},
+        {"id": "lamp", "kind": "check", "label": "Lamp", "value": True},
+        {"id": "gain", "kind": "slide", "label": "Gain", "value": 5},
+        {"id": "cage", "label": "Cage", "locked": "The reactor is low."},
+        {"id": "recall", "label": "A very long recall"}], **more)
+
+
+class WheelTests(unittest.TestCase):
+    def test_a_ring_of_parts_with_a_hub(self):
+        m = orbit()
+        b = M.board(m, 99, 28)
+        text = b.plain()
+        whole = "\n".join(text)
+        self.assertEqual((b.w, b.h, m.ringed), (77, 23, True))
+        self.assertTrue(text[0].startswith("ORBIT") and text[0].endswith("PASS 14"))
+        for name in ("PROBE", "BEACON", "LAMP", "GAIN", "CAGE", "A VERY LO…"):  # a name too long for its part is cut
+            self.assertIn(name, whole)
+        self.assertIn("locked", whole)                                       # under the name of what is
+        self.assertEqual(sum(line.count("on") for line in text[2:]), 1)      # a value's word in its part
+        self.assertIn("DEPLOY", text[11])                                    # the hub: what is done, and to what
+        self.assertIn("PROBE", text[12])
+        self.assertEqual((b.rows[11][text[11].index("DEPLOY")][1], b.rows[12][text[12].index("PROBE")][1]), ("title", "sel"))
+        self.assertIn("A probe to the surface.", whole)                      # beside it: what it is
+        self.assertIn("3 aboard", whole)
+        self.assertEqual(whole.count("PROBE"), 2)
+        top = next(y for y, line in enumerate(text) if "PROBE" in line)
+        self.assertEqual((top, b.rows[top][text[top].index("PROBE")][1]), (3, "sel"))
+        self.assertEqual(text[top + 1].strip("⠀ ").strip("".join(chr(c) for c in range(0x2800, 0x2900)) + " "), "3")
+        y = next(y for y, line in enumerate(text) if "CAGE" in line)
+        self.assertEqual(b.rows[y][text[y].index("CAGE")][1], "dim")
+        self.assertEqual((b.at(text[top].index("PROBE"), top), b.at(text[y].index("CAGE"), y)), (("item", 0), ("item", 4)))
+        self.assertEqual(b.keys, "←→ turn   Enter choose   Esc back")
+        self.assertGreater(styled(b, "sel"), 40)                             # the chosen part, lit
+
+    def test_round_it_and_what_goes_round_the_hub(self):
+        m = orbit()
+        M.board(m, 99, 28)
+        text = M.board(keys(m, "right"), 99, 28).plain()
+        self.assertEqual(m.current().id, "beacon")
+        self.assertIn("BEACON", text[12])                                    # the hub says to what
+        self.assertIn("Held to go.", "\n".join(text))
+        clock = Clock()
+        with mock.patch.object(M, "now", clock):
+            keys(m, "enter")
+            b = M.board(m, 99, 28)
+            self.assertIn("armed", "\n".join(b.plain()))
+            few = styled(b, "hot")
+            keys(m, "enter", "enter", "enter")
+            self.assertGreater(styled(M.board(m, 99, 28), "hot"), few + 6)   # round the hub as it is held
+            keys(m, "enter", "enter")
+            self.assertEqual(m.result.id, "beacon")
+        m = keys(orbit(), "3")
+        self.assertIsNone(m.result)
+        M.board(m, 99, 28)
+        keys(m, "down", "right")                                             # on a value: up and down go round
+        self.assertEqual((m.current().id, m.find("gain").value), ("gain", 6))
+        self.assertEqual(M.board(m, 99, 28).keys, "↑↓ turn   ←→ change   Enter choose   Esc back")
+        b = M.board(keys(m, "down"), 99, 28)
+        self.assertIn("The reactor is low.", "\n".join(b.plain()))           # locked: why, beside it
+        keys(m, "enter")
+        self.assertFalse(m.done)
+
+    def test_smaller_it_is_a_dial_and_then_a_bar(self):
+        m = orbit()
+        for size, what in (((99, 28), "wheel"), ((70, 21), "wheel"), ((44, 24), "wheel"), ((70, 18), "dial"),
+                           ((70, 16), "dial"), ((40, 12), "bar"), ((30, 30), "bar")):
+            text = "\n".join(M.board(m, *size).plain())
+            got = "wheel" if "DEPLOY" in text else ("dial" if m.ringed else "bar")
+            self.assertEqual(got, what, size)
+        under = M.board(m, 44, 24).plain()                                   # no room beside it: under it
+        self.assertEqual(under[-2].split()[0], "PROBE")
+        self.assertEqual(under[-1].strip(), "A probe to the surface.")
+        self.assertFalse(M.board(m, 99, 28, term(uni=False)) and m.ringed)   # no dots to draw with: a bar
+        self.assertFalse(M.board(m, 99, 28, numbers=True) and m.ringed)
+        two = Menu(look="wheel", items=[{"label": "One"}, {"label": "Two"}])
+        self.assertIn("► ONE", "\n".join(M.board(two, 99, 28).plain()))      # two things: a dial
+        self.assertTrue(two.ringed)
+        eight = Menu(look="wheel", hub="Go", items=[{"label": "Thing %d" % i} for i in range(8)])
+        text = "\n".join(M.board(eight, 99, 28).plain())
+        self.assertEqual((text.count("THING"), text.count("GO")), (9, 1))
+
+    def test_shown_over_a_picture_and_in_a_game(self):
+        sc = screen(["right", "right", "enter", "up", "up", "enter"], glyphs="full")
+        m = orbit()
+        got = M.over(sc, m, [[(None, (200, 100, 50), (20, 40, 60))] * 100 for _ in range(28)], ui_of(color=3, glyphs="full"))
+        self.assertEqual((got.id, m.find("lamp").value), ("probe", False))
+        self.assertIn("DEPLOY", sc.out.getvalue())
+        s = Session("templates/station").start()
+        bay = M.from_data(s.game, "bay")
+        text = "\n".join(M.board(bay, 99, 28).plain())
+        self.assertEqual((bay.look, bay.hub), ("wheel", "Bay 2"))
+        for part in ("BAY 2", "PROBE", "BUOY", "LAMPS", "PRESSURE", "DRONE", "CLOSE", "locked", "A survey probe to the surface."):
+            self.assertIn(part, text)
+
+        class D:
+            menus = {}
+            config = {"menu_look": "wheel"}
+        self.assertEqual(M.problems(D()), [])
 
 
 class ColourTests(unittest.TestCase):
@@ -1245,13 +1348,13 @@ class DataTests(unittest.TestCase):
     def test_what_is_wrong_in_menus_json_is_said(self):
         from engine.data import GameData
         self.assertEqual(GameData(self.game()).validate(), [])
-        bad = {"camp": {"look": "wheel", "items": [
+        bad = {"camp": {"look": "carousel", "items": [
             {"label": "A"}, {"label": "A"}, {"kind": "dial", "label": "B"}, {"kind": "cycle", "label": "C", "var": "c"},
             {"kind": "slide", "label": "D", "low": 5, "high": 5, "var": "d"}, {"kind": "check", "label": "E"},
             {"kind": "do"}, 7, {"label": "F", "items": []}, {"label": "G", "look": "spiral"}]},
             "empty": {}, "list": []}
         text = "\n".join(GameData(self.game(bad)).validate())
-        for part in ("menu 'camp': unknown look 'wheel' (lines, bar, tabs, find, line, terminal, cards, ring)",
+        for part in ("menu 'camp': unknown look 'carousel' (lines, bar, tabs, find, line, terminal, cards, ring, wheel)",
                      "menu 'camp' item 2: the id 'a' is used twice in this menu",
                      "menu 'camp' item 3: unknown kind 'dial'", "menu 'camp' item 4: a cycle needs \"choices\"",
                      "menu 'camp' item 5: a slide needs \"low\" under \"high\"",
@@ -1267,10 +1370,10 @@ class DataTests(unittest.TestCase):
         folder = self.game({})                                               # no menus of its own: game.json is still read
         with open(os.path.join(folder, "game.json"), encoding="utf-8") as f:
             cfg = json.load(f)
-        cfg.update(menu_look="wheel", menu_border="double shadow")
+        cfg.update(menu_look="carousel", menu_border="double shadow")
         with open(os.path.join(folder, "game.json"), "w", encoding="utf-8") as f:
             json.dump(cfg, f)
-        self.assertEqual(GameData(folder).validate(), ["game.json: unknown menu_look 'wheel' (bar, line, terminal, cards)"])
+        self.assertEqual(GameData(folder).validate(), ["game.json: unknown menu_look 'carousel' (bar, line, terminal, cards, ring, wheel)"])
 
 
 class LevelTests(unittest.TestCase):

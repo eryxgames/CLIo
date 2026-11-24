@@ -144,8 +144,15 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   circle inside the rim; what is locked has a dotted rim, and the reason is shown while the
   cursor is on it. In the text and over a picture; a click on a name chooses it. Where there
   is no braille (the Windows console's own fonts, the Linux console, safe glyphs, ASCII), no
-  room, more than eight things, or typed answers, it is a bar. The station starter has one:
-  `bay` on the bridge (`menus.json`). `python -m engine.menu` has a Launch bay to try.
+  room, more than eight things, or typed answers, it is a bar. `python -m engine.menu` has a
+  Launch bay to try.
+- **The wheel look** (`"look": "wheel"`): a ring cut into three to eight parts with a thing in
+  each (its name, and a word under it: a value, a state, `locked`); the part the cursor is on
+  stands out, lit; the hub says what is done there (the menu's `"hub"`) and to what, and a
+  value or a hold goes round it; beside the wheel, what the thing is. With less than 19 rows
+  it is a ring, and where there is no braille a bar. The station starter's `bay` is one, and
+  `python -m engine.menu` has an Orbit to try. `--check` now names every look a game may ask
+  for when `menu_look` is wrong.
 - In the terminal look, a thing that is locked says `LOCKED` whatever its `state` (it kept
   saying `READY`).
 - The station starter's consoles do things: the reactor vents steam and scrams (hold `X`); the

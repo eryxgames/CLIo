@@ -2998,6 +2998,7 @@ that show the sim's values by name:
 | `{"plot": [NAMES]}` | The values over time as lines of dots, `rows` high, between `min` and `max` (else what they have reached). |
 | `{"scope": ...}` | A vector display (things in three dimensions, drawn in lines): a scene by name (`hauler`, `approach`, `orbit`, `scan`, `signals`), or `{"model": ID}` - one of the game's 3D models turning in lines (`turn` degrees a second, `fov`, `far`, `height`); with `"reveal": NAME` only as much of it is drawn, from the ground up, as the value is of `whole`, and when it is whole it is drawn solid. |
 | `{"planet": ID}` | One of the game's planets (below), in a `view`. |
+| `{"ahead": true}` | The view forward from the vehicle over the sim's own map, in lines (below). |
 | `{"functions": true}` | The sim's functions (above), a line each: `[X] SCRAM ...... READY` - its key, its name and its state: READY (a switch: OFF), LOCKED, a bar that fills while its key is held, ON with the seconds left, WAIT with the seconds to go, SPENT. A list of names shows those, in that order; `"keys": false` leaves the keys out. |
 | `{"map": true}` | The sim's map (a vehicle's). |
 | `{"rule": true}`, `{"space": 1}` | A line; empty rows. |
@@ -3010,6 +3011,29 @@ its phosphor (`green`, `amber`, `cyan`, `white`, `red`, `blue`, `violet`), `bord
 too. Widgets fill a panel from the top; a scope or a map takes what room is left. On a screen
 under 60 columns, or piped, the sim is shown as ever. `--check` checks the layout and the names
 in it. `templates/station` has three such screens to copy; `python -m engine.panels` shows one.
+
+**Ahead.** A vehicle sim's map is drawn from above (`{"map": true}`); `{"ahead": true}` draws
+the same map as the pilot sees it, on a vector display: a net on the ground that fades with
+distance, rock as ridges and peaks (as high as the sim holds it to be), buildings as blocks,
+trees, the pad as a ring, a horizon and stars. The marks to pass are posts with a lamp and
+their number; the next one blinks, and when it is out of the picture an arrow at the side
+says which way to turn. Nearer things hide what is behind them.
+
+```json
+{"ahead": {"look": "space", "far": 14, "fov": 80, "tilt": 0, "afterglow": 0.3}}
+```
+
+| Key | Meaning |
+| --- | --- |
+| `look` | `terrain` (the default), or `space`: the same map as open space - what is solid floats there as tumbling rocks, the pad is a ring, the marks are lamps, and there is no ground. The vehicle flies as it did; only the picture changes. |
+| `far` | How far it draws, in tiles (3 to 40; 12). |
+| `fov`, `tilt` | The angle seen from side to side (30 to 120; 78) and how far the eye looks down or up (-45 to 45; -6 over ground, 0 in space). |
+| `solid` | `false`: everything shows through everything (quicker). |
+| `stars`, `afterglow` | `false`: no stars. How much of a frame's light is left in the next (0: none). |
+
+The rocks alone, flown through without end, are the vector scene `asteroids`: `{"scope":
+{"scene": "asteroids"}}` in any panel. `python -m engine.ahead GAME SIM [--space]` shows a sim's
+view as its autopilot flies it; `python -m engine.ahead` the field of rocks.
 
 **Views.** A scope with a `model` can show it in one of the viewer's views - `"view"`:
 

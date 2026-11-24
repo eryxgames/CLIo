@@ -189,7 +189,7 @@ class CheckTests(unittest.TestCase):
                      "row 2 widget 1: there is no value called 'nope'", "row 2 widget 1: there is no value called 'also_nope'",
                      "row 2 widget 2: it should be one of gauge, center, number,", "row 2 widget 3: there is no value called 'gone'",
                      "row 2 widget 4: a lamp needs a \"label\"", "row 2 widget 4 lamp 'A': unknown tone 'blue'",
-                     "row 2 widget 5: unknown scene 'wormhole' (hauler, approach, orbit, scan, signals)",
+                     "row 2 widget 5: unknown scene 'wormhole' (hauler, approach, orbit, scan, signals, asteroids)",
                      "row 2 widget 6: a scope needs a \"scene\" or a \"model\"", "row 2 widget 7: there is no model called 'ghost'",
                      "row 2 widget 7: there is no value called 'gone'", "row 2 widget 9: \"lamps\" should be a list",
                      "panels row 3: it should be a map"):

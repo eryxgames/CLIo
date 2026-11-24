@@ -153,6 +153,17 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   it is a ring, and where there is no braille a bar. The station starter's `bay` is one, and
   `python -m engine.menu` has an Orbit to try. `--check` now names every look a game may ask
   for when `menu_look` is wrong.
+- **The view ahead** (`engine/ahead.py`, a panel's `{"ahead": true}`): a vehicle simulator's
+  own map as the pilot sees it, in lines - a net on the ground fading with distance, rock as
+  ridges and peaks, buildings, trees, the pad, a horizon, stars; the marks as numbered posts,
+  the next one blinking, with an arrow at the side when it is out of the picture; nearer
+  things hide what is behind. `"look": "space"` draws the same map as open space: what is
+  solid floats there as tumbling rocks. About 10 to 20 ms a frame at 84 by 22.
+- **Asteroids**: the vector scene `asteroids` (`{"scope": {"scene": "asteroids"}}`, and the
+  sixth scene of `python -m engine.vector`): a flight through tumbling rocks that never ends.
+  Every rock is twenty sides, no two alike, and the same every time.
+- The station starter's helm has the view ahead over a bigger map (34 by 12) with a pad of
+  four tiles: the autopilot would not always come down on a pad of one.
 - In the terminal look, a thing that is locked says `LOCKED` whatever its `state` (it kept
   saying `READY`).
 - The station starter's consoles do things: the reactor vents steam and scrams (hold `X`); the

@@ -2,6 +2,7 @@
  "engine": [
   "engine/__init__.py",
   "engine/actions.py",
+  "engine/ahead.py",
   "engine/arcade.py",
   "engine/art.py",
   "engine/atmosphere.py",

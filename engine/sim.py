@@ -1322,8 +1322,21 @@ class Runner:
         except Exception:
             sheet = None
         parts = {"map": lambda w, h: map_cells(sim, w, h, color=bool(depth), unicode=unicode, arrows=arrows)}
+        if sim.mode == "vehicle":
+            parts["ahead"] = self.ahead
         return self.view.rows(W, H, sim.env(), sim.ticks / float(sim.rate), parts, unicode, level, sheet,
                               functions=sim.shown_functions())
+
+    def ahead(self, w, h, spec, ink, t, unicode, key):
+        """What is ahead of the vehicle (a panel's ``ahead``): rows of cells. A display is kept for each
+        place it is shown, for its afterglow."""
+        from . import ahead, vector
+        scopes = self.__dict__.setdefault("_ahead", {})
+        scope = scopes.get((key, w, h))
+        if scope is None:
+            glow = spec.get("afterglow", 0.0) if isinstance(spec, dict) else 0.0
+            scope = scopes[(key, w, h)] = vector.Scope(w, h, colour=ink, afterglow=float(glow or 0.0))
+        return ahead.rows(self.sim, w, h, spec, ink, t, unicode, scope)
 
     @property
     def over(self):
@@ -1648,7 +1661,7 @@ def problems(data):
             from . import panels
             out += panels.problems(spec["panels"], names, "%s: panels" % where, formula,
                                    getattr(data, "models", None) or {}, getattr(data, "planets", None) or {},
-                                   functions=set(fns))
+                                   functions=set(fns), ahead=mode == "vehicle")
     for sid, sc in (getattr(data, "scenes", None) or {}).items():
         if sc.get("sim") and sc["sim"] not in sims:
             out.append("scene '%s': unknown sim '%s'" % (sid, sc["sim"]))

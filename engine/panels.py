@@ -23,6 +23,7 @@ lines), ``control`` (a gauge with the keys that move it), ``compass``, ``lamps``
 ``if`` holds), ``text`` (with ``{name}`` and ``{name:.1f}`` in it; ``"align": "center"``), ``plot`` (lines over time, in dots),
 ``scope`` (a vector display: one of the reel's scenes, or a 3D model of the game's turning in lines,
 drawn as far as ``reveal`` says and solid when it is whole), ``map`` (what the host draws there),
+``ahead`` (the view forward from the host's vehicle over its map, in lines: engine/ahead.py),
 ``functions`` (what the console does when asked: each with its key and its state - ready, locked, held
 so far, on for so long), ``rule`` and ``space``. A panel's ``colour`` is its phosphor (green, amber, cyan, white, red, blue,
 violet); its ``border`` one of the menus' frames (engine/menu.py); ``pulse`` names a cue the frame
@@ -41,8 +42,8 @@ from . import vector
 from .menu import BORDERS, border as border_of, wrap
 
 WIDGETS = ("gauge", "center", "number", "control", "compass", "lamps", "text", "plot", "scope", "planet", "map",
-           "functions", "rule", "space")
-FLEX = ("scope", "planet", "map")                        # these take what room is left
+           "ahead", "functions", "rule", "space")
+FLEX = ("scope", "planet", "map", "ahead")                        # these take what room is left
 TONES = {"good": (110, 240, 130), "warn": (255, 176, 40), "hot": (255, 84, 64), "off": None}
 BITS = ((1, 8), (2, 16), (4, 32), (64, 128))             # braille: the dot at (row, column) of a character
 KEEP = 600                                               # values kept of what is plotted
@@ -233,7 +234,7 @@ class View:
             yy += rows
 
     def _tall(self, wd, w, env):
-        if "scope" in wd or "map" in wd or "planet" in wd:
+        if "scope" in wd or "map" in wd or "planet" in wd or "ahead" in wd:
             return int(wd["rows"]) if wd.get("rows") else None
         if "plot" in wd:
             return max(2, int(wd.get("rows", 4)))
@@ -366,6 +367,12 @@ class View:
                 cv.paste(x, y, fn(w, h))
             else:
                 cv.put(x, y, "NO MAP", dim)
+        elif kind == "ahead":                            # what is ahead of the host's vehicle, in lines
+            fn = parts.get("ahead")
+            if fn is not None:
+                cv.paste(x, y, fn(w, h, wd["ahead"], ink, t, uni, (owner, id(wd))))
+            else:
+                cv.put(x, y, "NO VIEW AHEAD", dim)
         elif kind == "functions":
             for i, f in enumerate(self._listed(wd)[:h]):
                 self._function(cv, f, x, y + i, w, uni, ink, wd.get("keys", True))
@@ -560,7 +567,7 @@ def _fill(text, env):
         return str(text or "")
 
 
-def problems(spec, names=None, where="panels", formula=None, models=None, planets=None, functions=None):
+def problems(spec, names=None, where="panels", formula=None, models=None, planets=None, functions=None, ahead=None):
     """What is wrong in a layout. ``names``: the values there are to show; ``formula``: checks a condition;
     ``functions``: the names of what the host does when asked."""
     out = []
@@ -652,6 +659,11 @@ def problems(spec, names=None, where="panels", formula=None, models=None, planet
                         out.append("%s: a site needs \"lat\" and \"lon\" (and a \"name\")" % wat)
                     else:
                         cond_ok("%s site '%s'" % (wat, st.get("name", "")), st.get("if"))
+            elif kind == "ahead":
+                from . import ahead as forward
+                out.extend(forward.problems(wd["ahead"], wat))
+                if ahead is False:
+                    out.append("%s: there is no vehicle here to look ahead of (a simulator with a map has one)" % wat)
             elif kind == "functions":
                 listed = wd["functions"]
                 if listed is not True and not isinstance(listed, (list, str)):

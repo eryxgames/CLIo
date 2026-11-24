@@ -23,7 +23,7 @@ lines that cross add up towards white), dimmed by distance when the scope has a 
 
 Nothing here is random and nothing reads the clock: the same scene gives the same picture.
 
-    python -m engine.vector            # a reel: a hauler, an approach, an orbit, a surface scan, signals
+    python -m engine.vector            # a reel: a hauler, an approach, an orbit, a surface scan, signals, rocks
     python -m engine.vector scan 3.5   # one picture of a scene at a time, as text (strokes when piped)
 """
 from __future__ import annotations
@@ -670,8 +670,8 @@ def _height(x, y):
     return h
 
 
-SCENES = ("hauler", "approach", "orbit", "scan", "signals")
-GLOW = {"hauler": 0.25, "approach": 0.45, "orbit": 0.3, "scan": 0.0, "signals": 0.4}     # the afterglow that suits each
+SCENES = ("hauler", "approach", "orbit", "scan", "signals", "asteroids")
+GLOW = {"hauler": 0.25, "approach": 0.45, "orbit": 0.3, "scan": 0.0, "signals": 0.4, "asteroids": 0.2}     # the afterglow that suits each
 TRACK = {"mood": "tense", "seed": 7, "bars": 8}          # the reel's music, and what "signals" moves to
 _sheet = []
 
@@ -689,6 +689,9 @@ def scene(name, t, scope, sheet=None):
     """Draw a scene of the reel at time ``t`` (seconds) on a scope. Returns a caption. ``sheet``: the
     cue sheet "signals" moves to (the reel's own track's unless given)."""
     cols, rows = scope.cols, scope.rows_n
+    if name == "asteroids":                              # a flight through rocks (engine/ahead.py)
+        from . import ahead
+        return ahead.field(scope, t)
     if name == "signals":
         sheet = sheet or reel_sheet()
         scope.cue = None
@@ -787,7 +790,7 @@ def scene(name, t, scope, sheet=None):
     return "A surface scan: profiles of the ground, each hiding what lies behind it, and a sweep"
 
 
-def reel(term=None, seconds=8.0, style=None, colours=("green", "amber", "cyan", "green", "green"), sound=True):
+def reel(term=None, seconds=8.0, style=None, colours=("green", "amber", "cyan", "green", "green", "cyan"), sound=True):
     """Play the scenes in turn on a terminal, in frame mode (Ctrl-C ends), with their track when
     this machine can play one: "signals" then moves by the sound's own clock."""
     from .frame import Screen

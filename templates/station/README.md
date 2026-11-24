@@ -1,6 +1,7 @@
 # A station starter
 
-Three consoles of a ship's bridge: the helm (a hopper flown to a pad), the reactor (a core brought
+Three consoles of a ship's bridge: the helm (a hopper flown to a pad, with the view ahead in
+lines over the map: `{"ahead": true}`), the reactor (a core brought
 to power) and the scan (a beam held on a drifting target while a 3D model comes into the scope).
 Each is a CLIo simulator (`sims.json`) with a screen of its own under `"panels"`: frames, gauges,
 big numbers, lamps, plots over time, a map, and vector scopes. The consoles do things when asked

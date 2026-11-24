@@ -102,7 +102,7 @@ engine/
   realm.py           realms: strategy by turns (seasons, stocks, works, threats), and its steward
   vector.py          vector displays: 3D in lines (wire and hidden-line), dots or strokes, afterglow
   cues.py            cue sheets (Playhead's): what a screen does with the sound, from a file or a song's notes
-  menu.py            menus: items and values, looks (bar, tabs, find, line, terminal, cards, lines), frames
+  menu.py            menus: items and values, looks (bar, tabs, find, line, terminal, cards, ring, lines), frames
   panels.py          screens of instruments: panels in frames, gauges, big numbers, lamps, plots, scopes
   viewer.py          views of a model (shaded, lines, cut open, a plan, by heat) and of a planet; --view-model
   demo.py            the demos (engine/demos/clio.json, a game's demo.json)
@@ -110,7 +110,7 @@ engine/
 games/               derelict/  depths/  rootless/
 templates/starter/   a tiny complete game to copy (Apache-2.0)
 templates/realm/     a tiny complete realm to copy (Apache-2.0)
-templates/station/   three simulators with screens of panels to copy: helm, reactor, scan (Apache-2.0)
+templates/station/   three simulators with screens of panels to copy: helm, reactor, scan; a ring menu (Apache-2.0)
 game_files/          the original CLIo 1 sandbox
 tests/               python -m unittest discover -s tests
 utils/               Tkinter data editor (desktop, alpha)
@@ -125,7 +125,7 @@ guide.
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 999 tests, about a minute
+python -m unittest discover -s tests     # 1005 tests, about a minute
 python -m engine.vector                  # the vector display's reel (Ctrl-C ends)
 python -m engine.realm templates/realm 8 # a steward plays the realm starter over eight seeds
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class

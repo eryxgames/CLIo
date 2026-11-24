@@ -1,7 +1,7 @@
 [
  {
   "name": "The Bridge",
-  "description": "Three consoles are lit: the {exit}helm{/}, the {exit}reactor{/} and the {exit}scan{/} station. The rest of the deck is dark. {hint}(go helm, go reactor, go scan){/}",
+  "description": "Three consoles are lit: the {exit}helm{/}, the {exit}reactor{/} and the {exit}scan{/} station. By the hatch the launch {key}bay{/}'s dial glows. The rest of the deck is dark. {hint}(go helm, go reactor, go scan; bay){/}",
   "exits": [
    {
     "door_name": "Helm",
@@ -16,6 +16,15 @@
     "scene_id": "scan"
    }
   ],
+  "actions": {
+   "bay": {
+    "do": [
+     {
+      "menu": "bay"
+     }
+    ]
+   }
+  },
   "id": "bridge"
  },
  {

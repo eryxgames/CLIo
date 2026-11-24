@@ -56,7 +56,7 @@ class Game(Actions):
         want = self.settings.get("menus") or self.data.config.get("menus") or self.ui.theme.ui.get("menus")
         self.ui.menus = "lines" if self.settings.get("lines") else (want if want in ("bar", "lines") else None)
         look = self.settings.get("menu_look") or self.data.config.get("menu_look") or self.ui.theme.ui.get("menu_look")
-        self.ui.menu_look = look if look in ("bar", "line", "terminal", "cards") else None
+        self.ui.menu_look = look if look in ("bar", "line", "terminal", "cards", "ring") else None
         self.ui.menu_border = self.settings.get("menu_border") or self.data.config.get("menu_border") or None
         self.art = ArtLibrary(self.data.art_dir, ENGINE_ART, sprites=self.data.sprites)
         self.parser = Parser(self.data.config.get("verbs"))

@@ -164,7 +164,7 @@ KINDS = [
         R("music_sound", "choice", "Generated music is played on", options=["chip", "rich"]),
         R("music_form", "text", "Form of generated music (long, or as (A) A B- A+)"),
         R("menus", "choice", "Lists of choices are answered", options=["lines", "bar"]),
-        R("menu_look", "choice", "The look of the game's menus", options=["bar", "line", "terminal", "cards"]),
+        R("menu_look", "choice", "The look of the game's menus", options=["bar", "line", "terminal", "cards", "ring"]),
         R("menu_border", "text", "The frame menus are drawn in (single, double, heavy, cut... and shadow, center, caps)"),
         R("sound_set", "text", "Sound effects from another set (sounds.NAME.json), unless the player picks one"),
         R("logo", "choice", "CLIo logo on the title screen", options=_logo_names()),

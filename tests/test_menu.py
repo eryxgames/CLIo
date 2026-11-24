@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2024-2026 Daniel Sandner
 """Menus (engine/menu.py): items and their values, the keys, pages, finding, what cannot be chosen, the
-picture of a menu and what a click on it means, colours from a theme, the three ways a menu is shown
+picture of a menu and what a click on it means, the ring, colours from a theme, the three ways a menu is shown
 (numbered lines, in the text, over a frame), the menus every game has, a game's own menus as data, and
 the menu in a first-person level and a realm."""
 import io
@@ -64,8 +64,8 @@ def ui_of(lines=(), theme="default", **kw):
     return UI(term(inp, **kw), load_theme(theme))
 
 
-def screen(presses):
-    sc = Screen(term(color=3), ScriptedKeys(presses) if presses is not None else None, {}, animate=False,
+def screen(presses, glyphs=None):
+    sc = Screen(term(color=3, glyphs=glyphs), ScriptedKeys(presses) if presses is not None else None, {}, animate=False,
                 out=io.StringIO())
     sc.size = lambda: (80, 24)
     sc.started = True
@@ -704,6 +704,205 @@ class CardTests(unittest.TestCase):
         self.assertIn("2. Realm 2 (Year 2)", strip_ansi(ui.term.out.getvalue()))
 
 
+def bay(**more):
+    return Menu(title="Launch bay", look="ring", status="BAY 2", items=[
+        {"id": "probe", "label": "Probe", "state": "ready", "tone": "good", "note": "3 aboard", "hint": "To the surface."},
+        {"id": "relay", "label": "Relay buoy", "hold": True, "hint": "Held to go."},
+        {"id": "lamps", "kind": "check", "label": "Lamps", "value": True},
+        {"id": "air", "kind": "slide", "label": "Pressure", "value": 5},
+        {"kind": "head", "label": "Out"},
+        {"id": "drone", "label": "Tow drone", "locked": "It is out."},
+        {"id": "close", "label": "Close"}], **more)
+
+
+def styled(b, style):
+    """How many of a board's cells are painted so."""
+    return sum(1 for row in b.rows for _ch, st, _lit in row if st == style)
+
+
+class RingTests(unittest.TestCase):
+    def test_the_things_stand_round_a_dial(self):
+        m = bay()
+        b = M.board(m, 70, 22)
+        text = b.plain()
+        self.assertEqual((b.w, b.h, m.ringed), (50, 18, True))
+        self.assertEqual((text[0], text[1]), ("LAUNCH BAY                                   BAY 2", "─" * 50))
+        self.assertEqual(text[2].strip(), "► PROBE")                         # the first at the top, marked
+        self.assertEqual(text[14].strip(), "PRESSURE")                       # the fourth of six under it
+        self.assertTrue(text[5].startswith("       CLOSE    ⡴"))                 # the last, up on the left
+        self.assertTrue(text[5].endswith("⢦   RELAY BUOY"))                    # the second, up on the right
+        self.assertIn("TOW DRONE", text[11])
+        self.assertTrue(text[11].endswith("LAMPS"))
+        self.assertNotIn("OUT", "\n".join(text))                             # a heading has no place on a ring
+        self.assertEqual(text[16], " PROBE  READY                            3 aboard")
+        self.assertEqual(text[17], " To the surface.")
+        self.assertEqual(b.keys, "←→ turn   Enter choose   Esc back")
+        dial = "".join(text[3:14])
+        self.assertTrue(all(0x2800 <= ord(ch) < 0x2900 or ch == " " or ch.isalpha() for ch in dial))
+        self.assertGreater(sum(1 for ch in dial if 0x2800 < ord(ch) < 0x2900), 60)
+        at = text[4].index("⡆")                                              # the needle, straight up to the first
+        self.assertEqual((at, b.rows[4][at][1], b.rows[5][at][1]), (25, "sel", "sel"))
+        self.assertEqual(b.rows[2][22][1], "sel")                            # its name lit; the others not
+        self.assertEqual(b.rows[5][text[5].index("RELAY")][1], "item")
+        self.assertEqual(b.rows[11][text[11].index("TOW")][1], "dim")        # what cannot be chosen: faint
+        self.assertEqual((b.at(22, 2), b.at(40, 5), b.at(8, 5), b.at(1, 1)), (("item", 0), ("item", 1), ("item", 6), None))
+        self.assertFalse(b.moving)
+
+    def test_round_it_with_the_arrows(self):
+        m = bay()
+        M.board(m, 70, 22)
+        self.assertEqual(keys(m, "right").current().id, "relay")
+        self.assertEqual(keys(m, "down").current().id, "lamps")
+        self.assertEqual(M.board(m, 70, 22).keys, "↑↓ turn   ←→ change   Enter choose   Esc back")
+        keys(m, "right")                                                     # on a value, left and right change it
+        self.assertEqual((m.current().id, m.find("lamps").value), ("lamps", False))
+        self.assertEqual(keys(m, "down", "right").find("air").value, 6)
+        self.assertEqual(keys(m, "down", "right").current().id, "close")     # over the heading
+        self.assertEqual(keys(m, "right").current().id, "probe")             # and round
+        self.assertEqual(keys(m, "left", "left").current().id, "drone")
+        text = M.board(m, 70, 22).plain()
+        self.assertIn("TOW DRONE ◄", text[11])                               # on the left its mark is after it
+        self.assertEqual((text[16].strip(), text[17]), ("TOW DRONE  LOCKED", " It is out."))   # and why, unasked
+        keys(m, "enter")
+        b = M.board(m, 70, 22)
+        self.assertEqual((m.done, b.plain()[17], b.rows[17][1][1]), (False, " It is out.", "warn"))
+        self.assertEqual(keys(bay(), "6").result.id, "close")                # a digit still chooses
+        m = bay()
+        m.click(("item", 0))
+        self.assertEqual(m.result.id, "probe")
+
+    def test_what_goes_round_inside(self):
+        m = keys(bay(), "down", "down", "down")                             # the slider: as much of a circle as it is
+        M.board(m, 70, 22)
+        half = styled(M.board(m, 70, 22), "val")
+        m.set(m.find("air"), 10)
+        full = styled(M.board(m, 70, 22), "val")
+        m.set(m.find("air"), 0)
+        none = styled(M.board(m, 70, 22), "val")
+        self.assertTrue(none < half < full, (none, half, full))
+        on = styled(M.board(keys(bay(), "down", "down"), 70, 22), "val")
+        m = keys(bay(), "down", "down")
+        m.set(m.find("lamps"), False)
+        self.assertGreater(on, styled(M.board(m, 70, 22), "val") + 20)       # a switch: all the way round, or not
+        clock = Clock()
+        with mock.patch.object(M, "now", clock):
+            m = bay()
+            M.board(m, 70, 22)
+            keys(m, "down", "enter")                                         # held to be done: it fills as it is held
+            b = M.board(m, 70, 22)
+            self.assertEqual(b.plain()[16].strip(), "RELAY BUOY  ARMED")
+            armed = styled(b, "hot")
+            keys(m, "enter", "enter", "enter")
+            more = styled(M.board(m, 70, 22), "hot")
+            self.assertGreater(more, armed + 8)
+            self.assertEqual(M.board(m, 70, 22).keys, "Hold Enter to do it   Esc lets go")
+            keys(m, "enter", "enter")
+            self.assertEqual(m.result.id, "relay")
+
+    def test_the_needle_takes_a_moment_where_it_is_watched(self):
+        clock = Clock()
+        with mock.patch.object(M, "now", clock):
+            m = bay()
+            m.live = True                                                    # (what shows it draws it again as it goes)
+            b = M.board(m, 70, 22)
+            self.assertFalse(b.moving)
+            keys(m, "down", "down", "down")                                  # to the bottom: half a turn
+            b = M.board(m, 70, 22)
+            self.assertTrue(b.moving)
+            self.assertEqual(b.plain()[2].strip(), "PROBE")                  # the mark is where it is going
+            self.assertEqual(b.plain()[14].strip(), "► PRESSURE")
+            at = lambda b: sorted((y, x) for y, row in enumerate(b.rows[3:14]) for x, c in enumerate(row)   # noqa: E731
+                                  if c[1] == "sel" and 20 <= x <= 29 and 5 <= y <= 9)
+            start = at(b)
+            clock.t += M.SWING / 2
+            mid = M.board(m, 70, 22)
+            self.assertTrue(mid.moving)
+            self.assertNotEqual(at(mid), start)
+            clock.t += M.SWING
+            there = M.board(m, 70, 22)
+            self.assertFalse(there.moving)
+            self.assertEqual(M.board(m, 70, 22).plain(), there.plain())
+            still = keys(bay(), "down", "down", "down")                      # not watched: it is there at once
+            b = M.board(still, 70, 22)
+            b = M.board(keys(still, "up"), 70, 22)
+            self.assertFalse(b.moving)
+            self.assertEqual(M._needle(["k", 350.0, 10.0, clock.t - M.SWING / 2]) % 360 < 10
+                             or M._needle(["k", 350.0, 10.0, clock.t - M.SWING / 2]) > 350, True)   # the short way round
+
+    def test_where_a_ring_cannot_be_it_is_a_bar(self):
+        m = bay()
+        for what, b in (("no room across", M.board(m, 40, 22)), ("nor down", M.board(m, 70, 12)),
+                        ("typed", M.board(m, 70, 22, numbers=True)), ("ascii", M.board(m, 70, 22, term(uni=False))),
+                        ("safe glyphs", M.board(m, 70, 22, term(glyphs="safe")))):
+            self.assertFalse(m.ringed, what)
+            self.assertFalse(any(0x2800 <= ord(ch) < 0x2900 for line in b.plain() for ch in line), what)
+            self.assertIn("Probe", "\n".join(b.plain()), what)
+        self.assertEqual(M.board(m, 40, 22).keys, "↑↓ move   Enter choose   Esc back")
+        self.assertEqual(keys(m, "right").current().id, "probe")             # and the arrows are a bar's again
+        linux = term()
+        linux.limited_glyphs = True
+        M.board(m, 70, 22, linux)
+        self.assertFalse(m.ringed)
+        with mock.patch("engine.term._WINDOWS", True):                       # Windows' own console: no braille in its fonts
+            old = term()
+        self.assertEqual((old.font, M.ring_able(old), M.ring_able(term(glyphs="full")), M.ring_able(None)),
+                         ("console", False, True, True))
+        many = Menu(look="ring", items=[{"label": "Thing %d" % i} for i in range(9)])
+        M.board(many, 70, 22)
+        self.assertFalse(many.ringed)
+        M.board(Menu(look="ring", items=[{"label": "Only"}]), 70, 22)
+        eight = Menu(look="ring", items=[{"label": "Thing %d" % i} for i in range(8)])
+        text = M.board(eight, 70, 22).plain()
+        self.assertTrue(eight.ringed)
+        self.assertEqual(sum(line.count("THING") for line in text), 9)       # each has its own place (and one below)
+        self.assertEqual(max(line.count("THING") for line in text[:15]), 2)
+        self.assertTrue(M.board(m, 70, 22) and m.ringed)                     # the same menu, with room again
+
+    def test_shown_in_the_text_and_over_a_picture(self):
+        ui = ui_of(color=3, glyphs="full")
+        got = M.inline(ui, bay(), ScriptedKeys(["right", "down", "up", "enter", "enter", "enter", "enter", "enter", "enter"]))
+        raw = ui.term.out.getvalue()
+        self.assertEqual(got.id, "relay")
+        self.assertIn("⣏⣹", strip_ansi(raw))
+        self.assertIn("► RELAY BUOY", strip_ansi(raw))
+        self.assertTrue(strip_ansi(raw).rstrip().endswith("► Relay buoy"))
+        sc = screen(["left", "enter"], glyphs="full")
+        m = bay()
+        self.assertEqual(M.over(sc, m, [[(None, (200, 100, 50), (20, 40, 60))] * 80 for _ in range(22)],
+                                ui_of(color=3, glyphs="full")).id, "close")
+        self.assertIn("\x1b[48;2;8;9;12m  \x1b[38;2", sc.out.getvalue())     # no box of its own: room round it
+        self.assertIn("⣏", sc.out.getvalue())
+        self.assertFalse(m.live)
+        from engine.game import Game
+        g = Game(STARTER, term=term(), audio=Session("templates/starter").audio, settings={"menu_look": "ring"})
+        self.assertEqual(g.ui.menu_look, "ring")
+
+        s = Session("templates/station").start()             # the station starter's launch bay
+        self.assertEqual(s.game.data.validate(), [])
+        m = M.from_data(s.game, "bay")
+        text = M.board(m, 79, 28).plain()
+        self.assertTrue(m.ringed)
+        self.assertEqual(text[2].strip(), "► SURVEY PROBE")
+        self.assertEqual(text[16].strip(), "SURVEY PROBE  READY")
+        keys(m, "right")
+        text = M.board(m, 79, 28).plain()
+        self.assertEqual((text[16].strip(), text[17].strip()),
+                         ("RELAY BUOY  LOCKED", "Nothing below is marked for it yet: finish the scan."))
+        s.game.world.flags["scan_done"] = True
+        m = keys(M.from_data(s.game, "bay"), "down")
+        self.assertEqual(M.board(m, 79, 28).plain()[16].strip(), "RELAY BUOY  READY")
+        said = s.do("bay", "1", "6")                         # typed: its numbered lines, and what it does
+        self.assertIn("1. Survey probe", said)
+        self.assertIn("The probe drops away, turning.", said)
+        self.assertTrue(s.game.world.flags.get("probe_away"))
+
+        class D:
+            menus = {"bay": {"look": "ring", "items": [{"label": "Go"}, {"label": "More", "look": "rings",
+                                                                        "items": [{"label": "In"}]}]}}
+            config = {"menu_look": "ring"}
+        self.assertEqual(M.problems(D()), ["menu 'bay' item 2: unknown look 'rings' (%s)" % ", ".join(M.LOOKS)])
+
+
 class ColourTests(unittest.TestCase):
     def test_a_colour_spec_as_a_colour(self):
         self.assertEqual(M.rgb_of("amber"), (255, 176, 0))
@@ -1049,16 +1248,16 @@ class DataTests(unittest.TestCase):
         bad = {"camp": {"look": "wheel", "items": [
             {"label": "A"}, {"label": "A"}, {"kind": "dial", "label": "B"}, {"kind": "cycle", "label": "C", "var": "c"},
             {"kind": "slide", "label": "D", "low": 5, "high": 5, "var": "d"}, {"kind": "check", "label": "E"},
-            {"kind": "do"}, 7, {"label": "F", "items": []}, {"label": "G", "look": "ring"}]},
+            {"kind": "do"}, 7, {"label": "F", "items": []}, {"label": "G", "look": "spiral"}]},
             "empty": {}, "list": []}
         text = "\n".join(GameData(self.game(bad)).validate())
-        for part in ("menu 'camp': unknown look 'wheel' (lines, bar, tabs, find, line, terminal, cards)",
+        for part in ("menu 'camp': unknown look 'wheel' (lines, bar, tabs, find, line, terminal, cards, ring)",
                      "menu 'camp' item 2: the id 'a' is used twice in this menu",
                      "menu 'camp' item 3: unknown kind 'dial'", "menu 'camp' item 4: a cycle needs \"choices\"",
                      "menu 'camp' item 5: a slide needs \"low\" under \"high\"",
                      "menu 'camp' item 6: a value needs a \"var\" (or a \"flag\") to be kept in",
                      "menu 'camp' item 7: it needs a \"label\"", "menu 'camp' item 8: it should be a map",
-                     "menu 'camp' item 9: it needs a list of \"items\"", "menu 'camp' item 10: unknown look 'ring'",
+                     "menu 'camp' item 9: it needs a list of \"items\"", "menu 'camp' item 10: unknown look 'spiral'",
                      "menu 'empty': it needs a list of \"items\"", "menu 'list': it should be a map"):
             self.assertIn(part, text)
 

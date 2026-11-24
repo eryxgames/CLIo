@@ -87,7 +87,7 @@ That is a finished game: `take corkscrew`, `use corkscrew on barrel`, `up`. It s
 | `player_stats` | `health`, `max_health`, `attack`, `defense`, `critical_hit_chance`, `evasion`, plus any stat of your own. |
 | `style` | Theme name (see [themes](#text-colour-and-themes)). |
 | `menus` | `"bar"`: lists of choices are answered with the arrow keys (see [menus](#menus)); `"lines"`: every menu is typed. |
-| `menu_look`, `menu_border` | The look of the game's menus (`bar`, `line`, `terminal`, `cards`) and the frame they are drawn in (`"double shadow"`): see [menus](#menus). |
+| `menu_look`, `menu_border` | The look of the game's menus (`bar`, `line`, `terminal`, `cards`, `ring`) and the frame they are drawn in (`"double shadow"`): see [menus](#menus). |
 | `title_banner` | The title drawn in a graphic style: `{"style": "reflect", "palette": "ice"}` - see [banners](#title-screens-banners-and-animation). |
 | `title_effect` | How the title picture animates: `"glitch"`, `"shine"`, `"none"`... |
 | `logo` | Which CLIo logo the title screen shows when the game has no title art or banner (`python clio.py --looks`). |
@@ -510,7 +510,7 @@ typing. Fights keep their typed line (`strike 2`).
 | `again` | After its effects the menu comes back. |
 | `var`, `flag` | Where a value is kept: a variable (any kind of value) or a flag (a `check`). It is read when the menu opens and written as it changes. |
 | `hold` | Done only by holding Enter: the first Enter arms it, holding (or pressing on) fills a bar and does it, Esc or any other key lets go. Where answers are typed it asks first instead. |
-| `state`, `tone` | In the `terminal` look: a word for how it stands (`READY`, `RUNNING`...), and how the word is painted: `good`, `warn`, `hot`, `off`. What is locked says `LOCKED`, what is armed `ARMED`. |
+| `state`, `tone` | In the `terminal` and `ring` looks: a word for how it stands (`READY`, `RUNNING`...), and how the word is painted: `good`, `warn`, `hot`, `off`. What is locked says `LOCKED` whatever its state, what is armed `ARMED`. |
 | `look`, `border` | For the items under it: a look and a frame of their own (below). A menu's own are beside its `title`, with `status` (a word at the top right of a `terminal`). |
 
 **Looks.** `"look"` says how a menu, or the items under an item, are shown:
@@ -523,8 +523,14 @@ typing. Fights keep their typed line (`strike 2`).
 | `line` | The title in letters of heavy lines, rules, and a rail down the items with an arm out to the one the cursor is on. |
 | `terminal` | A console's functions: a number, a name, how it stands, a note; items whose `key` is `f1`...`f12` are soft keys on a strip under the list. |
 | `cards` | Tiles in rows, the arrows going all four ways; a tile shows a picture if the item has one (in code: `picture`, rows of `(r, g, b)`, two to a cell's height). |
+| `ring` | A dial: two to eight things stand round it, the first at the top and the rest the way a clock goes; a needle swings to the one the cursor is on and its part of the rim is lit. Left and right (or up and down) go round. A value, and what is held to be done, go round inside the rim as they fill; what is locked has a dotted rim and says why. Under the dial: the name, how it stands (`state`), its value, its hint. |
 
-`"menu_look"` in `game.json` (`bar`, `line`, `terminal`, `cards`) is the look of the game's own
+A ring is drawn in braille dots. Where there are none (the Windows console window's own fonts,
+the Linux console, `CLIO_GLYPHS=safe`, ASCII), where it does not fit (it needs 13 to 15 rows,
+and across twice its longest label and 22 columns more), with more than eight things, or where
+answers are typed, the same menu is a `bar`, which shows everything but the dial and the `state`.
+
+`"menu_look"` in `game.json` (`bar`, `line`, `terminal`, `cards`, `ring`) is the look of the game's own
 `menu` and of its lists of choices.
 
 **Frames.** A box is drawn in a frame: `single`, `rounded`, `double`, `dos` (double across, single

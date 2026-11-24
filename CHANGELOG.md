@@ -138,6 +138,16 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   beacon, once it is down); a site at a planet's edge has its name before its mark, not cut
   off. While a simulator with panels has not begun or is paused, its screen is dark behind the
   words.
+- **The ring look** (`"look": "ring"`): two to eight things round a dial drawn in dots, a
+  needle that swings to the one the cursor is on (0.18 s, the short way round), its part of the
+  rim lit; left and right go round. A slider, a switch and a thing held to be done fill a
+  circle inside the rim; what is locked has a dotted rim, and the reason is shown while the
+  cursor is on it. In the text and over a picture; a click on a name chooses it. Where there
+  is no braille (the Windows console's own fonts, the Linux console, safe glyphs, ASCII), no
+  room, more than eight things, or typed answers, it is a bar. The station starter has one:
+  `bay` on the bridge (`menus.json`). `python -m engine.menu` has a Launch bay to try.
+- In the terminal look, a thing that is locked says `LOCKED` whatever its `state` (it kept
+  saying `READY`).
 - The station starter's consoles do things: the reactor vents steam and scrams (hold `X`); the
   scan narrows its beam (faster, and less forgiving) and is done by deploying a beacon (hold
   `B`) once the picture is whole - it descends, and is named on the moon below; the helm

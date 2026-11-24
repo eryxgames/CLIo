@@ -36,6 +36,7 @@ Every game has :func:`options` (sound, screen) and :func:`game_menu` behind ``op
 """
 from __future__ import annotations
 
+import math
 import re
 import time
 
@@ -43,13 +44,15 @@ from .term import FRAMES, PALETTE, QuitGame, char_width, idx256_to_rgb, parse_he
 
 KINDS = ("do", "go", "check", "slide", "cycle", "text", "bind", "head")
 VALUES = ("check", "slide", "cycle", "text", "bind")
-LOOKS = ("lines", "bar", "tabs", "find", "line", "terminal", "cards")
+LOOKS = ("lines", "bar", "tabs", "find", "line", "terminal", "cards", "ring")
 CSI = "\x1b["
 MOUSE_ON, MOUSE_OFF = CSI + "?1000h" + CSI + "?1006h", CSI + "?1000l" + CSI + "?1006l"
 FIND_OVER = 12                    # a plain list longer than this is found by typing
 BAR = 10                          # cells of a slider
 HOLD = 5                          # presses (or repeats of a held key) that do a thing that is held to be done
 HOLD_GAP = 1.2                    # seconds between them at most, or the count starts again
+RING_MOST = 8                     # things round a ring at most; more are shown as a bar
+SWING = 0.18                      # seconds a ring's needle takes to the next thing
 # The frames a menu can be drawn in: top, bottom, left, right, the four corners, the two ends of a rule
 # across it, and the rule. After the name may come "shadow", "center" (the title) and "caps" (its ends).
 BORDERS = {
@@ -166,6 +169,9 @@ class Menu:
         self.armed, self.charge, self.armed_at = None, 0, 0.0   # a thing held to be done: armed, how far, when
         self.once = False                                # one answer a line (typed): holding becomes asking
         self.columns = 1                                 # cards in a row, as they were last drawn
+        self.ringed = False                              # drawn as a ring, the last time (not as the bar it falls back to)
+        self.live = False                                # shown by something that draws again while a needle moves
+        self.swing = None                                # a ring's needle on its way: [page, from, to, since]
         self.done, self.result, self.ended = False, None, False
 
     # ---- where ---------------------------------------------------------- #
@@ -467,6 +473,8 @@ class Menu:
             d = 1 if k == "right" else -1
             if cur is not None and cur.kind in ("check", "slide", "cycle"):
                 self.change(cur, d)
+            elif self.ringed and self.look_now() == "ring":                  # round the ring
+                self.move(d)
             elif tabs:
                 self.turn(d)
             elif d > 0 and cur is not None and cur.kind == "go":
@@ -574,6 +582,7 @@ class Board:
         self.rows = [[(" ", "item", False)] * w for _ in range(h)]
         self.hits = []
         self.keys = ""
+        self.moving = False                              # something in it is on its way: draw it again soon
 
     def put(self, x, y, text, style="item", lit=False):
         if not 0 <= y < self.h:
@@ -778,7 +787,10 @@ def keys_line(menu, g, numbers=False):
     if menu.armed is not None:
         return "Hold Enter to do it   Esc lets go"
     parts = ["type to find"] if look == "find" else []
-    parts.append("%s %s move" % (g["ud"], g["lr"]) if look == "cards" and menu.columns > 1 else "%s move" % g["ud"])
+    if look == "ring" and menu.ringed:
+        parts.append("%s turn" % (g["ud"] if cur is not None and cur.kind in ("slide", "cycle", "check") else g["lr"]))
+    else:
+        parts.append("%s %s move" % (g["ud"], g["lr"]) if look == "cards" and menu.columns > 1 else "%s move" % g["ud"])
     if cur is not None and cur.kind in ("slide", "cycle", "check"):
         parts.append("%s change" % g["lr"])
     parts.append("Enter arm" if cur is not None and cur.hold else "Enter choose")
@@ -812,7 +824,11 @@ def board(menu, cols=80, lines=24, term=None, frame=None, numbers=False, roomy=F
     item (for a screen that reads typed lines); ``roomy``: a blank row between items when they fit so."""
     g = glyphs_of(term)
     look = menu.look_now()
-    if look == "cards":
+    b = _ring(menu, cols, lines, term, g) if look == "ring" and not numbers else None
+    menu.ringed = b is not None
+    if b is not None:
+        pass
+    elif look == "cards":
         b = _cards(menu, cols, lines, term, g)
     elif look == "terminal":
         b = _terminal(menu, cols, lines, term, g, numbers)
@@ -1068,8 +1084,8 @@ def state_of(menu, item):
     """How an item stands, in a word, and how the word is painted (the terminal look)."""
     if menu.armed is item:
         return "ARMED", "hot"
-    if menu.why_not(item):
-        return item.state.upper() or "LOCKED", "dim"
+    if menu.why_not(item):                               # whatever it says of itself: not now
+        return "LOCKED", "dim"
     return item.state.upper(), TONES.get(item.tone, "val")
 
 
@@ -1145,6 +1161,190 @@ def _terminal(menu, cols, lines, term, g, numbers):
             b.hit(x, y, x + len(cap) + cells_wide(text), y + 1, ("item", n))
             x += len(cap) + cells_wide(text) + 1
     return b
+
+
+class Dots:
+    """Dots to draw with on a board: braille, two across a cell and four down it. A cell is painted in
+    the style of the strongest thing drawn in it (its ``rank``)."""
+    BITS = ((1, 8), (2, 16), (4, 32), (64, 128))
+
+    def __init__(self, w, h):
+        self.w, self.h = w * 2, h * 4
+        self.cells = {}                                  # (column, row) -> [bits, rank, style]
+
+    def dot(self, x, y, style="frame", rank=0):
+        x, y = int(math.floor(x + 0.5)), int(math.floor(y + 0.5))
+        if 0 <= x < self.w and 0 <= y < self.h:
+            c = self.cells.setdefault((x // 2, y // 4), [0, -1, style])
+            c[0] |= self.BITS[y % 4][x % 2]
+            if rank > c[1]:
+                c[1], c[2] = rank, style
+
+    def line(self, x0, y0, x1, y1, style="frame", rank=0):
+        n = int(max(abs(x1 - x0), abs(y1 - y0)) * 1.5) + 1
+        for i in range(n + 1):
+            self.dot(x0 + (x1 - x0) * i / float(n), y0 + (y1 - y0) * i / float(n), style, rank)
+
+    def arc(self, cx, cy, r, a0, a1, style="frame", rank=0, every=1):
+        """Part of a circle, from ``a0`` to ``a1`` degrees round from the top (the way a clock goes);
+        ``every`` 2 leaves each other dot out (a dotted line)."""
+        n = max(1, int(abs(a1 - a0) / 360.0 * 2 * math.pi * r * 1.6))
+        for i in range(n + 1):
+            if every > 1 and i % every:
+                continue
+            a = math.radians(a0 + (a1 - a0) * i / float(n))
+            self.dot(cx + r * math.sin(a), cy - r * math.cos(a), style, rank)
+
+    def onto(self, board, x, y):
+        for (cx, cy), (bits, _rank, style) in self.cells.items():
+            board.put(x + cx, y + cy, chr(0x2800 + bits), style)
+
+
+def ring_able(term, g=None):
+    """Whether a ring can be drawn here: it is drawn in braille dots, which the Windows console's own
+    fonts and the Linux console's have not (there, and in ASCII, a ring is shown as a bar)."""
+    g = g if g is not None else glyphs_of(term)
+    if g is not GLYPHS:
+        return False
+    return term is None or (getattr(term, "font", "full") != "console" and not getattr(term, "limited_glyphs", False))
+
+
+def _ring(menu, cols, lines, term, g):
+    """The ring look: the things to choose stand round a dial, a needle points at the one the cursor is
+    on and its part of the rim is lit; what is held to be done, and a value, go round inside the rim as
+    they fill. None when it cannot be drawn so here (no braille, no room, more than a ring holds)."""
+    rows = menu.rows()
+    ok = [n for n, r in enumerate(rows) if r.kind != "head"]
+    if not 2 <= len(ok) <= RING_MOST or not ring_able(term, g) or menu.tabs():
+        return None
+    count, at = len(ok), menu.at
+    here = ok.index(at) if at in ok else 0
+    cur = rows[ok[here]]
+    title, status = menu.title_now().upper(), menu.holder().status
+    labels = [rows[n].label.upper() for n in ok]
+    label_w = min(18, max(cells_wide(t) for t in labels))
+    hints = [rows[n].hint for n in ok if rows[n].hint] + [menu.why_not(rows[n]) for n in ok if menu.why_not(rows[n])] \
+        + ([menu.said] if menu.said else [])
+    value_w = max([value_wide(rows[n], g) for n in ok] or [0])
+    state_w = max([cells_wide(state_of(menu, rows[n])[0]) for n in ok] + [6 if any(rows[n].locked for n in ok) else 0,
+                                                                         5 if any(rows[n].hold for n in ok) else 0])
+    foot = 2 + (max(1, min(2, max([len(wrap(t, 52)) for t in hints] or [1])))
+                if hints or any(rows[n].locked or rows[n].hold for n in ok) else 0)
+    rh = min(11, lines - 4 - foot)                       # the dial's rows: the title, a rule, a row above and below it
+    rh -= 1 - rh % 2
+    if rh < 7:
+        return None
+    R = rh * 2 - 1.5                                     # in dots
+    rw = rh * 2                                          # the dial's columns: dots are as wide as they are high
+    side = label_w + 4                                   # a label, its mark, a gap
+    W = max(2 * side + rw, cells_wide(title) + cells_wide(status) + 4, label_w + 2 + state_w + 2 + value_w + 2,
+            min(52, max([cells_wide(t) for t in hints] or [0])))
+    W += (W - rw) % 2                                    # the dial in the very middle
+    if W > cols:
+        return None
+    b = Board(W, 2 + 1 + rh + 1 + foot)
+    b.put(0, 0, title[:W], "title")
+    if status:
+        b.put(max(cells_wide(title) + 2, W - cells_wide(status)), 0, status, "dim")
+    b.put(0, 1, g["rule"] * W, "frame")
+    x0, y0 = (W - rw) // 2, 3
+    cx, cy = rw - 0.5, rh * 2 - 0.5                      # the dial's middle, in its dots
+    step = 360.0 / count
+    want = here * step
+    shown = want
+    key = menu.page_key()
+    sw = menu.swing
+    if sw is not None and sw[0] == key and sw[2] != want and menu.live:      # it has moved on: from where it is now
+        sw = menu.swing = [key, _needle(sw), want, now()]
+    elif sw is None or sw[0] != key or not menu.live:
+        sw = menu.swing = [key, want, want, 0.0]
+    shown = _needle(sw)
+    b.moving = shown != want
+    armed = menu.armed is cur
+    d = Dots(rw, rh)
+    for k, n in enumerate(ok):                           # the rim, a part for each thing; what is locked, dotted
+        a = k * step
+        d.arc(cx, cy, R, a - step / 2.0, a + step / 2.0, "dim" if menu.why_not(rows[n]) else "frame", 1,
+              2 if menu.why_not(rows[n]) else 1)
+        edge = math.radians(a - step / 2.0)              # and a notch between it and the one before
+        d.line(cx + (R - 3) * math.sin(edge), cy - (R - 3) * math.cos(edge), cx + R * math.sin(edge),
+               cy - R * math.cos(edge), "frame", 2)
+    lit = "hot" if armed else ("dim" if menu.why_not(cur) else "sel")
+    for r in (R, R - 1, R - 2):                          # the part the cursor is on, thick
+        d.arc(cx, cy, r, want - step / 2.0 + 4, want + step / 2.0 - 4, lit, 4)
+    part = None                                          # what goes round inside: how far it is held, or a value
+    if armed:
+        part = (menu.charge / float(HOLD), "hot")
+    elif cur.kind == "slide":
+        part = ((cur.value - cur.low) / (float(cur.high - cur.low) or 1.0), "val")
+    elif cur.kind == "check":
+        part = (1.0 if cur.value else 0.0, "val")
+    elif cur.kind == "cycle" and cur.choices:
+        values = [v for v, _l in cur.choices]
+        part = ((values.index(cur.value) + 1 if cur.value in values else 0) / float(len(values)), "val")
+    if part is not None:
+        d.arc(cx, cy, R - 6, 0, 360, "dim", 0, 3)
+        if part[0] > 0:
+            for r in (R - 6, R - 7):
+                d.arc(cx, cy, r, 0, 360 * max(0.0, min(1.0, part[0])), part[1], 5)
+    a = math.radians(shown)                              # the needle, from a hub
+    d.arc(cx, cy, 2, 0, 360, lit, 6)
+    d.line(cx + 2 * math.sin(a), cy - 2 * math.cos(a), cx + (R - (9 if part is not None else 4)) * math.sin(a),
+           cy - (R - (9 if part is not None else 4)) * math.cos(a), lit, 6)
+    d.onto(b, x0, y0)
+    mid = y0 + rh // 2
+    for k, n in enumerate(ok):                           # the names, round it
+        r, a = rows[n], math.radians(k * step)
+        sx, sy = math.sin(a), -math.cos(a)
+        sel, why = n == at, menu.why_not(r)
+        style = "dim" if why else ("sel" if sel else "item")
+        text = labels[k] if cells_wide(labels[k]) <= label_w else labels[k][:label_w - 1] + g["ell"]
+        wide = cells_wide(text)
+        if abs(sx) < 0.05:                               # at the top, at the bottom: over it, under it
+            y = y0 - 1 if sy < 0 else y0 + rh
+            x = (W - wide) // 2
+            if sel:
+                b.put(x - 2, y, g["mark"], lit)
+        else:
+            off = int(math.floor(sy * (rh / 2.0) + 0.5))
+            off = max(-(rh // 2), min(rh // 2, off))
+            y = mid + off
+            half = math.sqrt(max(0.0, R * R - (off * 4.0) ** 2)) / 2.0       # how far out the rim is on that row
+            if sx > 0:
+                x = int(W / 2.0 + half) + 4
+                if sel:
+                    b.put(x - 2, y, g["mark"], lit)
+            else:
+                x = int(W / 2.0 - half) - 4 - wide
+                if sel:
+                    b.put(x + wide + 1, y, g["less"], lit)
+        b.put(x, y, text, style)
+        b.hit(x - 2, y, x + wide + 2, y + 1, ("item", n))
+    y = y0 + rh + 1
+    b.put(0, y, g["rule"] * W, "frame")
+    state, tone = state_of(menu, cur)                    # under it: the one the cursor is on, how it stands, its value
+    x = b.put(1, y + 1, labels[here][:W - 2], "dim" if menu.why_not(cur) else "sel")
+    if state:
+        b.put(x + 2, y + 1, state, tone)
+    if value_w and (cur.kind != "do" or cur.note):
+        draw_value(b, W - value_w - 1, y + 1, cur, ok[here], True, False, g, menu, value_w)
+    if foot > 2:
+        text, how = hint_of(menu, g)
+        if menu.why_not(cur) and not menu.said:          # on what cannot be chosen: why, before it is asked
+            text, how = menu.why_not(cur), "dim"
+        for i, line in enumerate(wrap(text, W - 1)[:foot - 2]):
+            b.put(1, y + 2 + i, line, how)
+    return b
+
+
+def _needle(sw):
+    """Where a ring's needle is now (degrees), on its way the short way round."""
+    _key, a, to, since = sw
+    k = (now() - since) / SWING if SWING > 0 else 1.0
+    if a == to or k >= 1.0 or k < 0.0:
+        return to
+    turn = (to - a + 180.0) % 360.0 - 180.0
+    return (a + turn * k * (2.0 - k)) % 360.0            # quick, then slower as it comes to it
 
 
 def _cards(menu, cols, lines, term, g):
@@ -1412,6 +1612,7 @@ def inline(ui, menu, keys=None, idle=None):
     drawn = 0
     quiet = now()
     ended = False
+    menu.live = True
     try:
         term.write(CSI + "?25l")
         while not menu.done:
@@ -1428,8 +1629,8 @@ def inline(ui, menu, keys=None, idle=None):
             term.flush()
             drawn = len(out)
             while True:
-                k = keys.get(0.1)
-                if k is not None:
+                k = keys.get(0.04 if b.moving else 0.1)
+                if k is not None or b.moving:            # a needle on its way: drawn again as it goes
                     break
                 if idle and now() - quiet >= idle[0]:
                     term.write("%s%dA\r%sJ%s?25h" % (CSI, drawn, CSI, CSI))
@@ -1446,6 +1647,7 @@ def inline(ui, menu, keys=None, idle=None):
             elif not k.startswith(("mouse:", "mouseup:")):
                 menu.key(k)
     finally:
+        menu.live = False
         try:
             keys.stop()
         finally:
@@ -1496,7 +1698,7 @@ def over(screen, menu, backdrop=None, ui=None, mouse=True, after=""):
         behind = backdrop() if callable(backdrop) else backdrop
         rows = dimmed(behind, W, H - 2)
         x0, y0 = max(0, (W - b.w) // 2), max(0, (H - 2 - b.h) // 2)
-        if menu.look_now() in ("line", "terminal", "cards") or \
+        if menu.look_now() in ("line", "terminal", "cards", "ring") and (menu.look_now() != "ring" or menu.ringed) or \
                 border(menu.border_now() or frame_of(ui), term).name in ("none", "rule", "corners", "brackets"):
             for yy in range(max(0, y0 - 1), min(len(rows), y0 + b.h + 1)):       # no box of its own: room round it
                 for xx in range(max(0, x0 - 2), min(W, x0 + b.w + 2)):
@@ -1542,14 +1744,16 @@ def over(screen, menu, backdrop=None, ui=None, mouse=True, after=""):
     mouse = mouse and not getattr(screen.keys, "win", False)
     if mouse:
         screen.write(MOUSE_ON)
+    menu.live = True
     try:
         screen.shown = {}
         dirty = True
         while not menu.done:
             if dirty or screen.resized():
                 draw()
-            k = screen.keys.get(0.1)
-            dirty = k is not None
+            moving = state["board"].moving               # a needle on its way: drawn again as it goes
+            k = screen.keys.get(0.04 if moving else 0.1)
+            dirty = k is not None or moving
             if k is None:
                 continue
             if k == "ctrl-d":
@@ -1567,6 +1771,7 @@ def over(screen, menu, backdrop=None, ui=None, mouse=True, after=""):
             elif not k.startswith("mouseup:"):
                 menu.key(k)
     finally:
+        menu.live = False
         if mouse:
             screen.write(MOUSE_OFF + after)
         screen.shown = {}
@@ -1726,7 +1931,7 @@ def problems(data):
     """What is wrong in a game's ``menus.json`` (for ``--check``)."""
     out = []
     cfg = getattr(data, "config", None) or {}
-    if cfg.get("menu_look") not in (None, "bar", "line", "terminal", "cards"):
+    if cfg.get("menu_look") not in (None, "bar", "line", "terminal", "cards", "ring"):
         out.append("game.json: unknown menu_look '%s' (bar, line, terminal, cards)" % cfg.get("menu_look"))
     if cfg.get("menu_border") is not None and str(cfg["menu_border"]).split()[:1] not in [[n] for n in BORDERS]:
         out.append("game.json: unknown menu_border '%s' (%s)" % (cfg["menu_border"], ", ".join(BORDERS)))
@@ -1822,6 +2027,17 @@ def sample():
             {"id": "scan", "label": "Hull scan", "state": "running", "tone": "warn", "note": "41%", "key": "f4"},
             {"id": "cage", "label": "Field cage", "locked": "The reactor is under 80%."},
             {"id": "boat", "label": "Lifeboat 2", "state": "gone", "tone": "off"}]},
+        {"label": "Launch bay", "title": "Launch bay", "look": "ring", "status": "BAY 2 OPEN", "hint": "The ring look.",
+         "items": [
+            {"id": "probe", "label": "Survey probe", "state": "ready", "tone": "good", "note": "3 aboard",
+             "hint": "A probe to the surface."},
+            {"id": "relay", "label": "Relay buoy", "state": "ready", "tone": "good", "hold": True,
+             "hint": "Enter arms it; hold Enter and it goes. It cannot be taken back."},
+            {"id": "lamps", "kind": "check", "label": "Bay lamps", "value": True, "hint": "On or off."},
+            {"id": "pressure", "kind": "slide", "label": "Pressure", "value": 60, "low": 0, "high": 100, "step": 10,
+             "unit": "%", "hint": "Left and right."},
+            {"id": "drone", "label": "Tow drone", "locked": "The drone is out with the hopper."},
+            {"id": "close", "label": "Close the bay", "hint": "And back."}]},
         {"label": "Saved realms", "look": "cards", "hint": "The cards look.", "items": [
             {"id": "s%d" % n, "label": name, "note": when, "picture": land(n), "hint": "A realm kept."}
             for n, (name, when) in enumerate((("Fer", "Year 19, Deep"), ("Taros", "Year 4, Ember"),
@@ -1857,7 +2073,8 @@ def main(argv=None):
             ui.line("\n".join(painted(board(small, 60, 12, term), ui)))
         return 0
     if "--print" in argv:
-        for keys in ((), ("down", "enter"), ("down", "down", "enter", "f", "o"), ("3", "down"), ("4", "enter"), ("5",)):
+        for keys in ((), ("down", "enter"), ("down", "down", "enter", "f", "o"), ("3", "down"), ("4", "enter"), ("5",),
+                     ("6",)):
             m = sample()
             for k in keys:
                 m.key(k)

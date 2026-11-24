@@ -1,0 +1,82 @@
+{
+ "bay": {
+  "title": "Launch bay",
+  "look": "ring",
+  "status": "BAY 2",
+  "items": [
+   {
+    "id": "probe",
+    "label": "Survey probe",
+    "state": "ready",
+    "tone": "good",
+    "hint": "A probe to the surface.",
+    "locked": "probe_away",
+    "why": "It is on its way down.",
+    "effects": [
+     {
+      "set": "probe_away"
+     },
+     {
+      "say": "The probe drops away, turning."
+     }
+    ],
+    "again": true
+   },
+   {
+    "id": "buoy",
+    "label": "Relay buoy",
+    "state": "ready",
+    "tone": "good",
+    "hold": true,
+    "hint": "Enter arms it; hold Enter and it goes. It cannot be taken back.",
+    "locked": "!scan_done",
+    "why": "Nothing below is marked for it yet: finish the scan.",
+    "effects": [
+     {
+      "set": "buoy_out"
+     },
+     {
+      "say": "The buoy is out, and holding over the mast."
+     }
+    ]
+   },
+   {
+    "id": "lamps",
+    "kind": "check",
+    "label": "Bay lamps",
+    "flag": "bay_lamps",
+    "hint": "On or off."
+   },
+   {
+    "id": "pressure",
+    "kind": "slide",
+    "label": "Pressure",
+    "var": "bay_pressure",
+    "low": 0,
+    "high": 100,
+    "step": 10,
+    "unit": "%",
+    "hint": "Left and right."
+   },
+   {
+    "id": "drone",
+    "label": "Tow drone",
+    "state": "ready",
+    "tone": "good",
+    "locked": "!reactor_done",
+    "why": "The drone needs the reactor steady.",
+    "effects": [
+     {
+      "say": "The drone unfolds and goes out along the hull."
+     }
+    ],
+    "again": true
+   },
+   {
+    "id": "close",
+    "label": "Close the bay",
+    "hint": "Back to the bridge."
+   }
+  ]
+ }
+}

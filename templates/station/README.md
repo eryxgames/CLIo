@@ -6,7 +6,8 @@ Each is a CLIo simulator (`sims.json`) with a screen of its own under `"panels"`
 big numbers, lamps, plots over time, a map, and vector scopes. The consoles do things when asked
 (`"functions"`): the reactor vents steam (`V`) and scrams (hold `X`); the scan narrows its beam
 (`N`) and is done by deploying a beacon (hold `B`) once the picture is whole; the helm flushes its
-coolant (`F`).
+coolant (`F`). On the bridge, `bay` opens a menu of the game's own in the ring look (`menus.json`):
+things round a dial, some locked until a console is done, one held to be done, two values.
 
 ```
 python clio.py templates/station            # play it

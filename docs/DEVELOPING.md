@@ -66,7 +66,7 @@ For people working on the engine itself. Making a game needs none of this: see
 - [x] Cues: screens that move with the sound, from Playhead's cue sheets or a song's own notes
 - [x] Menus: one menu in several looks, options and a game menu in every game, a game's own as data
 - [x] Panels: a simulator's own screen of instruments (a bridge, an engineering console)
-- [x] Three demo games, two starter templates, several hundred automated tests
+- [x] Three demo games and a terminals demo, three starter templates, over a thousand automated tests
 - [x] Game editor in the browser: `python clio.py mygame --edit`, or
       [on the web](https://eryxgames.github.io/CLIo/) with nothing installed - forms for
       everything a game is made of, the map, conversations as graphs, all text as a
@@ -126,7 +126,7 @@ guide.
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 1064 tests, about a minute
+python -m unittest discover -s tests     # 1070 tests, about a minute
 python -m engine.vector                  # the vector display's reel (Ctrl-C ends)
 python -m engine.realm templates/realm 8 # a steward plays the realm starter over eight seeds
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class

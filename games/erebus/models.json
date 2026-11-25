@@ -1,0 +1,1207 @@
+{
+ "hauler": {
+  "materials": {
+   "hull": {
+    "color": "#8d949c",
+    "metal": 0.6,
+    "rough": 0.5
+   },
+   "deck": {
+    "color": "#5f6a70",
+    "metal": 0.2,
+    "rough": 0.8
+   },
+   "cargo": {
+    "color": "#b0733a",
+    "metal": 0.1,
+    "rough": 0.8
+   },
+   "core": {
+    "color": "#7fe0ff",
+    "glow": 2.5
+   },
+   "glass": {
+    "color": "#ffd27a",
+    "glow": 1.5
+   },
+   "engine": {
+    "color": "#4a4f57",
+    "metal": 0.8,
+    "rough": 0.35
+   }
+  },
+  "parts": [
+   {
+    "shape": "box",
+    "size": [
+     2.4,
+     6.0,
+     0.12
+    ],
+    "at": [
+     0,
+     0,
+     0.06
+    ],
+    "material": "hull"
+   },
+   {
+    "shape": "box",
+    "size": [
+     2.4,
+     6.0,
+     0.12
+    ],
+    "at": [
+     0,
+     0,
+     1.74
+    ],
+    "material": "hull"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.12,
+     6.0,
+     1.8
+    ],
+    "at": [
+     -1.14,
+     0,
+     0.9
+    ],
+    "material": "hull"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.12,
+     6.0,
+     1.8
+    ],
+    "at": [
+     1.14,
+     0,
+     0.9
+    ],
+    "material": "hull"
+   },
+   {
+    "shape": "box",
+    "size": [
+     2.4,
+     0.12,
+     1.8
+    ],
+    "at": [
+     0,
+     -2.94,
+     0.9
+    ],
+    "material": "hull"
+   },
+   {
+    "shape": "wedge",
+    "size": [
+     2.4,
+     1.4,
+     1.8
+    ],
+    "at": [
+     0,
+     3.7,
+     0.9
+    ],
+    "material": "hull"
+   },
+   {
+    "shape": "box",
+    "size": [
+     2.1,
+     5.6,
+     0.06
+    ],
+    "at": [
+     0,
+     0,
+     0.9
+    ],
+    "material": "deck",
+    "group": "decks"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.06,
+     1.2,
+     0.8
+    ],
+    "at": [
+     0,
+     1.6,
+     0.5
+    ],
+    "material": "deck",
+    "group": "decks"
+   },
+   {
+    "shape": "box",
+    "size": [
+     2.1,
+     0.06,
+     0.8
+    ],
+    "at": [
+     0,
+     0.4,
+     0.5
+    ],
+    "material": "deck",
+    "group": "decks"
+   },
+   {
+    "shape": "box",
+    "size": [
+     2.1,
+     0.06,
+     0.8
+    ],
+    "at": [
+     0,
+     -1.4,
+     1.3
+    ],
+    "material": "deck",
+    "group": "decks"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.8,
+     0.8,
+     0.7
+    ],
+    "at": [
+     -0.55,
+     1.5,
+     0.5
+    ],
+    "material": "cargo",
+    "group": "hold"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.8,
+     0.8,
+     0.7
+    ],
+    "at": [
+     0.55,
+     1.5,
+     0.5
+    ],
+    "material": "cargo",
+    "group": "hold"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.8,
+     0.8,
+     0.7
+    ],
+    "at": [
+     -0.55,
+     -0.5,
+     0.5
+    ],
+    "material": "cargo",
+    "group": "hold"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.8,
+     0.8,
+     0.7
+    ],
+    "at": [
+     0.55,
+     -0.5,
+     0.5
+    ],
+    "material": "cargo",
+    "group": "hold"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.8,
+     0.8,
+     0.5
+    ],
+    "at": [
+     0.0,
+     0.5,
+     1.25
+    ],
+    "material": "cargo",
+    "group": "hold"
+   },
+   {
+    "shape": "sphere",
+    "size": [
+     0.55,
+     0.55,
+     0.55
+    ],
+    "at": [
+     0,
+     -2.1,
+     0.5
+    ],
+    "material": "core",
+    "group": "reactor",
+    "detail": 1
+   },
+   {
+    "shape": "ring",
+    "size": [
+     0.8,
+     0.8,
+     0.5
+    ],
+    "at": [
+     0,
+     -2.1,
+     0.5
+    ],
+    "material": "engine",
+    "group": "reactor",
+    "sides": 8,
+    "thick": 0.15,
+    "tube": 4
+   },
+   {
+    "shape": "box",
+    "size": [
+     1.6,
+     1.0,
+     0.6
+    ],
+    "at": [
+     0,
+     2.2,
+     1.35
+    ],
+    "material": "glass",
+    "group": "bridge"
+   },
+   {
+    "shape": "cylinder",
+    "size": [
+     0.45,
+     0.45,
+     1.0
+    ],
+    "at": [
+     -0.7,
+     -3.4,
+     0.9
+    ],
+    "material": "engine",
+    "group": "engines",
+    "axis": "y",
+    "sides": 8
+   },
+   {
+    "shape": "cylinder",
+    "size": [
+     0.45,
+     0.45,
+     1.0
+    ],
+    "at": [
+     0.7,
+     -3.4,
+     0.9
+    ],
+    "material": "engine",
+    "group": "engines",
+    "axis": "y",
+    "sides": 8
+   }
+  ],
+  "look": {
+   "view": "structure",
+   "groups": {
+    "reactor": "red",
+    "engines": "amber",
+    "bridge": "white",
+    "hold": "blue",
+    "decks": "cyan"
+   }
+  }
+ },
+ "mast": {
+  "materials": {
+   "steel": {
+    "color": "#b4bac2",
+    "metal": 0.7,
+    "rough": 0.45
+   },
+   "rust": {
+    "color": "#a8583a",
+    "metal": 0.3,
+    "rough": 0.7
+   },
+   "base": {
+    "color": "#5a5a58",
+    "metal": 0.0,
+    "rough": 0.9
+   },
+   "dish": {
+    "color": "#c8ccd0",
+    "metal": 0.6,
+    "rough": 0.3
+   },
+   "lamp": {
+    "color": "#ff3020",
+    "glow": 4
+   }
+  },
+  "parts": [
+   {
+    "shape": "box",
+    "size": [
+     1.3,
+     1.3,
+     0.3
+    ],
+    "at": [
+     0,
+     0,
+     0.15
+    ],
+    "material": "base"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.12,
+     0.12,
+     5.2
+    ],
+    "at": [
+     -0.42,
+     -0.42,
+     2.75
+    ],
+    "material": "steel"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.12,
+     0.12,
+     5.2
+    ],
+    "at": [
+     -0.42,
+     0.42,
+     2.75
+    ],
+    "material": "steel"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.12,
+     0.12,
+     5.2
+    ],
+    "at": [
+     0.42,
+     -0.42,
+     2.75
+    ],
+    "material": "steel"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.12,
+     0.12,
+     5.2
+    ],
+    "at": [
+     0.42,
+     0.42,
+     2.75
+    ],
+    "material": "steel"
+   },
+   {
+    "shape": "ring",
+    "size": [
+     0.96,
+     0.96,
+     0.08
+    ],
+    "at": [
+     0,
+     0,
+     0.9
+    ],
+    "material": "steel",
+    "sides": 4,
+    "thick": 0.12,
+    "tube": 3,
+    "turn": [
+     45,
+     0,
+     0
+    ]
+   },
+   {
+    "shape": "ring",
+    "size": [
+     0.96,
+     0.96,
+     0.08
+    ],
+    "at": [
+     0,
+     0,
+     1.75
+    ],
+    "material": "rust",
+    "sides": 4,
+    "thick": 0.12,
+    "tube": 3,
+    "turn": [
+     45,
+     0,
+     0
+    ]
+   },
+   {
+    "shape": "ring",
+    "size": [
+     0.96,
+     0.96,
+     0.08
+    ],
+    "at": [
+     0,
+     0,
+     2.6
+    ],
+    "material": "steel",
+    "sides": 4,
+    "thick": 0.12,
+    "tube": 3,
+    "turn": [
+     45,
+     0,
+     0
+    ]
+   },
+   {
+    "shape": "ring",
+    "size": [
+     0.96,
+     0.96,
+     0.08
+    ],
+    "at": [
+     0,
+     0,
+     3.4499999999999997
+    ],
+    "material": "rust",
+    "sides": 4,
+    "thick": 0.12,
+    "tube": 3,
+    "turn": [
+     45,
+     0,
+     0
+    ]
+   },
+   {
+    "shape": "ring",
+    "size": [
+     0.96,
+     0.96,
+     0.08
+    ],
+    "at": [
+     0,
+     0,
+     4.3
+    ],
+    "material": "steel",
+    "sides": 4,
+    "thick": 0.12,
+    "tube": 3,
+    "turn": [
+     45,
+     0,
+     0
+    ]
+   },
+   {
+    "shape": "ring",
+    "size": [
+     0.96,
+     0.96,
+     0.08
+    ],
+    "at": [
+     0,
+     0,
+     5.15
+    ],
+    "material": "rust",
+    "sides": 4,
+    "thick": 0.12,
+    "tube": 3,
+    "turn": [
+     45,
+     0,
+     0
+    ]
+   },
+   {
+    "shape": "cylinder",
+    "axis": "y",
+    "size": [
+     1.0,
+     0.1,
+     1.0
+    ],
+    "at": [
+     0,
+     0.5,
+     4.4
+    ],
+    "material": "dish",
+    "sides": 10,
+    "turn": [
+     0,
+     -20,
+     0
+    ]
+   },
+   {
+    "shape": "cone",
+    "size": [
+     0.6,
+     0.6,
+     0.6
+    ],
+    "at": [
+     0,
+     0,
+     5.65
+    ],
+    "material": "rust",
+    "sides": 4
+   },
+   {
+    "shape": "sphere",
+    "size": [
+     0.32,
+     0.32,
+     0.32
+    ],
+    "at": [
+     0,
+     0,
+     6.05
+    ],
+    "material": "lamp",
+    "detail": 0
+   }
+  ]
+ },
+ "beacon": {
+  "materials": {
+   "steel": {
+    "color": "#b4bac2",
+    "metal": 0.7,
+    "rough": 0.45
+   },
+   "dark": {
+    "color": "#4a5058",
+    "metal": 0.4,
+    "rough": 0.7
+   },
+   "gold": {
+    "color": "#d8a84a",
+    "metal": 0.8,
+    "rough": 0.35
+   },
+   "lamp": {
+    "color": "#ff3020",
+    "glow": 4
+   }
+  },
+  "parts": [
+   {
+    "shape": "cylinder",
+    "size": [
+     0.5,
+     0.5,
+     0.6
+    ],
+    "at": [
+     0,
+     0,
+     0.75
+    ],
+    "material": "gold",
+    "sides": 8
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.08,
+     0.08,
+     1.1
+    ],
+    "at": [
+     0,
+     0,
+     1.6
+    ],
+    "material": "steel",
+    "group": "mast"
+   },
+   {
+    "shape": "cone",
+    "size": [
+     0.7,
+     0.7,
+     0.3
+    ],
+    "at": [
+     0,
+     0,
+     2.2
+    ],
+    "material": "steel",
+    "group": "mast",
+    "sides": 10
+   },
+   {
+    "shape": "sphere",
+    "size": [
+     0.16,
+     0.16,
+     0.16
+    ],
+    "at": [
+     0,
+     0,
+     2.45
+    ],
+    "material": "lamp",
+    "group": "lamp",
+    "detail": 0
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.09,
+     1.1,
+     0.09
+    ],
+    "at": [
+     0.0,
+     0.72,
+     0.28
+    ],
+    "turn": [
+     0,
+     -28,
+     0
+    ],
+    "material": "dark",
+    "group": "leg1"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.09,
+     1.1,
+     0.09
+    ],
+    "at": [
+     -0.624,
+     -0.36,
+     0.28
+    ],
+    "turn": [
+     120,
+     -28,
+     0
+    ],
+    "material": "dark",
+    "group": "leg2"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.09,
+     1.1,
+     0.09
+    ],
+    "at": [
+     0.624,
+     -0.36,
+     0.28
+    ],
+    "turn": [
+     240,
+     -28,
+     0
+    ],
+    "material": "dark",
+    "group": "leg3"
+   }
+  ],
+  "look": {
+   "view": "solid",
+   "ink": "amber"
+  },
+  "tracks": {
+   "deploy": {
+    "length": 2,
+    "loop": false,
+    "parts": {
+     "leg1": {
+      "t": [
+       0,
+       0.3,
+       1.3
+      ],
+      "about": [
+       0.0,
+       0.22,
+       0.55
+      ],
+      "turn": [
+       [
+        0.76604,
+        -0.0,
+        0.0,
+        0.64279
+       ],
+       [
+        0.76604,
+        -0.0,
+        0.0,
+        0.64279
+       ],
+       [
+        0,
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     "leg2": {
+      "t": [
+       0,
+       0.3,
+       1.3
+      ],
+      "about": [
+       -0.191,
+       -0.11,
+       0.55
+      ],
+      "turn": [
+       [
+        -0.38302,
+        0.66341,
+        0.0,
+        0.64279
+       ],
+       [
+        -0.38302,
+        0.66341,
+        0.0,
+        0.64279
+       ],
+       [
+        0,
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     "leg3": {
+      "t": [
+       0,
+       0.3,
+       1.3
+      ],
+      "about": [
+       0.191,
+       -0.11,
+       0.55
+      ],
+      "turn": [
+       [
+        -0.38302,
+        -0.66341,
+        0.0,
+        0.64279
+       ],
+       [
+        -0.38302,
+        -0.66341,
+        0.0,
+        0.64279
+       ],
+       [
+        0,
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     "mast": {
+      "t": [
+       0,
+       1.0,
+       2.0
+      ],
+      "move": [
+       [
+        0,
+        0,
+        -1.0
+       ],
+       [
+        0,
+        0,
+        -1.0
+       ],
+       [
+        0,
+        0,
+        0
+       ]
+      ]
+     },
+     "lamp": {
+      "t": [
+       0,
+       1.0,
+       2.0
+      ],
+      "move": [
+       [
+        0,
+        0,
+        -1.0
+       ],
+       [
+        0,
+        0,
+        -1.0
+       ],
+       [
+        0,
+        0,
+        0
+       ]
+      ],
+      "size": [
+       [
+        0.2,
+        0.2,
+        0.2
+       ],
+       [
+        0.2,
+        0.2,
+        0.2
+       ],
+       [
+        1,
+        1,
+        1
+       ]
+      ]
+     }
+    }
+   }
+  }
+ },
+ "bay": {
+  "materials": {
+   "steel": {
+    "color": "#b4bac2",
+    "metal": 0.7,
+    "rough": 0.45
+   },
+   "dark": {
+    "color": "#4a5058",
+    "metal": 0.4,
+    "rough": 0.7
+   },
+   "gold": {
+    "color": "#d8a84a",
+    "metal": 0.8,
+    "rough": 0.35
+   },
+   "lamp": {
+    "color": "#ff3020",
+    "glow": 4
+   }
+  },
+  "parts": [
+   {
+    "shape": "box",
+    "size": [
+     3.2,
+     0.2,
+     0.2
+    ],
+    "at": [
+     0,
+     0,
+     0.1
+    ],
+    "material": "dark"
+   },
+   {
+    "shape": "box",
+    "size": [
+     3.2,
+     0.2,
+     0.2
+    ],
+    "at": [
+     0,
+     0,
+     2.1
+    ],
+    "material": "dark"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.2,
+     0.2,
+     2.2
+    ],
+    "at": [
+     -1.6,
+     0,
+     1.1
+    ],
+    "material": "dark"
+   },
+   {
+    "shape": "box",
+    "size": [
+     0.2,
+     0.2,
+     2.2
+    ],
+    "at": [
+     1.6,
+     0,
+     1.1
+    ],
+    "material": "dark"
+   },
+   {
+    "shape": "box",
+    "size": [
+     3.0,
+     2.4,
+     0.1
+    ],
+    "at": [
+     0,
+     -1.3,
+     0.05
+    ],
+    "material": "dark"
+   },
+   {
+    "shape": "box",
+    "size": [
+     1.5,
+     0.08,
+     1.8
+    ],
+    "at": [
+     -0.75,
+     0.1,
+     1.1
+    ],
+    "material": "steel",
+    "group": "door_left"
+   },
+   {
+    "shape": "box",
+    "size": [
+     1.5,
+     0.08,
+     1.8
+    ],
+    "at": [
+     0.75,
+     0.1,
+     1.1
+    ],
+    "material": "steel",
+    "group": "door_right"
+   },
+   {
+    "shape": "box",
+    "size": [
+     1.0,
+     1.2,
+     0.7
+    ],
+    "at": [
+     0,
+     -1.2,
+     0.75
+    ],
+    "material": "gold",
+    "group": "lander"
+   },
+   {
+    "shape": "wedge",
+    "size": [
+     0.8,
+     0.5,
+     0.5
+    ],
+    "at": [
+     0,
+     -0.4,
+     0.75
+    ],
+    "material": "gold",
+    "group": "lander"
+   },
+   {
+    "shape": "box",
+    "size": [
+     1.3,
+     0.1,
+     0.1
+    ],
+    "at": [
+     0,
+     -1.2,
+     0.3
+    ],
+    "material": "steel",
+    "group": "lander"
+   }
+  ],
+  "look": {
+   "view": "solid",
+   "groups": {
+    "lander": "amber",
+    "door_left": "cyan",
+    "door_right": "cyan"
+   }
+  },
+  "tracks": {
+   "open": {
+    "length": 2,
+    "loop": false,
+    "parts": {
+     "door_left": {
+      "t": [
+       0,
+       1.2
+      ],
+      "about": [
+       -1.5,
+       0.1,
+       1.1
+      ],
+      "turn": [
+       [
+        0,
+        0,
+        0
+       ],
+       [
+        105,
+        0,
+        0
+       ]
+      ]
+     },
+     "door_right": {
+      "t": [
+       0,
+       1.2
+      ],
+      "about": [
+       1.5,
+       0.1,
+       1.1
+      ],
+      "turn": [
+       [
+        0,
+        0,
+        0
+       ],
+       [
+        -105,
+        0,
+        0
+       ]
+      ]
+     },
+     "lander": {
+      "t": [
+       0,
+       1.2,
+       2.0
+      ],
+      "move": [
+       [
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        0,
+        0
+       ],
+       [
+        0,
+        3.2,
+        0
+       ]
+      ]
+     }
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,138 @@
+{
+ "orders": {
+  "title": "Watch orders",
+  "look": "wheel",
+  "hub": "Watch",
+  "status": "LAST WATCH",
+  "items": [
+   {
+    "id": "reactor",
+    "label": "Reactor",
+    "state": "ready",
+    "tone": "warn",
+    "hint": "Wake the core: bring it to power and hold it there.",
+    "when": "!reactor_done",
+    "effects": [
+     {
+      "goto": "reactor"
+     }
+    ]
+   },
+   {
+    "id": "reactor_done",
+    "label": "Reactor",
+    "state": "done",
+    "tone": "good",
+    "hint": "The core holds at power.",
+    "when": "reactor_done",
+    "locked": "reactor_done",
+    "why": "The core holds at power."
+   },
+   {
+    "id": "scan",
+    "label": "Scan",
+    "state": "ready",
+    "tone": "warn",
+    "hint": "Find the old mast below and leave a beacon by it.",
+    "when": "!scan_done",
+    "effects": [
+     {
+      "goto": "scan"
+     }
+    ],
+    "locked": "!reactor_done",
+    "why": "The scan station has no power yet: wake the core."
+   },
+   {
+    "id": "scan_done",
+    "label": "Scan",
+    "state": "done",
+    "tone": "good",
+    "hint": "The beacon is down by the mast.",
+    "when": "scan_done",
+    "locked": "scan_done",
+    "why": "The beacon is down by the mast."
+   },
+   {
+    "id": "bay",
+    "label": "Bay 2",
+    "state": "ready",
+    "tone": "warn",
+    "hint": "Open the bay and swing the lander out.",
+    "when": "!bay_done",
+    "effects": [
+     {
+      "goto": "bay"
+     }
+    ],
+    "locked": "!scan_done",
+    "why": "Nothing below is marked: the lander has nowhere to go."
+   },
+   {
+    "id": "bay_done",
+    "label": "Bay 2",
+    "state": "done",
+    "tone": "good",
+    "hint": "The lander is out.",
+    "when": "bay_done",
+    "locked": "bay_done",
+    "why": "The lander is out."
+   },
+   {
+    "id": "approach",
+    "label": "Approach",
+    "state": "ready",
+    "tone": "warn",
+    "hint": "Fly the lander through the drift to the drop ring.",
+    "when": "!approach_done",
+    "effects": [
+     {
+      "goto": "approach"
+     }
+    ],
+    "locked": "!bay_done",
+    "why": "The lander is still clamped in the bay."
+   },
+   {
+    "id": "approach_done",
+    "label": "Approach",
+    "state": "done",
+    "tone": "good",
+    "hint": "The lander is in the ring.",
+    "when": "approach_done",
+    "locked": "approach_done",
+    "why": "The lander is in the ring."
+   },
+   {
+    "id": "descent",
+    "label": "Descent",
+    "state": "ready",
+    "tone": "warn",
+    "hint": "Take the lander down to the pad by the beacon.",
+    "when": "!descent_done",
+    "effects": [
+     {
+      "goto": "descent"
+     }
+    ],
+    "locked": "!approach_done",
+    "why": "The lander is not at the drop ring yet."
+   },
+   {
+    "id": "descent_done",
+    "label": "Descent",
+    "state": "done",
+    "tone": "good",
+    "hint": "Down.",
+    "when": "descent_done",
+    "locked": "descent_done",
+    "why": "Down."
+   },
+   {
+    "id": "close",
+    "label": "Stand by",
+    "hint": "Leave the wheel; 'orders' brings it back."
+   }
+  ]
+ }
+}

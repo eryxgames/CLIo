@@ -3011,6 +3011,9 @@ a mouse on a desk. It needs no data: the lines are found where they are drawn, o
 panels and in the plain column alike. What the simulator sees, and what its journal keeps, are
 keys. Not on Windows yet (`--touch on` asks for it there all the same).
 
+(`games/erebus/` is a whole small game of such consoles, one opening the next from a wheel of
+orders, and `templates/station/` three of them to copy.)
+
 **A screen of its own** (`"panels"`): instead of the instruments in a column, a sim can lay its
 screen out as panels - a bridge console, an engineering station. Panels stand side by side
 (`"cols"`) or one over another (`"rows"`), each in a frame with a `title`, each with `widgets`

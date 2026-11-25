@@ -83,6 +83,15 @@ def workdir(game_dir, pending=None):
                     json.dump(pending[key], f)
             elif os.path.isfile(path):
                 shutil.copyfile(path, target)
+        try:                                                # the data files the editor has no page for (planets.json):
+            others = sorted(os.listdir(game_dir))           # a check has to see them too
+        except OSError:
+            others = []
+        for name in others:
+            src, target = os.path.join(game_dir, name), os.path.join(work, name)
+            if name.endswith(".json") and os.path.isfile(src) and not os.path.exists(target) \
+                    and name not in {os.path.basename(p) for p in where.values()}:
+                shutil.copyfile(src, target)
         yield work
     finally:
         shutil.rmtree(work, ignore_errors=True)

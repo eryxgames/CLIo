@@ -6,6 +6,15 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 
 ### Added
 
+- **Erebus: Last Watch** (`games/erebus/`), the terminals demo: five consoles opened one after
+  another from a wheel of orders on the bridge. Reactor (panels, functions at once and held),
+  Scan (a model coming into a scope, a planet and its relief, a beacon that unfolds as far as its
+  key is held), Bay 2 (a switch, a control and two held functions in order; a hatch as far open
+  as a value says, in two views), Approach (the view ahead as space, the drift of rocks), Descent
+  (the view ahead over ground, the map, a scan of the ground below). All of it data; the
+  autopilot does each console; the last one ends the game.
+- Fixed with it: the editor's check now sees the data files it has no page for (`planets.json`),
+  so a game with planets no longer shows "there is no planet called..." in the editor.
 - **CLIo Picture draws the vector display** (library 0.10 and later; with an older one, or none,
   the Python draws as before): a `Scope`'s lines, hidden lines, afterglow and characters are the
   library's `clio_scope_*` - so every console's scopes, the view ahead, scans of ground, a level

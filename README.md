@@ -39,6 +39,7 @@ downloads (CLIo Picture, Ballistic's sounds); every game and the tech demo play.
 | **RØØTLESS** (`rootless`) | A first-person shooter drawn in the terminal, a beat at a time: you step, the monsters step. A recruit's battle simulation: **E1M1** *Boot Sector*, **E1M2** *Dynamic Loader* (ride a cargo loader across the acid), **E1M3** *Drone Refit Assembly*, **E1M4** *Xantrium Fens* (open land to the horizon, a hopper to fly), **E1M5** *User Space* (lockers, supply crates, force fields, a race through a door that will not stay open), **E1M6** *Kernel Space* (a hall of many floors, drawn in the mesh view: a gallery a storey up, the scheduler's dais, the interrupt well), **E1M7** *The Stack* (magboots on the ceiling, upside down over the overflow), **E1M8** *Aspiration Central* (up a building's face and a broken lift shaft to the Metacron) and a secret level. Shotguns, chainsaws, rockets, grenades that bounce, drones in 3D, barrels, crates, oil that burns, keys, secrets to punch and shoot - and Cron, who rains fire on a schedule. |
 | **The Hollow** (`depths`) | A dungeon crawler that is different every time: three classes, tactical fights where every enemy shows what it is about to do, loot, shrines, a peddler. **Rogue mode** (`--mode rogue`): one life, no bottom, a table of the best runs. **Deck mode** (`--mode cards`): every fight is a card battle. |
 | **Derelict** (`derelict`) | A short sci-fi text adventure aboard an abandoned cargo hauler: puzzles, conversations, a fight that can be talked around, three endings. |
+| **Erebus: Last Watch** (`erebus`) | The terminals demo: the last watch aboard a cargo hauler, on five consoles opened from a wheel of orders - wake the core, scan for a place to land and leave a beacon, open the bay, fly the lander through the drift and set it down. Panels, scopes, scans, models that move as values say; the autopilot can do each console (`python -m engine.sim games/erebus`). |
 | **Tech demo** | `python clio.py --demo`: CLIo shows what it can do, by itself. Any key goes back. |
 
 RØØTLESS also has a **simulatron** of training programs, each its own kind of game. Start one
@@ -235,7 +236,7 @@ CLIo is open source so that anyone can make games with it, including games they 
 | --- | --- |
 | The engine: `engine/`, `clio.py`, `tests/`, `utils/`, `docs/` | [Apache-2.0](LICENSE) |
 | Everything the engine ships for games to use: the themes, the built-in sound effects, the music composer, the sprite generator, the CLIo logo art | Apache-2.0 - reuse and edit freely |
-| `templates/starter/`, `templates/realm/`, `templates/station/` and the sandbox in `game_files/` | Apache-2.0 - copy them as a starting point |
+| `templates/starter/`, `templates/realm/`, `templates/station/`, the terminals demo `games/erebus/` and the sandbox in `game_files/` | Apache-2.0 - copy them as a starting point |
 | The demo games `games/derelict/`, `games/depths/` and `games/rootless/` (story, text, characters, art, sprites, levels, music) | Copyright Daniel Sandner, all rights reserved - see the `LICENSE.md` in each folder |
 
 **What you make is yours.** A game you write for CLIo is your own work under whatever

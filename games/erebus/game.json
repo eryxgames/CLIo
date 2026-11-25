@@ -1,0 +1,43 @@
+{
+ "id": "erebus",
+ "title": "Erebus: Last Watch",
+ "subtitle": "Five consoles, one way down",
+ "description": "A terminals demo. Take the cargo hauler Erebus through its last watch over Gordian Moon: wake the core, mark a place to land, open the bay, fly the drift, set the lander down.",
+ "author": "Daniel Sandner",
+ "version": "0.1.0",
+ "order": 4,
+ "license": "Apache-2.0, as CLIo is (the names are placeholders until the lore says otherwise)",
+ "initial_scene": "berth",
+ "style": "techno",
+ "show_title": true,
+ "menus": "bar",
+ "menu_look": "terminal",
+ "menu_border": "single",
+ "title_banner": {
+  "style": "line",
+  "palette": "ice"
+ },
+ "music": {
+  "generate": {
+   "mood": "tense",
+   "seed": 7
+  }
+ },
+ "help": "On the bridge, 'orders' opens the watch's wheel. In a console: Esc is the menu, with its keys.",
+ "about": "The terminals demo of the CLIo engine: consoles as panels, functions held and switched, scans of real ground, the view ahead in lines, models that move as values say, a wheel of orders.",
+ "palettes": {
+  "erebus": [
+   "#dfe8ee",
+   "#8fb3c9",
+   "#4f7896",
+   "#2b4a63",
+   "#ffb028"
+  ]
+ },
+ "model_look": {
+  "palette": "erebus",
+  "shades": 4,
+  "dither": true,
+  "ink": "cyan"
+ }
+}

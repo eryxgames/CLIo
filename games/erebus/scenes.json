@@ -1,0 +1,193 @@
+[
+ {
+  "id": "berth",
+  "name": "The Watch Berth",
+  "description": "The bell wakes you: three strokes, the last watch. The Erebus is coming round Gordian Moon for the final time with her core banked and nobody else aboard to take the bridge. {hint}(go bridge){/}",
+  "exits": [
+   {
+    "door_name": "Bridge",
+    "scene_id": "bridge"
+   }
+  ]
+ },
+ {
+  "id": "bridge",
+  "name": "The Bridge",
+  "description": "Five consoles in a half ring, most of them dark. The watch's {key}orders{/} hang over the middle one as a wheel of lights: what is done, what can be done, what waits. {hint}(orders){/}",
+  "exits": [
+   {
+    "door_name": "Berth",
+    "scene_id": "berth"
+   }
+  ],
+  "on_first_enter": [
+   {
+    "say": "The orders are short. Wake the core. Mark a place to land. Get the lander out, across the drift, and down."
+   }
+  ],
+  "actions": {
+   "orders": {
+    "do": [
+     {
+      "menu": "orders"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "id": "reactor",
+  "name": "Reactor",
+  "description": "The core's console.",
+  "sim": "reactor",
+  "exits": [],
+  "on_sim_done": [
+   {
+    "say": "The core holds at power. Console by console, the bridge comes alight."
+   },
+   {
+    "set": "reactor_done"
+   },
+   {
+    "goto": "bridge"
+   }
+  ],
+  "on_sim_fail": [
+   {
+    "say": "The core scrams itself. It will take a while to coax back."
+   },
+   {
+    "goto": "bridge"
+   }
+  ],
+  "on_sim_quit": [
+   {
+    "goto": "bridge"
+   }
+  ]
+ },
+ {
+  "id": "scan",
+  "name": "Scan",
+  "description": "The scan station.",
+  "sim": "scan",
+  "exits": [],
+  "on_sim_done": [
+   {
+    "say": "The beacon stands by the old mast, unfolded, its lamp turning. There is a place to come down."
+   },
+   {
+    "set": "scan_done"
+   },
+   {
+    "goto": "bridge"
+   }
+  ],
+  "on_sim_fail": [
+   {
+    "say": "The pass is over before the beacon is away. The moon will come round again."
+   },
+   {
+    "goto": "bridge"
+   }
+  ],
+  "on_sim_quit": [
+   {
+    "goto": "bridge"
+   }
+  ]
+ },
+ {
+  "id": "bay",
+  "name": "Bay 2",
+  "description": "The launch bay's console.",
+  "sim": "bay",
+  "exits": [],
+  "on_sim_done": [
+   {
+    "say": "The lander hangs clear of the doors on its arm, and the arm lets go."
+   },
+   {
+    "set": "bay_done"
+   },
+   {
+    "goto": "bridge"
+   }
+  ],
+  "on_sim_fail": [
+   {
+    "say": "The doors jam half way. The motors need a while to cool."
+   },
+   {
+    "goto": "bridge"
+   }
+  ],
+  "on_sim_quit": [
+   {
+    "goto": "bridge"
+   }
+  ]
+ },
+ {
+  "id": "approach",
+  "name": "Lander: approach",
+  "description": "The lander's helm, slaved to this console.",
+  "sim": "approach",
+  "exits": [],
+  "on_sim_done": [
+   {
+    "say": "The lander sits in the drop ring, the moon filling everything below it."
+   },
+   {
+    "set": "approach_done"
+   },
+   {
+    "goto": "bridge"
+   }
+  ],
+  "on_sim_fail": [
+   {
+    "say": "The console goes dark, and comes back with the lander where it started."
+   },
+   {
+    "goto": "bridge"
+   }
+  ],
+  "on_sim_quit": [
+   {
+    "goto": "bridge"
+   }
+  ]
+ },
+ {
+  "id": "descent",
+  "name": "Lander: descent",
+  "description": "The lander's helm.",
+  "sim": "descent",
+  "exits": [],
+  "on_sim_done": [
+   {
+    "say": "Dust blows out flat from under the lander and settles."
+   },
+   {
+    "set": "descent_done"
+   },
+   {
+    "win": "down"
+   }
+  ],
+  "on_sim_fail": [
+   {
+    "say": "The console goes dark, and comes back with the lander at the ring."
+   },
+   {
+    "goto": "bridge"
+   }
+  ],
+  "on_sim_quit": [
+   {
+    "goto": "bridge"
+   }
+  ]
+ }
+]

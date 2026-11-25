@@ -467,6 +467,21 @@ def _e_shop(g, arg, eff, ctx):
     g.open_shop(arg)
 
 
+def _e_console(g, arg, eff, ctx):
+    """Open a console - a simulator of sims.json - here and now: in a scene's action, a conversation, a
+    menu, an item's use. ``"console": "reactor"``, or ``{"sim": "reactor", "done": [...], "fail": [...],
+    "quit": [...]}`` with what happens after. Done, the flag ``<sim>_done`` is set; failed, ``<sim>_failed``."""
+    from . import sim
+    spec = arg if isinstance(arg, dict) else {"sim": arg}
+    sid = str(spec.get("sim") or "")
+    if sid not in (getattr(g.data, "sims", None) or {}):
+        g.say("(There is no console called '%s'.)" % sid, "dim")
+        return
+    g.world.flags.pop(sid + "_failed", None)
+    sim.play_scene(g, {"sim": sid, "on_sim_done": spec.get("done"), "on_sim_quit": spec.get("quit"),
+                       "on_sim_fail": [{"set": sid + "_failed"}] + list(spec.get("fail") or [])}, soft=True)
+
+
 def _e_menu(g, arg, eff, ctx):
     from . import menu
     menu.play(g, str(arg))
@@ -538,5 +553,5 @@ _EFFECTS = {
     "random": _e_random, "do": _e_do, "learn": _e_learn, "end_dialogue": _e_end_dialogue,
     "turns": _e_turns, "shop": _e_shop, "story": _e_story, "transition": _e_transition,
     "look": _e_look, "save": _e_save, "deepen": _e_deepen, "add_card": _e_add_card, "remove_card": _e_remove_card,
-    "upgrade_card": _e_upgrade_card, "menu": _e_menu,
+    "upgrade_card": _e_upgrade_card, "menu": _e_menu, "console": _e_console,
 }

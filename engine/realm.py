@@ -881,6 +881,26 @@ def works_lines(realm, kind=None, orders=True):
     return rows
 
 
+def panel_lines(realm, ui, models=None, planets=None):
+    """The realm's own screen (its ``"panels"``: engine/panels.py) as lines to write, its widgets showing
+    the realm's values by name (stocks, works, hands...) - or [] if it has none, or the screen is too
+    narrow for it. ``"lines"`` in the layout is how many rows it takes (14)."""
+    layout = realm.spec.get("panels")
+    if not isinstance(layout, dict) or ui.width < 60:
+        return []
+    from . import panels
+    from .frame import Painter
+    from .sim import formula
+    view = realm.__dict__.get("_view")
+    if view is None:
+        view = realm.__dict__["_view"] = panels.View(layout, formula, models, planets)
+    rows = view.rows(min(ui.width - 1, 110), max(5, min(40, int(layout.get("lines", 14) or 14))), realm.env(),
+                     float(realm.state.get("season", 0)), unicode=ui.term.unicode)
+    paint = Painter(ui.term.color_depth, getattr(ui.term, "subst", None) if ui.term.unicode else None)
+    reset = "\x1b[0m" if ui.term.color_depth else ""
+    return [paint.cells(r, ui.term.unicode) + reset for r in rows]
+
+
 def tell(ui, lines):
     for line in lines:
         if line[0] == "rule":
@@ -892,6 +912,13 @@ def tell(ui, lines):
         else:
             for l in ui.wrap(line[1], line[2], indent=" "):
                 ui.line(l)
+
+
+def show(ui, realm):
+    """How the realm stands: its own screen of panels where it has one, then the words."""
+    for line in panel_lines(realm, ui, getattr(realm, "models", None), getattr(realm, "planets", None)):
+        ui.term.line(line)
+    tell(ui, status_lines(realm))
 
 
 def play(realm, ui, read, save=None, audio=None, after=None, menu=None):
@@ -955,14 +982,14 @@ def play(realm, ui, read, save=None, audio=None, after=None, menu=None):
         for t in intro if isinstance(intro, list) else [intro]:
             say(str(t), "story")
         say(HELP, "hint")
-    tell(ui, status_lines(realm))
+    show(ui, realm)
     while not s["result"]:
         line = read(None)
         if line is None:
             return "quit"
         words = line.strip().split()
         if not words:
-            tell(ui, status_lines(realm))
+            show(ui, realm)
             continue
         verb, rest = words[0].lower(), words[1:]
         if verb in ("quit", "q", "exit"):
@@ -972,7 +999,7 @@ def play(realm, ui, read, save=None, audio=None, after=None, menu=None):
         elif verb in ("end", "e", "next", "n", "pass"):
             season()
             if not s["result"]:
-                tell(ui, status_lines(realm))
+                show(ui, realm)
         elif verb in ("build", "b", "find", "f", "learn"):
             kind = "build" if verb in ("build", "b") else "find"
             if not rest:
@@ -1036,7 +1063,7 @@ def play(realm, ui, read, save=None, audio=None, after=None, menu=None):
                 if after:
                     after(realm)
             if not s["result"]:
-                tell(ui, status_lines(realm))
+                show(ui, realm)
         elif verb in ("menu", "options", "settings") and menu:
             act = menu("menu" if verb == "menu" else "options")
             if act in ("quit", "load"):
@@ -1053,7 +1080,7 @@ def play(realm, ui, read, save=None, audio=None, after=None, menu=None):
         elif verb == "load":
             return "load"
         elif verb in ("look", "l", "status"):
-            tell(ui, status_lines(realm))
+            show(ui, realm)
         else:
             say("Orders: " + HELP, "hint")
     if s.get("why"):
@@ -1158,6 +1185,14 @@ def problems(data):
             out.append("%s should be an object" % where)
             continue
         r = Realm(spec, rid)
+        if spec.get("panels") is not None:               # a screen of its own: its widgets show the realm's values
+            from . import panels
+            try:
+                names = set(r.env())
+            except Exception:
+                names = None
+            out += panels.problems(spec["panels"], names, "%s: panels" % where, None,
+                                   getattr(data, "models", None) or {}, getattr(data, "planets", None) or {})
         if not r.stocks:
             out.append("%s: it has no stocks" % where)
         cal = spec.get("calendar") or {}

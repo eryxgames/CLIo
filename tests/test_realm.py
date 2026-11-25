@@ -482,5 +482,32 @@ class PlayTests(unittest.TestCase):
         self.assertIn("ford: stood 2 of 2", out.getvalue())
 
 
+class ScreenTests(unittest.TestCase):
+    """A realm's own screen of panels: its values in gauges and plots over the words."""
+
+    def test_the_starters_screen_shows_its_stores(self):
+        from helpers import Session
+        from engine import realm as R
+        from engine.data import GameData
+        folder = os.path.join(ROOT, "templates", "realm")
+        s = Session(folder, ["status", "quit", "y"], seed=3, width=90)
+        text = s.run()
+        self.assertIn("STORES", text)
+        self.assertIn("FOOD AND PEOPLE", text)
+        self.assertIn("FROST", text)
+        self.assertLessEqual(max(len(l) for l in text.split("\n")), 90)
+        narrow = Session(folder, ["status", "quit", "y"], seed=3, width=50).run()
+        self.assertNotIn("FOOD AND PEOPLE", narrow)                  # too narrow for panels: the words alone
+        data = GameData(folder)
+        self.assertEqual(data.validate(), [])
+        data.realms["ford"]["panels"]["cols"][0]["widgets"][0]["gauge"] = "gold"
+        wrong = R.problems(data)
+        self.assertEqual(len(wrong), 1)
+        self.assertIn("realm 'ford': panels", wrong[0])
+        self.assertIn("no value called 'gold'", wrong[0])
+        plain = R.Realm({k: v for k, v in data.realms["ford"].items() if k != "panels"}, "ford")
+        self.assertEqual(R.panel_lines(plain, s.game.ui), [])
+
+
 if __name__ == "__main__":
     unittest.main()

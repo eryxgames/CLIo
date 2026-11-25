@@ -542,5 +542,34 @@ class ConsoleTests(unittest.TestCase):
         self.assertIn("Vent", text[at["v"]])
 
 
+class ConsoleEffectTests(unittest.TestCase):
+    """{"console": ...}: a simulator opened by an effect, in the middle of something else."""
+
+    def test_a_console_by_an_effect_ends_softly(self):
+        from helpers import Session
+        from engine import conditions
+        s = Session("templates/station").start()
+        game = s.game
+        s.queue[:] = ["quit"]
+        conditions.run([{"console": "reactor"}], game)                       # left unfinished: nothing more happens
+        self.assertFalse(game.over)
+        self.assertEqual(game.world.scene.get("id"), "bridge")
+        self.assertFalse(game.world.flags.get("reactor_done"))
+        s.queue[:] = ["quit"]
+        conditions.run([{"console": {"sim": "reactor", "quit": [{"set": "walked_away"}], "done": [{"set": "lit"}]}}], game)
+        self.assertTrue(game.world.flags.get("walked_away"))
+        self.assertFalse(game.world.flags.get("lit"))
+        with mock.patch.object(S, "play_text", side_effect=lambda sim, write, read: setattr(sim, "result", "lost")):
+            conditions.run([{"console": {"sim": "reactor", "fail": [{"set": "dark"}]}}], game)
+        self.assertFalse(game.over)                                          # a console that fails is not the game's end
+        self.assertTrue(game.world.flags.get("reactor_failed") and game.world.flags.get("dark"))
+        with mock.patch.object(S, "play_text", side_effect=lambda sim, write, read: setattr(sim, "result", "won")):
+            conditions.run([{"console": {"sim": "reactor", "done": [{"set": "lit"}]}}], game)
+        self.assertTrue(game.world.flags.get("reactor_done") and game.world.flags.get("lit"))
+        self.assertFalse(game.world.flags.get("reactor_failed"))             # tried again and done: no longer failed
+        conditions.run([{"console": "warp"}], game)
+        self.assertIn("no console called 'warp'", s.text)
+
+
 if __name__ == "__main__":
     unittest.main()

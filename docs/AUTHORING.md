@@ -3014,6 +3014,17 @@ keys. Not on Windows yet (`--touch on` asks for it there all the same).
 (`games/erebus/` is a whole small game of such consoles, one opening the next from a wheel of
 orders, and `templates/station/` three of them to copy.)
 
+**A console anywhere.** The effect `{"console": "reactor"}` opens a simulator here and now -
+from a scene's action, a line of a conversation, an item's use, an entry of a menu, the effects
+that follow a level - and when it is over the game goes on where it was. Done, it sets the flag
+`reactor_done`; failed, `reactor_failed`; left, nothing. `{"console": {"sim": "reactor", "done":
+[...], "fail": [...], "quit": [...]}}` says what follows each end. (A scene with `"sim"` is still
+the way to make a console a place of its own.) A **realm** can have a screen of panels too:
+`"panels"` in its entry of `realms.json`, with `"lines"` rows (14), is drawn over the words each
+time the realm says how it stands, its widgets showing the realm's values by name - stocks,
+`people`, `idle`, each work and its `_hands`, the season's and the tide's names (`python clio.py
+templates/realm`). Under 60 columns the words stand alone.
+
 **One name for the look.** `"console": "amber"` in `game.json` says how all of a game's consoles
 look at once: its panels' colour and frame, its menus' look and frame, and how its models are
 drawn (their line colour and a palette of four tones for the shaded view). There are `green`,

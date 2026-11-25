@@ -1615,9 +1615,10 @@ def play_text(sim, write, read):
     return sim.result
 
 
-def play_scene(game, scene):
+def play_scene(game, scene, soft=False):
     """Play the sim of a CLIo scene, then the scene's (or the sim's) effects: done, failed (none: the
-    game is lost), left (none: the game ends)."""
+    game is lost), left (none: the game ends). ``soft`` (a console opened by an effect, in the middle of
+    something else): with no effects for an end, nothing more happens."""
     from . import conditions
     w, term, settings = game.world, game.term, game.settings
     sid = scene.get("sim")
@@ -1659,19 +1660,19 @@ def play_scene(game, scene):
         effects = scene.get("on_sim_done") or spec.get("on_done")
         if effects:
             conditions.run(effects, game)
-        else:
+        elif not soft:
             game.say("Mission done.", "success")
     elif outcome == "lost":
         effects = scene.get("on_sim_fail") or spec.get("on_fail")
         if effects:
             conditions.run(effects, game)
-        else:
+        elif not soft:
             game.end_game("lose", spec.get("death_text") or "outro_lose")
     else:
         effects = scene.get("on_sim_quit")
         if effects:
             conditions.run(effects, game)
-        else:
+        elif not soft:
             game.over = "quit"
     if not game.over:
         game.resume_music()

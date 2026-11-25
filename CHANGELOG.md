@@ -6,6 +6,12 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 
 ### Added
 
+- **A console anywhere**: the effect `{"console": "reactor"}` (or `{"sim", "done", "fail",
+  "quit"}`) opens a simulator from a scene's action, a conversation, an item, a menu, the effects
+  after a level; it sets `<sim>_done` or `<sim>_failed` and the game goes on where it was.
+- **A realm's screen of panels**: `"panels"` in a realm (with `"lines"`) is drawn over the words
+  each time the realm says how it stands, showing its stocks, people, works and tides by name;
+  checked by `--check`. The realm starter has one.
 - **The editor's page of a simulator** shows its screen as the game draws it (`/api/console`): at
   four moments of the autopilot's run, four sizes and six kinds of terminal, from what is on the
   page, with the autopilot's verdict and what is wrong. Any widget can be added to any of its

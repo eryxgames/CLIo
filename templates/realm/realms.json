@@ -1,5 +1,12 @@
 {
   "ford": {
+    "panels": {"lines": 9, "colour": "amber", "cols": [
+      {"title": "STORES", "size": 38, "widgets": [
+        {"gauge": "food", "max": 80}, {"gauge": "wood", "max": 80}, {"gauge": "stone", "max": 80},
+        {"number": "people"}, {"number": "idle", "label": "idle hands"},
+        {"lamps": [{"label": "FROST", "if": "frost", "tone": "hot"}, {"label": "STORM", "if": "storm", "tone": "warn"},
+                   {"label": "FAIR", "if": "fair", "tone": "good"}]}]},
+      {"title": "FOOD AND PEOPLE", "widgets": [{"plot": ["food", "people"], "rows": 6}]}]},
     "name": "The Ford",
     "intro": [
       "Six families have stopped at the ford. Four years will show whether a village stands here.",

@@ -6,6 +6,11 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 
 ### Added
 
+- **`docs/COOKBOOK.md`**: consoles by example, a task a page - held functions, a switch that
+  drains a stock, things done in order, a hatch as far open as a value, a device that unfolds
+  under its key, scans, frames that beat with the music, a wheel of orders, one look for all,
+  and how to lay a model out in Blender for the importer. The tests build every block marked
+  checked and let the autopilot do each console (`tests/test_cookbook.py`).
 - **`--schema DIR`** (`engine/jsonschema.py`): a JSON Schema for each data file, written from
   what the editor knows, and the `json.schemas` settings that tie them to the files - so VS Code
   and other editors complete keys, say what each is for and offer what may be chosen (a

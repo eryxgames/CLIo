@@ -3024,6 +3024,10 @@ or from one of these: `"console": {"like": "ice", "border": "heavy", "model_look
 game (`menu_look`, `menu_border`, `model_look`), a simulator's panels (`colour`, `border`) or a
 model (`look`) says itself goes over it.
 
+**By example.** [COOKBOOK.md](COOKBOOK.md) answers "how do I make..." for consoles a task at a
+time - a thing that has to be held, things done in order, a hatch as far open as a value, a
+wheel of orders, a model from Blender - each with JSON that the tests build and play.
+
 **Starting from a piece that works.** `python clio.py GAME --add console reactor` pastes a
 console of CLIo's own into your game: its simulator into `sims.json`, the models and planets its
 panels show (where your game has none by that name), and a scene that runs it, reached from

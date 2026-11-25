@@ -229,7 +229,8 @@ ship's bridge: three simulators, each with a screen of panels) to `games/yourgam
 [on the web](https://eryxgames.github.io/CLIo/), with nothing installed). The guide is
 **[docs/AUTHORING.md](docs/AUTHORING.md)**: scenes, items, characters, conversations, quests,
 first-person levels, monsters, realms, music, art. Working on the engine itself:
-**[docs/DEVELOPING.md](docs/DEVELOPING.md)**. What changed: [CHANGELOG.md](CHANGELOG.md).
+**[docs/DEVELOPING.md](docs/DEVELOPING.md)**. What changed: [CHANGELOG.md](CHANGELOG.md). For consoles and terminals there is also a cookbook, a task a page:
+**[docs/COOKBOOK.md](docs/COOKBOOK.md)**.
 
 ## Licence
 

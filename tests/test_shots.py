@@ -17,6 +17,11 @@ from engine.data import GameData  # noqa: E402
 STATION = os.path.join(ROOT, "templates", "station")
 
 
+def read(path):
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
 class ShotsTests(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp(prefix="clio-shots-")
@@ -29,17 +34,23 @@ class ShotsTests(unittest.TestCase):
         self.assertEqual(len(names), n + 1)                      # a text file each, and the page
         self.assertIn("index.html", names)
         self.assertIn("%d pictures of Erebus: Last Watch" % n, said[0])
-        page = open(os.path.join(self.dir, "index.html"), encoding="utf-8").read()
+        page = read(os.path.join(self.dir, "index.html"))
         for word in ("reactor", "helm", "scan", "menu bay", "model hauler", "planet Gordian Moon", "the autopilot does it in"):
             self.assertIn(word, page)
-        self.assertEqual(page.count('<pre class="shot">'), n)
-        self.assertIn("color:#", page)
-        text = open(os.path.join(self.dir, next(x for x in names if "reactor--70" in x)), encoding="utf-8").read()
+        self.assertEqual(page.count('<canvas class="shot"'), n)
+        self.assertIn("function paintCells(", page)              # the editor's painter, in the page
+        self.assertIn("function paintLines(", page)
+        self.assertNotIn("// ---- cells: end", page)
+        import json
+        data = json.loads(page[page.index('id="shots">') + 11:page.index("</script>")].replace("<\\/", "</"))
+        self.assertEqual((len(data), data[0]["cols"], data[0]["lines"]), (n, 100, 28))                  # (a console leaves two lines for what is said under it)
+        self.assertTrue(any(run[1] and run[1].startswith("#") for row in data[0]["rows"] for run in row))
+        text = read(os.path.join(self.dir, next(x for x in names if "reactor--70" in x)))
         self.assertIn("[X] SCRAM", text)
         self.assertIn("100 by 30", text)
         plain = [x for x in names if "reactor" in x and x.endswith(".txt")]
         self.assertEqual(len(plain), 2 * len(shots.MOMENTS))     # each moment on each kind of terminal
-        ascii_one = open(os.path.join(self.dir, plain[1]), encoding="utf-8").read()
+        ascii_one = read(os.path.join(self.dir, plain[1]))
         self.assertTrue(ascii_one.isascii(), plain[1])
 
     def test_each_part_alone(self):

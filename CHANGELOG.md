@@ -6,6 +6,11 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 
 ### Added
 
+- **Pictures in a browser stand in their cells**: the editor's painter of cells now draws frames
+  as lines (light, heavy, double, rounded, half lines, diagonals) as it already drew braille as
+  dots and blocks as boxes - and the page `--shots` writes is painted by that same painter, a
+  canvas a picture. A browser's font no longer sets braille or frames wider than the letters.
+- Fixed: the newer tests left files they read open (a ResourceWarning under some Pythons).
 - **`docs/COOKBOOK.md`**: consoles by example, a task a page - held functions, a switch that
   drains a stock, things done in order, a hatch as far open as a value, a device that unfolds
   under its key, scans, frames that beat with the music, a wheel of orders, one look for all,

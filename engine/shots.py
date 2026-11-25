@@ -4,8 +4,8 @@
 
 Every simulator with a screen (at a few moments of the autopilot's run), every menu of ``menus.json``
 and every 3D model (as its look has it, and through its clips) is drawn by the code the game runs and
-written as one page, ``DIR/index.html`` - the cells as coloured text, nothing to install - with the
-same as plain text beside it (``DIR/NAME.txt``). An author changes the data and looks.
+written as one page, ``DIR/index.html`` - each picture painted cell by cell, nothing to install - with
+the same as plain text beside it (``DIR/NAME.txt``). An author changes the data and looks.
 
 ``--shots-size 112x34`` is the size of a console's screen; ``--shots-as full,ascii`` the kinds of
 terminal it is shown on (full, 256, 16, none, console - the Windows console's font -, ascii).
@@ -130,12 +130,23 @@ def models(data, size=(60, 22), terminals=("full",)):
     return out
 
 
+def painter():
+    """The editor's own painter of cells (engine/editor/web/app.js, between its marks): braille as dots,
+    blocks and shades as boxes, frames as lines - each in its cell, whatever font the browser has."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "editor", "web", "app.js")
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    return text[text.index("// ---- cells: begin"):text.index("// ---- cells: end")]
+
+
 def page(title, shots):
+    """The page: each picture a canvas, painted cell by cell by the editor's painter when it comes into
+    sight - so dots, blocks and frames stand in their cells in any browser."""
+    import json
     parts = ["<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>%s</title><style>" % html.escape(title),
              "body{background:#06080c;color:%s;font:14px system-ui,sans-serif;margin:1.5rem}" % INK,
              "h1{font-size:1.3rem}h2{font-size:1rem;margin:2rem 0 .2rem}p{color:#8a93a3;margin:.1rem 0 .5rem}",
-             "pre.shot{background:%s;color:%s;font:13px/1.2 ui-monospace,'DejaVu Sans Mono',Menlo,Consolas,monospace;" % (PAPER, INK),
-             "padding:.5rem;display:inline-block;margin:0;overflow-x:auto;max-width:100%}nav a{color:#7fb4ff;margin-right:1em}",
+             "canvas.shot{background:%s;display:block;max-width:100%%}nav a{color:#7fb4ff;margin-right:1em}" % PAPER,
              "</style></head><body><h1>%s</h1><nav>" % html.escape(title)]
     seen = []
     for name, _note, _runs in shots:
@@ -144,13 +155,26 @@ def page(title, shots):
             seen.append(head)
             parts.append('<a href="#%s">%s</a>' % (html.escape(head.replace(" ", "-")), html.escape(head)))
     parts.append("</nav>")
-    done = set()
+    done, data = set(), []
     for name, note, runs in shots:
         head = name.split("  ")[0]
         anchor = ' id="%s"' % html.escape(head.replace(" ", "-")) if head not in done else ""
         done.add(head)
-        parts.append("<h2%s>%s</h2><p>%s</p>%s" % (anchor, html.escape(name), html.escape(note), block(runs) if runs else ""))
-    parts.append("</body></html>\n")
+        cols = max([sum(len(r[0]) for r in row) for row in runs] or [1])
+        parts.append("<h2%s>%s</h2><p>%s</p>" % (anchor, html.escape(name), html.escape(note)))
+        if runs:
+            parts.append('<canvas class="shot" data-n="%d" role="img" aria-label="%s" style="width:%dch;height:%dem"></canvas>'
+                         % (len(data), html.escape(name), cols, len(runs) + 2))
+            data.append({"rows": runs, "cols": cols, "lines": len(runs)})
+    parts.append('<script type="application/json" id="shots">%s</script><script>\n%s\n' % (
+        json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/"), painter()))
+    parts.append("""const SHOTS = JSON.parse(document.getElementById("shots").textContent);
+const paint = (c) => { const s = SHOTS[+c.dataset.n]; c.style.height = ""; paintCells(c, s.rows, s.cols, s.lines - 2); };
+const seen = new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) { seen.unobserve(e.target); paint(e.target); } },
+  { rootMargin: "600px" });
+document.querySelectorAll("canvas.shot").forEach((c) => seen.observe(c));
+</script></body></html>
+""")
     return "".join(parts)
 
 

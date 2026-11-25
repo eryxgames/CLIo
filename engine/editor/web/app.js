@@ -931,10 +931,33 @@ function spriteField(kind, f, thing, change) {
 // ---------------------------------------------------------------------- banners, drawn as the game draws them
 // The engine draws the banner (/api/banner) and sends its cells; the page paints them on a canvas the way a
 // terminal does: blocks and braille dots as shapes, so they join without seams.
+// ---- cells: begin (engine/shots.py takes this part, to its end mark, into the page it writes: one painter for both)
 const BLOCKS = { "▀": [0, 0, 1, 0.5], "▄": [0, 0.5, 1, 1], "█": [0, 0, 1, 1], "▌": [0, 0, 0.5, 1], "▐": [0.5, 0, 1, 1],
   "▁": [0, 0.875, 1, 1], "▔": [0, 0, 1, 0.125], "▖": [0, 0.5, 0.5, 1], "▗": [0.5, 0.5, 1, 1], "▘": [0, 0, 0.5, 0.5], "▝": [0.5, 0, 1, 0.5] };
 const SHADES = { "░": 0.3, "▒": 0.55, "▓": 0.8 };
 const DOTS = [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [0, 3], [1, 3]];
+// Frames are drawn, not written: a line of each character to the left, right, up and down of its middle
+// (1 light, 2 heavy, 3 double), so that frames meet whatever the font has for them.
+const LINES = { "─": "1100", "│": "0011", "┌": "0101", "┐": "1001", "└": "0110", "┘": "1010", "├": "0111", "┤": "1011", "┬": "1101",
+  "┴": "1110", "┼": "1111", "╭": "0101", "╮": "1001", "╰": "0110", "╯": "1010", "━": "2200", "┃": "0022", "┏": "0202", "┓": "2002",
+  "┗": "0220", "┛": "2020", "┣": "0222", "┫": "2022", "┳": "2202", "┻": "2220", "╋": "2222", "═": "3300", "║": "0033", "╔": "0303",
+  "╗": "3003", "╚": "0330", "╝": "3030", "╠": "0333", "╣": "3033", "╦": "3303", "╩": "3330", "╬": "3333", "╒": "0301", "╕": "3001",
+  "╘": "0310", "╛": "3010", "╞": "0311", "╡": "3011", "╟": "0133", "╢": "1033", "╴": "1000", "╵": "0010", "╶": "0100", "╷": "0001",
+  "╸": "2000", "╹": "0020", "╺": "0200", "╻": "0002" };
+function paintLines(ctx, how, X, Y, cw, ch) {
+  const [l, r, u, d] = [...how].map(Number);
+  const t = Math.max(1, Math.round(cw * 0.13)), mx = X + Math.floor(cw / 2), my = Y + Math.floor(ch / 2);
+  const most = Math.max(l, r, u, d), reach = most === 3 ? t + Math.ceil(t / 2) : Math.ceil(t / 2) + (most === 2 ? t : 0);
+  const seg = (w, across, from, to) => {
+    if (!w) return;
+    const thick = w === 2 ? 2 * t + 1 : t;
+    for (const off of (w === 3 ? [-t, t] : [0])) {
+      if (across) ctx.fillRect(from, my - Math.floor(thick / 2) + off, to - from, thick);
+      else ctx.fillRect(mx - Math.floor(thick / 2) + off, from, thick, to - from);
+    }
+  };
+  seg(l, true, X, mx + reach); seg(r, true, mx - reach, X + cw); seg(u, false, Y, my + reach); seg(d, false, my - reach, Y + ch);
+}
 
 function paintCells(canvas, rows, cols, lines) {
   const dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -975,6 +998,15 @@ function paintCells(canvas, rows, cols, lines) {
           DOTS.forEach(([dx, dy], i) => {
             if ((code - 0x2800) & (1 << i)) { ctx.beginPath(); ctx.arc(X + cw * (0.27 + 0.46 * dx), Y + ch * (0.14 + 0.24 * dy), r, 0, 2 * Math.PI); ctx.fill(); }
           });
+        } else if (LINES[c]) {
+          paintLines(ctx, LINES[c], X, Y, cw, ch);
+        } else if (c === "╱" || c === "╲") {
+          ctx.strokeStyle = ctx.fillStyle;
+          ctx.lineWidth = Math.max(1, Math.round(cw * 0.13));
+          ctx.beginPath();
+          ctx.moveTo(X, c === "╱" ? Y + ch : Y);
+          ctx.lineTo(X + cw, c === "╱" ? Y : Y + ch);
+          ctx.stroke();
         } else if (c !== " ") {
           ctx.font = font(bold);
           ctx.fillText(c, X, Y + ch / 2);
@@ -984,6 +1016,7 @@ function paintCells(canvas, rows, cols, lines) {
     }
   });
 }
+// ---- cells: end
 
 function bannerField(kind, f, thing, path) {
   const value = thing[f.key];

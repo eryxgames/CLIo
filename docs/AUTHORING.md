@@ -3014,6 +3014,16 @@ keys. Not on Windows yet (`--touch on` asks for it there all the same).
 (`games/erebus/` is a whole small game of such consoles, one opening the next from a wheel of
 orders, and `templates/station/` three of them to copy.)
 
+**One name for the look.** `"console": "amber"` in `game.json` says how all of a game's consoles
+look at once: its panels' colour and frame, its menus' look and frame, and how its models are
+drawn (their line colour and a palette of four tones for the shaded view). There are `green`,
+`amber`, `ice` (cyan, rounded frames, line menus), `paper` (white, double frames), `alert` (red,
+heavy frames) and `violet` (cut corners, wheel menus). A map makes one of your own, from nothing
+or from one of these: `"console": {"like": "ice", "border": "heavy", "model_look": {"ink":
+"white"}}` (keys: `colour`, `border`, `menu_look`, `menu_border`, `model_look`). Whatever the
+game (`menu_look`, `menu_border`, `model_look`), a simulator's panels (`colour`, `border`) or a
+model (`look`) says itself goes over it.
+
 **Starting from a piece that works.** `python clio.py GAME --add console reactor` pastes a
 console of CLIo's own into your game: its simulator into `sims.json`, the models and planets its
 panels show (where your game has none by that name), and a scene that runs it, reached from

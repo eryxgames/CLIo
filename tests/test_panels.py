@@ -273,6 +273,48 @@ class SimTests(unittest.TestCase):
         self.assertIn("no value called 'latch'", wrong[1])
         self.assertIn("give the scope one", wrong[2])
 
+    def test_one_name_for_how_a_games_consoles_look(self):
+        cfg = {"console": "amber", "menu_border": "double", "model_look": {"shades": 6}}
+        sims = {"a": {"panels": {"widgets": []}}, "b": {"panels": {"colour": "cyan", "widgets": []}}, "c": {}}
+        P.apply_console(cfg, sims)
+        self.assertEqual((cfg["menu_look"], cfg["menu_border"]), ("terminal", "double"))     # its own frame stays
+        self.assertEqual((cfg["model_look"]["ink"], cfg["model_look"]["shades"]), ("amber", 6))
+        self.assertEqual((sims["a"]["panels"]["colour"], sims["a"]["panels"]["border"]), ("amber", "single"))
+        self.assertEqual(sims["b"]["panels"]["colour"], "cyan")                           # a console's own colour stays
+        own = P.console_look({"like": "ice", "border": "heavy", "model_look": {"ink": "white"}})
+        self.assertEqual((own["colour"], own["border"], own["menu_look"]), ("cyan", "heavy", "line"))
+        self.assertEqual((own["model_look"]["ink"], own["model_look"]["shades"]), ("white", 4))
+        self.assertIsNone(P.console_look("plaid"))
+        self.assertEqual(P.console_problems({"console": "amber"}), [])
+        self.assertIn("no console look 'plaid'", P.console_problems({"console": "plaid"})[0])
+        wrong = P.console_problems({"console": {"like": "plaid", "color": "red"}})
+        self.assertEqual(len(wrong), 2)
+        import json
+        import shutil
+        import tempfile
+        folder = tempfile.mkdtemp(prefix="clio-console-")
+        self.addCleanup(shutil.rmtree, folder, True)
+        game = os.path.join(folder, "g")
+        shutil.copytree(STATION, game)
+        with open(os.path.join(game, "game.json"), encoding="utf-8") as f:
+            cfg = json.load(f)
+        for key in ("menu_look", "menu_border", "model_look"):
+            cfg.pop(key, None)
+        cfg["console"] = "violet"
+        with open(os.path.join(game, "game.json"), "w", encoding="utf-8") as f:
+            json.dump(cfg, f)
+        data = GameData(game)
+        self.assertEqual(data.validate(), [])
+        self.assertEqual((data.config["menu_look"], data.config["model_look"]["ink"]), ("wheel", "violet"))
+        self.assertEqual(data.sims["helm"]["panels"]["colour"], "amber")                  # the starter's consoles say their own
+        self.assertEqual(data.sims["helm"]["panels"]["border"], "cut")
+        for name, look in P.CONSOLE_LOOKS.items():                                        # every look is of things there are
+            from engine import menu, vector, viewer
+            self.assertIn(look["colour"], vector.COLOURS, name)
+            self.assertIn(look["border"], menu.BORDERS, name)
+            self.assertIn(look["menu_look"], menu.GAME_LOOKS, name)
+            self.assertIsNotNone(viewer.palette(look["model_look"]["palette"]), name)
+
     def test_the_station_starter_at_a_prompt(self):
         from helpers import Session
         s = Session("templates/station").start()

@@ -128,6 +128,9 @@ class GameData:
         self.demo = load("demo") or {}                 # clips that play themselves (engine/demo.py)
         self.menus = load("menus") or {}               # the game's own menus (engine/menu.py)
         self.planets = load("planets") or {}           # worlds to look at (engine/viewer.py)
+        if cfg.get("console") is not None:             # one name for how its consoles look, under what it says itself
+            from . import panels
+            panels.apply_console(cfg, self.sims)
         self.art_dir = os.path.join(self.dir, cfg.get("art_dir", "art"))
 
         self.theme = cfg.get("style") or cfg.get("style_config") or "default"
@@ -347,6 +350,9 @@ class GameData:
             from . import viewer
             problems += viewer.planet_problems(self)
             problems += viewer.look_problems(self)
+        if self.config.get("console") is not None:
+            from . import panels
+            problems += panels.console_problems(self.config)
         if self.menus or self.config.get("menu_look") or self.config.get("menu_border"):
             from . import menu
             problems += menu.problems(self)

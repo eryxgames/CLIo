@@ -768,6 +768,78 @@ SAMPLE = {"colour": "green", "rows": [
         {"title": "HULL SCAN", "colour": "cyan", "widgets": [{"scope": {"scene": "hauler"}}]}]}]}
 
 
+# One name for how a game's consoles look: its panels' colour and frame, its menus' look and frame, how
+# its models are drawn. A game says "console": "amber" in game.json (or a map of these keys of its own);
+# whatever the game, a simulator's panels or a model says itself goes over it.
+CONSOLE_LOOKS = {
+    "green": {"colour": "green", "border": "single", "menu_look": "terminal", "menu_border": "single",
+              "model_look": {"ink": "green", "palette": ["#d8ffe0", "#46ff8c", "#1f9a4c", "#0c3a1e"], "shades": 4}},
+    "amber": {"colour": "amber", "border": "single", "menu_look": "terminal", "menu_border": "single",
+              "model_look": {"ink": "amber", "palette": ["#ffe9b0", "#ffb028", "#a86a10", "#4a2c06"], "shades": 4}},
+    "ice": {"colour": "cyan", "border": "rounded", "menu_look": "line", "menu_border": "rounded",
+            "model_look": {"ink": "cyan", "palette": ["#dfe8ee", "#8fb3c9", "#4f7896", "#2b4a63"], "shades": 4}},
+    "paper": {"colour": "white", "border": "double", "menu_look": "bar", "menu_border": "double",
+              "model_look": {"ink": "white", "palette": ["#f0f0e8", "#b8b8b0", "#707068", "#303030"], "shades": 3,
+                             "dither": False}},
+    "alert": {"colour": "red", "border": "heavy", "menu_look": "terminal", "menu_border": "heavy",
+              "model_look": {"ink": "red", "palette": ["#ffd0c0", "#ff5440", "#a02818", "#401008"], "shades": 4}},
+    "violet": {"colour": "violet", "border": "cut", "menu_look": "wheel", "menu_border": "cut",
+               "model_look": {"ink": "violet", "palette": ["#eadcff", "#be82ff", "#6a3fb0", "#2a1650"], "shades": 4}},
+}
+CONSOLE_KEYS = ("colour", "border", "menu_look", "menu_border", "model_look")
+
+
+def console_look(value):
+    """A game's ``"console"`` as its keys: one of :data:`CONSOLE_LOOKS` by name, or a map of them (which
+    may start from one: ``{"like": "amber", "border": "double"}``). None if it is neither."""
+    if isinstance(value, str):
+        return dict(CONSOLE_LOOKS[value]) if value in CONSOLE_LOOKS else None
+    if isinstance(value, dict):
+        base = dict(CONSOLE_LOOKS.get(value.get("like"), {}))
+        base.update({k: v for k, v in value.items() if k in CONSOLE_KEYS})
+        if isinstance(value.get("model_look"), dict) and value.get("like") in CONSOLE_LOOKS:
+            base["model_look"] = dict(CONSOLE_LOOKS[value["like"]]["model_look"], **value["model_look"])
+        return base
+    return None
+
+
+def apply_console(config, sims):
+    """Put a game's ``"console"`` under what it says itself: ``config`` gets ``menu_look``, ``menu_border``
+    and ``model_look`` where it has none (a ``model_look`` of its own goes over the look's), each
+    simulator's panels their colour and frame where they name none. Changes both in place."""
+    look = console_look(config.get("console"))
+    if not look:
+        return
+    for key in ("menu_look", "menu_border"):
+        if look.get(key) and not config.get(key):
+            config[key] = look[key]
+    if isinstance(look.get("model_look"), dict):
+        own = config.get("model_look") if isinstance(config.get("model_look"), dict) else {}
+        config["model_look"] = dict(look["model_look"], **own)
+    for spec in (sims or {}).values():
+        layout = spec.get("panels") if isinstance(spec, dict) else None
+        if isinstance(layout, dict):
+            for key in ("colour", "border"):
+                if look.get(key) and not layout.get(key):
+                    layout[key] = look[key]
+
+
+def console_problems(config):
+    value = config.get("console")
+    if value is None:
+        return []
+    if isinstance(value, str) and value not in CONSOLE_LOOKS:
+        return ["game.json: there is no console look '%s' (%s; or a map of %s)" % (
+            value, ", ".join(CONSOLE_LOOKS), ", ".join(CONSOLE_KEYS))]
+    if isinstance(value, dict):
+        out = ["game.json: console: unknown key '%s' (like, %s)" % (k, ", ".join(CONSOLE_KEYS))
+               for k in value if k != "like" and k not in CONSOLE_KEYS]
+        if value.get("like") is not None and value["like"] not in CONSOLE_LOOKS:
+            out.append("game.json: console: there is no look '%s' to be like (%s)" % (value["like"], ", ".join(CONSOLE_LOOKS)))
+        return out
+    return [] if isinstance(value, str) else ["game.json: \"console\" should be a look's name or a map"]
+
+
 # Every widget once, with values to show it by: (what it is for, its JSON, rows it is given)
 GALLERY = (
     ("a value as a bar, with its number; warn and hot colour it from a share of max (negative: below)",

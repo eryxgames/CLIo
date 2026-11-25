@@ -6,6 +6,11 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 
 ### Added
 
+- **`"console"` in `game.json`**: one name for how a game's consoles look - its panels' colour
+  and frame, its menus' look and frame, how its models are drawn. `green`, `amber`, `ice`,
+  `paper`, `alert`, `violet`, or a map (`{"like": "ice", "border": "heavy"}`). What the game, a
+  simulator's panels or a model says itself goes over it. Checked; a field of the editor's Game
+  page.
 - **`--add KIND NAME`** (`engine/recipes.py`): a working piece pasted into a game - a console
   (`reactor`, `scan`, `helm`, `bay`, `approach`) with its simulator, the models and planets its
   panels show and a scene that runs it and sets `<id>_done`; a menu (`wheel`, `ring`, `bar`); a

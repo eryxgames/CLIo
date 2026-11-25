@@ -3085,8 +3085,13 @@ put in groups with `"group": "reactor"` in `models.json`.
 | `light` | Where the light comes from: three numbers - from the right, from above, from the eye's side (`[0.5, 0.8, 0.6]`). |
 | `groups` | A colour for a named part, in the views that tell parts apart (`{"reactor": "red"}`). |
 
-The editor has these on the game and on each model (all but `light` and `groups`, which are
-written in the file). `python clio.py GAME --view-model` shows every model as its look has it.
+The editor has these on the game and on each model, and under a model's fields a picture of it
+**as its look has it**: the viewer's own drawing, in the view its look says or one chosen, at 40
+by 20, 60 by 24 or 80 by 24 characters, as a terminal of full colour, 256 colours, 16 colours or
+none shows it, in the Windows console's font, and in ASCII only. Beside it is who said each thing
+(the game or this model), a colour for each named part, and the light. It is drawn anew as the
+fields change, from what is on the page, saved or not. (The game's own `light` and `groups` are
+written in the file.) `python clio.py GAME --view-model` shows every model as its look has it.
 The look is the viewer's and the panels'; a model standing in a first-person level is still
 drawn as that level's picture draws it.
 

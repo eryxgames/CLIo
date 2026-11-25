@@ -79,6 +79,10 @@ def handle(game_dir, path, body=None):
         return levels.weapon_view(game_dir, str(body.get("weapon") or ""), pending)
     if path == "/api/modelview":                            # a 3D model in a small room: turning, broken, its frames
         return levels.model_view(game_dir, str(body.get("name") or ""), pending, body.get("turns") or 12)
+    if path == "/api/modellook":                            # a model as a console or the viewer draws it, by its look
+        return looks.model_look(game_dir, str(body.get("name") or ""), pending, body.get("view"), body.get("cols") or 60,
+                                body.get("rows") or 24, str(body.get("terminal") or "full"),
+                                body.get("yaw", 30.0) or 0.0, body.get("pitch", 20.0) or 0.0, body.get("turns") or 0)
     if path == "/api/modelimport":                          # a glTF file from Blender, made a model (not written)
         return levels.model_import(body.get("data"), str(body.get("name") or ""), body.get("scale") or 0.4)
     if path == "/api/levelcheck":                           # the level bot plays the level a few times

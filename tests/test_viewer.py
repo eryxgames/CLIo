@@ -358,5 +358,60 @@ class ModelLookTests(unittest.TestCase):
         self.assertEqual(next(iter(runner.view.subjects.values())).look["groups"]["engines"], "amber")
 
 
+class EditorLookTests(unittest.TestCase):
+    """The editor's picture of a model's look: the viewer's own drawing, at a size, on a terminal of some kind."""
+
+    def test_a_model_as_its_look_says_and_who_said_it(self):
+        from engine.editor import looks, service
+        got = looks.model_look(STATION, "hauler")
+        self.assertEqual((got["view"], got["problems"], got["cols"], got["lines"]), ("structure", [], 60, 24))
+        self.assertEqual((got["from"]["view"], got["from"]["ink"], got["from"]["groups"]), ("model", "game", "model"))
+        self.assertEqual(got["groups"][0], "body")
+        self.assertEqual(got["palettes"][0], "erebus")                        # the game's own first
+        self.assertEqual(len(got["rows"]), 24)
+        self.assertTrue(any(ord(c) >= 0x2800 for row in got["rows"] for run in row for c in run[0]))
+        mast = looks.model_look(STATION, "mast", cols=40, rows=20, turns=4)
+        self.assertEqual((mast["view"], len(mast["rows"]), len(mast["frames"])), ("shaded", 20, 4))
+        self.assertNotEqual(mast["frames"][0], mast["frames"][1])            # it turns
+        over = service.handle(STATION, "/api/modellook", {"name": "hauler", "view": "wire", "cols": 40, "rows": 20})
+        self.assertEqual((over["view"], over["cols"]), ("wire", 40))
+        with self.assertRaises(Exception):
+            looks.model_look(STATION, "nothing")
+
+    def test_what_is_being_edited_is_what_is_drawn(self):
+        from engine.editor import looks
+        models = dict(self.models())
+        models["hauler"] = dict(models["hauler"], look={"view": "solid", "ink": "amber"})
+        got = looks.model_look(STATION, "hauler", {"models": models})
+        self.assertEqual((got["view"], got["from"]["ink"], got["look"]["ink"]), ("solid", "model", "amber"))
+        models["hauler"] = dict(models["hauler"], look={"view": "sideways", "shades": 40})
+        bad = looks.model_look(STATION, "hauler", {"models": models})
+        self.assertEqual((bad["rows"], len(bad["problems"])), ([], 2))
+        self.assertIn("unknown view 'sideways'", bad["problems"][0])
+
+    def models(self):
+        return GameData(STATION).models
+
+    def test_the_terminals_it_can_be_seen_on(self):
+        from engine.editor import looks
+        seen = {t: looks.model_look(STATION, "hauler", terminal=t) for t in looks.TERMINALS}
+        text = {t: "".join(run[0] for row in g["rows"] for run in row) for t, g in seen.items()}
+        colours = {t: {run[1] for row in g["rows"] for run in row if run[1]} for t, g in seen.items()}
+        self.assertEqual(colours["none"], set())                                # no colour: none
+        self.assertTrue(colours["16"] <= {"#%02x%02x%02x" % c for c in __import__("engine.term").term._BASE16})
+        self.assertGreater(len(colours["full"]), len(colours["256"]))
+        self.assertTrue(text["ascii"].isascii())
+        self.assertFalse(any(ord(c) >= 0x2800 for c in text["console"]))        # that font has no braille: shades
+        self.assertTrue(any(c in "░▒▓█" for c in text["console"]))
+        shaded = looks.model_look(STATION, "mast", terminal="ascii")
+        self.assertTrue("".join(run[0] for row in shaded["rows"] for run in row).isascii())
+
+    def test_runs_of_any_colour_depth(self):
+        from engine.editor.looks import cells
+        self.assertEqual(cells("\x1b[0;38;5;196;48;5;16mA\x1b[0m B"), [["A", "#ff0000", "#000000", False], [" B", None, None, False]])
+        self.assertEqual(cells("\x1b[31;104mA"), [["A", "#aa0000", "#5555ff", False]])
+        self.assertEqual(cells("\x1b[38;2;1;2;3mA"), [["A", "#010203", None, False]])
+
+
 if __name__ == "__main__":
     unittest.main()

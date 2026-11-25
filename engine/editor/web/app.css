@@ -289,3 +289,5 @@ button.pal .unused { color: var(--ink-2); }
 .model-part .row, .model-row { flex-wrap: wrap; gap: 0.35rem; align-items: center; }
 .triple { display: inline-flex; gap: 0.2rem; align-items: center; margin-right: 0.5rem; }
 .model-list input.tiny, .model-list input[type="number"].tiny { width: 4.4em; min-width: 0; }
+.look-parts { flex-wrap: wrap; gap: 0.35rem 1rem; }
+.look-parts .pair { display: inline-flex; gap: 0.4rem; align-items: center; }

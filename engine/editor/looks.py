@@ -13,6 +13,7 @@ import os
 import re
 
 from .. import sprite
+from ..term import idx256_to_rgb
 
 
 def _hex(rgb):
@@ -79,7 +80,7 @@ _INK, _SCREEN = "#c8cfdb", "#0b0e14"
 
 
 def cells(line):
-    """One line of truecolour terminal output as runs: ``[[text, fg, bg, bold], ...]`` (colours ``#rrggbb`` or None)."""
+    """One line of terminal output (colours of any depth) as runs: ``[[text, fg, bg, bold], ...]`` (colours ``#rrggbb`` or None)."""
     runs, at = [], {"fg": None, "bg": None, "b": False, "d": False, "v": False}
 
     def add(text):
@@ -118,6 +119,13 @@ def cells(line):
             elif p in (38, 48) and i + 4 < len(ps) and ps[i + 1] == 2:
                 at["fg" if p == 38 else "bg"] = _hex(ps[i + 2:i + 5])
                 i += 4
+            elif p in (38, 48) and i + 2 < len(ps) and ps[i + 1] == 5:      # one of 256
+                at["fg" if p == 38 else "bg"] = _hex(idx256_to_rgb(ps[i + 2]))
+                i += 2
+            elif 30 <= p <= 37 or 90 <= p <= 97:                           # one of 16
+                at["fg"] = _hex(idx256_to_rgb(p - 30 if p < 90 else p - 82))
+            elif 40 <= p <= 47 or 100 <= p <= 107:
+                at["bg"] = _hex(idx256_to_rgb(p - 40 if p < 100 else p - 92))
             i += 1
     add(line[pos:])
     return runs
@@ -154,6 +162,70 @@ def banner(game_dir, key, width=78, pending=None):
             "frames": [[[cells(l) for l in fr], round(secs, 3)] for fr, secs in frames],
             "reveals": reveals, "style": getattr(art, "style", chosen["style"]), "chosen": chosen["style"],
             "effect": (art.effect or {}).get("name"), "size": list(art.size("art"))}
+
+
+# a terminal the editor can show a picture in: colour depth, unicode, symbol set
+TERMINALS = {"full": (3, True, "full"), "256": (2, True, "full"), "16": (1, True, "full"),
+             "none": (0, True, "full"), "console": (2, True, "console"), "ascii": (2, False, "ascii")}
+LOOK_SIZES = ((40, 20), (60, 24), (80, 24))
+
+
+def as_terminal(rows, terminal="full"):
+    """Rows of cells ``(char or None, fg, bg)`` as a terminal of some kind shows them: painted by the
+    frame's own painter at that depth and in that font, and read back as runs for the page."""
+    from ..frame import Painter
+    from ..term import Term
+    depth, uni, glyphs = TERMINALS.get(terminal, TERMINALS["full"])
+    term = Term(out=io.StringIO(), color=depth, unicode=uni, env={}, glyphs=glyphs)
+    paint = Painter(depth, {"console": term.subst}.get(glyphs) if uni else None)
+    return [cells(paint.cells(list(r), uni)) for r in rows]
+
+
+def model_look(game_dir, name, pending=None, view=None, cols=60, rows=24, terminal="full", yaw=30.0, pitch=20.0,
+               turns=0):
+    """A model as the game draws it in a console or the viewer: its look (the game's ``"model_look"``
+    with the model's own ``"look"`` over it), in a view, at a size, on a terminal of some kind.
+
+    Returns ``{"rows", "frames" (``turns`` pictures going round, when asked), "cols", "lines", "view":
+    the view drawn, "views", "look": what was used, "from": {key: "model" | "game"}, "groups": its
+    parts' names, "palettes": names a palette may be, "terminals", "problems"}``."""
+    from .. import banner as banners
+    from .. import model as model_mod
+    from .. import viewer
+    from ..data import GameData
+    from . import EditorError, workdir
+    with workdir(game_dir, pending) as work:
+        data = GameData(work)
+    models = getattr(data, "models", None) or {}
+    if name not in models:
+        raise EditorError("There is no model called %s." % name)
+    cfg = data.config or {}
+    base = cfg.get("model_look") if isinstance(cfg.get("model_look"), dict) else {}
+    own = models[name].get("look") if isinstance(models[name].get("look"), dict) else {}
+    cols, rows = max(20, min(120, int(cols or 60))), max(8, min(40, int(rows or 24)))
+    out = {"rows": [], "frames": [], "cols": cols, "lines": rows, "views": list(viewer.VIEWS), "view": None,
+           "look": {}, "from": {k: ("model" if k in own else "game") for k in viewer.LOOK_KEYS if k in own or k in base},
+           "groups": [], "terminals": list(TERMINALS),
+           "palettes": sorted(cfg.get("palettes") or {}) + [p for p in sorted(banners.PALETTES)
+                                                             if p not in (cfg.get("palettes") or {})]}
+    wrong = model_mod.problems({name: models[name]})
+    wrong += [w for w in viewer.look_problems(data) if w.startswith(("game.json: model_look", "model '%s': look" % name))]
+    if wrong:
+        return dict(out, problems=wrong)
+    built = model_mod.load({name: models[name]})[name]
+    look = viewer.looks(data)[name]
+    subject = viewer.Subject(built, look=look)
+    view = view if view in viewer.VIEWS else (look.get("view") if look.get("view") in viewer.VIEWS else "shaded")
+    uni = TERMINALS.get(terminal, TERMINALS["full"])[1]
+    ink = None if look.get("ink") else "green"
+
+    def seen(turn):
+        return as_terminal(viewer.draw(subject, view, cols, rows, yaw=turn, pitch=float(pitch), colour=ink,
+                                       unicode=uni), terminal)
+    turns = max(0, min(24, int(turns or 0)))
+    return dict(out, problems=[], view=view, rows=seen(float(yaw)), groups=list(subject.groups),
+                frames=[seen(float(yaw) + 360.0 * k / turns) for k in range(turns)],
+                look={k: v for k, v in look.items() if k in viewer.LOOK_KEYS})
 
 
 def picture(game_dir, name, pending=None):

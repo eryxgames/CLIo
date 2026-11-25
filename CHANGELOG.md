@@ -6,6 +6,12 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 
 ### Added
 
+- **The editor shows a model as its look has it**: under a model's fields, the viewer's own
+  drawing of it (`/api/modellook`), in the view its look says or one chosen, at three terminal
+  sizes, as a terminal of full colour, 256, 16 or no colours shows it, in the Windows console's
+  font and in ASCII; who said each key (the game or the model); a colour for each named part and
+  the light, written to the model's `"look"`. The pictures are painted by the frame's own painter
+  at that depth and in that font, so what is seen is what a player with such a terminal gets.
 - **Realms: strategy by turns** (`engine/realm.py`, `realms.json`, a scene's `"realm"`): a hold
   and its people, a season at a time. Stocks; people who eat, grow while there is room and leave
   when they go hungry; works that are built, staffed by the hand and yield by formulas; findings

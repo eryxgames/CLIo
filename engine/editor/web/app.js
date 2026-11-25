@@ -625,7 +625,7 @@ function renderForm() {
   if (drawn) parts.push(spriteEditor(kind, thing));
   if (mapped) parts.push(levelEditor(kind, thing, hit.id));
   if (kind.editor === "weapon") parts.push(weaponSheet(kind, thing, hit.id));
-  if (kind.editor === "model") parts.push(modelSheet(kind, thing, hit.id, built));
+  if (kind.editor === "model") parts.push(modelSheet(kind, thing, hit.id, built), lookSheet(kind, thing, hit.id));
 
   // everything the schema does not describe is still here, as JSON
   const rest = restArea(kind, thing, known, kind.fields.length || drawn ? "" : "This kind has no form yet: edit it as JSON.");
@@ -2395,6 +2395,94 @@ function modelSheet(kind, thing, id, built) {
     el("p", { class: "note" }, "Export glTF 2.0 (.glb). Its meshes, materials, vertex colours, PNG textures and animations take this model's place; " +
       "how it bobs, turns, spins and breaks stays. clio.py --import-model does the same from a terminal."),
     el("div", { class: "row" }, el("label", { class: "pair" }, "Cells per metre", scale), file), importNote);
+}
+
+// A model as a console or the viewer draws it: its look tried at terminal sizes and on terminals of several kinds.
+const LOOK_TERMINALS = [["full", "Full colour"], ["256", "256 colours"], ["16", "16 colours"], ["none", "No colour"],
+  ["console", "Windows console font"], ["ascii", "ASCII only"]];
+const LOOK_FROM = { model: "this model", game: "the game" };
+function lookSheet(kind, thing, id) {
+  const canvas = el("canvas", { class: "banner-canvas", role: "img", "aria-label": "The model as a console or the viewer draws it" });
+  const note = el("p", { class: "note" }), from = el("p", { class: "note" });
+  const groupsBox = el("div", { class: "model-list" });
+  const view = el("select", { "aria-label": "View" }, el("option", { value: "" }, "As its look says"));
+  const size = el("select", { "aria-label": "Size in characters" }, ...[[40, 20], [60, 24], [80, 24]].map(([c, r], i) =>
+    el("option", { value: `${c}x${r}`, selected: i === 1 }, `${c} by ${r}`)));
+  const terminal = el("select", { "aria-label": "Terminal" }, ...LOOK_TERMINALS.map(([v, label]) => el("option", { value: v }, label)));
+  let drawn = null, timer = null, wait = null, yaw = 30, asked = 0;
+  const lookOf = () => { if (!isObject(thing.look)) thing.look = {}; return thing.look; };
+  const tidy = () => { if (isObject(thing.look) && !Object.keys(thing.look).length) delete thing.look; };
+  const ask = (more) => {
+    const [cols, rows] = size.value.split("x").map(Number);
+    return api("/api/modellook", Object.assign({ pending: pending(), name: id, view: view.value || null, cols, rows, terminal: terminal.value, yaw }, more || {}));
+  };
+  async function show() {
+    clearTimeout(timer);
+    const mine = ++asked;
+    let got;
+    try { got = await ask(); } catch (err) { note.classList.add("bad"); note.textContent = "It cannot be drawn: " + err.message; return; }
+    if (mine !== asked) return;                                    // a later asking is on its way
+    drawn = got;
+    note.classList.toggle("bad", got.problems.length > 0);
+    note.textContent = got.problems.join(" ");
+    if (view.options.length === 1) for (const v of got.views) view.append(el("option", { value: v }, v));
+    if (got.problems.length) { from.textContent = ""; return; }
+    paintCells(canvas, got.rows, got.cols, got.lines);
+    const said = Object.keys(got.look).map((k) => `${k} ${typeof got.look[k] === "object" ? "" : got.look[k] + " "}(${LOOK_FROM[got.from[k]] || "the game"})`);
+    from.textContent = `Drawn ${got.view}. ` + (said.length ? "Its look: " + said.join(", ") + "." : "No look is set: the game's model look (Game) and this model's own (below) decide it.") +
+      (got.view === "shaded" && !got.look.palette ? " Shaded is in the model's own colours until a palette is named." : "");
+    drawGroups(got.groups);
+  }
+  const later = () => { clearTimeout(wait); wait = setTimeout(show, 350); };
+  const changed = () => { tidy(); touched(kind); later(); };
+  function drawGroups(names) {
+    const light = Array.isArray(lookOf().light) ? lookOf().light : null;
+    const groups = () => { const l = lookOf(); if (!isObject(l.groups)) l.groups = {}; return l.groups; };
+    const own = isObject(lookOf().groups) ? lookOf().groups : {};
+    tidy();
+    groupsBox.replaceChildren(el("div", { class: "row look-parts" },
+      ...(names.length > 1 ? names.map((g) => el("label", { class: "pair" }, g, el("input", { type: "text", class: "code short", spellcheck: "false", value: own[g] || "",
+        placeholder: (drawn && drawn.look.groups && drawn.look.groups[g]) || "by turn", "aria-label": `Colour of the part ${g}`,
+        onchange: (e) => {
+          const v = e.target.value.trim();
+          if (v) groups()[g] = v; else if (isObject(lookOf().groups)) { delete lookOf().groups[g]; if (!Object.keys(lookOf().groups).length) delete lookOf().groups; }
+          changed();
+        } }))) : [el("span", { class: "note" }, "It has one group: give parts a group name (Parts, above) to colour them apart.")])),
+      el("span", { class: "triple" }, "light", ...[0, 1, 2].map((i) => el("input", { type: "number", class: "tiny", step: "0.1", value: light ? light[i] : "",
+        placeholder: [0.5, 0.8, 0.6][i], "aria-label": `Light from ${["the right", "above", "the eye's side"][i]}`,
+        onchange: () => {
+          const v = [...groupsBox.querySelectorAll(".triple input")].map((n, j) => (n.value === "" ? [0.5, 0.8, 0.6][j] : +n.value));
+          if (v.every((c, j) => c === [0.5, 0.8, 0.6][j]) || !v.some(Boolean)) delete lookOf().light; else lookOf().light = v;
+          changed();
+        } }))));
+  }
+  function turn() {
+    clearTimeout(timer);
+    ask({ turns: 12 }).then((got) => {
+      if (got.problems.length) return;
+      let i = 0;
+      const step = () => { if (i >= got.frames.length) { paintCells(canvas, got.rows, got.cols, got.lines); return; } paintCells(canvas, got.frames[i++], got.cols, got.lines); timer = setTimeout(step, 110); };
+      step();
+    }).catch(() => {});
+  }
+  for (const s of [view, size, terminal]) s.addEventListener("change", show);
+  setTimeout(() => {
+    const form = canvas.closest("#form");
+    if (form) { form.addEventListener("input", later); form.addEventListener("change", later); }
+  }, 0);
+  show();
+  return el("div", { class: "sheet" },
+    el("h3", {}, "In a console or the viewer, by its look"), canvas,
+    el("div", { class: "row" }, view, size, terminal,
+      el("button", { type: "button", class: "quiet", "aria-label": "Turn it left", onclick: () => { yaw -= 30; show(); } }, "◀"),
+      el("button", { type: "button", class: "quiet", "aria-label": "Turn it right", onclick: () => { yaw += 30; show(); } }, "▶"),
+      el("button", { type: "button", class: "quiet", onclick: turn }, "Turn round")),
+    from, note,
+    el("h3", {}, "Colours of its parts, and its light"),
+    el("p", { class: "note" }, "A part's colour in the structure and plan views: green, amber, cyan, white, red, blue, violet, or #rrggbb; empty takes the game's, else one by turn. " +
+      "Light is from the right, from above and from the eye's side. View, line colour, palette, shades and dither are the fields \"How it is drawn\" above; " +
+      "the game's own are on the Game page."),
+    groupsBox);
 }
 
 // ---------------------------------------------------------------------- enemies: make one, try one

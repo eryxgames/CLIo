@@ -159,7 +159,7 @@ LOOK = [F("view", "choice", "View", options=["shaded", "wire", "solid", "structu
         F("palette", "text", "Palette the shaded view is painted in (one of the game's, or a built-in one)"),
         F("shades", "number", "Strengths of each palette colour (1 to 8; 3)"),
         F("dither", "bool", "Mix two colours in a pattern where one does not fit")]
-# (a look's "light" and "groups" are written in the file: the editor has no field for a list of numbers or a map of colours)
+# (a model's "light" and "groups" are set on its page, under the picture of its look; the game's own in the file)
 
 KINDS = [
     {"key": "game", "file": "game", "label": "Game", "one": "game", "shape": "object", "title": "title", "fields": [

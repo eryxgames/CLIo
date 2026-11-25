@@ -6,6 +6,12 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 
 ### Added
 
+- **Two haulers** in `games/erebus/models.json`, built of parts after two design drawings:
+  `hauler_heavy` (a spine, three rows of cargo pods either side, a forked prow with the bridge's
+  ball between; 660 triangles) and `hauler_light` (an eight-sided body on a nose leg, three
+  engines, a nacelle and a fin on an arm either side; 516). Both have the groups the views tell
+  apart (body, hold, decks, reactor, bridge, engines). The demo's reactor shows the heavy one by
+  heat, its bay the light one; the simple `hauler` stays as it was.
 - **`--shots DIR`**: a game's consoles (at four moments of the autopilot's run), menus and models
   drawn by the code the game runs into one page of coloured text and a text file each - at a
   size (`--shots-size`), as terminals of several kinds show them (`--shots-as`). `engine/shots.py`.

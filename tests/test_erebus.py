@@ -75,6 +75,24 @@ class DataTests(unittest.TestCase):
         self.assertNotEqual(a, b)
 
 
+    def test_the_haulers_have_the_parts_the_views_tell_apart(self):
+        data = GameData(EREBUS)
+        models = model.load(data.models)
+        for name in ("hauler", "hauler_heavy", "hauler_light"):
+            m = models[name]
+            self.assertEqual(sorted(m.groups), ["body", "bridge", "decks", "engines", "hold", "reactor"], name)
+            self.assertLess(len(m.faces), 800, name)             # low enough for a terminal
+        heavy, light = models["hauler_heavy"], models["hauler_light"]
+        wide = lambda m: max(p[0] for p in m.verts) - min(p[0] for p in m.verts)
+        tall = lambda m: max(p[2] for p in m.verts)
+        self.assertGreater(wide(heavy), 5.0)                     # pods out to either side of a low spine
+        self.assertLess(tall(heavy), 1.4)
+        self.assertGreater(tall(light), 3.0)                     # a tall body on a leg, antennas up
+        used = str(data.sims)
+        self.assertIn("hauler_heavy", used)
+        self.assertIn("hauler_light", used)
+
+
 class WatchTests(unittest.TestCase):
     def test_the_orders_open_one_after_another_and_the_last_ends_it(self):
         s = Session("erebus").start()

@@ -23,5 +23,7 @@ python clio.py erebus --view-model     # its models; P plays their clips
 ```
 
 The story is a frame for the consoles and the names are placeholders. Everything here is data:
-`sims.json` (the consoles), `models.json` (hauler, mast, beacon, bay), `planets.json`,
+`sims.json` (the consoles), `models.json` (mast, beacon, bay; three haulers - the simple
+`hauler` of the tests, and `hauler_heavy` and `hauler_light`, built of parts after two design
+drawings), `planets.json`,
 `menus.json`, `scenes.json`.

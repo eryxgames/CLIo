@@ -184,7 +184,7 @@
         },
         {
          "scope": {
-          "model": "hauler",
+          "model": "hauler_heavy",
           "view": "heat",
           "max": 1400,
           "turn": 10,
@@ -653,12 +653,10 @@
          "widgets": [
           {
            "scope": {
-            "model": "bay",
+            "model": "hauler_light",
             "view": "structure",
-            "clip": "open",
-            "at": "stage",
-            "yaw": 150,
-            "turn": 6
+            "turn": 14,
+            "pitch": 16
            }
           }
          ]

@@ -29,13 +29,80 @@ Nothing here is random and nothing reads the clock: the same scene gives the sam
 from __future__ import annotations
 
 import math
+from array import array
+from itertools import chain
 
 COLOURS = {"green": (70, 255, 140), "amber": (255, 176, 40), "cyan": (90, 230, 255), "white": (236, 240, 232),
            "red": (255, 84, 64), "blue": (110, 150, 255), "violet": (190, 130, 255)}
 OFFSET = 0.004                                           # faces stand this much (of their depth) behind their lines
+FLAT = 0.41421356237309503                               # a line runs flat while it rises less than this a dot across
+FACE_MOST = 16                                           # corners of a face the library takes (more: the Python)
 BITS = ((1, 8), (2, 16), (4, 32), (64, 128))             # braille: the dot at (row, column) of a character
 STROKES = "─╲│╱"                                         # by the way a line runs: flat, down to the right, up, up to the right
 PLAIN = "-\\|/"
+
+
+_BRAILLE = [chr(0x2800 + i) for i in range(256)]
+_seen = {}                                               # the same colour, the same tuple
+_fast = {}                                               # a library -> whether its display is this Python's
+
+
+def library():
+    """CLIo Picture's vector display, if the library is there, has one (0.10) and draws what this
+    Python draws - which is found out once, on a small picture, dot for dot. Else None."""
+    try:
+        from . import picture
+        lib = picture.scope()
+    except Exception:
+        return None
+    if lib is None:
+        return None
+    ok = _fast.get(id(lib))
+    if ok is None:
+        _fast[id(lib)] = False                           # (the check draws: not to come here again while it does)
+        try:
+            ok = agree(lib)
+        except Exception:
+            ok = False
+        _fast[id(lib)] = ok
+    return lib if ok else None
+
+
+def backend():
+    """What draws the vector display here, in words."""
+    try:
+        from . import picture
+        if picture.scope() is None:
+            return "Python (%s)" % (picture.status() if picture.load() is None else "its library is older than 0.10")
+    except Exception as e:
+        return "Python (%s)" % e
+    return "CLIo Picture" if library() else "Python (the library draws another picture than CLIo does: not used)"
+
+
+def agree(lib):
+    """Does a library's display give what the Python gives? A small scene - a box before a net, lines
+    that cross, pass behind the eye and leave the display, with and without dimming and afterglow -
+    drawn both ways and compared: every dot's light, every face's depth, every character."""
+    def picture_of(fast):
+        scope = Scope(23, 9, "amber", afterglow=0.6, cue=(2.0, 9.0), dim=0.25, fast=fast)
+        out = []
+        for turn in (0.0, 0.7, 1.9):
+            cam = Camera((4.0 * math.sin(turn), -4.0 * math.cos(turn), 1.6 + turn), (0.1, 0.0, 0.4), fov=62.0, roll=7.0 * turn)
+            scope.clear()
+            things = [box((1.2, 0.9, 0.8)).placed((0.0, 0.3, 0.4), yaw=20.0), grid(5, 5, 1.2).lit("cyan", 0.6),
+                      box((0.5, 0.5, 2.5)).placed((1.1, -0.6 + turn, 1.25), yaw=-35.0, pitch=12.0).lit((255, 90, 60))]
+            scope.render(cam, things, solid=turn < 1.0)
+            scope.line(cam, (-9.0, -9.0, 0.2), (9.0, 30.0, 3.0), 0.8, "white")
+            scope.line2(-7.5, 3.25, 60.0, 31.5, 1.3)
+            scope.line2(5.0, 40.0, 5.0, -4.0, 0.4, (10, 200, 250), 0.3, 0.9)
+            scope.circle2(20.0, 14.0, 9.5, 0.7)
+            scope.dot(3, 3, 1.7)
+            out.append((list(scope.light), list(scope.depth) if scope.depth is not None else None, list(scope.best),
+                        [scope.colours[i] for i in scope.ink], list(scope.way), scope.rows("dots"),
+                        scope.rows("strokes", False)))
+            scope.paper, scope.glow = ((4, 6, 8), True) if turn else (None, False)
+        return out
+    return picture_of(lib) == picture_of(False)
 
 
 def colour_of(c, default=(70, 255, 140)):
@@ -101,6 +168,30 @@ class Wire:
         self.faces = [tuple(int(i) for i in f) for f in faces]
         self.colour, self.bright, self.wound = colour, bright, wound
         self._sides = None
+        self._points = self._lines = self._corners = None    # packed for CLIo Picture, when it draws
+
+    def points(self):
+        """Its points as one row of numbers (x y z x y z...), kept while its list of points is the same list."""
+        got = self._points
+        if got is None or got[0] is not self.verts:
+            got = self._points = (self.verts, array("d", chain.from_iterable(self.verts)))
+        return got[1]
+
+    def lines(self):
+        """Its lines as one row of whole numbers (a b a b...)."""
+        got = self._lines
+        if got is None or got[0] is not self.edges:
+            got = self._lines = (self.edges, array("i", chain.from_iterable(self.edges)))
+        return got[1]
+
+    def corners(self):
+        """Its faces as ``(corners in turn, how many each has)``, or None if one has more than the library takes."""
+        got = self._corners
+        if got is None or got[0] is not self.faces:
+            sizes = array("i", [len(f) for f in self.faces])
+            ok = all(3 <= n <= FACE_MOST for n in sizes)
+            got = self._corners = (self.faces, (array("i", chain.from_iterable(self.faces)), sizes) if ok else None)
+        return got[1]
 
     def sides(self):
         """For each line, the faces it is an edge of."""
@@ -116,8 +207,9 @@ class Wire:
     def placed(self, at=(0.0, 0.0, 0.0), yaw=0.0, pitch=0.0, roll=0.0, scale=1.0):
         """The same thing made bigger, turned (see :func:`turned`) and moved - in that order."""
         sx, sy, sz = (scale, scale, scale) if isinstance(scale, (int, float)) else scale
-        out = Wire((), self.edges, (), self.colour, self.bright, self.wound)
-        out.faces, out._sides = self.faces, self.sides()
+        out = Wire((), (), (), self.colour, self.bright, self.wound)
+        out.edges, out._lines = self.edges, self._lines
+        out.faces, out._sides, out._corners = self.faces, self.sides(), self._corners
         verts = []
         for x, y, z in self.verts:
             x, y, z = turned((x * sx, y * sy, z * sz), yaw, pitch, roll)
@@ -126,9 +218,10 @@ class Wire:
         return out
 
     def lit(self, colour=None, bright=None):
-        out = Wire((), self.edges, (), self.colour if colour is None else colour,
+        out = Wire((), (), (), self.colour if colour is None else colour,
                    self.bright if bright is None else bright, self.wound)
-        out.verts, out.faces, out._sides = self.verts, self.faces, self._sides
+        out.verts, out.edges, out.faces, out._sides = self.verts, self.edges, self.faces, self._sides
+        out._points, out._lines, out._corners = self._points, self._lines, self._corners
         return out
 
     def __add__(self, other):
@@ -338,33 +431,85 @@ class Scope:
     ``(near, far)`` distances between which lines dim to ``dim`` of their light; ``glow``: lit
     characters also light their background a little."""
 
-    def __init__(self, cols=80, rows=24, colour="green", afterglow=0.0, cue=None, dim=0.3, glow=True, paper=None):
+    def __init__(self, cols=80, rows=24, colour="green", afterglow=0.0, cue=None, dim=0.3, glow=True, paper=None,
+                 fast=None):
         self.cols, self.rows_n = int(cols), int(rows)
         self.W, self.H = self.cols * 2, self.rows_n * 4
         self.colour = colour_of(colour)
         self.afterglow, self.cue, self.dim, self.glow, self.paper = float(afterglow), cue, float(dim), glow, paper
         n = self.W * self.H
-        self.light = [0.0] * n                           # each dot's light
-        self.depth = None                                # 1 / distance of the nearest face at each dot, or None
         cells = self.cols * self.rows_n
-        self.best = [0.0] * cells                        # the brightest thing drawn in each character this frame
-        self.ink = [self.colour] * cells                 # and its colour
-        self.way = [-1] * cells                          # the way lines run through it (-1 none, 4 several)
+        self.colours, self._inks = [], {}                # the colours drawn in, each with a number (an ink)
         self.words = []
+        self.depth = None                                # 1 / distance of the nearest face at each dot, or None
+        # CLIo Picture draws it where the library is there and gives what this Python gives (fast: None finds
+        # out; False: the Python; a library: that one, unasked - the check itself)
+        self._lib = (library() if fast is None else fast) if n > 0 else None
+        if self._lib:
+            from . import picture
+            self.light = array("d", bytes(8 * n))
+            self.best = array("d", bytes(8 * cells))
+            self.ink = array("i", bytes(4 * cells))
+            self.way = array("i", [-1]) * cells
+            self._c = picture._Scope(self.cols, self.rows_n, self.light.buffer_info()[0], None,
+                                     self.best.buffer_info()[0], self.ink.buffer_info()[0],
+                                     self.way.buffer_info()[0], 0, 0.0, 1.0, self.dim)
+            self._ref = picture.ctypes.byref(self._c)
+            self._packed = None                          # (how many colours, they as 0xRRGGBB)
+        else:
+            self.light = [0.0] * n                       # each dot's light
+            self.best = [0.0] * cells                    # the brightest thing drawn in each character this frame
+            self.ink = [0] * cells                       # and its colour: its number in ``colours``
+            self.way = [-1] * cells                      # the way lines run through it (-1 none, 4 several)
+        self._ink(self.colour)
+
+    def _ink(self, colour):
+        """A colour's number on this display."""
+        n = self._inks.get(colour)
+        if n is None:
+            n = self._inks[colour] = len(self.colours)
+            self.colours.append(colour)
+        return n
+
+    def _state(self):
+        """The library's view of the display as it stands now: its faces, how lines dim."""
+        c = self._c
+        depth, cue = self.depth, self.cue
+        c.depth = depth.buffer_info()[0] if depth is not None else None
+        if cue:
+            c.has_cue, c.cue_near, c.cue_far = 1, cue[0], cue[1]
+        else:
+            c.has_cue = 0
+        c.dim = self.dim
+        return self._ref
+
+    def _eye(self, cam):
+        """A camera as the library takes one (kept on it; ``f`` is this display's)."""
+        from . import picture
+        eye = cam.__dict__.get("_eye")
+        if eye is None:
+            three = picture.ctypes.c_double * 3
+            eye = cam.__dict__["_eye"] = picture._Eye(three(*cam.eye), three(*cam.right), three(*cam.up),
+                                                      three(*cam.ahead), cam.near, 0.0)
+        eye.f = (self.W / 2.0) / math.tan(math.radians(cam.fov) / 2.0)
+        return picture.ctypes.byref(eye)
 
     # ---- a frame ----------------------------------------------------- #
     def clear(self):
         """A new frame: what was drawn fades (or goes out), faces are forgotten."""
         k = self.afterglow
+        self.depth = None
+        self.words = []
+        if self._lib:
+            self._lib.clio_scope_clear(self._state(), k)
+            return
         if k > 0:
             self.light = [v * k if v * k > 0.07 else 0.0 for v in self.light]
         else:
             self.light = [0.0] * (self.W * self.H)
-        self.depth = None
         cells = self.cols * self.rows_n
         self.best = [0.0] * cells
         self.way = [-1] * cells
-        self.words = []
 
     def project(self, cam, p):
         """Where a point shows: ``(x, y, 1 / distance)`` in dots, or None behind the eye."""
@@ -394,6 +539,9 @@ class Scope:
     # ---- lines ------------------------------------------------------- #
     def dot(self, x, y, bright=1.0, colour=None, way=-1):
         """Light one dot (x across, y down, in dots)."""
+        self._put(x, y, bright, self._ink(self.colour if colour is None else colour), way)
+
+    def _put(self, x, y, bright, ink, way):
         if 0 <= x < self.W and 0 <= y < self.H:
             i = y * self.W + x
             v = self.light[i]
@@ -401,7 +549,7 @@ class Scope:
             c = (y >> 2) * self.cols + (x >> 1)
             if bright >= self.best[c]:
                 self.best[c] = bright
-                self.ink[c] = self.colour if colour is None else colour
+                self.ink[c] = ink
             if way >= 0:
                 w = self.way[c]
                 self.way[c] = way if w < 0 or w == way else 4
@@ -410,6 +558,15 @@ class Scope:
         """A line on the display, in dots. With ``w0`` and ``w1`` (1 / distance at its ends) it is hidden
         where a face is in front, and dimmed by distance."""
         W, H = self.W, self.H
+        if colour is not None:
+            colour = colour_of(colour)
+        ink = self._ink(self.colour if colour is None else colour)
+        if self._lib:
+            if w0 is None:
+                self._lib.clio_scope_line2(self._state(), x0, y0, x1, y1, bright, ink, 0, 0.0, 0.0)
+            else:
+                self._lib.clio_scope_line2(self._state(), x0, y0, x1, y1, bright, ink, 1, w0, w1)
+            return
         dx, dy = x1 - x0, y1 - y0
         t0, t1 = 0.0, 1.0                                # keep the part of it that is on the display
         for p, q in ((-dx, x0 + 1.0), (dx, W - x0), (-dy, y0 + 1.0), (dy, H - y0)):
@@ -429,11 +586,14 @@ class Scope:
                 w0, w1 = w0 + (w1 - w0) * t0, w0 + (w1 - w0) * t1
             x0, y0, x1, y1 = x0 + dx * t0, y0 + dy * t0, x0 + dx * t1, y0 + dy * t1
             dx, dy = x1 - x0, y1 - y0
-        n = max(1, int(max(abs(dx), abs(dy)) + 0.5))
-        if colour is not None:
-            colour = colour_of(colour)
-        a = math.degrees(math.atan2(dy, dx)) % 180.0
-        way = int((a + 22.5) // 45) % 4
+        ax, ay = abs(dx), abs(dy)
+        n = max(1, int(max(ax, ay) + 0.5))
+        if ay <= ax * FLAT:                              # the way it runs: flat, down to the right, upright, up to the right
+            way = 0
+        elif ax <= ay * FLAT:
+            way = 2
+        else:
+            way = 1 if (dx > 0) == (dy > 0) else 3
         depth, cue = self.depth, self.cue
         sx, sy = dx / n, dy / n
         sw = (w1 - w0) / n if w0 is not None else 0.0
@@ -452,7 +612,7 @@ class Scope:
                     d = 1.0 / w
                     k = (d - cue[0]) / (cue[1] - cue[0])
                     b *= 1.0 - (1.0 - self.dim) * (0.0 if k < 0 else 1.0 if k > 1 else k)
-            self.dot(x, y, b, colour, way)
+            self._put(x, y, b, ink, way)
 
     def _behind(self, x, y, w):
         """Is a point of a line behind the faces all round its dot? (A face's edge is not behind its
@@ -499,8 +659,15 @@ class Scope:
             return
         W, H = self.W, self.H
         if self.depth is None:
-            self.depth = [0.0] * (W * H)
+            self.depth = array("d", bytes(8 * W * H)) if self._lib else [0.0] * (W * H)
         depth = self.depth
+        if self._lib:
+            packed = wire.corners()
+            if packed is not None and isinstance(depth, array):
+                self._lib.clio_scope_hide(self._state(), self._eye(cam), wire.points().buffer_info()[0],
+                                          len(wire.verts), packed[0].buffer_info()[0], packed[1].buffer_info()[0],
+                                          len(wire.faces), 1.0 - OFFSET)
+                return
         near = cam.near
         f = (W / 2.0) / math.tan(math.radians(cam.fov) / 2.0)
         cx, cy = W / 2.0, H / 2.0
@@ -568,6 +735,11 @@ class Scope:
                 a, b, c = verts[f[0]], verts[f[1]], verts[f[2]]
                 front.append(_dot(_cross(_sub(b, a), _sub(c, a)), _sub(eye, a)) > 0)
             skip = [bool(s) and not any(front[i] for i in s) for s in wire.sides()]
+        if self._lib and wire.edges:
+            self._lib.clio_scope_wire(self._state(), self._eye(cam), wire.points().buffer_info()[0], len(verts),
+                                      wire.lines().buffer_info()[0], len(wire.edges),
+                                      bytes(skip) if skip is not None else None, bright, self._ink(colour))
+            return
         for i, (a, b) in enumerate(wire.edges):
             if skip is not None and skip[i]:
                 continue
@@ -594,9 +766,24 @@ class Scope:
     def rows(self, style="dots", unicode=True):
         """The picture as rows of ``(character, colour, background)``: ``dots`` (braille) or ``strokes``
         (lines by the way they run; ``unicode`` false: in ASCII)."""
-        W, cols = self.W, self.cols
-        light, best, ink, way = self.light, self.best, self.ink, self.way
+        cols = self.cols
         marks = (STROKES if unicode else PLAIN) + ("┼" if unicode else "+")
+        out = self._cells(style, unicode, marks) if self._lib else None
+        if out is None:
+            out = self._read(style, unicode, marks)
+        for col, r, text, colour, bright in self.words:
+            if 0 <= r < self.rows_n:
+                fg = self.tone(colour, bright)
+                for i, ch in enumerate(text):
+                    if 0 <= col + i < cols:
+                        out[r][col + i] = (ch, fg, self.paper)
+        return out
+
+    def _read(self, style, unicode, marks):
+        """The characters read from the dots, in Python."""
+        W, cols = self.W, self.cols
+        light, way = self.light, self.way
+        ink, colours = self.ink, self.colours
         out = []
         for r in range(self.rows_n):
             row = []
@@ -616,12 +803,13 @@ class Scope:
                     row.append((" ", None, self.paper))
                     continue
                 ci = r * cols + c
-                fg = self.tone(ink[ci], most)
+                col = colours[ink[ci]]
+                fg = self.tone(col, most)
                 bg = self.paper
                 if self.glow and most > 0.5:
                     g = 0.05 + 0.05 * min(1.0, most - 0.5)
-                    bg = tuple(int(v * g) for v in ink[ci]) if bg is None else \
-                        tuple(int(min(255, p + v * g)) for p, v in zip(bg, ink[ci]))
+                    bg = tuple(int(v * g) for v in col) if bg is None else \
+                        tuple(int(min(255, p + v * g)) for p, v in zip(bg, col))
                 if style == "dots":
                     ch = chr(0x2800 + bits)
                 else:
@@ -629,12 +817,67 @@ class Scope:
                     ch = marks[w] if w >= 0 else ("·" if unicode else ".")
                 row.append((ch, fg, bg))
             out.append(row)
-        for col, r, text, colour, bright in self.words:
-            if 0 <= r < self.rows_n:
-                fg = self.tone(colour, bright)
-                for i, ch in enumerate(text):
-                    if 0 <= col + i < cols:
-                        out[r][col + i] = (ch, fg, self.paper)
+        return out
+
+    def _cells(self, style, unicode, marks):
+        """:meth:`rows` by the library: the rows, or None when a colour is not one it can take (then the
+        Python reads them)."""
+        from . import picture
+        ctypes = picture.ctypes
+        packed = self._packed
+        if packed is None or packed[0] != len(self.colours):
+            try:
+                packed = self._packed = (len(self.colours), array(picture.U32, [(c[0] << 16) | (c[1] << 8) | c[2]
+                                                                                for c in self.colours]))
+            except (TypeError, OverflowError, IndexError):
+                return None
+            if any(len(c) != 3 or not all(isinstance(v, int) and 0 <= v <= 255 for v in c) for c in self.colours):
+                self._packed = None
+                return None
+        paper = self.paper
+        if paper is not None and not (len(paper) == 3 and all(isinstance(v, int) and 0 <= v <= 255 for v in paper)):
+            return None
+        cols, n = self.cols, self.cols * self.rows_n
+        buf = ctypes.create_string_buffer(n * 8)
+        if self._lib.clio_scope_cells(self._state(), packed[1].buffer_info()[0], packed[0], 1 if self.glow else 0,
+                                      0 if paper is None else 1,
+                                      0 if paper is None else (paper[0] << 16) | (paper[1] << 8) | paper[2], buf) != 0:
+            return None
+        raw = buf.raw
+        seen = _seen
+        if len(seen) > 50000:
+            seen.clear()
+        dots = style == "dots"
+        way = self.way
+        blank = (" ", None, paper)
+        point = "·" if unicode else "."
+        out, i = [], 0
+        for r in range(self.rows_n):
+            row = []
+            for c in range(cols):
+                bits = raw[i]
+                if not bits:
+                    row.append(blank)
+                else:
+                    k = raw[i + 2:i + 5]
+                    fg = seen.get(k)
+                    if fg is None:
+                        fg = seen[k] = (k[0], k[1], k[2])
+                    if raw[i + 1] == 3:
+                        k = raw[i + 5:i + 8]
+                        bg = seen.get(k)
+                        if bg is None:
+                            bg = seen[k] = (k[0], k[1], k[2])
+                    else:
+                        bg = None
+                    if dots:
+                        ch = _BRAILLE[bits]
+                    else:
+                        w = way[r * cols + c]
+                        ch = marks[w] if w >= 0 else point
+                    row.append((ch, fg, bg))
+                i += 8
+            out.append(row)
         return out
 
     def plain(self, style="strokes", unicode=False):

@@ -3,11 +3,12 @@
 """CLIo Picture: the inner loops of the pictures in C, when the library is installed - as Ballistic Engine is
 for sound.  A game never needs it: without it CLIo draws everything in Python, as before.
 
-What it does now (CLIo Picture 0.5): the land's heights for a chunk at once (``land_raw``), the open land's
+What it does now (CLIo Picture 0.10): the land's heights for a chunk at once (``land_raw``), the open land's
 ground caster (``land_draw``), the sky over open cells but for the sun (``sky``), the rooms' floor and
 ceiling but for teleporters' rings (``room``), the dots and dots-fill styles' braille cells (``dots``), from
 0.4 the whole picture kept in the library (``frame.py``), and from 0.5 the models projected and shaded there
-(``model_draw``: with this Python's own pow and exp, checked against model.pbr first, ``models_agree``).  All give exactly what the Python gives - the same floats, to the last bit - so a game looks and
+(``model_draw``: with this Python's own pow and exp, checked against model.pbr first, ``models_agree``), and
+from 0.10 the vector display's dots, lines, hidden lines and characters (``scope``; engine/vector.py).  All give exactly what the Python gives - the same floats, to the last bit - so a game looks and
 plays the same with it or without it; only faster.  When the
 library is loaded it is checked against the Python on a few known values first, and not used if anything
 differs (``status()`` says why).
@@ -184,6 +185,18 @@ class _Surface(ctypes.Structure if ctypes else object):
                 ("cells", P_), ("heights", P_)] if ctypes else []
 
 
+class _Scope(ctypes.Structure if ctypes else object):      # clio_scope: a vector display's state (engine/vector.py)
+    D_, P_, I_ = (ctypes.c_double, ctypes.c_void_p, ctypes.c_int) if ctypes else (None, None, None)
+    _fields_ = [("cols", I_), ("rows", I_), ("light", P_), ("depth", P_), ("best", P_), ("ink", P_), ("way", P_),
+                ("has_cue", I_), ("cue_near", D_), ("cue_far", D_), ("dim", D_)] if ctypes else []
+
+
+class _Eye(ctypes.Structure if ctypes else object):        # clio_eye: where a camera is and how it is turned
+    D_ = ctypes.c_double if ctypes else None
+    _fields_ = [("eye", D_ * 3), ("right", D_ * 3), ("up", D_ * 3), ("ahead", D_ * 3), ("near_z", D_), ("f", D_)] \
+        if ctypes else []
+
+
 CHUNK_FN = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int64, ctypes.c_int64) if ctypes else None
 CHUNK_BYTES = 256 * 8 + 256 * 4 + 256 * 2                    # clio_chunk: heights, colours, kinds
 U32 = "I" if array("I").itemsize == 4 else "L"
@@ -275,6 +288,18 @@ def _open(path):
         lib.clio_tilt.argtypes = [P, I, I, D, D, ctypes.c_uint32, P]
         lib.clio_land_terraced.restype = I
         lib.clio_land_terraced.argtypes = [ctypes.POINTER(_Ground), I, P, P, CHUNK_FN, P, P, I, P, P]
+    if hasattr(lib, "clio_scope_cells"):                # 0.10 and later: the vector display
+        S, E = ctypes.POINTER(_Scope), ctypes.POINTER(_Eye)
+        lib.clio_scope_clear.restype, lib.clio_scope_clear.argtypes = None, [S, D]
+        lib.clio_scope_dot.restype, lib.clio_scope_dot.argtypes = None, [S, I, I, D, ctypes.c_int32, I]
+        lib.clio_scope_line2.restype = None
+        lib.clio_scope_line2.argtypes = [S, D, D, D, D, D, ctypes.c_int32, I, D, D]
+        lib.clio_scope_wire.restype = I
+        lib.clio_scope_wire.argtypes = [S, E, P, I, P, I, P, D, ctypes.c_int32]
+        lib.clio_scope_hide.restype = I
+        lib.clio_scope_hide.argtypes = [S, E, P, I, P, P, I, D]
+        lib.clio_scope_cells.restype = I
+        lib.clio_scope_cells.argtypes = [S, P, I, I, I, ctypes.c_uint32, P]
     if hasattr(lib, "clio_room_draw"):                  # 0.3 and later
         lib.clio_room_draw.restype = I
         lib.clio_room_draw.argtypes = [ctypes.POINTER(_Room), ROOM_CELL_FN, P, P, P, ctypes.POINTER(I)]
@@ -330,6 +355,13 @@ def load(env=None):
                 _lib = lib
                 _why = "CLIo Picture %s (%s)" % (lib.clio_picture_version().decode("ascii", "replace"), path)
     return _lib or None
+
+
+def scope():
+    """The library, if it has the vector display (0.10 and later); else None. (engine/vector.py checks it
+    against its own Python before it draws with it.)"""
+    lib = load()
+    return lib if lib is not None and hasattr(lib, "clio_scope_cells") and array("i").itemsize == 4 else None
 
 
 def use(on=True, env=None):

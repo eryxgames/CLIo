@@ -2019,7 +2019,12 @@ your Python uses (CLIo hands them over and checks the shading against its own be
 the library draw models); from 0.6 it keeps each model's faces and is handed only the posed
 corners and where the model stands, so a crowd costs about half as much (100 drones in sight:
 15 ms a frame instead of 32); from 0.7 it draws the mesh view, from 0.8 its lit surfaces
-(lamps, highlights, reflections, rain's splashes), from 0.9 its slopes. Along the bot's own games at 150 x 34: a room frame takes 4-5 ms
+(lamps, highlights, reflections, rain's splashes), from 0.9 its slopes, and from 0.10 the
+vector display - every console's scopes, the view ahead, scans, a level in lines, the model
+viewer's line views: lines lit dot by dot, faces hiding the lines behind them, the characters
+read from the dots (a surface scan at 100 x 28 takes 5 ms instead of 27, a level as a scan 3
+instead of 27; CLIo draws a small picture both ways first and keeps to the Python if a dot
+differs). Along the bot's own games at 150 x 34: a room frame takes 4-5 ms
 instead of 10-12 (in the dots view 6-7 instead of 40), open land and the hall of drones 7-8 ms
 instead of 35-80 (in dots 10-15 instead of 95-140). It gives exactly what the Python gives - every pixel, height and dot the
 same, to the last bit; CLIo checks some before it uses the library and keeps to the Python if

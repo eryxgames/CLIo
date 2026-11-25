@@ -119,7 +119,8 @@ Two **optional downloads** make RØØTLESS nicer. The launcher offers them under
 (it says the size first and installs nothing without a yes):
 
 - **CLIo Picture** (about 50 KB, `--get-picture`): draws the first-person picture several times
-  faster - the same picture, to the last pixel.
+  faster - the same picture, to the last pixel - and, from its release 0.10, the consoles' line
+  displays, scans and views ahead.
 - **Ballistic's C engine** (about 1 MB, `--get-ballistic`): physically modelled shots, ricochets
   and blasts for RØØTLESS's Ballistic sound set (`--sounds ballistic`) - some of them; with
   [Node.js](https://nodejs.org) installed, all of them.

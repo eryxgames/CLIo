@@ -126,7 +126,7 @@ guide.
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 1057 tests, about a minute
+python -m unittest discover -s tests     # 1064 tests, about a minute
 python -m engine.vector                  # the vector display's reel (Ctrl-C ends)
 python -m engine.realm templates/realm 8 # a steward plays the realm starter over eight seeds
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
@@ -150,7 +150,9 @@ levels to their exits (key presses in a redrawn screen and typed commands), chec
 screen fits 40 columns in both Unicode and ASCII (and down to 24), fight packs, run rogue mode
 until the bot falls, round-trip saves, and render every sound effect. They write nothing into
 the repository: saves and audio go to temporary folders. With `CLIO_PICTURE_LIB` set to a build
-of CLIo Picture (and `CLIO_PICTURE_REQUIRE=1`), the picture tests compare it with the Python.
+of CLIo Picture (and `CLIO_PICTURE_REQUIRE=1`), the picture tests compare it with the Python -
+`tests/test_vector.py`'s `LibraryTests` the vector display (library 0.10 and later), scene by
+scene and dot for dot. `engine.vector.backend()` says what draws the display here.
 
 ## Releasing
 

@@ -9,6 +9,7 @@ import math
 import os
 import sys
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -16,6 +17,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, HERE)
 
 from engine import vector as V  # noqa: E402
+vector = V
 from engine.vector import Camera, Scope  # noqa: E402
 
 
@@ -342,6 +344,145 @@ class ReelTests(unittest.TestCase):
             V.scene(name, 3.0, s)
             s.rows()
         self.assertLess((time.time() - t0) / len(V.SCENES), 0.5)             # generous: a slow machine, under tests
+
+
+def with_library(test):
+    """Run with CLIo Picture drawing the display (skipped where the library is not, or has none - 0.10)."""
+    def run(self):
+        from engine import picture
+        picture.use(True)
+        if picture.scope() is None:
+            if os.environ.get("CLIO_PICTURE_REQUIRE"):
+                self.fail("CLIo Picture with a vector display is required here: %s" % picture.status())
+            self.skipTest("CLIo Picture's vector display is not here: %s" % picture.status())
+        try:
+            test(self)
+        finally:
+            picture.use(True)
+    run.__name__, run.__doc__ = test.__name__, test.__doc__
+    return run
+
+
+class LibraryTests(unittest.TestCase):
+    """CLIo Picture draws the display where it is there: the same picture, dot for dot."""
+
+    def both(self, draw):
+        """What ``draw(scope maker)`` gives with the library and with the Python."""
+        from engine import picture
+        fast = draw()
+        picture.use(False)
+        try:
+            slow = draw()
+        finally:
+            picture.use(True)
+        return fast, slow
+
+    @with_library
+    def test_it_is_used_and_says_so(self):
+        self.assertEqual(vector.backend(), "CLIo Picture")
+        self.assertTrue(vector.Scope(20, 8)._lib)
+        self.assertFalse(vector.Scope(20, 8, fast=False)._lib)
+
+    @with_library
+    def test_every_scene_dot_for_dot(self):
+        def draw():
+            out = []
+            scope = vector.Scope(72, 22)
+            for name in vector.SCENES:
+                for t in (0.0, 1.3, 7.7, 13.0):
+                    vector.scene(name, t, scope)
+                    out.append((name, t, list(scope.light), None if scope.depth is None else list(scope.depth),
+                                list(scope.way), scope.rows(), scope.rows("strokes"), scope.rows("strokes", False)))
+            return out
+        fast, slow = self.both(draw)
+        self.assertEqual(len(fast), 4 * len(vector.SCENES))
+        for a, b in zip(fast, slow):
+            self.assertEqual(a, b, "%s at %s" % a[:2])
+
+    @with_library
+    def test_afterglow_paper_and_what_is_drawn_by_hand(self):
+        def draw():
+            scope = vector.Scope(30, 10, "amber", afterglow=0.7, cue=(1.0, 6.0), dim=0.2, paper=(6, 8, 10))
+            out = []
+            for k in range(5):
+                scope.clear()
+                cam = vector.Camera((3.0 - k, -4.0, 1.5), (0, 0, 0.5), fov=50 + 8 * k, roll=5.0 * k)
+                scope.render(cam, [vector.box((1.0, 1.5, 1.0)).placed((0, 0, 0.5), yaw=15.0 * k), vector.globe(0.8, 6, 8)
+                                   .placed((1.5, 0.5, 0.8)).lit("red", 1.4)], solid=k % 2 == 0)
+                scope.line(cam, (-20.0, 0.0, 0.0), (20.0, 0.3, 0.0), 0.6, "#40c0ff")       # through the eye's plane
+                scope.line2(-5.0, -3.0, 70.0, 45.0, 1.8)
+                scope.line2(10.0, 10.0, 10.0, 10.0, 0.9, "white")
+                scope.circle2(30.0, 20.0, 12.0, 0.5, (200, 40, 220))
+                scope.dot(59, 39, 2.0, (1, 2, 3))
+                scope.dot(-1, 5)
+                scope.text(2, 1, "MARK", "cyan", 1.2)
+                scope.label(cam, (0.0, 0.0, 1.2), "BOX")
+                out.append((list(scope.light), list(scope.best), [scope.colours[i] for i in scope.ink], scope.rows(),
+                            scope.rows("strokes", False), scope.plain()))
+            return out
+        fast, slow = self.both(draw)
+        self.assertEqual(fast, slow)
+
+    @with_library
+    def test_a_console_a_view_ahead_and_a_model_dot_for_dot(self):
+        from engine import ahead, model, viewer
+        from engine import sim as S
+        from engine.data import GameData
+        station = os.path.join(ROOT, "templates", "station")
+
+        def draw():
+            data = GameData(station)
+            out = []
+            for name in ("helm", "scan"):
+                sim = S.make(data, name)
+                sim.paused = None
+                runner = S.Runner(sim)
+                for _ in range(3):
+                    sim.ticks += 9
+                    out.append(runner.rows(112, 34, 3, True))
+            subject = viewer.Subject(model.load(data.models)["hauler"], look=viewer.looks(data)["hauler"])
+            for view in ("wire", "solid", "structure", "plan"):
+                out.append(viewer.draw(subject, view, 50, 18, yaw=70.0, cut_at=0.4))
+            scope = vector.Scope(60, 18)
+            ahead.field(scope, 3.3)
+            out.append(scope.rows())
+            return out
+        fast, slow = self.both(draw)
+        self.assertEqual(fast, slow)
+
+    @with_library
+    def test_a_face_of_too_many_corners_and_a_colour_it_cannot_take_are_the_pythons(self):
+        def draw():
+            scope = vector.Scope(30, 12)
+            cam = vector.Camera((0.0, -6.0, 3.0), (0, 0, 0))
+            plate = vector.Wire([(math.cos(i / 20.0 * 2 * math.pi) * 2, math.sin(i / 20.0 * 2 * math.pi) * 2, 0.0)
+                                 for i in range(20)], [(i, (i + 1) % 20) for i in range(20)], [tuple(range(20))])
+            under = vector.box((1, 1, 1)).placed((0, 0, -1.0))
+            scope.render(cam, [plate, under], solid=True)
+            scope.dot(4, 4, 1.0, (300.5, 10, 10))                    # not a colour of whole numbers to 255
+            return list(scope.depth), list(scope.light), scope.rows()
+        fast, slow = self.both(draw)
+        self.assertEqual(fast, slow)
+        self.assertIsNone(vector.Wire([(0, 0, 0)] * 20, [], [tuple(range(20))]).corners())
+
+    def test_a_library_that_draws_another_picture_is_not_used(self):
+        from engine import picture
+        fake = object()
+        with mock.patch.object(picture, "scope", return_value=fake), mock.patch.object(vector, "agree", return_value=False):
+            self.assertIsNone(vector.library())
+            self.assertIn("another picture", vector.backend())
+            self.assertFalse(vector.Scope(10, 4)._lib)
+        with mock.patch.object(picture, "scope", return_value=None):
+            self.assertIsNone(vector.library())
+            self.assertTrue(vector.backend().startswith("Python ("))
+
+    def test_the_way_a_line_runs(self):
+        s = vector.Scope(20, 10, fast=False)
+        for (x1, y1), way in (((30, 0), 0), ((30, 10), 0), ((30, 30), 1), ((10, 30), 2), ((0, 30), 2), ((-30, 30), 3),
+                              ((-30, 10), 0), ((-30, -30), 1), ((30, -30), 3), ((30, -13), 3), ((30, -12), 0)):
+            s.clear()
+            s.line2(20.0, 20.0, 20.0 + x1, 20.0 + y1)
+            self.assertEqual(s.way[5 * s.cols + 10], way, (x1, y1))
 
 
 if __name__ == "__main__":

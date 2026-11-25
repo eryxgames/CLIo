@@ -6,6 +6,18 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 
 ### Added
 
+- **CLIo Picture draws the vector display** (library 0.10 and later; with an older one, or none,
+  the Python draws as before): a `Scope`'s lines, hidden lines, afterglow and characters are the
+  library's `clio_scope_*` - so every console's scopes, the view ahead, scans of ground, a level
+  in lines or as a scan, the reel and the model viewer's line views. The same picture, dot for
+  dot: a small scene is drawn both ways before the library is used, and it is not used if
+  anything differs (`engine.vector.backend()` says which draws). Measured here: the reel's scan
+  at 100 x 28, 27 ms to 5.4; a level as a scan, 27 to 3.4, in lines 13.4 to 3.6; the station's
+  helm console at 112 x 34, 11.3 to 5.0. `--get-picture` still fetches 0.9 until a 0.10 release
+  is pinned in `engine/picture/fetch.py`.
+- Changed with it: the way a line runs through a character (the `strokes` style, where there is
+  no braille) is told by comparing its rise with its run, not by an arctangent - the same on
+  every machine, and the same in the library. A line at exactly 22.5 degrees now counts as flat.
 - **Models: tracks.** A clip can be kept as tracks (`"tracks"` in `models.json`): for each named
   part that moves, keys in time of where it is moved to, how it is turned and its size. Played
   at any moment, as smooth as the screen is drawn; a few numbers where frames are thousands;

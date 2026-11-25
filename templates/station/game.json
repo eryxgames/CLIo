@@ -16,5 +16,20 @@
    "seed": 7
   }
  },
- "about": "Three screens of a ship's bridge, each a simulator with its own panels: copy the folder and change them."
+ "about": "Three screens of a ship's bridge, each a simulator with its own panels: copy the folder and change them.",
+ "palettes": {
+  "erebus": [
+   "#dfe8ee",
+   "#8fb3c9",
+   "#4f7896",
+   "#2b4a63",
+   "#ffb028"
+  ]
+ },
+ "model_look": {
+  "palette": "erebus",
+  "shades": 4,
+  "dither": true,
+  "ink": "cyan"
+ }
 }

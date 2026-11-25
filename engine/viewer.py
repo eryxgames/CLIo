@@ -68,12 +68,87 @@ def cut(wire, axis, at, keep=-1):
     return vector.Wire(verts, edges, (), wire.colour)
 
 
+LOOK_KEYS = ("view", "ink", "palette", "shades", "dither", "light", "groups")
+
+
+def looks(data):
+    """How each of a game's models is to be drawn: the game's own ``"model_look"`` (``game.json``), with
+    what a model's ``"look"`` says over it. ``{name: look}``; a look's ``palette`` is made colours here."""
+    cfg = getattr(data, "config", None) or {}
+    base = cfg.get("model_look") if isinstance(cfg.get("model_look"), dict) else {}
+    out = {}
+    for name, spec in (getattr(data, "models", None) or {}).items():
+        own = spec.get("look") if isinstance(spec, dict) and isinstance(spec.get("look"), dict) else {}
+        look = dict(base, **own)
+        if isinstance(base.get("groups"), dict) and isinstance(own.get("groups"), dict):
+            look["groups"] = dict(base["groups"], **own["groups"])
+        if look.get("palette") is not None:
+            look["colours"] = palette(look["palette"], cfg.get("palettes"))
+        out[name] = look
+    return out
+
+
+def palette(value, own=None):
+    """A look's palette as colours: a name of the game's own ``palettes`` or of the banner's, or a list
+    of ``#rrggbb``. None when it is none of them."""
+    from . import banner
+    if isinstance(value, str):
+        if isinstance(own, dict) and value in own:
+            got = banner.own_palette(own[value])
+            value = (list(got[0]) + list(got[1] or [])) if got else None
+        elif value in banner.PALETTES:
+            main, accent = banner.PALETTES[value]
+            value = list(main) + list(accent or [])
+        else:
+            return None
+    if not isinstance(value, (list, tuple)):
+        return None
+    cols = [_hex(c) if isinstance(c, str) else (tuple(int(v) for v in c) if isinstance(c, (list, tuple)) and len(c) == 3
+                                                else None) for c in value]
+    cols = [c for c in cols if c]
+    return cols or None
+
+
+def _hex(c):
+    """``#rrggbb`` as numbers; None when it is not that."""
+    try:
+        return tuple(int(c[i:i + 2], 16) for i in (1, 3, 5)) if isinstance(c, str) and c.startswith("#") and len(c) == 7 else None
+    except ValueError:
+        return None
+
+
+BAYER = ((0.125, 0.625), (0.875, 0.375))                 # which of two colours a pixel takes, by where it is
+
+
+def to_palette(px, colours, shades=3, dither=True):
+    """Repaint a picture (rows of ``(r, g, b)`` or None) in a palette's colours only: each pixel becomes
+    the nearest of the colours at ``shades`` strengths, or - dithered - one of the two nearest by where
+    it lies between them, in a pattern. The same picture gives the same picture."""
+    shades = max(1, min(8, int(shades or 1)))
+    table = sorted({tuple(int(c * k / float(shades)) for c in col) for col in colours for k in range(1, shades + 1)})
+    known = {}
+    for y, row in enumerate(px):
+        for x, c in enumerate(row):
+            if c is None:
+                continue
+            got = known.get(c)
+            if got is None:
+                ranked = sorted((((c[0] - t[0]) ** 2 * 3 + (c[1] - t[1]) ** 2 * 4 + (c[2] - t[2]) ** 2 * 2), t) for t in table)
+                d0 = math.sqrt(ranked[0][0])
+                d1 = math.sqrt(ranked[1][0]) if len(ranked) > 1 else 0.0
+                got = known[c] = (ranked[0][1], ranked[1][1] if len(ranked) > 1 else ranked[0][1],
+                                  d0 / (d0 + d1) if d0 + d1 > 0 else 0.0)
+            row[x] = got[1] if dither and got[2] > BAYER[y % 2][x % 2] else got[0]
+    return px
+
+
 class Subject:
     """A model made ready to be seen: its triangles, its lines whole and group by group, how big it is."""
 
-    def __init__(self, model, clip="idle"):
+    def __init__(self, model, clip="idle", look=None):
         self.model, self.clip = model, clip
         self.name = model.name
+        self.look = dict(look or {})                     # how it is to be drawn (see looks())
         self.groups = list(model.groups)
         verts = model.pose(clip, 0.0)
         self.wire = vector.from_triangles(verts, [f[:3] for f in model.faces])
@@ -98,6 +173,15 @@ class Subject:
         return vector.Camera(eye, self.mid, fov=fov)
 
 
+def _tone(subject, name, n, colour):
+    """The colour of a model's named part in the views that tell parts apart: its look's, else the hull
+    in the display's own and the others in turn."""
+    own = (subject.look.get("groups") or {}).get(name)
+    if own:
+        return own
+    return colour if n == 0 else TONES[(n - 1) % len(TONES)]
+
+
 def _cells(scope, unicode):
     return scope.rows("dots" if unicode else "strokes", unicode)
 
@@ -107,10 +191,17 @@ def draw(subject, view="shaded", cols=60, rows=24, yaw=30.0, pitch=20.0, zoom=1.
     """A model in a view, as rows of cells. ``cut_at`` (0..1): how far along ``axis`` the cut stands (the
     structure view); ``levels`` and ``level``: the floors of a plan (which ``yaw`` turns on the page); ``values``: a heat for each group by
     name (0..1; a group without one is cold); ``t``: seconds, for a model that moves (shaded and heat)."""
+    if view is None:                                     # the model's own view (its look), else shaded
+        view = subject.look.get("view")
     view = view if view in VIEWS else "shaded"
     if view in ("shaded", "heat"):
         return _raster(subject, view, cols, rows, yaw, pitch, zoom, values, t, unicode)
-    scope = scope or vector.Scope(cols, rows, colour=colour)
+    mine = colour or subject.look.get("ink")             # asked for here, else the model's own, else the display's
+    if scope is None:
+        scope = vector.Scope(cols, rows, colour=mine or "green")
+    elif mine:
+        scope.colour = vector.colour_of(mine)
+    colour = mine or "green"
     scope.clear()
     W, H = scope.W, scope.H
     if view == "plan":
@@ -130,7 +221,7 @@ def draw(subject, view="shaded", cols=60, rows=24, yaw=30.0, pitch=20.0, zoom=1.
                             roll=yaw + (90.0 if lying else 0.0))
         for n, (name, wire) in enumerate(subject.parts):
             part = wire if levels == 1 else cut(cut(wire, 2, z1 + 1e-6, -1), 2, z0 - 1e-6, 1)
-            scope.draw(cam, part, colour=colour if n == 0 else TONES[(n - 1) % len(TONES)], bright=0.7 if n == 0 else 1.1)
+            scope.draw(cam, part, colour=_tone(subject, name, n, colour), bright=0.7 if n == 0 else 1.1)
         return _cells(scope, unicode)
     cam = subject.camera(yaw, pitch, zoom, W, H)
     if view == "wire":
@@ -143,7 +234,7 @@ def draw(subject, view="shaded", cols=60, rows=24, yaw=30.0, pitch=20.0, zoom=1.
             at = subject.low[axis] + (subject.high[axis] - subject.low[axis]) * max(0.0, min(1.0, float(cut_at)))
         for n, (name, wire) in enumerate(subject.parts):
             part = wire if at is None else cut(wire, axis, at, 1)
-            scope.draw(cam, part, colour=colour if n == 0 else TONES[(n - 1) % len(TONES)], bright=0.45 if n == 0 else 1.2)
+            scope.draw(cam, part, colour=_tone(subject, name, n, colour), bright=0.45 if n == 0 else 1.2)
         if at is not None:                               # where it is cut: the outline of the plane
             lo, hi = list(subject.low), list(subject.high)
             lo[axis] = hi[axis] = at
@@ -170,9 +261,10 @@ def _raster(subject, view, cols, rows, yaw, pitch, zoom, values, t, unicode):
     for p in verts:
         s = probe.project(cam, p)
         pts.append(None if s is None else (s[0] / 2.0, s[1] / 2.0, 1.0 / s[2]))
-    light = vector._unit((cam.right[0] * 0.5 + cam.up[0] * 0.8 - cam.ahead[0] * 0.6,
-                          cam.right[1] * 0.5 + cam.up[1] * 0.8 - cam.ahead[1] * 0.6,
-                          cam.right[2] * 0.5 + cam.up[2] * 0.8 - cam.ahead[2] * 0.6))
+    lr, lu, lt = subject.look.get("light") or (0.5, 0.8, 0.6)     # from the right, from above, from the eye's side
+    light = vector._unit((cam.right[0] * lr + cam.up[0] * lu - cam.ahead[0] * lt,
+                          cam.right[1] * lr + cam.up[1] * lu - cam.ahead[1] * lt,
+                          cam.right[2] * lr + cam.up[2] * lu - cam.ahead[2] * lt))
     back = (-cam.ahead[0], -cam.ahead[1], -cam.ahead[2])
     heat = {}
     if view == "heat":
@@ -218,6 +310,8 @@ def _raster(subject, view, cols, rows, yaw, pitch, zoom, values, t, unicode):
                 x, y = int((sa[0] + (sb[0] - sa[0]) * k / n) / 2.0), int((sa[1] + (sb[1] - sa[1]) * k / n) / 2.0)
                 if 0 <= x < W and 0 <= y < H and px[y][x] is None:
                     px[y][x] = faint
+    if view == "shaded" and subject.look.get("colours"):     # in the game's colours only
+        to_palette(px, subject.look["colours"], subject.look.get("shades", 3), subject.look.get("dither", True))
     out = []
     for y in range(0, H, 2):
         row = []
@@ -374,6 +468,46 @@ def _arc(scope, points, cx, cy, R, bright):
         prev = cur
 
 
+def look_problems(data):
+    """What is wrong in a game's ``"model_look"`` and in its models' ``"look"``s."""
+    out = []
+    cfg = getattr(data, "config", None) or {}
+    table = getattr(data, "models", None) or {}
+    places = [("game.json: model_look", cfg.get("model_look"))] if cfg.get("model_look") is not None else []
+    places += [("model '%s': look" % name, spec["look"]) for name, spec in table.items()
+               if isinstance(spec, dict) and spec.get("look") is not None]
+    for where, look in places:
+        if not isinstance(look, dict):
+            out.append("%s should be a map (%s)" % (where, ", ".join(LOOK_KEYS)))
+            continue
+        for k in look:
+            if k not in LOOK_KEYS:
+                out.append("%s: unknown key '%s' (%s)" % (where, k, ", ".join(LOOK_KEYS)))
+        if look.get("view") not in (None,) + VIEWS:
+            out.append("%s: unknown view '%s' (%s)" % (where, look["view"], ", ".join(VIEWS)))
+        inks = [("ink", look.get("ink"))] + [("groups %s" % g, c) for g, c in (look["groups"].items()
+                                                                               if isinstance(look.get("groups"), dict) else [])]
+        if look.get("groups") is not None and not isinstance(look["groups"], dict):
+            out.append("%s: \"groups\" should be a map of a part's name to a colour" % where)
+        for what, c in inks:
+            if c is not None and not (isinstance(c, str) and (c in vector.COLOURS or _hex(c))):
+                out.append("%s: %s is not a colour (%s, or #rrggbb)" % (where, what, ", ".join(sorted(vector.COLOURS))))
+        if look.get("palette") is not None and palette(look["palette"], cfg.get("palettes")) is None:
+            out.append("%s: there is no palette '%s' (one of the game's own \"palettes\", a built-in one, or a list "
+                       "of #rrggbb)" % (where, look["palette"]))
+        shades = look.get("shades")
+        if shades is not None and (isinstance(shades, bool) or not isinstance(shades, int) or not 1 <= shades <= 8):
+            out.append("%s: \"shades\" should be a whole number from 1 to 8" % where)
+        if look.get("dither") not in (None, True, False):
+            out.append("%s: \"dither\" should be true or false" % where)
+        light = look.get("light")
+        if light is not None and not (isinstance(light, list) and len(light) == 3
+                                      and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in light)
+                                      and any(light)):
+            out.append("%s: \"light\" should be three numbers: from the right, from above, from the eye's side" % where)
+    return out
+
+
 def planet_problems(data):
     """What is wrong in a game's ``planets.json``."""
     out = []
@@ -476,7 +610,7 @@ class Look:
         scope.colour = vector.colour_of("green")
         if view == "plan":                               # a map lies still: the arrows turn it
             yaw = self.yaw - 30.0
-        return draw(thing, view, cols, rows, yaw, self.pitch, self.zoom, "green", unicode, self.cut, self.axis,
+        return draw(thing, view, cols, rows, yaw, self.pitch, self.zoom, None, unicode, self.cut, self.axis,
                     self.levels, self.level, None, t, scope)
 
     def status(self):
@@ -496,7 +630,8 @@ class Look:
 def things_of(data):
     """A game's models and planets, ready to be looked at."""
     from . import model
-    out = [Subject(m) for m in model.load(getattr(data, "models", None) or {}).values()]
+    how = looks(data)
+    out = [Subject(m, look=how.get(name)) for name, m in model.load(getattr(data, "models", None) or {}).items()]
     out += [Planet(spec, name) for name, spec in (getattr(data, "planets", None) or {}).items() if isinstance(spec, dict)]
     return out
 

@@ -123,6 +123,7 @@ class View:
         self.formula = formula
         self.models = models or {}
         self.planets = planets or {}                     # a game's planets.json, for planet widgets
+        self.looks = {}                                  # how each model is to be drawn (viewer.looks): the host's
         self.subjects, self.worlds = {}, {}
         self.scopes = {}                                 # a scope each, kept for its afterglow
         self.wires = {}
@@ -493,7 +494,7 @@ class View:
             name = spec.get("model")
             subject = self.subjects.get(name)
             if subject is None and name in self.models:
-                subject = self.subjects[name] = viewer.Subject(self.models[name])
+                subject = self.subjects[name] = viewer.Subject(self.models[name], look=self.looks.get(name))
             if subject is None:
                 cv.put(x, y, "NO MODEL", shade(ink, 0.45))
                 return
@@ -505,7 +506,7 @@ class View:
             cut_at = None if spec.get("cut") is None else of(spec["cut"], 0.5) / float(spec.get("whole", 1) or 1)
             yaw = float(spec.get("yaw", 0.0 if view == "plan" else 30.0)) + (0.0 if view == "plan" else float(spec.get("turn", 12)) * t)
             cv.paste(x, y, viewer.draw(subject, view, w, h, yaw, float(spec.get("pitch", 20)), float(spec.get("zoom", 1)),
-                                       ink, uni, cut_at, {"x": 0, "y": 1, "z": 2}.get(spec.get("axis"), 1),
+                                       spec.get("colour") or (None if subject.look.get("ink") else ink), uni, cut_at, {"x": 0, "y": 1, "z": 2}.get(spec.get("axis"), 1),
                                        int(of(spec.get("levels"), 1)), int(of(spec.get("level"), 0)), vals, t, scope))
             return
         else:

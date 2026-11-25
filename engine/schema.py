@@ -154,11 +154,19 @@ END_SCREEN = [F("heading", label="Heading (THE END if left empty)"),
 PALETTE = [F("colors", "tags", "Colours, top to bottom (#rrggbb, #rrggbb, ...)"),
            F("accent", "tags", "Colours for lower-case letters (optional)")]
 
+LOOK = [F("view", "choice", "View", options=["shaded", "wire", "solid", "structure", "plan", "heat"]),
+        F("ink", "text", "Line colour (green, amber, cyan, white, red, blue, violet, or #rrggbb)"),
+        F("palette", "text", "Palette the shaded view is painted in (one of the game's, or a built-in one)"),
+        F("shades", "number", "Strengths of each palette colour (1 to 8; 3)"),
+        F("dither", "bool", "Mix two colours in a pattern where one does not fit")]
+# (a look's "light" and "groups" are written in the file: the editor has no field for a list of numbers or a map of colours)
+
 KINDS = [
     {"key": "game", "file": "game", "label": "Game", "one": "game", "shape": "object", "title": "title", "fields": [
         F("title"), F("subtitle"), F("description", "long"), F("author"), F("version"),
         F("initial_scene", "ref", "First scene", of="scenes"), F("style"), F("currency"),
         F("max_hints", "number"), F("player_stats", "group", "The player's stats", fields=STATS),
+        R("model_look", "group", "How 3D models are drawn (a model's own look goes over this)", fields=LOOK),
         R("title_banner", "banner", "The title drawn in a graphic style", fields=BANNER),
         R("title_effect", "choice", "Animation of the title picture", options=list(_fx.NAMES)),
         R("music_sound", "choice", "Generated music is played on", options=["chip", "rich"]),
@@ -365,7 +373,8 @@ KINDS = [
     {"key": "models", "file": "models", "label": "3D models", "one": "model", "shape": "map", "editor": "model", "fields": [
         F("smooth", "bool", "Smooth (lit at the corners: round things)"), F("scale", "number", "Scale (1: as built)"),
         F("break", "choice", "Destroyed, it breaks into", options=["shards", "parts", "groups"]),
-        F("turning", "number", "Turns this many degrees a beat (a pickup)"), F("fps", "number", "Frames a beat")]},
+        F("turning", "number", "Turns this many degrees a beat (a pickup)"), F("fps", "number", "Frames a beat"),
+        R("look", "group", "How it is drawn (over the game's own)", fields=LOOK)]},
 ]
 
 BY_FILE = {k["file"]: k for k in KINDS}

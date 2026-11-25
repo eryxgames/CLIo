@@ -175,6 +175,13 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   the asteroids flare with the low hits of the track that is playing.
 - The station starter: the helm's third panel is the relief of its own map, and the scan
   console shows the relief of the moon below.
+- **How a model is drawn is data**: a game's `"model_look"` (`game.json`), a model's own
+  `"look"` over it, and the place's own keys over both. `view` (the view shown where none is
+  asked for), `ink` (the lines' colour), `palette` with `shades` and `dither` (the shaded view
+  repainted in one of the game's palettes only, so every model sits in the game's colours),
+  `light`, and `groups` (a colour for a named part). Honoured by the viewer and by panels,
+  checked by `--check`, and in the editor on the game and on each model. The station starter
+  has a palette and a look of its own.
 - In the terminal look, a thing that is locked says `LOCKED` whatever its `state` (it kept
   saying `READY`).
 - The station starter's consoles do things: the reactor vents steam and scrams (hold `X`); the

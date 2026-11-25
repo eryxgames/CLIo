@@ -346,6 +346,7 @@ class GameData:
         if self.planets:
             from . import viewer
             problems += viewer.planet_problems(self)
+            problems += viewer.look_problems(self)
         if self.menus or self.config.get("menu_look") or self.config.get("menu_border"):
             from . import menu
             problems += menu.problems(self)

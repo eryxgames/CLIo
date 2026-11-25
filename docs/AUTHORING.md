@@ -3065,6 +3065,31 @@ view as its autopilot flies it; `python -m engine.ahead` the field of rocks.
 `"turn"` (degrees a second), `"yaw"`, `"pitch"` and `"zoom"` place the eye. A model's parts are
 put in groups with `"group": "reactor"` in `models.json`.
 
+**How a model is drawn** is data too, in three layers, each over the one before:
+
+1. the game: `"model_look"` in `game.json` - what 3D looks like in this game;
+2. a model: `"look"` on it in `models.json`;
+3. the place: what a panel's scope says (`view`, `colour`, `cut`, `levels`, `values`).
+
+```json
+"palettes": {"erebus": ["#dfe8ee", "#8fb3c9", "#4f7896", "#2b4a63", "#ffb028"]},
+"model_look": {"palette": "erebus", "shades": 4, "dither": true, "ink": "cyan"}
+```
+
+| Key | Meaning |
+| --- | --- |
+| `view` | The view it is shown in where none is asked for (`shaded`, `wire`, `solid`, `structure`, `plan`, `heat`). |
+| `ink` | The colour of its lines: `green`, `amber`, `cyan`, `white`, `red`, `blue`, `violet`, or `#rrggbb`. |
+| `palette` | The shaded view is repainted in these colours only: one of the game's own `palettes`, a built-in one (`clio`, `sunset`, `ice`, `fire`...), or a list of `#rrggbb`. However a model was painted where it was made, it sits in the game's colours. |
+| `shades`, `dither` | Each palette colour at this many strengths (1 to 8; 3), for light and shadow. `dither` (on unless `false`): where a colour lies between two, both in a pattern - finer shading, with a visible weave at a terminal's size. |
+| `light` | Where the light comes from: three numbers - from the right, from above, from the eye's side (`[0.5, 0.8, 0.6]`). |
+| `groups` | A colour for a named part, in the views that tell parts apart (`{"reactor": "red"}`). |
+
+The editor has these on the game and on each model (all but `light` and `groups`, which are
+written in the file). `python clio.py GAME --view-model` shows every model as its look has it.
+The look is the viewer's and the panels'; a model standing in a first-person level is still
+drawn as that level's picture draws it.
+
 **Planets** are in `planets.json`, and a panel shows one with `{"planet": "moon", "view": "surface"}`:
 
 ```json

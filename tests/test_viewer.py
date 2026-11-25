@@ -270,5 +270,93 @@ class PanelTests(unittest.TestCase):
             self.assertGreater(len([c for r in rows if isinstance(r, list) for c in r if c[0] is None]), 60)
 
 
+class ModelLookTests(unittest.TestCase):
+    """How a model is drawn is data: the game's ``model_look``, a model's ``look`` over it."""
+
+    def data(self):
+        return GameData(STATION)
+
+    def test_the_games_look_and_a_models_own_over_it(self):
+        data = self.data()
+        how = V.looks(data)
+        self.assertEqual(sorted(how), sorted(data.models))
+        self.assertEqual((how["mast"]["ink"], how["mast"].get("view"), how["mast"]["shades"]), ("cyan", None, 4))
+        self.assertEqual((how["hauler"]["view"], how["hauler"]["ink"], how["hauler"]["groups"]["reactor"]),
+                         ("structure", "cyan", "red"))                         # its own, and the game's under it
+        self.assertEqual(how["hauler"]["colours"][-1], (255, 176, 40))       # the game's palette, as colours
+        data.config["model_look"]["groups"] = {"body": "white", "reactor": "blue"}
+        self.assertEqual(V.looks(data)["hauler"]["groups"]["body"], "white")
+        self.assertEqual(V.looks(data)["hauler"]["groups"]["reactor"], "red")
+        self.assertEqual(V.palette("fire")[0], (255, 243, 160))               # a built-in one, by name
+        self.assertEqual(V.palette(["#102030", [1, 2, 3], "nope"]), [(16, 32, 48), (1, 2, 3)])
+        self.assertIsNone(V.palette("nowhere"))
+        self.assertEqual({t.name: t.look.get("view") for t in V.things_of(data) if hasattr(t, "look")}["hauler"], "structure")
+
+    def test_a_picture_in_a_palettes_colours_only(self):
+        px = [[(200, 200, 200), None, (10, 10, 10)], [(120, 60, 30), (120, 60, 30), (255, 0, 0)]]
+        pal = [(255, 255, 255), (255, 128, 0)]
+        flat = V.to_palette([list(r) for r in px], pal, 2, False)
+        table = {(255, 255, 255), (127, 127, 127), (255, 128, 0), (127, 64, 0)}
+        self.assertIsNone(flat[0][1])
+        self.assertTrue(all(c in table for row in flat for c in row if c))
+        self.assertEqual((flat[1][0], flat[1][1]), ((127, 64, 0), (127, 64, 0)))
+        mixed = V.to_palette([[(190, 190, 190)] * 8 for _ in range(8)], pal, 2, True)   # between two: a pattern of both
+        self.assertEqual({c for row in mixed for c in row}, {(255, 255, 255), (127, 127, 127)})
+        self.assertEqual(mixed, V.to_palette([[(190, 190, 190)] * 8 for _ in range(8)], pal, 2, True))
+        self.assertEqual({c for row in V.to_palette([[(190, 190, 190)] * 4], pal, 1, False) for c in row}, {(255, 255, 255)})
+
+    def test_drawn_by_its_look(self):
+        data = self.data()
+        things = {t.name: t for t in V.things_of(data) if hasattr(t, "look")}
+        hauler = things["hauler"]
+        bare = V.Subject(hauler.model)
+        own = set(data.models) and {c for col in hauler.look["colours"] for k in range(1, 5) for c in [tuple(int(v * k / 4.0) for v in col)]}
+        shaded = V.draw(hauler, "shaded", 40, 14)
+        seen = {c for row in shaded for cell in row for c in cell[1:] if cell[0] is None and c and c != V.PAPER}
+        self.assertTrue(seen and seen <= own, seen - own)                    # nothing but the palette's colours
+        self.assertNotEqual(shaded, V.draw(bare, "shaded", 40, 14))
+        self.assertEqual(V.draw(hauler, None, 40, 14), V.draw(hauler, "structure", 40, 14))   # no view asked: its own
+        self.assertEqual(V.draw(bare, None, 40, 14), V.draw(bare, "shaded", 40, 14))
+        inks = lambda rows: {cell[1] for row in rows for cell in row if cell[0] not in (" ", None)}   # noqa: E731
+        lines = V.draw(things["mast"], "wire", 40, 14, colour=None)
+        self.assertTrue(all(c[2] > c[0] for c in inks(lines)))               # the game's ink: cyan
+        self.assertTrue(all(c[0] > c[2] for c in inks(V.draw(things["mast"], "wire", 40, 14, colour="amber"))))
+        parts = inks(V.draw(hauler, "structure", 56, 18, colour=None))
+        self.assertTrue(any(c[0] > 200 and 120 < c[1] < 200 and c[2] < 110 for c in parts))    # the engines: amber, as its look says
+        self.assertNotEqual(V.draw(hauler, "structure", 56, 18, colour="cyan"), V.draw(bare, "structure", 56, 18, colour="cyan"))
+        lit = V.Subject(hauler.model, look={"light": [-1, 0.2, 0.3]})
+        self.assertNotEqual(V.draw(lit, "shaded", 40, 14), V.draw(bare, "shaded", 40, 14))
+
+    def test_problems_are_said(self):
+        data = self.data()
+        self.assertEqual(V.look_problems(data), [])
+        data.config["model_look"] = {"view": "xray", "ink": "pink", "palette": "nowhere", "shades": 0, "dither": "yes",
+                                     "light": [0, 0, 0], "glow": 1, "groups": []}
+        data.models["mast"]["look"] = "wire"
+        data.models["hopper"]["look"] = {"groups": {"body": "#12345", "legs": "#123456"}, "palette": ["#ffffff"]}
+        self.assertEqual(V.look_problems(data), [
+            "game.json: model_look: unknown key 'glow' (view, ink, palette, shades, dither, light, groups)",
+            "game.json: model_look: unknown view 'xray' (shaded, wire, solid, structure, plan, heat)",
+            "game.json: model_look: \"groups\" should be a map of a part's name to a colour",
+            "game.json: model_look: ink is not a colour (amber, blue, cyan, green, red, violet, white, or #rrggbb)",
+            "game.json: model_look: there is no palette 'nowhere' (one of the game's own \"palettes\", a built-in one, "
+            "or a list of #rrggbb)",
+            "game.json: model_look: \"shades\" should be a whole number from 1 to 8",
+            "game.json: model_look: \"dither\" should be true or false",
+            "game.json: model_look: \"light\" should be three numbers: from the right, from above, from the eye's side",
+            "model 'mast': look should be a map (view, ink, palette, shades, dither, light, groups)",
+            "model 'hopper': look: groups body is not a colour (amber, blue, cyan, green, red, violet, white, or #rrggbb)"])
+        self.assertTrue(any("model_look" in p for p in data.validate()))
+
+    def test_in_a_simulators_panels(self):
+        from engine import sim as S
+        data = self.data()
+        reactor = S.make(data, "reactor")
+        runner = S.Runner(reactor)
+        runner.panel_rows(100, 30, 3, True, None)
+        self.assertEqual(runner.view.looks["hauler"]["view"], "structure")
+        self.assertEqual(next(iter(runner.view.subjects.values())).look["groups"]["engines"], "amber")
+
+
 if __name__ == "__main__":
     unittest.main()

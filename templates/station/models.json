@@ -1004,6 +1004,16 @@
     "axis": "y",
     "sides": 8
    }
-  ]
+  ],
+  "look": {
+   "view": "structure",
+   "groups": {
+    "reactor": "red",
+    "engines": "amber",
+    "bridge": "white",
+    "hold": "blue",
+    "decks": "cyan"
+   }
+  }
  }
 }

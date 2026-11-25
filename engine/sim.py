@@ -1314,6 +1314,9 @@ class Runner:
             except Exception:
                 models = {}
             self.view = panels.View(sim.panels, formula, models, getattr(sim.data, "planets", None))
+            if sim.data is not None:
+                from . import viewer
+                self.view.looks = viewer.looks(sim.data)
         level = sheet = None
         try:                                             # the track that plays, for panels that move with it
             sheet, now = self.audio.cues(), self.audio.clock()

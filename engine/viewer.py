@@ -151,17 +151,54 @@ class Subject:
         self.look = dict(look or {})                     # how it is to be drawn (see looks())
         self.groups = list(model.groups)
         verts = model.pose(clip, 0.0)
-        self.wire = vector.from_triangles(verts, [f[:3] for f in model.faces])
+        # a model whose parts move (tracks, frames): corners of different parts stay apart, and each
+        # corner of the lines remembers which of the model's it is, to be put where a pose has it
+        self.moving = bool(model.tracks or model.frames)
+        apart = None
+        if self.moving:
+            apart = [0] * len(verts)
+            for f in model.faces:
+                for i in f[:3]:
+                    apart[i] = f[5]
+        self._origin = [] if self.moving else None
+        self.wire = vector.from_triangles(verts, [f[:3] for f in model.faces], apart=apart, origin=self._origin)
         self.parts = []                                  # (group, its lines)
+        self._origins = []
         for g, name in enumerate(self.groups):
             tris = [f[:3] for f in model.faces if f[5] == g]
             if tris:
-                self.parts.append((name, vector.from_triangles(verts, tris)))
+                back = [] if self.moving else None
+                self.parts.append((name, vector.from_triangles(verts, tris, origin=back)))
+                self._origins.append(back)
+        self._posed = None                               # (clip, time, the lines whole, the lines part by part)
         xs, ys, zs = ([v[i] for v in verts] or [0.0] for i in range(3))
         self.low, self.high = (min(xs), min(ys), min(zs)), (max(xs), max(ys), max(zs))
         self.mid = tuple((self.low[i] + self.high[i]) / 2.0 for i in range(3))
         self.half = tuple(max(0.05, (self.high[i] - self.low[i]) / 2.0) for i in range(3))
         self.reach = math.sqrt(sum(h * h for h in self.half))                # the ball it fits in
+
+    def posed(self, clip=None, when=0.0):
+        """Its lines whole and part by part as it is ``when`` beats into ``clip``: the lines at rest, their
+        corners where the pose has them. A model that never moves is always as it was."""
+        if not self.moving:
+            return self.wire, self.parts
+        clip = clip or self.clip
+        if self._posed is not None and self._posed[:2] == (clip, when):
+            return self._posed[2], self._posed[3]
+        verts = self.model.pose(clip, when)
+
+        def moved(wire, origin):
+            return vector.Wire([verts[i] for i in origin], wire.edges, wire.faces, wire.colour, wound=wire.wound)
+        whole = moved(self.wire, self._origin)
+        parts = [(name, moved(wire, origin)) for (name, wire), origin in zip(self.parts, self._origins)]
+        self._posed = (clip, when, whole, parts)
+        return whole, parts
+
+    def when(self, t, clip=None, at=None):
+        """The time (beats) to pose it at: ``t`` as it runs, or ``at`` (0..1) of the way through the clip."""
+        if at is None:
+            return t
+        return max(0.0, min(1.0, float(at))) * self.model.beats(clip or self.clip) * 0.999999
 
     def camera(self, yaw, pitch, zoom, w, h, fov=40.0):
         """An eye that has all of it in sight in ``w`` by ``h`` dots, from ``yaw`` round it and ``pitch`` up."""
@@ -187,15 +224,20 @@ def _cells(scope, unicode):
 
 
 def draw(subject, view="shaded", cols=60, rows=24, yaw=30.0, pitch=20.0, zoom=1.0, colour="green", unicode=True,
-         cut_at=None, axis=1, levels=1, level=0, values=None, t=0.0, scope=None):
+         cut_at=None, axis=1, levels=1, level=0, values=None, t=0.0, scope=None, clip=None, at=None):
     """A model in a view, as rows of cells. ``cut_at`` (0..1): how far along ``axis`` the cut stands (the
     structure view); ``levels`` and ``level``: the floors of a plan (which ``yaw`` turns on the page); ``values``: a heat for each group by
-    name (0..1; a group without one is cold); ``t``: seconds, for a model that moves (shaded and heat)."""
+    name (0..1; a group without one is cold); ``t``: the time, for a model that moves; ``clip``: what it
+    plays (its tracks or frames; None: ``idle``); ``at`` (0..1): how far through the clip it is shown,
+    whatever the time - a door as far open as a value says."""
     if view is None:                                     # the model's own view (its look), else shaded
         view = subject.look.get("view")
     view = view if view in VIEWS else "shaded"
+    clip = clip or subject.clip
+    when = subject.when(t, clip, at)
     if view in ("shaded", "heat"):
-        return _raster(subject, view, cols, rows, yaw, pitch, zoom, values, t, unicode)
+        return _raster(subject, view, cols, rows, yaw, pitch, zoom, values, when, unicode, clip)
+    whole, in_parts = subject.posed(clip, when)
     mine = colour or subject.look.get("ink")             # asked for here, else the model's own, else the display's
     if scope is None:
         scope = vector.Scope(cols, rows, colour=mine or "green")
@@ -219,29 +261,29 @@ def draw(subject, view="shaded", cols=60, rows=24, yaw=30.0, pitch=20.0, zoom=1.
         far = max(across * 1.15 / reach, along * 1.15 / (reach * H / float(W))) / max(0.2, zoom)
         cam = vector.Camera((subject.mid[0], subject.mid[1], subject.mid[2] + far), subject.mid, fov=fov,
                             roll=yaw + (90.0 if lying else 0.0))
-        for n, (name, wire) in enumerate(subject.parts):
+        for n, (name, wire) in enumerate(in_parts):
             part = wire if levels == 1 else cut(cut(wire, 2, z1 + 1e-6, -1), 2, z0 - 1e-6, 1)
             scope.draw(cam, part, colour=_tone(subject, name, n, colour), bright=0.7 if n == 0 else 1.1)
         return _cells(scope, unicode)
     cam = subject.camera(yaw, pitch, zoom, W, H)
     if view == "wire":
-        scope.draw(cam, subject.wire)
+        scope.draw(cam, whole)
     elif view == "solid":
-        scope.render(cam, [subject.wire], solid=True)
+        scope.render(cam, [whole], solid=True)
     else:                                                # structure
-        at = None
+        plane = None
         if cut_at is not None:
-            at = subject.low[axis] + (subject.high[axis] - subject.low[axis]) * max(0.0, min(1.0, float(cut_at)))
-        for n, (name, wire) in enumerate(subject.parts):
-            part = wire if at is None else cut(wire, axis, at, 1)
+            plane = subject.low[axis] + (subject.high[axis] - subject.low[axis]) * max(0.0, min(1.0, float(cut_at)))
+        for n, (name, wire) in enumerate(in_parts):
+            part = wire if plane is None else cut(wire, axis, plane, 1)
             scope.draw(cam, part, colour=_tone(subject, name, n, colour), bright=0.45 if n == 0 else 1.2)
-        if at is not None:                               # where it is cut: the outline of the plane
+        if plane is not None:                            # where it is cut: the outline of the plane
             lo, hi = list(subject.low), list(subject.high)
-            lo[axis] = hi[axis] = at
+            lo[axis] = hi[axis] = plane
             others = [i for i in range(3) if i != axis]
             ring = []
             for u, v in ((0, 0), (1, 0), (1, 1), (0, 1)):
-                p = [at, at, at]
+                p = [plane, plane, plane]
                 p[others[0]] = (lo, hi)[u][others[0]]
                 p[others[1]] = (lo, hi)[v][others[1]]
                 ring.append(tuple(p))
@@ -249,14 +291,14 @@ def draw(subject, view="shaded", cols=60, rows=24, yaw=30.0, pitch=20.0, zoom=1.
     return _cells(scope, unicode)
 
 
-def _raster(subject, view, cols, rows, yaw, pitch, zoom, values, t, unicode):
+def _raster(subject, view, cols, rows, yaw, pitch, zoom, values, t, unicode, clip=None):
     """The shaded and heat views: triangles filled, the nearest in front."""
     from .model import raster
     model = subject.model
     W, H = cols, rows * 2
     probe = vector.Scope(cols, rows)                     # its dots are half a pixel: the same eye as the line views
     cam = subject.camera(yaw, pitch, zoom, probe.W, probe.H)
-    verts = model.pose(subject.clip, t) if (model.frames or model.group_spin or model.bob) else model.pose(subject.clip, 0.0)
+    verts = model.pose(clip or subject.clip, t) if model.moves else model.pose(subject.clip, 0.0)
     pts = []
     for p in verts:
         s = probe.project(cam, p)
@@ -556,6 +598,7 @@ class Look:
         self.levels, self.level = 1, 0
         self.over = False
         self.scopes = {}
+        self.clip = None                                 # the clip a model plays (None: as it stands)
 
     @property
     def thing(self):
@@ -586,6 +629,10 @@ class Look:
         elif k in ("tab", "n"):
             self.n = (self.n + 1) % len(self.things)
             self.view = min(self.view, len(self.views()) - 1)
+            self.clip = None
+        elif k == "p":                                   # play its next clip (after the last: still again)
+            clips = [None] + list(getattr(getattr(self.thing, "model", None), "clips", []))
+            self.clip = clips[(clips.index(self.clip) + 1) % len(clips)] if self.clip in clips else None
         elif k == "c":
             self.cut = 0.5 if self.cut is None else None
         elif k in ("[", "]") and self.cut is not None:
@@ -611,7 +658,7 @@ class Look:
         if view == "plan":                               # a map lies still: the arrows turn it
             yaw = self.yaw - 30.0
         return draw(thing, view, cols, rows, yaw, self.pitch, self.zoom, None, unicode, self.cut, self.axis,
-                    self.levels, self.level, None, t, scope)
+                    self.levels, self.level, None, t * 2.0 if self.clip else t, scope, clip=self.clip)
 
     def status(self):
         thing, views = self.thing, self.views()
@@ -623,6 +670,9 @@ class Look:
             more = "  level %d of %d (L, , .)" % (self.level + 1, self.levels)
         elif view == "heat" and not isinstance(thing, Planet):
             more = "  by group: " + " ".join(thing.groups)
+        clips = list(getattr(getattr(thing, "model", None), "clips", []))
+        if clips:
+            more += "  P plays %s" % (self.clip or "/".join(clips))
         return "%s  %s (%d/%d)%s   arrows  +/-  V view  Tab next  Space turn  Q" % (
             thing.name.upper(), view, self.view % len(views) + 1, len(views), more)
 

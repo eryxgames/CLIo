@@ -247,6 +247,32 @@ class SimTests(unittest.TestCase):
         self.assertEqual([p for p in data.validate() if "panels" in p],
                          ["sim 'scan': panels col 1 row 1 widget 1: there is no value called 'mst'"])
 
+    def test_a_scope_plays_a_models_clip_as_far_as_a_value_says(self):
+        from engine import model
+        door = {"materials": {"m": {"color": "#888888"}},
+                "parts": [{"shape": "box", "size": [0.1, 0.1, 2], "at": [0, 0, 1]},
+                          {"shape": "box", "size": [1, 0.1, 2], "at": [0.5, 0, 1], "group": "door"}],
+                "tracks": {"open": {"length": 2, "loop": False,
+                                    "parts": {"door": {"t": [0, 2], "turn": [[0, 0, 0], [90, 0, 0]], "about": [0, 0, 0]}}}}}
+        layout = {"widgets": [{"scope": {"model": "door", "view": "solid", "clip": "open", "at": "hatch", "whole": 100,
+                                         "turn": 0}}]}
+        view = P.View(layout, None, model.load({"door": door}))
+        shut = view.rows(40, 14, {"hatch": 0}, 0.0)
+        self.assertEqual(view.rows(40, 14, {"hatch": 0}, 7.0), shut)             # the value says where it is: not the time
+        half = view.rows(40, 14, {"hatch": 50}, 0.0)
+        wide = view.rows(40, 14, {"hatch": 100}, 0.0)
+        self.assertEqual(len({str(shut), str(half), str(wide)}), 3)
+        free = P.View({"widgets": [{"scope": {"model": "door", "view": "solid", "clip": "open", "turn": 0}}]}, None,
+                      model.load({"door": door}))
+        self.assertNotEqual(free.rows(40, 14, {}, 0.0), free.rows(40, 14, {}, 0.5))   # no "at": it runs with the time
+        self.assertEqual(P.problems(layout, {"hatch"}, models={"door": door}), [])
+        wrong = P.problems({"widgets": [{"scope": {"model": "door", "view": "solid", "clip": "shut", "at": "latch"}},
+                                        {"scope": {"model": "door", "clip": "open"}}]}, {"hatch"}, models={"door": door})
+        self.assertEqual(len(wrong), 3)
+        self.assertIn("model 'door' has no clip 'shut' (open)", wrong[0])
+        self.assertIn("no value called 'latch'", wrong[1])
+        self.assertIn("give the scope one", wrong[2])
+
     def test_the_station_starter_at_a_prompt(self):
         from helpers import Session
         s = Session("templates/station").start()

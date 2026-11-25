@@ -6,6 +6,19 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 
 ### Added
 
+- **Models: tracks.** A clip can be kept as tracks (`"tracks"` in `models.json`): for each named
+  part that moves, keys in time of where it is moved to, how it is turned and its size. Played
+  at any moment, as smooth as the screen is drawn; a few numbers where frames are thousands;
+  writable by hand (a turn in degrees). `--import-model` and the editor keep a glTF animation of
+  objects that stay stiff as tracks (keys that say nothing new are left out) and each object as
+  a named part of the mesh (`mesh.parts`), so the viewer's views and a look's `groups` tell an
+  imported model's parts apart.
+- **Models: packed frames.** What bends (a skin on bones) is still frames, now kept packed:
+  whole numbers, frame-to-frame differences, deflated, as text - about a seventh the size.
+  Frames written out as numbers are read as before; `model.pack(spec)` packs them.
+- **A scope plays a clip** (`"clip"`), in every view - the lines move with the parts - by the
+  time, or as far through as a value says (`"at"`, of `whole`): a hatch as far open as a value,
+  a device that unfolds while its key is held. The viewer plays a model's clips with P.
 - **One pause for every kind in real time**: in a stage, a skirmish and a simulator `Esc` or `P`
   now opens the game's menu over the picture (resume, options, that kind's keys, leaving), in the
   game's menu look, as it does in a first-person level. Time stands while it is open

@@ -10,15 +10,25 @@ Materials are physically based in the glTF way: a colour, ``metal`` (0..1), ``ro
 ``glow`` (light of its own). Each triangle is lit as a whole (flat, the low-poly look) or, with
 ``"smooth": true``, at its corners and blended across. A part can belong to a ``group``; a group can
 ``spin`` about its own middle (rotors, turbines), and a model can ``bob`` and ``spin`` as a whole.
-Imported animations are kept as frames of the mesh (``frames``: clip -> list of vertex lists).
+How a model moves is kept in one of two ways. **Tracks** (``tracks``: clip -> its length in beats and,
+for each named part that moves, keys in time of where it is moved to, how it is turned and its size):
+rigid parts - a door, an arm, a gun on its mount - played at any moment, as smooth as the screen is
+drawn. **Frames** (``frames``: clip -> the mesh's corners, picture by picture) for what bends (a skin
+on bones); a clip's frames may be a list of lists of numbers or **packed** (:func:`pack_frames`:
+whole numbers, the differences from frame to frame, deflated, as text - about a seventh the size).
 When a model is destroyed, its triangles (or its groups) fly apart as shards: ``shards()``.
 
 Everything here is drawing: nothing in a level's rules depends on it.
 """
 from __future__ import annotations
 
+import base64
+import bisect
 import math
 import random
+import sys
+import zlib
+from array import array
 
 SHAPES = ("box", "wedge", "cylinder", "cone", "sphere", "ring")
 CLIPS = ("idle", "walk", "attack", "die")
@@ -155,6 +165,164 @@ def _turn(p, yaw, pitch, roll):
     return x, y, z
 
 
+# ---------------------------------------------------------------- frames, packed -----------------------
+def pack_frames(frames):
+    """A clip's frames (each a flat list ``x, y, z, x, y, z...``) packed: ``{"packed": text, "count",
+    "size", "step"}``. The numbers are made whole at ``step`` (so that the largest fits sixteen bits: a
+    model five cells across keeps a six-thousandth of a cell), each frame is kept as its difference from
+    the one before, the lot deflated, and written as base64 text that can stand in a JSON file."""
+    frames = [list(f) for f in frames]
+    size = len(frames[0]) if frames else 0
+    if not frames or not size or any(len(f) != size for f in frames):
+        raise ValueError("frames to pack should be lists of numbers, all as long as the first")
+    top = max(abs(float(c)) for f in frames for c in f)
+    step = float("%.7g" % max(1e-5, top / 32000.0))
+    out, before = array("h"), [0] * size
+    for f in frames:
+        now = [int(round(float(c) / step)) for c in f]
+        out.extend(((a - b + 32768) % 65536) - 32768 for a, b in zip(now, before))
+        before = now
+    if sys.byteorder == "big":
+        out.byteswap()
+    return {"packed": base64.b64encode(zlib.compress(out.tobytes(), 9)).decode("ascii"), "count": len(frames),
+            "size": size, "step": step}
+
+
+def unpack_frames(clip):
+    """What :func:`pack_frames` made, as frames again (lists of numbers). ValueError if it is not that."""
+    try:
+        count, size, step = int(clip["count"]), int(clip["size"]), float(clip["step"])
+        raw = zlib.decompress(base64.b64decode(clip["packed"]))
+    except (KeyError, TypeError, ValueError, zlib.error) as e:
+        raise ValueError("packed frames cannot be read (%s)" % (e,))
+    if count < 1 or size < 3 or len(raw) != count * size * 2:
+        raise ValueError("packed frames are not as long as they say (%d frames of %d numbers)" % (count, size))
+    nums = array("h")
+    nums.frombytes(raw)
+    if sys.byteorder == "big":
+        nums.byteswap()
+    frames, before = [], [0] * size
+    for k in range(count):
+        now = [((a + b + 32768) % 65536) - 32768 for a, b in zip(before, nums[k * size:(k + 1) * size])]
+        frames.append([v * step for v in now])
+        before = now
+    return frames
+
+
+def pack(spec):
+    """A model's spec with every clip of frames packed (those that are already are left)."""
+    frames = spec.get("frames")
+    if not isinstance(frames, dict):
+        return spec
+    out = dict(spec)
+    out["frames"] = {k: (pack_frames(v) if isinstance(v, list) and v else v) for k, v in frames.items()}
+    return out
+
+
+# ---------------------------------------------------------------- tracks: parts that move ---------------
+def _quat(turn):
+    """A key's turn as a quaternion (x, y, z, w): four numbers are one; three are yaw, pitch and roll in
+    degrees, as a part's ``turn`` is."""
+    turn = [float(a) for a in turn]
+    if len(turn) == 4:
+        n = math.sqrt(sum(a * a for a in turn)) or 1.0
+        return tuple(a / n for a in turn)
+    yaw, pitch, roll = (turn + [0.0, 0.0, 0.0])[:3]
+    out = (0.0, 0.0, 0.0, 1.0)
+    for axis, deg in ((1, -roll), (0, pitch), (2, yaw)):  # roll first, then pitch, then yaw: as _turn does (its
+        # roll goes the other way round its axis than the other two go round theirs)
+        h = math.radians(deg) / 2.0
+        q = [0.0, 0.0, 0.0, math.cos(h)]
+        q[axis] = math.sin(h)
+        out = _qmul(q, out)
+    return tuple(out)
+
+
+def _qmul(a, b):
+    ax, ay, az, aw = a
+    bx, by, bz, bw = b
+    return (aw * bx + ax * bw + ay * bz - az * by, aw * by - ax * bz + ay * bw + az * bx,
+            aw * bz + ax * by - ay * bx + az * bw, aw * bw - ax * bx - ay * by - az * bz)
+
+
+def _slerp(a, b, k):
+    d = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
+    if d < 0:
+        b, d = (-b[0], -b[1], -b[2], -b[3]), -d
+    if d > 0.9995:
+        q = [x + (y - x) * k for x, y in zip(a, b)]
+    else:
+        th = math.acos(d)
+        s = math.sin(th)
+        q = [(math.sin((1 - k) * th) * x + math.sin(k * th) * y) / s for x, y in zip(a, b)]
+    n = math.sqrt(sum(x * x for x in q)) or 1.0
+    return (q[0] / n, q[1] / n, q[2] / n, q[3] / n)
+
+
+class Track:
+    """One part's keys in a clip: at each time where it is moved to, how it is turned, its size - any of
+    the three left out stays as it is. Between two keys it goes evenly (a turn the short way round)."""
+
+    def __init__(self, spec, points, pivot):
+        self.points = points                              # which of the model's corners it moves
+        self.times = [float(t) for t in spec.get("t") or [0.0]]
+        n = len(self.times)
+        if any(b < a for a, b in zip(self.times, self.times[1:])):
+            raise ValueError("a track's times should go up")
+
+        def keys(name, width):
+            rows = spec.get(name)
+            if rows is None:
+                return None
+            if not isinstance(rows, list) or len(rows) != n or any(not isinstance(r, list) or len(r) not in width
+                                                                    for r in rows):
+                raise ValueError("a track's \"%s\" should have a key for each of its %d times" % (name, n))
+            return rows
+        move, turn, size = keys("move", (3,)), keys("turn", (3, 4)), keys("size", (3,))
+        self.move = [tuple(float(c) for c in r) for r in move] if move else None
+        self.turn = [_quat(r) for r in turn] if turn else None
+        self.size = [tuple(float(c) for c in r) for r in size] if size else None
+        about = spec.get("about")
+        self.about = tuple(float(c) for c in about[:3]) if isinstance(about, list) and len(about) == 3 else pivot
+
+    def at(self, t):
+        """``(move, turn, size)`` at time ``t`` (beats into the clip); None for what it has no keys for."""
+        times = self.times
+        i = bisect.bisect_right(times, t) - 1
+        if i < 0:
+            i, k = 0, 0.0
+        elif i >= len(times) - 1:
+            i, k = len(times) - 1, 0.0
+        else:
+            k = (t - times[i]) / ((times[i + 1] - times[i]) or 1.0)
+        j = min(i + 1, len(times) - 1)
+
+        def lerp(rows):
+            if rows is None:
+                return None
+            a, b = rows[i], rows[j]
+            return (a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k)
+        return lerp(self.move), (_slerp(self.turn[i], self.turn[j], k) if self.turn else None), lerp(self.size)
+
+    def apply(self, verts, t):
+        move, q, size = self.at(t)
+        ax, ay, az = self.about
+        mx, my, mz = move or (0.0, 0.0, 0.0)
+        if q is not None:
+            x, y, z, w = q
+            r = (1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w),
+                 2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w),
+                 2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y))
+        for i in self.points:
+            px, py, pz = verts[i][0] - ax, verts[i][1] - ay, verts[i][2] - az
+            if size is not None:
+                px, py, pz = px * size[0], py * size[1], pz * size[2]
+            if q is not None:
+                px, py, pz = (r[0] * px + r[1] * py + r[2] * pz, r[3] * px + r[4] * py + r[5] * pz,
+                              r[6] * px + r[7] * py + r[8] * pz)
+            verts[i] = (px + ax + mx, py + ay + my, pz + az + mz)
+
+
 def colour(text, default=(0.32, 0.32, 0.32)):
     """``"#rrggbb"`` or ``[r, g, b]`` (0..255), as picked on a screen (sRGB), to the linear 0..1 light is
     worked out in."""
@@ -214,10 +382,17 @@ class Model:
             o = len(self.verts)
             self.verts += [tuple(float(c) for c in p[:3]) for p in mesh["v"]]
             first = len(self.faces)
+            owner = {}                                    # a corner of the mesh -> the named part it is of
+            for pname, span in (mesh.get("parts") or {}).items():
+                if pname not in self.groups:
+                    self.groups.append(pname)
+                for i in range(int(span[0]), int(span[0]) + int(span[1])):
+                    owner[i] = self.groups.index(pname)
             for mname, tris in (mesh.get("faces") or {}).items():
                 mi = index.get(mname, 0)
                 for t in tris:
-                    self.faces.append((t[0] + o, t[1] + o, t[2] + o, mi, colour(t[3]) if len(t) > 3 else None, 0))
+                    self.faces.append((t[0] + o, t[1] + o, t[2] + o, mi, colour(t[3]) if len(t) > 3 else None,
+                                       owner.get(t[0], 0)))
             self.pieces += _pieces(self.faces[first:], len(spec.get("parts") or []))
         for g, how in (spec.get("spin") or {}).items():   # groups that turn: {"fans": {"axis": "z", "speed": 360}}
             if g in self.groups and isinstance(how, dict):
@@ -227,9 +402,27 @@ class Model:
         self.smooth = bool(spec.get("smooth"))
         self.bob = spec.get("bob")                        # [height, beats a bob takes]
         self.turning = float(spec.get("turning", 0.0))     # degrees a beat, the whole model (a pickup)
-        self.frames = {k: v for k, v in (spec.get("frames") or {}).items() if isinstance(v, list) and v}
+        self.frames = {}
+        for k, v in (spec.get("frames") or {}).items():
+            if isinstance(v, dict):
+                v = unpack_frames(v)
+            if isinstance(v, list) and v:
+                self.frames[k] = v
         self.fps = float(spec.get("fps", 8.0))            # frames a beat
         self._pivots = self._centres()
+        self.tracks = {}                                  # clip -> (beats long, whether it goes round, its parts' tracks)
+        for k, clip in (spec.get("tracks") or {}).items():
+            if not isinstance(clip, dict) or not isinstance(clip.get("parts"), dict):
+                raise ValueError("tracks '%s' should have \"parts\"" % k)
+            tracks = []
+            for pname, tspec in clip["parts"].items():
+                if pname not in self.groups:
+                    raise ValueError("tracks '%s' move a part '%s' that it has not" % (k, pname))
+                g = self.groups.index(pname)
+                points = sorted({i for a, b, c, _m, _t, fg in self.faces if fg == g for i in (a, b, c)})
+                tracks.append(Track(tspec, points, self._pivots.get(g, (0.0, 0.0, 0.0))))
+            length = float(clip.get("length") or max([t.times[-1] for t in tracks] or [0.0]) or 1.0)
+            self.tracks[k] = (length, clip.get("loop", True) is not False, tracks)
         zs = [p[2] for p in self.verts] or [0.0]
         self.height = (max(zs) or 0.5) * self.scale
         self.radius = max([math.hypot(p[0], p[1]) for p in self.verts] or [0.5]) * self.scale
@@ -258,6 +451,13 @@ class Model:
                 verts += self.verts[len(verts):]
         else:
             verts = self.verts
+        moving = self.tracks.get(clip) or self.tracks.get("idle")
+        if moving and not (frames and clip in self.frames):   # its parts moved along their tracks, at this very time
+            length, loop, tracks = moving
+            at = (t % length) if loop else min(t, length)
+            verts = list(verts)
+            for tr in tracks:
+                tr.apply(verts, at)
         if self.group_spin:
             verts = list(verts)
             moved = {}
@@ -285,6 +485,22 @@ class Model:
         if sc != 1.0 or lift:
             verts = [(x * sc, y * sc, z * sc + lift) for x, y, z in verts]
         return verts
+
+    @property
+    def clips(self):
+        """The names of what it can play (its frames' and its tracks')."""
+        return list(dict.fromkeys(list(self.frames) + list(self.tracks)))
+
+    @property
+    def moves(self):
+        """Whether it is ever anything but its pose at rest."""
+        return bool(self.frames or self.tracks or self.group_spin or self.bob)
+
+    def beats(self, clip):
+        """How long a clip is, in beats (0 when it has none)."""
+        if clip in self.frames:
+            return len(self.frames[clip]) / (self.fps or 1.0)
+        return self.tracks[clip][0] if clip in self.tracks else 0.0
 
 
 def load(table):
@@ -332,6 +548,11 @@ def problems(table, where="models.json"):
             if any(not isinstance(t, list) or len(t) < 3 or any(not isinstance(i, int) or not 0 <= i < n for i in t[:3])
                    for t in tris or []):
                 out.append("%s: model '%s': a face of '%s' names a corner the mesh has not" % (where, name, mname))
+        for pname, span in (mesh.get("parts") or {}).items() if isinstance(mesh.get("parts"), dict) else []:
+            if not (isinstance(span, list) and len(span) == 2 and all(isinstance(i, int) for i in span)
+                    and 0 <= span[0] and span[0] + span[1] <= n):
+                out.append("%s: model '%s': the mesh's part '%s' should be [first corner, how many] within the mesh"
+                           % (where, name, pname))
         if not spec.get("parts") and not n:
             out.append("%s: model '%s' has neither parts nor a mesh" % (where, name))
         if spec.get("break", "shards") not in BREAKS:

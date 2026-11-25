@@ -2389,8 +2389,26 @@ labelled as a sprite is. Model space: x to the right, y forward, z up; one unit 
   shows that light's side of the room, and the level's fog dims it as it does sprites.
 - **Moving**: `"bob": [height, beats]` floats it up and down; `"turning"` turns the whole
   model so many degrees a beat (a pickup); `"spin"` turns a `group` of parts about its own
-  middle (rotors, turbines, a radar dish). Imported animations play as **frames**: `idle`,
-  `walk` (while it moves), `attack` (while it aims and fires); `fps` is frames a beat.
+  middle (rotors, turbines, a radar dish). A model plays **clips**: `idle`, `walk` (while it
+  moves), `attack` (while it aims and fires), and any other by its name where one is asked
+  for. A clip is kept in one of two ways. **Tracks** move named parts that stay stiff - a
+  door on its hinge, an arm, legs unfolding - and can be written by hand:
+
+  ```json
+  "tracks": {"open": {"length": 2, "loop": false, "parts": {
+      "door": {"t": [0, 2], "turn": [[0, 0, 0], [90, 0, 0]], "about": [0, 0, 0]},
+      "bolt": {"t": [0, 0.5], "move": [[0, 0, 0], [0.2, 0, 0]]}}}}
+  ```
+
+  A part is a `group` of the model's parts (or a named part of an imported mesh). `t` are
+  its keys' times in beats; `move`, `turn` and `size` have a key for each time, and any of
+  the three may be left out. A turn is yaw, pitch and roll in degrees (as a part's `turn`)
+  or four numbers, a quaternion; `about` is the point it turns and grows about (the part's
+  middle if none). Between two keys a part goes evenly, so a clip is as smooth as the screen
+  is drawn, at any speed. `length` is the clip's beats; it goes round unless `"loop": false`.
+  **Frames** (`frames`, `fps` frames a beat) are the whole mesh picture by picture, for what
+  bends: a skin on bones. They are kept packed (about a seventh the size of the numbers
+  written out); a list of lists of numbers is read as well.
 - **Destroyed**, a model breaks apart: its pieces fly out from its middle, turn, fall to
   the floor and are gone; it leaves no gore unless its monster names `remains`. The pieces
   are its triangles (`"break": "shards"`, the default), its parts (`"parts"`: a pod, a
@@ -2401,8 +2419,12 @@ labelled as a sprite is. Model space: x to the right, y forward, z up; one unit 
   per metre, 0.4 by default - a 2.5 m room is a cell high). It brings in the meshes of
   the scene with their objects' placing; the materials' base colour, metallic, roughness
   and emission; a base colour texture (PNG) or vertex colours as a colour per triangle;
-  and every action - object and armature (skinned) animation alike - as frames, named as
-  the actions are. Shape keys (morph targets) and JPEG textures are not taken; it says so.
+  and every action, named as the actions are: where the objects stay stiff, as tracks (each
+  object a named part of the mesh, a few keys for each - a tenth the size of frames or
+  less); where an armature bends a skin, or a part is sheared on its way, as packed frames
+  (four a beat, 48 at most). Shape keys (morph targets) and JPEG textures are not taken; it
+  says so. An imported mesh's objects are its parts for the viewer's views and a look's
+  `groups` as well.
   Keys you added by hand to a model of that name (`bob`, `turning`, `smooth`, `spin`)
   stay. Keep models low: a few hundred triangles each - every one is lit and filled in
   Python, about 1 ms for a 200-triangle model.
@@ -3081,6 +3103,13 @@ view as its autopilot flies it; `python -m engine.ahead` the field of rocks.
 
 `"turn"` (degrees a second), `"yaw"`, `"pitch"` and `"zoom"` place the eye. A model's parts are
 put in groups with `"group": "reactor"` in `models.json`.
+
+A scope **plays a clip** of its model with `"clip": "open"`, in any view - in lines too: the
+lines move with the parts. By itself the clip runs with the time. With `"at"` (a number or a
+name, of `whole`) the model is shown that far through it, whatever the time: `{"scope":
+{"model": "bay", "view": "solid", "clip": "open", "at": "hatch", "whole": 100}}` is a hatch as
+far open as the value `hatch` says, and `"at": "beacon_charge"` a device that unfolds while its
+key is held. `python clio.py GAME --view-model` plays a model's clips with P.
 
 **How a model is drawn** is data too, in three layers, each over the one before:
 

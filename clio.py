@@ -380,7 +380,10 @@ def import_model(game_dir, path, name=None, scale=0.4):
         f.write(compact_json(table) + "\n")
     os.replace(target + ".tmp", target)
     m = model.Model(name, new)
-    clips = ", ".join("%s (%d)" % (k, len(v)) for k, v in (new.get("frames") or {}).items()) or "none"
+    clips = ", ".join(["%s (%d keys on %d parts)" % (k, sum(len(t["t"]) for t in v["parts"].values()), len(v["parts"]))
+                       for k, v in (new.get("tracks") or {}).items()]
+                      + ["%s (%d frames)" % (k, v["count"] if isinstance(v, dict) else len(v))
+                         for k, v in (new.get("frames") or {}).items()]) or "none"
     print("Model '%s' in %s: %d triangles, %d materials, %.2f cells high; animations: %s."
           % (name, target, len(m.faces), len(m.materials), m.height, clips))
     for n in notes:

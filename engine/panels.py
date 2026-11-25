@@ -515,9 +515,14 @@ class View:
                 vals = {g: max(0.0, min(1.0, of(src, 0.0) / top)) for g, src in spec["values"].items()}
             cut_at = None if spec.get("cut") is None else of(spec["cut"], 0.5) / float(spec.get("whole", 1) or 1)
             yaw = float(spec.get("yaw", 0.0 if view == "plan" else 30.0)) + (0.0 if view == "plan" else float(spec.get("turn", 12)) * t)
+            clip = spec.get("clip") if isinstance(spec.get("clip"), str) else None
+            how_far = None                               # how far through its clip: a value's share of "whole"
+            if clip and spec.get("at") is not None:
+                how_far = of(spec["at"], 0.0) / float(spec.get("whole", 1) or 1)
             cv.paste(x, y, viewer.draw(subject, view, w, h, yaw, float(spec.get("pitch", 20)), float(spec.get("zoom", 1)),
                                        spec.get("colour") or (None if subject.look.get("ink") else ink), uni, cut_at, {"x": 0, "y": 1, "z": 2}.get(spec.get("axis"), 1),
-                                       int(of(spec.get("levels"), 1)), int(of(spec.get("level"), 0)), vals, t, scope))
+                                       int(of(spec.get("levels"), 1)), int(of(spec.get("level"), 0)), vals,
+                                       t * 2.0 if clip else t, scope, clip=clip, at=how_far))
             return
         else:
             wire = self._wire(spec.get("model"))
@@ -688,6 +693,16 @@ def problems(spec, names=None, where="panels", formula=None, models=None, planet
                         name_ok(wat, sc.get(key))
                     for src in (sc.get("values") or {}).values() if isinstance(sc.get("values"), dict) else []:
                         name_ok(wat, src)
+                if sc.get("clip") is not None:           # what the model plays there, and how far through it is
+                    if sc.get("view") is None:
+                        out.append("%s: a model plays a clip in a \"view\": give the scope one" % wat)
+                    made = models.get(sc.get("model")) if isinstance(models, dict) else None
+                    if isinstance(made, dict):
+                        clips = list(made.get("tracks") or {}) + list(made.get("frames") or {})
+                        if sc["clip"] not in clips:
+                            out.append("%s: model '%s' has no clip '%s' (%s)" % (wat, sc["model"], sc["clip"],
+                                                                                ", ".join(clips) or "it has none"))
+                    name_ok(wat, sc.get("at"))
             elif kind == "planet":
                 from .viewer import PLANET_VIEWS
                 if isinstance(wd["planet"], str) and planets is not None and wd["planet"] not in planets:

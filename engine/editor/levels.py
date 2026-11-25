@@ -230,10 +230,10 @@ def model_view(game_dir, name, pending=None, turns=12):
     m.heading = math.pi / 2 - 0.6
     broken = [_picture(lv, fx=firstperson.FX(dissolve={m.id: k / 8.0})) for k in range(1, 9)]
     clips = {}
-    for clip, frames in built.frames.items():
+    for clip in built.clips:
         m.intent = "aim" if clip == "attack" else None
         fx = {"pos": {m.id: (m.x, m.y)}} if clip == "walk" else {}
-        n = max(1, min(16, int(len(frames) / max(1.0, built.fps)) * 4 or 4))
+        n = max(1, min(16, int(built.beats(clip)) * 4 or 4))
         clips[clip] = [_picture(lv, fx=firstperson.FX(tick=(k % 4) / 4.0, **fx), phase=k // 4) for k in range(n)]
     m.intent = None
     return {"problems": [], "turn": turn, "broken": broken, "clips": clips, "cols": 80, "lines": 17,

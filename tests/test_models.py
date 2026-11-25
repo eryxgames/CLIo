@@ -14,6 +14,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from engine import viewer  # noqa: E402
 from engine import gltf, model  # noqa: E402
 from engine.data import GameData  # noqa: E402
 from engine.firstperson import FX, View  # noqa: E402
@@ -89,6 +90,99 @@ class ModelTests(unittest.TestCase):
         m = model.Model("d", spec)
         self.assertEqual(m.pose("walk", 0.0)[0], (0.0, 0.0, 0.0))
         self.assertEqual(m.pose("walk", 0.5)[0], (1.0, 1.0, 1.0))
+
+    def test_frames_packed_are_a_seventh_the_size_and_the_same(self):
+        frames = [[round(math.sin(i * 0.1 + f * 0.3) * 2.5 + ((i * 7 + f) % 11) * 0.0004, 3) for i in range(300)]
+                  for f in range(48)]
+        packed = model.pack_frames(frames)
+        self.assertEqual((packed["count"], packed["size"]), (48, 300))
+        self.assertLess(len(json.dumps(packed)), len(json.dumps(frames)) // 6)
+        back = model.unpack_frames(packed)
+        self.assertLess(max(abs(a - b) for f, g in zip(frames, back) for a, b in zip(f, g)), 0.0001)
+        self.assertEqual(model.unpack_frames(json.loads(json.dumps(packed))), back)      # through a file the same
+        spec = dict(DRONE, frames={"walk": [[0, 0, 0] * 3, [1, 1, 1] * 3]}, fps=2, bob=None)
+        plain, small = model.Model("d", spec), model.Model("d", model.pack(spec))
+        self.assertEqual(sorted(model.pack(spec)["frames"]["walk"]), ["count", "packed", "size", "step"])
+        self.assertEqual(model.pack(model.pack(spec)), model.pack(spec))                 # packed already: left
+        for t in (0.0, 0.5, 0.9):
+            for p, q in zip(plain.pose("walk", t), small.pose("walk", t)):
+                self.assertAlmostEqual(p[0], q[0], places=4)
+        for wrong in ({"packed": "!!", "count": 2, "size": 9, "step": 0.1}, {"count": 2},
+                      dict(packed, count=47), dict(packed, packed=packed["packed"][:40])):
+            with self.assertRaises(ValueError):
+                model.unpack_frames(wrong)
+        bad = model.problems({"d": dict(DRONE, frames={"walk": dict(packed, count=47)})})
+        self.assertEqual(len(bad), 1)
+        self.assertIn("packed frames are not as long as they say", bad[0])
+        with self.assertRaises(ValueError):
+            model.pack_frames([[1, 2, 3], [1, 2]])
+
+    def door(self, **more):
+        return {"materials": {"m": {"color": "#888888"}},
+                "parts": [{"shape": "box", "size": [0.1, 0.1, 2], "at": [0, 0, 1]},
+                          {"shape": "box", "size": [1, 0.1, 2], "at": [0.5, 0, 1], "group": "door"}],
+                "tracks": {"open": dict({"length": 2, "parts": {"door": {"t": [0, 2], "turn": [[0, 0, 0], [90, 0, 0]],
+                                                                         "about": [0, 0, 0]}}}, **more)}}
+
+    def test_tracks_move_a_named_part_at_any_moment(self):
+        m = model.Model("door", self.door(loop=False))
+        self.assertEqual((m.clips, m.beats("open"), m.moves), (["open"], 2.0, True))
+        post, leaf = m.pose("open", 0.0)[:8], m.pose("open", 0.0)[8:]
+        self.assertEqual(m.pose("open", 2.0)[:8], post)                 # the post has no track: it stays
+        far = max(leaf, key=lambda p: p[0])
+        self.assertAlmostEqual(far[0], 1.0)
+        swung = max(m.pose("open", 2.0)[8:], key=lambda p: p[1])
+        self.assertAlmostEqual(swung[1], 1.0, places=5)                  # a quarter turn to the left about its hinge
+        self.assertAlmostEqual(swung[0], 0.05, places=5)
+        half = max(m.pose("open", 1.0)[8:], key=lambda p: p[1])
+        self.assertAlmostEqual(math.degrees(math.atan2(half[1], half[0])), 45.0, delta=3.5)
+        self.assertEqual(m.pose("open", 9.0), m.pose("open", 2.0))      # it does not go round: it stays open
+        self.assertNotEqual(m.pose("open", 0.37), m.pose("open", 0.38)) # no frames: every moment is its own
+        round_ = model.Model("door", self.door())
+        self.assertEqual(round_.pose("open", 2.5), round_.pose("open", 0.5))
+        for yaw, pitch, roll in ((30, 0, 0), (0, 40, 0), (0, 0, 50), (20, -35, 70)):     # a turn in degrees is a part's turn
+            t = model.Track({"t": [0], "turn": [[yaw, pitch, roll]]}, [0], (0, 0, 0))
+            verts = [(0.3, -0.7, 0.4)]
+            t.apply(verts, 0.0)
+            want = model._turn((0.3, -0.7, 0.4), math.radians(yaw), math.radians(pitch), math.radians(roll))
+            for a, b in zip(verts[0], want):
+                self.assertAlmostEqual(a, b, places=6)
+        moved = model.Track({"t": [0, 1], "move": [[0, 0, 0], [0, 0, 2]], "size": [[1, 1, 1], [2, 2, 2]]}, [0], (1, 0, 0))
+        verts = [(2.0, 0.0, 0.0)]
+        moved.apply(verts, 0.5)
+        self.assertEqual(verts[0], (2.5, 0.0, 1.0))                     # half as big again about its middle, a cell up
+
+    def test_tracks_that_are_wrong_are_said(self):
+        for change, said in (({"parts": {"lid": {"t": [0]}}}, "a part 'lid' that it has not"),
+                             ({"parts": {"door": {"t": [0, 1], "turn": [[0, 0, 0]]}}}, "a key for each of its 2 times"),
+                             ({"parts": {"door": {"t": [1, 0]}}}, "times should go up"),
+                             ({"parts": None}, "should have \"parts\"")):
+            spec = self.door(**change)
+            wrong = model.problems({"door": spec})
+            self.assertEqual(len(wrong), 1, wrong)
+            self.assertIn(said, wrong[0])
+        mesh = {"materials": {"m": {}}, "mesh": {"v": [[0, 0, 0], [1, 0, 0], [0, 1, 0]], "faces": {"m": [[0, 1, 2]]},
+                                                  "parts": {"wing": [1, 9]}}}
+        self.assertIn("should be [first corner, how many] within the mesh", model.problems({"x": mesh})[0])
+
+    def test_a_models_lines_move_with_it(self):
+        m = model.Model("door", self.door(loop=False))
+        v = viewer.Subject(m)
+        self.assertTrue(v.moving)
+        shut, in_parts = v.posed("open", 0.0)
+        wide, _ = v.posed("open", 2.0)
+        self.assertEqual((shut.edges, len(shut.verts)), (wide.edges, len(wide.verts)))   # the same lines, moved
+        self.assertNotEqual(shut.verts, wide.verts)
+        self.assertEqual([n for n, _ in in_parts], ["body", "door"])
+        self.assertIs(v.posed("open", 2.0)[0], wide)                                     # the same moment: not made twice
+        rows = lambda at: viewer.draw(v, "solid", 40, 16, at=at, clip="open")
+        self.assertNotEqual(rows(0.0), rows(1.0))
+        self.assertEqual(rows(0.5), viewer.draw(v, "solid", 40, 16, t=1.0, clip="open"))  # half way is a beat in
+        self.assertNotEqual(viewer.draw(v, "shaded", 40, 16, at=0.0, clip="open"),
+                            viewer.draw(v, "shaded", 40, 16, at=1.0, clip="open"))
+        still = viewer.Subject(model.Model("d", DRONE))
+        self.assertFalse(still.moving)
+        self.assertIs(still.posed("idle", 3.0)[0], still.wire)
 
     def test_shards_fly_out_and_fall(self):
         m = model.Model("drone", DRONE)
@@ -262,7 +356,7 @@ class GltfTests(unittest.TestCase):
         rots = b.acc([(0, 0, 0, 1), (0, s, 0, s)], "VEC4")             # a quarter turn about up
         b.doc["animations"] = [{"name": "Idle", "samplers": [{"input": times, "output": rots}],
                                 "channels": [{"sampler": 0, "target": {"node": 0, "path": "rotation"}}]}]
-        spec, _ = gltf.to_model(self.write("spin.gltf", b.gltf()), scale=1.0, fps=4)
+        spec, _ = gltf.to_model(self.write("spin.gltf", b.gltf()), scale=1.0, fps=4, tracks=False, packed=False)
         frames = spec["frames"]["idle"]
         self.assertEqual(len(frames), 8)                                # 1 s = 2 beats, 4 frames a beat
         first, mid = frames[0], frames[4]
@@ -270,6 +364,86 @@ class GltfTests(unittest.TestCase):
         self.assertEqual(len(first), 3 * len(spec["mesh"]["v"]))
         m = model.Model("spin", spec)
         self.assertNotEqual(m.pose("idle", 0.0), m.pose("idle", 1.0))
+
+    def spinning(self):
+        b = self.cube()
+        times = b.acc([0.0, 0.5, 1.0], "SCALAR")
+        s, e = math.sqrt(0.5), math.sin(math.radians(22.5))
+        rots = b.acc([(0, 0, 0, 1), (0, e, 0, math.cos(math.radians(22.5))), (0, s, 0, s)], "VEC4")   # a quarter turn about up
+        b.doc["nodes"][0]["name"] = "Hatch"
+        b.doc["animations"] = [{"name": "Idle", "samplers": [{"input": times, "output": rots}],
+                                "channels": [{"sampler": 0, "target": {"node": 0, "path": "rotation"}}]}]
+        return b
+
+    def test_parts_that_stay_stiff_come_in_as_tracks(self):
+        path = self.write("spin.gltf", self.spinning().gltf())
+        spec, notes = gltf.to_model(path, scale=1.0)
+        self.assertEqual(notes, [])
+        self.assertNotIn("frames", spec)
+        self.assertEqual(spec["mesh"]["parts"], {"hatch": [0, 8]})      # the node is a named part of the mesh
+        track = spec["tracks"]["idle"]
+        self.assertEqual((track["length"], list(track["parts"])), (2.0, ["hatch"]))   # 1 s is 2 beats
+        hatch = track["parts"]["hatch"]
+        self.assertEqual((hatch["t"], hatch["about"]), ([0.0, 2.0], [0, 0, 0]))       # an even turn: two keys say it
+        self.assertEqual(sorted(hatch), ["about", "t", "turn"])         # it is not moved and keeps its size
+        self.assertEqual(model.problems({"spin": spec}), [])
+        m = model.Model("spin", spec)
+        self.assertEqual((m.groups, m.clips, m.beats("idle")), (["body", "hatch"], ["idle"], 2.0))
+        baked, _ = gltf.to_model(path, scale=1.0, fps=8, tracks=False, packed=False)  # the same, frame by frame
+        for k, frame in enumerate(baked["frames"]["idle"]):
+            pose = m.pose("idle", k / 8.0)
+            for i, p in enumerate(pose):
+                for c in range(3):
+                    self.assertAlmostEqual(p[c], frame[i * 3 + c], places=3)
+        between = m.pose("idle", 0.3141)                                 # and at any moment between two frames
+        self.assertNotIn(between, (m.pose("idle", 0.25), m.pose("idle", 0.375)))
+        self.assertLess(len(json.dumps(spec["tracks"])), len(json.dumps(baked["frames"])) // 8)
+
+    def test_a_part_on_a_part_goes_where_both_take_it(self):
+        b = self.cube()
+        pos, idx = 0, 1
+        b.doc["meshes"].append({"primitives": [{"attributes": {"POSITION": pos}, "indices": idx, "material": 0}]})
+        b.doc["nodes"] = [{"mesh": 0, "name": "Arm", "translation": [0, 1, 0], "children": [1]},
+                          {"mesh": 1, "name": "Hand", "translation": [2, 0, 0], "scale": [0.5, 0.5, 0.5]}]
+        times = b.acc([0.0, 1.0, 2.0], "SCALAR")
+        s = math.sqrt(0.5)
+        rots = b.acc([(0, 0, 0, 1), (0, 0, s, s), (0, 0, 1, 0)], "VEC4")
+        lift = b.acc([(2, 0, 0), (2, 0.5, 0), (3, 0, 0)], "VEC3")
+        b.doc["animations"] = [{"name": "wave", "samplers": [{"input": times, "output": rots}, {"input": times, "output": lift}],
+                                "channels": [{"sampler": 0, "target": {"node": 0, "path": "rotation"}},
+                                             {"sampler": 1, "target": {"node": 1, "path": "translation"}}]}]
+        path = self.write("arm.glb", b.glb())
+        spec, notes = gltf.to_model(path, scale=0.5)
+        self.assertEqual(notes, [])
+        self.assertEqual(list(spec["mesh"]["parts"]), ["arm", "hand"])
+        self.assertEqual(sorted(spec["tracks"]["wave"]["parts"]["hand"]), ["about", "move", "t", "turn"])
+        m = model.Model("arm", spec)
+        baked, _ = gltf.to_model(path, scale=0.5, fps=8, tracks=False, packed=False)
+        frames = baked["frames"]["wave"]
+        worst = 0.0
+        for k, frame in enumerate(frames):
+            pose = m.pose("wave", k / 8.0)
+            worst = max(worst, max(abs(p[c] - frame[i * 3 + c]) for i, p in enumerate(pose) for c in range(3)))
+        self.assertLess(worst, 0.006)                                    # as the frames have it, to a hundredth of a cell
+        v = viewer.Subject(m)                                            # and its parts are apart in the viewer
+        self.assertEqual([n for n, _ in v.parts], ["arm", "hand"])
+
+    def test_a_part_that_shears_is_kept_as_frames(self):
+        b = self.cube()
+        b.doc["meshes"].append({"primitives": [{"attributes": {"POSITION": 0}, "indices": 1, "material": 0}]})
+        b.doc["nodes"] = [{"mesh": 0, "name": "Base", "scale": [1, 3, 1], "children": [1]},
+                          {"mesh": 1, "name": "Vane", "translation": [2, 0, 0]}]
+        times = b.acc([0.0, 1.0], "SCALAR")
+        s = math.sqrt(0.5)
+        rots = b.acc([(0, 0, 0, 1), (0, 0, math.sin(0.4), math.cos(0.4))], "VEC4")   # turned inside a squashed parent
+        b.doc["animations"] = [{"name": "idle", "samplers": [{"input": times, "output": rots}],
+                                "channels": [{"sampler": 0, "target": {"node": 1, "path": "rotation"}}]}]
+        spec, notes = gltf.to_model(self.write("shear.glb", b.glb()), fps=4)
+        self.assertEqual(notes, ["animation 'idle' shears a part: kept as frames"])
+        self.assertNotIn("tracks", spec)
+        self.assertEqual(spec["frames"]["idle"]["count"], 8)
+        self.assertEqual(model.problems({"shear": spec}), [])
+        self.assertNotEqual(model.Model("shear", spec).pose("idle", 0.0), model.Model("shear", spec).pose("idle", 1.0))
 
     def test_a_texture_gives_each_triangle_its_colour(self):
         from engine.sheets import png
@@ -309,8 +483,10 @@ class GltfTests(unittest.TestCase):
         b.doc["animations"] = [{"name": "walk", "samplers": [{"input": times, "output": lift}],
                                 "channels": [{"sampler": 0, "target": {"node": 2, "path": "translation"}}]}]
         spec, _ = gltf.to_model(self.write("skin.glb", b.glb()), fps=4)
-        rest = spec["frames"]["walk"][0]
-        last = spec["frames"]["walk"][-1]
+        self.assertNotIn("tracks", spec)                                # a skin bends: only frames can say it
+        self.assertEqual(sorted(spec["frames"]["walk"]), ["count", "packed", "size", "step"])
+        walk = model.unpack_frames(spec["frames"]["walk"])
+        rest, last = walk[0], walk[-1]
         pts = lambda f: [(f[i], f[i + 1], f[i + 2]) for i in range(0, len(f), 3)]
         far = lambda f: max(p[2] for p in pts(f) if p[0] <= -1.5)      # glTF +x 2 is CLIo x -2
         near = lambda f: max(p[2] for p in pts(f) if p[0] >= -0.01)

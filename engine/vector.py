@@ -260,16 +260,20 @@ def on_orbit(a, e, turn):
     return (a * e + a * math.cos(t), b * math.sin(t), 0.0)
 
 
-def from_triangles(verts, tris, crease=25.0, colour=None, wound=False):
+def from_triangles(verts, tris, crease=25.0, colour=None, wound=False, apart=None, origin=None):
     """A mesh of triangles as lines: only the edges where the surface folds by more than ``crease``
     degrees (0: every edge), and the edges of holes - so a flat side is one outline, not a net of
-    triangles."""
+    triangles. Corners in one place are one corner - unless ``apart`` (a mark for each of ``verts``)
+    says they are of different things, which may then move apart. ``origin``: a list that is filled
+    with, for each corner of the lines, which of ``verts`` it was."""
     key, verts2, index = {}, [], []
-    for p in verts:
-        k = (round(p[0], 4), round(p[1], 4), round(p[2], 4))
+    for n, p in enumerate(verts):
+        k = (round(p[0], 4), round(p[1], 4), round(p[2], 4), apart[n] if apart is not None else None)
         if k not in key:
             key[k] = len(verts2)
             verts2.append((float(p[0]), float(p[1]), float(p[2])))
+            if origin is not None:
+                origin.append(n)
         index.append(key[k])
     faces, normals, by = [], [], {}
     for t in tris:

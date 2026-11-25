@@ -2,9 +2,10 @@
 
 What comes in: the meshes of the default scene with their nodes' placing; materials in glTF's own PBR
 (base colour, metallic, roughness, emission) - a base colour texture (PNG) or vertex colours become a
-colour per triangle; and the animations, node and skinned alike, played and kept as frames of the mesh
-(one clip per animation, named as in Blender: ``idle``, ``walk``, ``attack``, ``die`` are the ones the
-engine plays). Not taken: morph targets, sparse accessors, JPEG textures (say so, and are left out).
+colour per triangle; and the animations, one clip each, named as in Blender (``idle``, ``walk``,
+``attack``, ``die`` are the ones a level plays): nodes that stay stiff as tracks (a few keys for each
+node, which becomes a named part of the mesh), a skin on bones as frames of the mesh, packed. Not
+taken: morph targets, sparse accessors, JPEG textures (say so, and are left out).
 
 glTF's axes (+Y up, +Z forward, -X right) become CLIo's (x right, y forward, z up); ``scale`` turns its
 metres into cells (a cell is the room's height: 0.4 makes a 2.5 m room one cell).
@@ -233,8 +234,129 @@ def _name(text, taken):
     return name
 
 
-def to_model(path, scale=1.0, fps=4, max_frames=48):
-    """A model for models.json, and notes on what was left out: ``(spec, notes)``."""
+def inverse(m):
+    """The inverse of a matrix that places, turns and sizes (no perspective); None if it flattens."""
+    a, b, c, d, e, f, g, h, i = m[0], m[4], m[8], m[1], m[5], m[9], m[2], m[6], m[10]
+    det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g)
+    if abs(det) < 1e-12:
+        return None
+    r = [(e * i - f * h) / det, (c * h - b * i) / det, (b * f - c * e) / det,
+         (f * g - d * i) / det, (a * i - c * g) / det, (c * d - a * f) / det,
+         (d * h - e * g) / det, (b * g - a * h) / det, (a * e - b * d) / det]
+    tx, ty, tz = m[12], m[13], m[14]
+    return [r[0], r[3], r[6], 0, r[1], r[4], r[7], 0, r[2], r[5], r[8], 0,
+            -(r[0] * tx + r[1] * ty + r[2] * tz), -(r[3] * tx + r[4] * ty + r[5] * tz),
+            -(r[6] * tx + r[7] * ty + r[8] * tz), 1]
+
+
+def _key(m, scale):
+    """A matrix (glTF's axes) as a key of a track on CLIo's: ``(move, turn as x y z w, size)``; None if it
+    shears (a size that is not along the part's own axes cannot be said in those three)."""
+    # CLIo's axes: x = -X, y = Z, z = Y. The matrix there is C m C^-1; C is its own kind of turn.
+    def el(r, c):                                         # row r, column c of the 3x3, on CLIo's axes
+        sign = (-1.0, 1.0, 1.0)
+        src = (0, 2, 1)
+        return sign[r] * sign[c] * m[src[c] * 4 + src[r]]
+    cols = [[el(r, c) for r in range(3)] for c in range(3)]
+    size = [math.sqrt(sum(v * v for v in col)) for col in cols]
+    if min(size) < 1e-9:
+        return None
+    u = [[v / size[c] for v in cols[c]] for c in range(3)]
+    for a, b in ((0, 1), (0, 2), (1, 2)):
+        if abs(sum(x * y for x, y in zip(u[a], u[b]))) > 1e-3:
+            return None
+    det = (u[0][0] * (u[1][1] * u[2][2] - u[1][2] * u[2][1]) - u[1][0] * (u[0][1] * u[2][2] - u[0][2] * u[2][1])
+           + u[2][0] * (u[0][1] * u[1][2] - u[0][2] * u[1][1]))
+    if det < 0:                                           # a mirror: one size is the other way
+        size[0], u[0] = -size[0], [-v for v in u[0]]
+    m00, m11, m22 = u[0][0], u[1][1], u[2][2]             # u[c][r]: column c, row r
+    tr = m00 + m11 + m22
+    if tr > 0:
+        k = math.sqrt(tr + 1.0) * 2
+        q = [(u[1][2] - u[2][1]) / k, (u[2][0] - u[0][2]) / k, (u[0][1] - u[1][0]) / k, 0.25 * k]
+    elif m00 > m11 and m00 > m22:
+        k = math.sqrt(1.0 + m00 - m11 - m22) * 2
+        q = [0.25 * k, (u[1][0] + u[0][1]) / k, (u[2][0] + u[0][2]) / k, (u[1][2] - u[2][1]) / k]
+    elif m11 > m22:
+        k = math.sqrt(1.0 + m11 - m00 - m22) * 2
+        q = [(u[1][0] + u[0][1]) / k, 0.25 * k, (u[2][1] + u[1][2]) / k, (u[2][0] - u[0][2]) / k]
+    else:
+        k = math.sqrt(1.0 + m22 - m00 - m11) * 2
+        q = [(u[2][0] + u[0][2]) / k, (u[2][1] + u[1][2]) / k, 0.25 * k, (u[0][1] - u[1][0]) / k]
+    move = _clio((m[12], m[13], m[14]), scale)
+    return list(move), q, size
+
+
+def _thin(times, rows, close):
+    """Keys left out where going evenly between their neighbours says the same (within ``close``)."""
+    keep = [0]
+    while keep[-1] < len(times) - 1:
+        a = keep[-1]
+        b = a + 1
+        while b + 1 < len(times):
+            ok = True
+            for i in range(a + 1, b + 1):
+                k = (times[i] - times[a]) / ((times[b + 1] - times[a]) or 1.0)
+                if not close(rows[a], rows[b + 1], k, rows[i]):
+                    ok = False
+                    break
+            if not ok:
+                break
+            b += 1
+        keep.append(b)
+    return keep
+
+
+def _tracks(sc, anim, length, nodes, rest, scale, per_beat=8, most=96):
+    """An animation of parts that stay stiff as tracks: ``{"length", "parts": {name: {"t", "move", "turn",
+    "size", "about"}}}`` - for each mesh node what it is moved, turned and sized by since it was at rest.
+    None when a part shears on its way (then only frames can say it)."""
+    count = max(2, min(most, int(round(length / BEAT * per_beat)) + 1))
+    times = [length * f / (count - 1) for f in range(count)]
+    keys = {name: [] for name in nodes}
+    for time in times:
+        worlds = sc.worlds(sc.sample(anim, time))
+        for name, ni in nodes.items():
+            back = inverse(rest[ni])
+            key = _key(mul(worlds[ni], back), scale) if back else None
+            if key is None:
+                return None
+            keys[name].append(key)
+    beats = [round(t / BEAT, 4) for t in times]
+    parts = {}
+    for name, rows in keys.items():
+        for a, b in zip(rows, rows[1:]):                  # the same turn can be said two ways: the nearer one each time
+            if sum(x * y for x, y in zip(a[1], b[1])) < 0:
+                b[1][:] = [-x for x in b[1]]
+        still = all(max(abs(c) for c in r[0]) < 1e-5 and abs(abs(r[1][3]) - 1.0) < 1e-7
+                    and max(abs(c - 1.0) for c in r[2]) < 1e-5 for r in rows)
+        if still:
+            continue
+
+        def close(a, b, k, c):
+            move = max(abs(a[0][i] + (b[0][i] - a[0][i]) * k - c[0][i]) for i in range(3)) < 2e-3
+            size = max(abs(a[2][i] + (b[2][i] - a[2][i]) * k - c[2][i]) for i in range(3)) < 2e-3
+            q = slerp(a[1], b[1], k)
+            return move and size and abs(sum(x * y for x, y in zip(q, c[1]))) > 1.0 - 2e-6
+        kept = _thin(beats, rows, close)
+        part = {"t": [beats[i] for i in kept], "about": [0, 0, 0]}
+        if any(max(abs(c) for c in r[0]) >= 1e-5 for r in rows):
+            part["move"] = [[round(c, 4) for c in rows[i][0]] for i in kept]
+        if any(abs(abs(r[1][3]) - 1.0) >= 1e-7 for r in rows):
+            part["turn"] = [[round(c, 5) for c in rows[i][1]] for i in kept]
+        if any(max(abs(c - 1.0) for c in r[2]) >= 1e-5 for r in rows):
+            part["size"] = [[round(c, 4) for c in rows[i][2]] for i in kept]
+        parts[name] = part
+    return {"length": round(length / BEAT, 4), "parts": parts}
+
+
+def to_model(path, scale=1.0, fps=4, max_frames=48, tracks=True, packed=True):
+    """A model for models.json, and notes on what was left out: ``(spec, notes)``.
+
+    An animation of parts that stay stiff (nodes moved, turned, sized) is kept as ``tracks`` - a few keys
+    for each part, played at any moment; one that bends a skin, or shears a part, as ``frames`` of the
+    mesh (``fps`` a beat, ``max_frames`` at most), ``packed`` unless asked otherwise. ``tracks=False``:
+    frames for all of them."""
     doc, buffers, folder = read(path)
     sc = Scene(doc, buffers, folder)
     notes = sc.notes
@@ -274,8 +396,12 @@ def to_model(path, scale=1.0, fps=4, max_frames=48):
             pieces.append((ni, prim, node.get("skin")))
     verts, keys, faces = [], {}, {}
     sources = []                                         # for frames: each kept vertex -> (node, prim no, index)
+    spans, part_names = {}, {}                           # a mesh node that is no skin: its corners, and its name as a part
     for pi, (ni, prim, skin) in enumerate(pieces):
         at = prim["attributes"]
+        if skin is None and ni not in spans:
+            spans[ni] = [len(verts), 0]
+            part_names[ni] = _name(sc.nodes[ni].get("name") or "part_%d" % (len(spans)), set(part_names.values()) | {"body"})
         pos = accessor(doc, buffers, at["POSITION"])
         idx = accessor(doc, buffers, prim["indices"]) if "indices" in prim else list(range(len(pos)))
         cols = accessor(doc, buffers, at["COLOR_0"]) if "COLOR_0" in at else None
@@ -317,20 +443,31 @@ def to_model(path, scale=1.0, fps=4, max_frames=48):
             if rgb is not None:
                 tri.append(_hex([_srgb(min(1.0, max(0.0, x))) for x in rgb]))
             faces.setdefault(mname, []).append(tri)
+        if skin is None:
+            spans[ni][1] = len(verts) - spans[ni][0]
     if not verts:
         raise GltfError("no triangles in %s" % os.path.basename(path))
     spec = {"source": os.path.basename(path), "materials": mats,
             "mesh": {"v": [[round(c, 4) for c in p] for p in verts], "faces": faces}}
-    # animations, played and kept as frames
-    clips = {}
+    stiff = bool(spans) and all(skin is None for _ni, _prim, skin in pieces)
+    if len(spans) > 1 or (stiff and tracks and doc.get("animations")):      # its nodes are its named parts
+        spec["mesh"]["parts"] = {part_names[ni]: list(span) for ni, span in spans.items() if span[1]}
+    # animations: parts that stay stiff as tracks, what bends as frames of the mesh
+    clips, moving = {}, {}
     for ai, anim in enumerate(doc.get("animations") or []):
-        name = _name(anim.get("name") or "clip_%d" % ai, set(clips))
+        name = _name(anim.get("name") or "clip_%d" % ai, set(clips) | set(moving))
         times = []
         for smp in anim.get("samplers") or []:
             times += accessor(doc, buffers, smp["input"])
         if not times:
             continue
         length = max(times)
+        if stiff and tracks and length > 0:
+            made = _tracks(sc, anim, length, {part_names[ni]: ni for ni, span in spans.items() if span[1]}, worlds, scale)
+            if made is not None:
+                moving[name] = made
+                continue
+            notes.append("animation '%s' shears a part: kept as frames" % name)
         count = max(1, min(max_frames, int(round(length / BEAT * fps))))
         frames = []
         for f in range(count):
@@ -346,12 +483,19 @@ def to_model(path, scale=1.0, fps=4, max_frames=48):
                     q = _skinned(sc, prim["attributes"], k, p, _skin_matrices(sc, skin, worlds_f, pose))
                 flat += [round(c, 3) for c in _clio(q, scale)]
             frames.append(flat)
-        clips[name] = frames
+        clips[name] = model_pack(frames) if packed else frames
     if clips:
         spec["frames"] = clips
         spec["fps"] = fps
+    if moving:
+        spec["tracks"] = moving
     spec["notes"] = sorted(set(notes))
     return spec, sorted(set(notes))
+
+
+def model_pack(frames):
+    from .model import pack_frames
+    return pack_frames(frames)
 
 
 _cache = {}

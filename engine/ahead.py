@@ -25,6 +25,8 @@ from . import vector
 from .vector import Camera, Wire
 
 LOOKS = ("terrain", "space")
+LEVEL_VIEWS = ("lines", "scan")   # a level's views drawn here (engine/level.py: "view")
+WALL = 1.0                        # how high a level's wall stands over the floor before it
 FAR = 12.0                        # how far it draws (tiles)
 EYE = 0.45                        # the eye above where the vehicle is
 STARS = 70
@@ -131,10 +133,14 @@ def stars(scope, cam, count=STARS, above=None, bright=0.5):
 def eye_of(sim, tilt=-6.0, fov=78.0, height=EYE):
     """The camera of a vehicle: where it is, a little above, looking the way it heads. A map's rows go
     south; here north is +y and up is +z."""
-    from .sim import degrees
-    a = math.radians(degrees(sim.heading))
+    turned = getattr(sim, "degrees", None)               # a place that is not a simulator says it in degrees
+    if turned is None:
+        from .sim import degrees
+        turned = degrees(sim.heading)
+    a = math.radians(turned)
     ex, ey, ez = sim.x, -sim.y, sim.z + height
     fx, fy = math.sin(a), math.cos(a)
+    tilt += getattr(sim, "tilt", 0.0)
     return Camera((ex, ey, ez), (ex + fx, ey + fy, ez + math.tan(math.radians(tilt))), fov=fov, near=0.08), (fx, fy)
 
 
@@ -146,23 +152,26 @@ def draw(scope, sim, spec=None, t=0.0):
     look = spec.get("look") if spec.get("look") in LOOKS else "terrain"
     far = max(3.0, min(40.0, _num(spec.get("far"), FAR)))
     space = look == "space"
-    cam, (fx, fy) = eye_of(sim, _num(spec.get("tilt"), 0.0 if space else -6.0), _num(spec.get("fov"), 78.0))
+    rooms = getattr(sim, "rooms", False)                 # a level: walls and doors, floors at their heights
+    cam, (fx, fy) = eye_of(sim, _num(spec.get("tilt"), 0.0 if space or rooms else -6.0), _num(spec.get("fov"), 78.0),
+                           0.55 if rooms else EYE)
+    floor = getattr(sim, "floor", None) or (lambda tx, ty: 0.0)
     ex, ey = cam.eye[0], cam.eye[1]
     scope.cue = (far * 0.25, far)
     scope.dim = 0.12
     solid = spec.get("solid", True) is not False
     horizon = None
-    if not space:                                        # where the ground ends
+    if not space and not rooms:                          # where the ground ends
         s = scope.project(cam, (ex + fx * 5000, ey + fy * 5000, 0.0))
         if s:
             horizon = int(s[1])
             if 0 <= horizon < scope.H:
                 scope.line2(0, horizon, scope.W - 1, horizon, 0.35)
-    if spec.get("stars", True) is not False:
+    if spec.get("stars", not rooms) is not False:
         stars(scope, cam, above=horizon)
     x0, x1 = int(math.floor(sim.x - far)), int(math.ceil(sim.x + far))
     y0, y1 = int(math.floor(sim.y - far)), int(math.ceil(sim.y + far))
-    things, flat, strong = [], [], []
+    things, flat, strong, named = [], [], [], []
 
     def seen(px, py, slack=1.5):                         # (world) in front, and not too far
         dx, dy = px - ex, py - ey
@@ -178,9 +187,12 @@ def draw(scope, sim, spec=None, t=0.0):
                     other = sim.kind(ax, ay)
                     if here == "water" and other == "water":
                         continue
-                    a, b = (tx, -ty, 0.0), (tx + ox, -(ty + oy), 0.0)
+                    if here in SHUT and other in SHUT:   # inside the walls: no floor to net
+                        continue
+                    z = floor(tx, ty) if here not in SHUT else floor(ax, ay)
+                    a, b = (tx, -ty, z), (tx + ox, -(ty + oy), z)
                     (strong if "road" in (here, other) and here != other else flat).append((a, b))
-    edge = 0 if space else 1                             # the rock round a map: one tile of it
+    edge = getattr(sim, "edge", 0 if space else 1)       # the rock round a map: one tile of it
     for ty in range(max(-edge, y0), min(sim.H + edge, y1 + 1)):
         for tx in range(max(-edge, x0), min(sim.W + edge, x1 + 1)):
             cx, cy = tx + 0.5, -(ty + 0.5)
@@ -198,6 +210,14 @@ def draw(scope, sim, spec=None, t=0.0):
                 elif kind == "pad":
                     for r in (0.45, 0.3):
                         strong.extend(_edges(vector.ring(r, 12, axis="z").placed((cx, cy, 0.05))))
+            elif kind in ("wall", "door", "exit"):       # a level's: the sides that face a floor
+                sides = walls(sim, tx, ty, floor)
+                if sides is not None:
+                    things.append(sides)
+                    if kind == "door":                   # a door: crossed
+                        strong.extend(crossed(sides))
+                    elif kind == "exit":
+                        named.append((cx, cy, floor(tx, ty) + WALL * 0.6, "EXIT"))
             elif kind == "rock":
                 things.append(ridge(sim, tx, ty))
             elif kind == "building":
@@ -220,10 +240,58 @@ def draw(scope, sim, spec=None, t=0.0):
     for thing in things:
         scope.draw(cam, thing, bright=0.95, solid=solid)
     marks(scope, cam, sim, space, far, t)
+    for px, py, pz, word in named:                       # a name on a thing, where it is in sight
+        if not rooms or sim.seen(px, -py):
+            scope.label(cam, (px, py, pz), word, bright=1.2)
+    for thing in (sim.things() if hasattr(sim, "things") else ()):
+        lamp(scope, cam, thing)
     cx, cy = scope.W // 2, scope.H // 2                  # where it heads
     for dx, dy in ((-3, 0), (-2, 0), (2, 0), (3, 0), (0, -2), (0, 2)):
         scope.dot(cx + dx, cy + dy, 0.9)
     return look
+
+
+SHUT = ("wall", "door", "exit", "void")
+
+
+def walls(place, tx, ty, floor):
+    """The sides of a level's wall (a door, an exit) that face a floor: upright faces from that floor up,
+    with their edges. None when it faces none (rock all round it)."""
+    verts, edges, faces = [], [], []
+    x0, x1, y0, y1 = tx, tx + 1, -(ty + 1), -ty          # (north is +y here; the map's rows go south)
+    for nx, ny, a, b in ((0, -1, (x1, y1), (x0, y1)), (1, 0, (x1, y0), (x1, y1)),
+                         (0, 1, (x0, y0), (x1, y0)), (-1, 0, (x0, y1), (x0, y0))):
+        if place.kind(tx + nx, ty + ny) in SHUT:
+            continue
+        low = floor(tx + nx, ty + ny)
+        k = len(verts)
+        verts += [(a[0], a[1], low), (b[0], b[1], low), (b[0], b[1], low + WALL), (a[0], a[1], low + WALL)]
+        edges += [(k, k + 1), (k + 1, k + 2), (k + 2, k + 3), (k + 3, k)]
+        faces.append((k, k + 1, k + 2, k + 3))
+    return Wire(verts, edges, faces) if verts else None
+
+
+def crossed(sides):
+    """A door's sides, crossed from corner to corner: the lines."""
+    return [(sides.verts[f[0]], sides.verts[f[2]]) for f in sides.faces] + \
+           [(sides.verts[f[1]], sides.verts[f[3]]) for f in sides.faces]
+
+
+def lamp(scope, cam, thing):
+    """A thing in a place - somebody, something to take: a diamond where it is, and a letter or a word."""
+    x, y, z = thing["x"], -thing["y"], thing.get("z", 0.4)
+    r, light = thing.get("size", 0.2), thing.get("bright", 1.2)
+    side = cam.see((x, y, z))
+    if side[2] <= 0.1:
+        return
+    rx, ry = cam.right[0] * r, cam.right[1] * r          # facing the eye
+    pts = [(x - rx, y - ry, z), (x, y, z + r * 1.6), (x + rx, y + ry, z), (x, y, z - r * 1.6)]
+    for i in range(4):
+        scope.line(cam, pts[i], pts[(i + 1) % 4], light)
+    if thing.get("legs"):
+        scope.line(cam, pts[3], (x, y, thing.get("ground", 0.0)), light * 0.6)
+    if thing.get("label"):
+        scope.label(cam, (x, y, z + r * 1.6), str(thing["label"]), bright=light, dx=1, dy=-1)
 
 
 def marks(scope, cam, sim, space=False, far=FAR, t=0.0):
@@ -267,9 +335,11 @@ def marks(scope, cam, sim, space=False, far=FAR, t=0.0):
                 scope.text(scope.cols - 3 - len(str(nxt)), row, "%d >" % nxt, bright=1.2)
 
 
-def field(scope, t=0.0, speed=2.6, count=26, reach=34.0, seed=3):
+def field(scope, t=0.0, speed=2.6, count=26, reach=34.0, seed=3, beat=0.0):
     """A flight through rocks that never ends: the same rocks come round again every ``reach`` of the
-    way. Returns the words for it."""
+    way. ``beat``: how strongly the music hits now (0-1): the rocks swell and flare with it. Returns
+    the words for it."""
+    beat = max(0.0, min(1.0, float(beat or 0.0)))
     way = t * speed
     sway = 0.5 * math.sin(t * 0.31)
     cam = Camera((sway, way, 0.25 * math.sin(t * 0.23)), (sway * 0.6 + 0.8 * math.sin(t * 0.17), way + 6.0, 0.0), fov=74.0,
@@ -282,14 +352,194 @@ def field(scope, t=0.0, speed=2.6, count=26, reach=34.0, seed=3):
         along = chance(seed, i, 1) * reach
         y = (lap + (1 if along < way - lap * reach - 1.0 else 0)) * reach + along
         a, r = 2 * math.pi * chance(seed, i, 2), 0.9 + 5.0 * chance(seed, i, 3)
-        size = 0.5 + 2.2 * chance(seed, i, 4) ** 2
+        size = (0.5 + 2.2 * chance(seed, i, 4) ** 2) * (1.0 + 0.35 * beat)
         rate = 6 + 40 * chance(seed, i, 5)
         things.append(lump(i % 23).placed((r * math.cos(a), y, r * math.sin(a) * 0.6), yaw=t * rate + 360 * chance(seed, i, 6),
                                           pitch=t * rate * 0.7, scale=size))
+    for thing in things:
+        thing.bright = 1.0 + 0.8 * beat
     scope.render(cam, things, solid=True)
     scope.text(1, 0, "ASTEROIDS")
     scope.text(1, 1, "WAY %6.1f" % way, bright=0.6)
     return "A field of rocks, flown through"
+
+
+def heights_of(place):
+    """A place's map as rows of heights (the first row the northmost): a simulator's by what stands on
+    each tile, a level's by its floors and walls."""
+    floor = getattr(place, "floor", None)
+    out = []
+    for ty in range(place.H):
+        row = []
+        for tx in range(place.W):
+            kind = place.kind(tx, ty)
+            if floor is not None:                        # a level
+                row.append(-0.4 if kind == "void" else (WALL + 0.0 if kind in SHUT else floor(tx, ty)))
+            else:
+                row.append(_height(kind) if kind != "water" else -0.5)
+        out.append(row)
+    return out
+
+
+def planet_heights(planet, turn=0.0, across=40, down=20):
+    """The half of a planet that faces us as rows of heights, from its legend's ``height``s (the first
+    row the northmost). None when its legend gives no heights."""
+    if not any(planet.high.values()):
+        return None
+    return [[planet.height(80.0 - 160.0 * j / (down - 1), turn - 80.0 + 160.0 * i / (across - 1))
+             for i in range(across)] for j in range(down)]
+
+
+def _sampled(heights, nx, ny):
+    """A grid of heights as ``ny`` rows of ``nx``, smoothly between what it has; the first row the
+    nearest (the map's last: seen from the south)."""
+    H, W = len(heights), len(heights[0])
+    out = []
+    for j in range(ny):
+        v = (1.0 - j / float(ny - 1)) * (H - 1)
+        j0 = min(H - 2, int(v)) if H > 1 else 0
+        fv = v - j0
+        row = []
+        for i in range(nx):
+            u = i / float(nx - 1) * (W - 1)
+            i0 = min(W - 2, int(u)) if W > 1 else 0
+            fu = u - i0
+            a, b = heights[j0][i0], heights[j0][min(W - 1, i0 + 1)]
+            c, d = heights[min(H - 1, j0 + 1)][i0], heights[min(H - 1, j0 + 1)][min(W - 1, i0 + 1)]
+            row.append((a * (1 - fu) + b * fu) * (1 - fv) + (c * (1 - fu) + d * fu) * fv)
+        out.append(row)
+    return out
+
+
+def scan(scope, heights, t=0.0, title="SURFACE SCAN", unit="", beat=0.0, at=None, profiles=22, across=44):
+    """A surface scan of real ground: its heights as profiles one behind another, each hiding what lies
+    behind it, and a bright sweep that goes over them. ``heights``: rows of numbers, the first row the
+    northmost. ``at``: a place on it to mark (column, row, of the heights' own). ``beat``: how strongly
+    the music hits now (0-1): the relief swells with it. Returns the profile the sweep is on, and its
+    highest point."""
+    H, W = len(heights), len(heights[0])
+    across, profiles = min(across, max(8, scope.W // 4)), min(profiles, max(6, scope.H // 5))   # no finer than shows
+    nx, ny = max(8, min(across, max(W * 2, 8))), max(6, min(profiles, max(H * 2, 6)))
+    hs = _sampled(heights, nx, ny)
+    low = min(min(r) for r in hs)
+    span = max(max(r) for r in hs) - low
+    gain = (1.5 / span if span > 1e-9 else 0.0) * (1.0 + 0.5 * max(0.0, min(1.0, beat)))
+    hs = [[(h - low) * gain for h in r] for r in hs]
+    sx, sy = 14.0 / (nx - 1), 13.0 / (ny - 1)
+    ground = vector.terrain(hs, (sx, sy), lines="rows")
+    cam = Camera(eye=(0.0, -17.5, 8.0), look=(0, 0.4, -0.9), fov=40)
+    scope.cue = (13.0, 28.0)
+    scope.render(cam, [ground], solid=True)
+    row = int(t * 6) % ny                                # the sweep: one profile, bright
+    y = -(ny - 1) * sy / 2.0 + row * sy
+    x0 = -(nx - 1) * sx / 2.0
+    for i in range(nx - 1):
+        scope.line(cam, (x0 + i * sx, y, hs[row][i] + 0.03), (x0 + (i + 1) * sx, y, hs[row][i + 1] + 0.03), 1.6, "white")
+    if at is not None:                                   # where we are on it: a post, and a lamp that blinks
+        u, v = at[0] / float(max(1, W - 1)), 1.0 - at[1] / float(max(1, H - 1))
+        i, j = min(nx - 1, max(0, int(round(u * (nx - 1))))), min(ny - 1, max(0, int(round(v * (ny - 1)))))
+        px, py, pz = x0 + u * (nx - 1) * sx, -(ny - 1) * sy / 2.0 + v * (ny - 1) * sy, hs[j][i]
+        was, scope.depth = scope.depth, None             # it shows whatever stands before it
+        scope.line(cam, (px, py, pz), (px, py, pz + 1.1), 1.4, "white")
+        if int(t * 3) % 2 == 0:
+            for dx, dy in ((-0.2, 0), (0.2, 0), (0, 0)):
+                scope.line(cam, (px + dx, py + dy, pz + 1.1), (px, py, pz + 1.45), 1.6, "white")
+        scope.depth = was
+    if title:
+        scope.text(1, 0, title[:scope.cols - 2].upper(), bright=1.0)
+    relief = max(heights[min(H - 1, int(round((1.0 - row / float(ny - 1)) * (H - 1))))])
+    words = ("PROFILE %02d/%02d  RELIEF %+0.2f %s" % (row + 1, ny, relief, unit)).rstrip()
+    if len(words) > scope.cols - 2:                      # a small display: the numbers alone
+        words = ("%02d/%02d  %+0.2f %s" % (row + 1, ny, relief, unit)).rstrip()
+    scope.text(1, scope.rows_n - 1, words, bright=0.6)
+    return row, relief
+
+
+class LevelPlace:
+    """A level (engine/level.py) as a place to look ahead in: its cells as walls, doors and floors at
+    their heights, the player as the eye, and who and what is in sight as things."""
+    rooms, edge = True, 0
+    order, checks, passed = (), {}, 0
+
+    def __init__(self, lv, fx=None):
+        p = lv.player
+        self.lv = lv
+        at = getattr(fx, "cam", None)
+        self.px, self.py = p.x, p.y
+        self.x, self.y = (at[0] + 0.5, at[1] + 0.5) if at else (p.x + 0.5, p.y + 0.5)
+        yaw = getattr(fx, "yaw", None)
+        self.degrees = math.degrees(yaw) if yaw is not None else p.facing * 90.0
+        self.tilt = 12.0 * float(getattr(p, "look", 0) or 0)
+        self.W, self.H = lv.w, lv.h
+        self.z = self.floor(p.x, p.y)
+        self.moved = getattr(fx, "pos", None) or {}
+
+    def kind(self, tx, ty):
+        if not (0 <= tx < self.W and 0 <= ty < self.H):
+            return "void"
+        c = self.lv.cell(tx, ty)
+        if c.kind == "door":
+            return "door" if c.open < 1.0 else "ground"
+        if c.kind == "exit":
+            return "exit"
+        return "wall" if c.solid else "ground"
+
+    def floor(self, tx, ty):
+        if not (0 <= tx < self.W and 0 <= ty < self.H):
+            return 0.0
+        return float(getattr(self.lv.cell(tx, ty), "height", 0.0) or 0.0)
+
+    def seen(self, x, y):
+        """Whether the player sees the middle of the cell there."""
+        try:
+            return bool(self.lv.line_of_sight(self.px, self.py, int(math.floor(x)), int(math.floor(y))))
+        except Exception:
+            return True
+
+    def things(self):
+        """Who is alive and in sight (a lamp on legs, with their first letter), and what there is to take."""
+        out = []
+        for m in getattr(self.lv, "monsters", ()) or ():
+            if getattr(m, "dead", False):
+                continue
+            x, y = self.moved.get(getattr(m, "id", None), (m.x, m.y))
+            if self.seen(x + 0.5, y + 0.5):
+                ground = self.floor(int(x), int(y))
+                out.append({"x": x + 0.5, "y": y + 0.5, "z": ground + 0.5, "ground": ground, "legs": True, "size": 0.22,
+                            "label": str(getattr(m, "kind", "?"))[:1].upper(), "bright": 1.5})
+        for it in getattr(self.lv, "items", ()) or ():
+            if getattr(it, "taken", False) or not self.seen(it.x + 0.5, it.y + 0.5):
+                continue
+            out.append({"x": it.x + 0.5, "y": it.y + 0.5, "z": self.floor(it.x, it.y) + 0.18, "size": 0.1, "bright": 0.9})
+        return out
+
+
+class LevelView:
+    """A level's picture in lines, where its first-person view goes (``"view": "lines"``, ``"scan"``):
+    ``lines`` is what is ahead - walls, doors, floors, who is in sight; ``scan`` the whole level as a
+    surface scan, the player marked on it."""
+
+    def __init__(self, W, VR, style="lines", colour="green"):
+        self.W, self.VR = W, VR
+        self.style = style if style in LEVEL_VIEWS else "lines"
+        self.scope = vector.Scope(W, VR, colour=colour)
+        self.scope.captions = True
+
+    def meshed(self, lv):
+        return False                                     # (a turn slides the picture across)
+
+    def rolled(self, lv, degrees, phase=0):
+        return None
+
+    def render(self, lv, fx=None, phase=0):
+        place = LevelPlace(lv, fx)
+        scope = self.scope
+        scope.clear()
+        if self.style == "scan":
+            scan(scope, heights_of(place), phase / 20.0, "SCAN  %s" % getattr(lv, "name", ""), at=(place.x - 0.5, place.y - 0.5))
+        else:
+            draw(scope, place, {"far": 11, "fov": 84}, phase / 20.0)
+        return scope.rows("dots", True)
 
 
 def rows(sim, cols, lines, spec=None, colour="green", t=0.0, unicode=True, scope=None):

@@ -248,6 +248,8 @@ class Planet:
         self.name = str(spec.get("name") or name)
         self.field = [str(r) for r in spec.get("field") or ["."]]
         self.legend = {}
+        self.high = {ch: float(v.get("height", 0.0)) if isinstance(v, dict) and isinstance(v.get("height"), (int, float))
+                     else 0.0 for ch, v in (spec.get("legend") or {}).items()}     # for a surface scan (engine/ahead.py)
         for ch, v in (spec.get("legend") or {}).items():
             v = v if isinstance(v, dict) else {"colour": v}
             self.legend[ch] = (str(v.get("name") or ch), vector.colour_of(_rgb(v.get("colour")), (120, 120, 120)),
@@ -264,6 +266,12 @@ class Planet:
         row = rows[max(0, min(len(rows) - 1, int((90.0 - lat) / 180.0 * len(rows))))] or "."
         ch = row[int((lon % 360.0) / 360.0 * len(row)) % len(row)]
         return self.legend.get(ch, (ch, (120, 120, 120), 0.5))
+
+    def height(self, lat, lon):
+        """How high the ground stands there, by its legend's ``height`` (0 when it gives none)."""
+        rows = self.field
+        row = rows[max(0, min(len(rows) - 1, int((90.0 - lat) / 180.0 * len(rows))))] or "."
+        return self.high.get(row[int((lon % 360.0) / 360.0 * len(row)) % len(row)], 0.0)
 
 
 def _rgb(c):

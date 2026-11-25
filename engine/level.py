@@ -125,6 +125,7 @@ SWIPE_GAP = 0.3              # seconds: a swipe sends a run of wheel steps; one 
 DUELLED = re.compile(r" =((?:won|lost|fled)(?::\d+)?)$")   # a duel's outcome on the line that started it
 META = re.compile(r"(?:save|load|saves)(?:\s+[\w-]+)?|\*[\w-]*|realtime(?:\s+(?:off|on|\d+(?:\.\d+)?))?")
 
+LINE_VIEWS = ("lines", "scan")        # a level's views in lines (engine/ahead.py): what is ahead; a surface scan
 DETAILS = ("auto", "high", "low")     # a level's picture: "low" draws the floor and ceiling at half width
 
 STATE_MARK = {"aim": "!", "windup": "!", "charge": "»", "spin": "!!"}
@@ -5057,8 +5058,14 @@ class FrameConsole:
 
     def view_for(self, lv, style=None):
         """The view to draw with: the game's style, or another for a moment (a teleport), or the goggles' dots."""
-        style = style or ("dots" if lv.player.nightvision else None)
-        if not style or style == self.style:
+        style = style or ((lv.spec.get("goggles") or "dots") if lv.player.nightvision else None)
+        style = style or (lv.spec.get("view") if lv.spec.get("view") in LINE_VIEWS else None) or self.style
+        if style in LINE_VIEWS:                          # in lines: what is ahead, or a scan (engine/ahead.py)
+            if style not in self.views:
+                from .ahead import LevelView
+                self.views[style] = LevelView(self.size[0], self.size[1], style, lv.spec.get("lines_colour") or "green")
+            return self.views[style]
+        if style == self.style:
             return self.view
         if style not in self.views:
             self.views[style] = View(self.size[0], self.size[1], style, self.detail, self.render, self.render_game)
@@ -5290,6 +5297,8 @@ class FrameConsole:
     def rolled(self, lv, angles):
         """The mesh view at each of ``angles`` (degrees) turned about its middle (View.rolled); None in the
         classic view, whose picture is turned as it is."""
+        if self.view_for(lv).__class__.__name__ == "LevelView":
+            return None                                  # in lines: the picture is turned as it is
         view = self.view_for(lv, "pixel")
         if not view.meshed(lv) or getattr(lv, "land", None) is not None:
             return None

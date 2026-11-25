@@ -1324,8 +1324,17 @@ class Runner:
         parts = {"map": lambda w, h: map_cells(sim, w, h, color=bool(depth), unicode=unicode, arrows=arrows)}
         if sim.mode == "vehicle":
             parts["ahead"] = self.ahead
+            parts["scan"] = self.scan
         return self.view.rows(W, H, sim.env(), sim.ticks / float(sim.rate), parts, unicode, level, sheet,
                               functions=sim.shown_functions())
+
+    def scan(self):
+        """The map for a surface scan (a panel's ``scan``): its heights, where the vehicle is, a title."""
+        from . import ahead
+        grid = self.__dict__.get("_heights")
+        if grid is None:
+            grid = self.__dict__["_heights"] = ahead.heights_of(self.sim)
+        return grid, (self.sim.x - 0.5, self.sim.y - 0.5), ""
 
     def ahead(self, w, h, spec, ink, t, unicode, key):
         """What is ahead of the vehicle (a panel's ``ahead``): rows of cells. A display is kept for each

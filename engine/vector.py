@@ -691,7 +691,8 @@ def scene(name, t, scope, sheet=None):
     cols, rows = scope.cols, scope.rows_n
     if name == "asteroids":                              # a flight through rocks (engine/ahead.py)
         from . import ahead
-        return ahead.field(scope, t)
+        # with a cue sheet (the reel's own track, a game's music) the rocks flare with its low hits
+        return ahead.field(scope, t, beat=sheet.level("hit.low", t) if sheet is not None else 0.0)
     if name == "signals":
         sheet = sheet or reel_sheet()
         scope.cue = None
@@ -817,7 +818,7 @@ def reel(term=None, seconds=8.0, style=None, colours=("green", "amber", "cyan", 
                 scope.clear()
                 if name == "signals" and audio is not None and audio.clock() is not None:
                     t = audio.clock()                    # the sound's own time, not the picture's
-                caption[0] = scene(name, t, scope)
+                caption[0] = scene(name, t, scope, reel_sheet() if name == "asteroids" else None)
                 screen.frame(scope.rows(style, term.unicode), status=" " + caption[0])
             screen.play([i / 15.0 for i in range(int(seconds * 15))], draw, 1 / 15.0)
             if screen.skip:

@@ -23,7 +23,8 @@ lines), ``control`` (a gauge with the keys that move it), ``compass``, ``lamps``
 ``if`` holds), ``text`` (with ``{name}`` and ``{name:.1f}`` in it; ``"align": "center"``), ``plot`` (lines over time, in dots),
 ``scope`` (a vector display: one of the reel's scenes, or a 3D model of the game's turning in lines,
 drawn as far as ``reveal`` says and solid when it is whole), ``map`` (what the host draws there),
-``ahead`` (the view forward from the host's vehicle over its map, in lines: engine/ahead.py),
+``ahead`` (the view forward from the host's vehicle over its map, in lines: engine/ahead.py), ``scan``
+(a surface scan of real ground - the host's map, or a planet by its legend's heights),
 ``functions`` (what the console does when asked: each with its key and its state - ready, locked, held
 so far, on for so long), ``rule`` and ``space``. A panel's ``colour`` is its phosphor (green, amber, cyan, white, red, blue,
 violet); its ``border`` one of the menus' frames (engine/menu.py); ``pulse`` names a cue the frame
@@ -42,8 +43,8 @@ from . import vector
 from .menu import BORDERS, border as border_of, wrap
 
 WIDGETS = ("gauge", "center", "number", "control", "compass", "lamps", "text", "plot", "scope", "planet", "map",
-           "ahead", "functions", "rule", "space")
-FLEX = ("scope", "planet", "map", "ahead")                        # these take what room is left
+           "ahead", "scan", "functions", "rule", "space")
+FLEX = ("scope", "planet", "map", "ahead", "scan")                        # these take what room is left
 TONES = {"good": (110, 240, 130), "warn": (255, 176, 40), "hot": (255, 84, 64), "off": None}
 BITS = ((1, 8), (2, 16), (4, 32), (64, 128))             # braille: the dot at (row, column) of a character
 KEEP = 600                                               # values kept of what is plotted
@@ -163,6 +164,7 @@ class View:
         ``functions``: what the host does when asked, as it is now - a list of ``{"id", "label", "key",
         "state", "word", "charge", "left", "wait", "tone", "flash"}`` (a simulator's ``shown_functions()``)."""
         self.functions = list(functions or [])
+        self.level = level
         for n in self.plotted:
             h = self.history.setdefault(n, [])
             h.append(float(env.get(n, 0.0)))
@@ -234,7 +236,7 @@ class View:
             yy += rows
 
     def _tall(self, wd, w, env):
-        if "scope" in wd or "map" in wd or "planet" in wd or "ahead" in wd:
+        if "scope" in wd or "map" in wd or "planet" in wd or "ahead" in wd or "scan" in wd:
             return int(wd["rows"]) if wd.get("rows") else None
         if "plot" in wd:
             return max(2, int(wd.get("rows", 4)))
@@ -367,6 +369,35 @@ class View:
                 cv.paste(x, y, fn(w, h))
             else:
                 cv.put(x, y, "NO MAP", dim)
+        elif kind == "scan":                             # a surface scan of real ground: the host's map, or a planet
+            from . import ahead, vector
+            spec = wd["scan"] if isinstance(wd["scan"], dict) else {}
+            key = (owner, id(wd), w, h)
+            scope = self.scopes.get(key)
+            if scope is None:
+                scope = self.scopes[key] = vector.Scope(w, h, colour=spec.get("colour") or ink)
+            scope.captions = True
+            scope.clear()
+            beat = float(self.level(spec["pulse"])) if spec.get("pulse") and self.level else 0.0
+            world = None
+            if isinstance(self.planets.get(spec.get("planet")), dict):
+                from . import viewer
+                made = self.__dict__.setdefault("_worlds", {})
+                world = made.get(spec["planet"]) or made.setdefault(spec["planet"],
+                                                                    viewer.Planet(self.planets[spec["planet"]], spec["planet"]))
+            if world is not None:
+                turn = spec.get("turn")                  # how far round it has turned: a number, a value's name
+                turn = value(turn) if isinstance(turn, str) else (turn if isinstance(turn, (int, float)) else world.spin * t)
+                grid = ahead.planet_heights(world, turn)
+                title, at = spec.get("title") or "", None
+            else:
+                grid, at, title = parts["scan"]() if "scan" in parts else (None, None, "")
+                title = spec.get("title") or title
+            if grid:
+                ahead.scan(scope, grid, t, title, str(spec.get("unit") or ""), beat, at)
+            else:
+                scope.text(1, 0, "NOTHING TO SCAN")
+            cv.paste(x, y, scope.rows("dots" if uni else "strokes", uni))
         elif kind == "ahead":                            # what is ahead of the host's vehicle, in lines
             fn = parts.get("ahead")
             if fn is not None:
@@ -659,6 +690,20 @@ def problems(spec, names=None, where="panels", formula=None, models=None, planet
                         out.append("%s: a site needs \"lat\" and \"lon\" (and a \"name\")" % wat)
                     else:
                         cond_ok("%s site '%s'" % (wat, st.get("name", "")), st.get("if"))
+            elif kind == "scan":
+                spec = wd["scan"]
+                if spec is not True and not isinstance(spec, dict):
+                    out.append("%s: \"scan\" should be true (the map here), or a map (planet, title, unit, pulse)" % wat)
+                elif isinstance(spec, dict) and spec.get("planet") is not None:
+                    world = (planets or {}).get(spec["planet"])
+                    if planets is not None and world is None:
+                        out.append("%s: there is no planet called '%s'" % (wat, spec["planet"]))
+                    elif isinstance(world, dict) and not any(isinstance(v, dict) and v.get("height")
+                                                             for v in (world.get("legend") or {}).values()):
+                        out.append("%s: planet '%s' has no heights to scan (give its legend's grounds a \"height\")"
+                                   % (wat, spec["planet"]))
+                elif ahead is False:
+                    out.append("%s: there is no map here to scan (a simulator with a map has one; or name a planet)" % wat)
             elif kind == "ahead":
                 from . import ahead as forward
                 out.extend(forward.problems(wd["ahead"], wat))

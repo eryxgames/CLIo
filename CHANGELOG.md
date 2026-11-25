@@ -164,6 +164,17 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   Every rock is twenty sides, no two alike, and the same every time.
 - The station starter's helm has the view ahead over a bigger map (34 by 12) with a pad of
   four tiles: the autopilot would not always come down on a pad of one.
+- **Levels in lines**: `"view": "lines"` (a game's, one level's, or `--view lines`) draws a
+  first-person level by the view ahead - walls by the sides that face a floor, doors crossed,
+  floors as a net at their heights, the way out named, who is in sight as a lamp with a
+  letter. `"view": "scan"` draws the whole level as a surface scan with the player marked. A
+  level's `"goggles": "lines"` puts the lines in its night-vision goggles.
+- **Scans of real ground**: a panel's `{"scan": true}` is the simulator's own map as profiles
+  with a sweep and the vehicle marked; `{"scan": {"planet": ID}}` the facing half of a planet,
+  by a new `"height"` in its legend. `"pulse"` swells the relief with a cue of the music, and
+  the asteroids flare with the low hits of the track that is playing.
+- The station starter: the helm's third panel is the relief of its own map, and the scan
+  console shows the relief of the moon below.
 - In the terminal look, a thing that is locked says `LOCKED` whatever its `state` (it kept
   saying `READY`).
 - The station starter's consoles do things: the reactor vents steam and scrams (hold `X`); the

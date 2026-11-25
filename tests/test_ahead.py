@@ -163,6 +163,167 @@ class ViewTests(unittest.TestCase):
         self.assertEqual(V.scene("asteroids", 1.0, scope), "A field of rocks, flown through")
 
 
+class ScanTests(unittest.TestCase):
+    HILL = [[0, 0, 0, 0, 0, 0], [0, 1, 2, 2, 1, 0], [0, 2, 5, 5, 2, 0], [0, 1, 2, 2, 1, 0], [0, 0, 0, 0, 0, 0]]
+
+    def scan(self, heights, t=0.0, cols=80, lines=24, **more):
+        scope = V.Scope(cols, lines, colour="green")
+        scope.clear()
+        got = A.scan(scope, heights, t, **more)
+        return scope.rows(), got
+
+    def test_real_ground_as_profiles(self):
+        rows, (row, relief) = self.scan(self.HILL, 0.0, title="Scan  the hill", unit="KM")
+        t = text(rows)
+        self.assertEqual((t[0].strip(), t[-1].strip()), ("SCAN  THE HILL", "PROFILE 01/10  RELIEF +0.00 KM"))
+        self.assertGreater(lit(rows), 300)
+        flat, _ = self.scan([[0] * 6] * 5)
+        self.assertNotEqual(rows, flat)
+        later, (row, relief) = self.scan(self.HILL, 0.9, unit="KM")          # the sweep has gone on, to the hill
+        self.assertEqual((row, relief), (5, 5))
+        self.assertNotEqual(later, rows)
+        white = lambda rr: sum(1 for r in rr for c in r if c[1] and min(c[1]) > 200 and c[0] != " ")   # noqa: E731
+        self.assertGreater(white(self.scan(self.HILL, 0.0, at=(2, 2))[0]), white(rows) + 5)     # where we are, marked
+        loud, _ = self.scan(self.HILL, 0.0, beat=1.0)                        # the music hits: the relief swells
+        self.assertNotEqual(loud, rows)
+        small, _ = self.scan(self.HILL, 0.0, cols=24, lines=10, unit="KM")   # a small display: fewer profiles, short words
+        self.assertEqual(text(small)[-1].strip(), "01/08  +0.00 KM")
+
+    def test_a_simulators_map_and_a_planet(self):
+        s = sim()
+        grid = A.heights_of(s)
+        self.assertEqual((len(grid), len(grid[0])), (7, 14))
+        self.assertEqual((grid[0][0], grid[1][1], grid[2][10], grid[3][10], grid[5][5]), (3.0, 0.0, 2.0, 1.0, -0.5))
+        from engine.viewer import Planet
+        moon = Planet(GameData(STATION).planets["moon"], "moon")
+        high = A.planet_heights(moon, 0.0)
+        self.assertEqual((len(high), len(high[0])), (20, 40))
+        self.assertGreater(max(max(max(r) for r in A.planet_heights(moon, turn)) for turn in (0, 90, 180, 270)), 2.0)
+        self.assertNotEqual(A.planet_heights(moon, 90.0), high)              # turned: other ground
+        self.assertIsNone(A.planet_heights(Planet({"legend": {".": {"colour": "#888"}}, "field": ["."]}, "bare")))
+
+    def test_in_panels(self):
+        layout = {"cols": [{"title": "RELIEF", "widgets": [{"scan": True}]},
+                           {"title": "MOON", "widgets": [{"scan": {"planet": "moon", "unit": "KM", "pulse": "hit.low"}}]}]}
+        data = GameData(STATION)
+        s = sim(panels=layout)
+        s.data = data
+        runner = S.Runner(s)
+        rows = runner.panel_rows(100, 20, 3, True, None)
+        t = text(rows)
+        self.assertIn("PROFILE 01/", t[18])
+        self.assertIn("KM", t[18][50:])
+        self.assertGreater(sum(1 for line in t[2:17] for ch in line[1:49] if 0x2800 < ord(ch) < 0x2900), 100)
+        self.assertGreater(sum(1 for line in t[2:17] for ch in line[51:99] if 0x2800 < ord(ch) < 0x2900), 100)
+        self.assertIn("NOTHING TO SCAN", "\n".join(P.View({"widgets": [{"scan": True}]}).plain(60, 12, {})))
+        bad = {"widgets": [{"scan": 3}, {"scan": {"planet": "mars"}}, {"scan": {"planet": "bare"}}, {"scan": True}]}
+        self.assertEqual(P.problems(bad, set(), "p", planets={"bare": {"legend": {".": {"colour": "#888"}}}}, ahead=False),
+                         ["p widget 1: \"scan\" should be true (the map here), or a map (planet, title, unit, pulse)",
+                          "p widget 2: there is no planet called 'mars'",
+                          "p widget 3: planet 'bare' has no heights to scan (give its legend's grounds a \"height\")",
+                          "p widget 4: there is no map here to scan (a simulator with a map has one; or name a planet)"])
+
+    def test_the_rocks_flare_with_the_music(self):
+        quiet, loud = V.Scope(60, 18), V.Scope(60, 18)
+        quiet.clear()
+        loud.clear()
+        A.field(quiet, 2.0)
+        A.field(loud, 2.0, beat=1.0)
+        self.assertGreater(lit(loud.rows()), lit(quiet.rows()))
+
+        class Sheet:
+            def level(self, action, t):
+                return 1.0 if action == "hit.low" else 0.0
+        with_music = V.Scope(60, 18)
+        with_music.clear()
+        V.scene("asteroids", 2.0, with_music, Sheet())
+        self.assertEqual(with_music.rows(), loud.rows())
+
+
+class LevelTests(unittest.TestCase):
+    ROOM = ["#########",
+            "#...#...#",
+            "#.z.+...#",
+            "#...#..E#",
+            "#.@.#####",
+            "#########"]
+
+    def level(self, **more):
+        from engine.level import Level
+        from test_levels import with_level
+        spec = dict({"map": self.ROOM, "facing": "n",
+                     "legend": {"z": {"monster": "zombie"}, "E": {"exit": True}}}, **more)
+        return Level(with_level(spec), "t", seed=1)
+
+    def test_a_level_is_a_place(self):
+        lv = self.level()
+        place = A.LevelPlace(lv)
+        self.assertEqual((place.x, place.y, place.degrees, place.W, place.H), (2.5, 4.5, 0.0, 9, 6))
+        self.assertEqual([place.kind(x, y) for x, y in ((0, 0), (1, 1), (4, 2), (7, 3), (-1, 0), (4, 1))],
+                         ["wall", "ground", "door", "exit", "void", "wall"])
+        lv.cell(4, 2).open = 1.0                                             # an open door is a way through
+        self.assertEqual(place.kind(4, 2), "ground")
+        lv.cell(4, 2).open = 0.0
+        who = [t for t in place.things() if t.get("label")]
+        self.assertEqual([(t["x"], t["y"], t["label"]) for t in who], [(2.5, 2.5, "Z")])
+        sides = A.walls(place, 4, 1, place.floor)                            # a wall between rooms: two sides face floors
+        self.assertEqual(len(sides.faces), 2)
+        self.assertIsNone(A.walls(place, 0, 0, place.floor))                 # the corner faces none
+        grid = A.heights_of(place)
+        self.assertEqual((grid[0][0], grid[1][1]), (A.WALL, 0.0))
+
+    def test_what_is_ahead_in_lines(self):
+        lv = self.level()
+        view = A.LevelView(80, 24, "lines")
+        rows = view.render(lv, None, 0)
+        self.assertEqual((len(rows), len(rows[0])), (24, 80))
+        t = text(rows)
+        self.assertEqual(sum(line.count("Z") for line in t), 1)              # who is ahead, by a letter
+        self.assertGreater(lit(rows), 200)
+        self.assertFalse(view.meshed(lv))
+        self.assertIsNone(view.rolled(lv, 30))
+        lv.player.facing = 2                                                 # the other way: a wall close by, nobody
+        back = view.render(lv, None, 0)
+        self.assertNotEqual(back, rows)
+        self.assertNotIn("Z", "".join(text(back)))
+        lv.player.facing = 1                                                 # east: a wall between: not seen through it
+        lv.player.x, lv.player.y = 2, 3
+        self.assertNotIn("EXIT", "".join(text(view.render(lv, None, 0))))
+        lv.player.x, lv.player.y, lv.player.facing = 5, 3, 1                 # in the other room: the way out, named
+        self.assertIn("EXIT", "".join(text(view.render(lv, None, 0))))
+        from engine.firstperson import FX
+        turning = view.render(lv, FX(yaw=0.8), 0)                            # between facings, as a turn is drawn
+        self.assertNotEqual(turning, view.render(lv, None, 0))
+
+    def test_the_level_as_a_scan_and_in_its_console(self):
+        from engine.level import FrameConsole, LINE_VIEWS
+        from engine.term import Term
+        import io
+        lv = self.level()
+        rows = A.LevelView(80, 24, "scan").render(lv, None, 0)
+        t = text(rows)
+        self.assertTrue(t[0].strip().startswith("SCAN"))
+        self.assertIn("PROFILE 01/12  RELIEF +1.00", t[-1])
+        self.assertEqual(LINE_VIEWS, A.LEVEL_VIEWS)
+        term = Term(out=io.StringIO(), inp=lambda p: "", width=100, height=34, color=3, unicode=True, animate=False, env={})
+        for style in ("lines", "scan"):
+            console = FrameConsole(term, style, keys=False)
+            console.layout()
+            view = console.view_for(lv)
+            self.assertEqual((view.__class__.__name__, view.style), ("LevelView", style))
+            self.assertIs(console.view_for(lv), view)                        # kept
+            self.assertEqual(len(console.snapshot(lv)), console.size[1])
+            self.assertIsNone(console.rolled(lv, [10, 20]))
+            self.assertEqual(console.view_for(lv, "dots").__class__.__name__, "View")   # another, for a moment
+        plain = FrameConsole(term, "pixel", keys=False)
+        plain.layout()
+        self.assertEqual(plain.view_for(lv).__class__.__name__, "View")
+        one = self.level(view="scan")                                        # one level's own view
+        self.assertEqual(plain.view_for(one).style, "scan")
+        goggles = self.level(goggles="lines")
+        self.assertEqual(plain.view_for(goggles).__class__.__name__, "View")
+
+
 class PanelTests(unittest.TestCase):
     LAYOUT = {"colour": "amber", "cols": [{"title": "AHEAD", "widgets": [{"ahead": {"far": 9}}]},
                                           {"title": "MAP", "size": 20, "widgets": [{"map": True}]}]}

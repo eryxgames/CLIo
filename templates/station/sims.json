@@ -127,14 +127,11 @@
          ]
         },
         {
-         "title": "APPROACH",
+         "title": "RELIEF",
          "colour": "green",
-         "pulse": "bar",
          "widgets": [
           {
-           "scope": {
-            "scene": "approach"
-           }
+           "scan": true
           }
          ]
         }
@@ -550,13 +547,14 @@
          ]
         },
         {
-         "title": "BELOW  heat",
-         "colour": "amber",
+         "title": "BELOW  relief",
          "widgets": [
           {
-           "planet": "moon",
-           "view": "heat",
-           "turn": "below"
+           "scan": {
+            "planet": "moon",
+            "unit": "KM",
+            "turn": "below"
+           }
           }
          ]
         },

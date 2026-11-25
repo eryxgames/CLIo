@@ -221,7 +221,7 @@ class SimTests(unittest.TestCase):
         self.assertIn("HEAT", small)
         helm = S.Runner(S.make(data, "helm"))
         text = "\n".join("".join(c[0] or "▀" for c in r) if isinstance(r, list) else strip_ansi(r) for r in helm.rows(100, 33, 3, True))
-        for part in ("─ SURFACE ─", "─ FLIGHT ─", "─ APPROACH ─", "TO THE MARK", "FUEL"):
+        for part in ("─ SURFACE ─", "─ FLIGHT ─", "─ RELIEF ─", "TO THE MARK", "FUEL"):
             self.assertIn(part, text)
         self.assertIn("│", text.splitlines()[16][:2])                       # the word in the middle lies over the panels
 

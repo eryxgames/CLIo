@@ -482,8 +482,9 @@ def main(argv=None):
     ap.add_argument("--test-display", action="store_true",
                     help="show a test page to check frames, symbols, colours and sprites on this terminal")
     ap.add_argument("--no-art", action="store_true", help="hide ASCII art and sprites")
-    ap.add_argument("--view", choices=("pixel", "dots", "dots-fill"),
-                    help="how first-person levels are drawn: pixel (half blocks), dots or dots-fill (braille)")
+    ap.add_argument("--view", choices=("pixel", "dots", "dots-fill", "lines", "scan"),
+                    help="how first-person levels are drawn: pixel (half blocks), dots or dots-fill (braille), "
+                         "lines (what is ahead, in lines) or scan (the level as a surface scan)")
     ap.add_argument("--render", choices=("classic", "mesh"),
                     help="first-person rooms: classic (each cell 0.64 the size of the one before) or mesh (a true "
                          "perspective, floors at their own heights, as open land is drawn)")

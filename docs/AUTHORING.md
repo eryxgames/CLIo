@@ -2999,6 +2999,7 @@ that show the sim's values by name:
 | `{"scope": ...}` | A vector display (things in three dimensions, drawn in lines): a scene by name (`hauler`, `approach`, `orbit`, `scan`, `signals`), or `{"model": ID}` - one of the game's 3D models turning in lines (`turn` degrees a second, `fov`, `far`, `height`); with `"reveal": NAME` only as much of it is drawn, from the ground up, as the value is of `whole`, and when it is whole it is drawn solid. |
 | `{"planet": ID}` | One of the game's planets (below), in a `view`. |
 | `{"ahead": true}` | The view forward from the vehicle over the sim's own map, in lines (below). |
+| `{"scan": true}` | A surface scan of real ground (below): the sim's own map, or `{"scan": {"planet": ID}}`. |
 | `{"functions": true}` | The sim's functions (above), a line each: `[X] SCRAM ...... READY` - its key, its name and its state: READY (a switch: OFF), LOCKED, a bar that fills while its key is held, ON with the seconds left, WAIT with the seconds to go, SPENT. A list of names shows those, in that order; `"keys": false` leaves the keys out. |
 | `{"map": true}` | The sim's map (a vehicle's). |
 | `{"rule": true}`, `{"space": 1}` | A line; empty rows. |
@@ -3031,7 +3032,23 @@ says which way to turn. Nearer things hide what is behind them.
 | `solid` | `false`: everything shows through everything (quicker). |
 | `stars`, `afterglow` | `false`: no stars. How much of a frame's light is left in the next (0: none). |
 
-The rocks alone, flown through without end, are the vector scene `asteroids`: `{"scope":
+**Scans.** `{"scan": true}` draws the sim's own map as a surface scan: its heights as profiles
+one behind another, each hiding what lies behind it, a bright sweep going over them, and the
+vehicle marked where it is. `{"scan": {"planet": "moon", "unit": "KM", "turn": "below"}}` scans
+the half of a planet that faces us, by the `"height"` its legend gives each kind of ground
+(`"m": {"name": "mountains", "colour": "#8a7f78", "heat": 0.45, "height": 2.4}`); `turn` is how
+far round it has turned (a number, or the name of a value; none: by its spin). `"pulse":
+"hit.low"` makes the relief swell with a cue of the music; `title` and `colour` are its own.
+
+**Levels in lines.** A first-person level can be drawn by the same lines: `"view": "lines"` in
+`game.json` (or `--view lines`, or on one level) shows what is ahead - the sides of walls that
+face a floor, doors crossed, floors as a net at their heights, the way out by name, and who is
+alive and in sight as a lamp on legs with their first letter. `"view": "scan"` shows the whole
+level as a surface scan with the player marked on it. A level's `"goggles": "lines"` makes its
+night-vision goggles show the lines instead of dots. The level plays as it does in any view.
+
+The rocks alone, flown through without end, are the vector scene `asteroids` (with music
+playing, they flare with its low hits): `{"scope":
 {"scene": "asteroids"}}` in any panel. `python -m engine.ahead GAME SIM [--space]` shows a sim's
 view as its autopilot flies it; `python -m engine.ahead` the field of rocks.
 

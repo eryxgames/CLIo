@@ -1276,18 +1276,39 @@ def function_line(f, width, unicode=True):
     return (head[:room].ljust(room) + " " + word, role)
 
 
-def help_line(sim):
+def help_line(sim, menu=False):
+    """The keys in a line. ``menu``: Esc and P open the game's menu here (else they pause)."""
     does = "".join("  %s%s %s" % ("hold " if f.hold else "", key_name(f.key), f.label.lower())
                    for f in sim.functions if f.key)
+    stop = "   Esc menu" if menu else "   P pause"
     if sim.mode == "systems":
         keys = ", ".join("%s %s/%s" % (c.get("label", k), *(list(c.get("keys", [])) + ["", ""])[:2])
                          for k, c in sim.controls.items())
-        return keys + does + "   P pause"
+        return keys + does + stop
     if sim.model == "hover":
-        return "↑↓ thrust  ←→ turn  W/S climb, descend" + does + "   P pause"
+        return "↑↓ thrust  ←→ turn  W/S climb, descend" + does + stop
     if sim.model == "plane":
-        return "↑↓ throttle  ←→ turn  W/S climb, dive  Space brakes" + does + "   P pause"
-    return "↑ go  ↓ brake  ←→ steer  Space handbrake" + does + "   P pause"
+        return "↑↓ throttle  ←→ turn  W/S climb, dive  Space brakes" + does + stop
+    return "↑ go  ↓ brake  ←→ steer  Space handbrake" + does + stop
+
+
+def help_lines(sim, taps=False):
+    """The keys a line each, ``(keys, what they do)``, for the menu's page of them."""
+    out = []
+    if sim.mode == "systems":
+        for k, c in sim.controls.items():
+            pair = (list(c.get("keys", [])) + ["", ""])[:2]
+            out.append(("%s / %s" % (key_name(pair[0]), key_name(pair[1])), "%s: more, less" % c.get("label", k)))
+    else:
+        out += {"hover": [("Up / Dn", "Thrust"), ("Lt / Rt", "Turn"), ("W / S", "Climb, descend")],
+                "plane": [("Up / Dn", "Throttle"), ("Lt / Rt", "Turn"), ("W / S", "Climb, dive"), ("Spc", "Brakes")]}.get(
+                    sim.model, [("Up", "Go"), ("Dn", "Brake"), ("Lt / Rt", "Steer"), ("Spc", "Handbrake")])
+    for f in sim.functions:
+        if f.key:
+            out.append((key_name(f.key), f.label + (" (hold it)" if f.hold else "")))
+    if taps:
+        out.append(("tap", "A line that names a key is that key"))
+    return out
 
 
 class Runner:
@@ -1354,6 +1375,18 @@ class Runner:
     def over(self):
         return self.sim.over
 
+    def pause_key(self, name):
+        """Whether this key, pressed now, stops the sim for the game's menu (the loop asks)."""
+        sim = self.sim
+        return self.__dict__.get("menu_on", False) and name in ("p", "esc") and not sim.paused and not sim.result
+
+    def backdrop(self):
+        """The picture as it stands, for what goes over it."""
+        scr = self.screen
+        W, H = scr.size()
+        unicode = scr.unicode and scr.glyphs.get("half") == "▀"
+        return self.rows(W, H, scr.paint.depth, unicode, scr.glyphs.get("heading") if unicode else None)
+
     def step(self, c):
         self.sim.step(c)
         if self.audio is not None:
@@ -1369,8 +1402,19 @@ class Runner:
         sim = self.sim
         paint = self.screen.paint if self.screen is not None else Painter(depth)
         mh = max(4, H - 3)
+        pointer = self.__dict__.get("pointer")
+        tag = "[MENU]" if pointer is not None and self.__dict__.get("menu_on") else ""
+        header = paint.text([(sim.name.ljust(W - len(tag))[:W - len(tag)], "title"), (tag, "dim")] if tag
+                            else [(sim.name, "title")], W)
+        hits = [(W - len(tag), 0, W, 1, "esc")] if tag else []
+        if pointer is not None:
+            pointer.hits = hits
+            if sim.paused == "ready" and not sim.result:     # not begun: a tap anywhere begins it
+                hits.append((0, 0, W, H, "enter"))
         if sim.panels and W >= 60 and mh >= 14:          # a screen of its own, where there is room for one
-            rows = [paint.text([(sim.name, "title")], W)] + self.panel_rows(W, mh, depth, unicode, arrows)
+            rows = [header] + self.panel_rows(W, mh, depth, unicode, arrows)
+            if not sim.paused and not sim.result:
+                hits += [(x0, y0 + 1, x1, y1 + 1, key) for x0, y0, x1, y1, key in self.view.hits]
             if sim.paused and not sim.result:            # not begun, or paused: the screen dark behind the words
                 rows[1:] = [[(ch, fg and (fg[0] * 2 // 5, fg[1] * 2 // 5, fg[2] * 2 // 5),
                               bg and (bg[0] * 2 // 5, bg[1] * 2 // 5, bg[2] * 2 // 5)) for ch, fg, bg in r]
@@ -1386,6 +1430,12 @@ class Runner:
         mw = W - pw - 1 if sim.mode == "vehicle" else 0
         cells = map_cells(sim, mw, mh, color=bool(depth), unicode=unicode, arrows=arrows) if mw > 0 else []
         lines = panel_lines(sim, pw - 1, unicode)[1:]          # (the name is on the line above)
+        if not sim.paused and not sim.result:                  # its functions are the last of them: a tap is the key
+            keyed = sim.shown_functions()
+            for i, f in enumerate(keyed):
+                r = len(lines) - len(keyed) + i
+                if f.get("key") and 0 <= r < mh:
+                    hits.append((mw + 1 if mw > 0 else 0, r + 1, W, r + 2, str(f["key"])))
         rows = []
         for r in range(mh):
             row = list(cells[r]) if cells else []
@@ -1396,7 +1446,6 @@ class Runner:
                 rows.append(row + [(ch, None, None) for ch in " " * 0] + text_cells(paint, text, role, pw, depth))
             else:
                 rows.append(paint.text([((" " + text).ljust(W)[:W], role)], W))
-        header = paint.text([(sim.name, "title")], W)
         rows = [header] + rows
         for i, (text, role) in enumerate(banner(sim)):
             r = 1 + mh // 2 - 1 + i
@@ -1414,7 +1463,7 @@ class Runner:
         rows = self.rows(W, H, scr.paint.depth, unicode, scr.glyphs.get("heading") if unicode else None)
         text, role, until = self.sim.note
         scr.frame(rows, status=text if text and self.sim.tick < until else "",
-                  footer=scr.paint.text([(help_line(self.sim), "dim")], W))
+                  footer=scr.paint.text([(help_line(self.sim, self.__dict__.get("menu_on", False)), "dim")], W))
 
 
 def text_cells(paint, text, role, width, depth):
@@ -1439,19 +1488,48 @@ def banner(sim):
     return []
 
 
-def play_frame(sim, term, audio=None, keys=None, clock=None):
+def play_frame(sim, term, audio=None, keys=None, clock=None, game=None, touch=None):
+    """Play a sim on the terminal's own screen until it is over; the Recorder (its journal) is returned.
+
+    ``game``: the game round it - Esc and P then open its menu over the picture, time standing, where
+    without one they pause. ``touch``: taps and clicks on a line that names a key are that key (None:
+    wherever the terminal's mouse reports can be told from keys, which is not yet so on Windows)."""
+    import os
+    from . import menu as menus
     from .frame import Screen
     from .keys import KeyReader
-    from .realtime import Loop
+    from .realtime import Loop, Pointer
     screen = Screen(term, None, {}, term.animate)
     runner = Runner(sim, screen, audio)
-    loop = Loop(runner, keys or KeyReader(), sim.rate, clock=clock)
+    keys = keys or KeyReader()
+    if touch is None:
+        touch = os.name != "nt"
+    if touch:
+        runner.pointer = Pointer()
+    mouse = menus.MOUSE_ON if touch else ""
+    opened = None
+    if game is not None:
+        runner.menu_on = True
+
+        def opened(loop):
+            if menus.paused(game, screen, loop.keys, runner.backdrop, title=sim.name,
+                            help_lines=help_lines(sim, bool(touch)), leave="Leave",
+                            sure="Leave this console? It ends as it stands.", after=mouse) == "quit":
+                sim.result = sim.over = sim.result or "quit"
+    loop = Loop(runner, keys, sim.rate, clock=clock, menu=opened)
     screen.start()
+    out = getattr(term, "out", None)
     try:
+        if mouse and out is not None:
+            out.write(mouse)
+            out.flush()
         loop.run()
     except KeyboardInterrupt:
         sim.result = sim.over = sim.result or "quit"
     finally:
+        if mouse and out is not None:
+            out.write(menus.MOUSE_OFF)
+            out.flush()
         screen.stop()
     return loop.recorder
 
@@ -1559,7 +1637,7 @@ def play_scene(game, scene):
     frame = term.is_tty and term.ansi and size_ok and term.inp is None and not settings.get("lines") \
         and not settings.get("scroll_levels")
     if frame:
-        play_frame(sim, term, game.audio)
+        play_frame(sim, term, game.audio, game=game, touch=settings.get("touch"))
     else:
         def read(prompt):
             try:

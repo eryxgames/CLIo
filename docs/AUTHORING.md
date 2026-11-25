@@ -464,6 +464,14 @@ Every game has two menus without writing a line: **`options`** (sound and screen
 load, help, leaving - which asks first). In a first-person level `Esc` opens the menu over the
 picture, which goes dark behind it.
 
+**In real time the same menu is the pause.** In a stage, a skirmish and a simulator `Esc` or `P`
+opens the game's menu over the picture (resume, options, the keys of that kind, leaving - which
+asks first), in the game's own menu look. Time stands while it is open: no tick is owed for it,
+and the key that opened it is not in the run's journal, so a run plays back the same however
+often it was stopped. (In a skirmish `Esc` first calls off what was begun - a box, a building
+being placed - and opens the menu when there is nothing to call off.) Played with no game round
+it - `python -m engine.sim`, a test - the kind's own PAUSED stays.
+
 A menu is shown in the best way the terminal allows. Where single keys can be read it is a box
 with a lit line that moves: arrows (or `j` `k`), Enter, Esc to go back, Tab for the next page, a
 digit for the item of that number, a letter for the item that begins with it, left and right to
@@ -2719,7 +2727,7 @@ When it ends, the scene's `on_stage_clear` (or the stage's `on_clear`) runs; fai
 variable `stages` keeps each one's result, score, chips, kills, deaths and seconds.
 
 **Playing it.** The arrows (or WASD, or hjkl) run and climb; Space, Z or Up jumps; Down and
-Space drop through a platform; X or F fires; P or Esc pauses (Q then leaves). It runs at 20
+Space drop through a platform; X or F fires; P or Esc opens the game's menu (see Menus). It runs at 20
 ticks a second, and is drawn in half-block pixels - a tile two by two - with the camera
 following, or a character a tile in plain text. A terminal that says when keys are let go
 (kitty, the Windows console; try `--keys`) holds a key exactly as long as it is held; any
@@ -2835,7 +2843,7 @@ enemies), `o` patrols between here and there, `s` stops, `h` holds (fights only 
 range), `g` gathers, `d` sets down what a transport carries. `b` opens the build menu (a digit,
 then Enter where the cursor shows it fits); with a building chosen, digits train or make an
 upgrade (shown with a +), `c` takes the last back (paid back), `r` sets where new units go. P
-or Esc pauses (Q then leaves). Where the terminal reports the mouse, a click chooses, a drag draws a box, and the
+or Esc opens the game's menu (see Menus). Where the terminal reports the mouse, a click chooses, a drag draws a box, and the
 right button acts. The panel shows crystal, units, the time, what is chosen and a map of the
 whole field with the view's frame on it. Piped, with `--lines` or on a screen under 40 x 14, a
 skirmish is played a typed line at a time: `select workers; gather; wait 20`,
@@ -2966,6 +2974,15 @@ while the pumps run (`"rate": "-10 * pumps"`), a sim can be done by a deployment
 `<sim>_<function>` is set for each one that was done, and the variable `sims` has the counts.
 The key line under the screen names the functions; without panels they stand in the column of
 instruments with their states.
+
+**Taps and clicks.** A line of the screen that names a key is that key: a tap (a click) on a
+function's line does it, and it stays down for as long as the finger does, so a thing that has
+to be held can be held; on a control's line, left of the middle of its bar is less and right of
+it more; `[MENU]` at the top right opens the game's menu, and before a console has begun a tap
+anywhere begins it. So a console can be worked on a phone (Termux) with no keyboard up, and with
+a mouse on a desk. It needs no data: the lines are found where they are drawn, on a screen of
+panels and in the plain column alike. What the simulator sees, and what its journal keeps, are
+keys. Not on Windows yet (`--touch on` asks for it there all the same).
 
 **A screen of its own** (`"panels"`): instead of the instruments in a column, a sim can lay its
 screen out as panels - a bridge console, an engineering station. Panels stand side by side

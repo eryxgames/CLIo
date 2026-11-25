@@ -14,7 +14,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, HERE)
 
 from engine import arcade, stagebot  # noqa: E402
-from engine.arcade import FP, Runner, Stage, parse_moves, play_frame, play_text  # noqa: E402
+from engine.arcade import FP, Runner, Stage, help_lines, parse_moves, play_frame, play_text  # noqa: E402
 from engine.data import GameData  # noqa: E402
 from engine.keys import PRESS, RELEASE, KeyEvent, ScriptedKeys  # noqa: E402
 from engine.realtime import Controls, FakeClock, replay  # noqa: E402
@@ -354,6 +354,24 @@ class PictureTests(unittest.TestCase):
         again = Stage({"map": ["#######", "#@...E#", "#######"]})
         replay(Runner(again), rec.journal, exact=True, ticks=60)
         self.assertEqual(again.ticks, st.ticks)
+
+    def test_in_a_game_esc_opens_its_menu_and_time_stands(self):
+        from helpers import Session
+        fc = FakeClock()
+        game = Session("templates/station").start().game
+        st = Stage({"map": ["##########", "#@.......#", "##########"], "name": "Short"})
+        script = [KeyEvent("enter", PRESS), KeyEvent("enter", RELEASE), None, "esc"] + [None] * 50 + ["r", None, None, "p",
+                                                                                                      None, "4", "down", "enter"]
+        term = Term(out=io.StringIO(), width=80, height=24, color=3, unicode=True, animate=False, env={})
+        rec = play_frame(st, term, keys=ScriptedKeys(script, mode="kitty", clock=fc), clock=arcade_clock(fc), game=game)
+        out = term.out.getvalue()
+        self.assertEqual(st.over, "quit")
+        self.assertIn("RESUME", out)
+        self.assertIn("Esc menu", out)
+        self.assertNotIn("PAUSED", out)
+        self.assertLess(st.ticks, 40)                            # fifty waits in the menu: not a tick
+        self.assertNotIn("esc", [n for _, evs in rec.journal for n, _ in evs])
+        self.assertEqual(help_lines(st)[0], ("Lt / Rt", "Move"))
 
     def test_typed_lines_play_a_stage(self):
         st = Stage({"map": ["#########", "#@..*..E#", "#########"], "intro": "Run."})

@@ -6,6 +6,16 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 
 ### Added
 
+- **One pause for every kind in real time**: in a stage, a skirmish and a simulator `Esc` or `P`
+  now opens the game's menu over the picture (resume, options, that kind's keys, leaving), in the
+  game's menu look, as it does in a first-person level. Time stands while it is open
+  (`realtime.Loop(menu=...)`, a kind's `pause_key`): no tick is owed, and the key is not in the
+  journal, so a run plays back the same however often it was stopped. With no game round a kind
+  its own PAUSED stays.
+- **Taps and clicks on a console**: a line that names a key is that key (`realtime.Pointer`) - a
+  function's line, held for as long as the finger is down; a control's line, less to the left of
+  its bar's middle and more to the right; `[MENU]`; a tap anywhere to begin. On a screen of
+  panels and in the plain column; not on Windows yet.
 - **The editor shows a model as its look has it**: under a model's fields, the viewer's own
   drawing of it (`/api/modellook`), in the view its look says or one chosen, at three terminal
   sizes, as a terminal of full colour, 256, 16 or no colours shows it, in the Windows console's

@@ -445,5 +445,102 @@ class GameTests(unittest.TestCase):
                           "sim 'reactor': panels row 2 col 1 widget 8: there is no function called 'purge'"])
 
 
+class ConsoleTests(unittest.TestCase):
+    """A console in a game: its menu over it, time standing; taps on its lines as keys."""
+
+    def play(self, name, script, touch=True, mode="kitty", game=True, size=(112, 34)):
+        from helpers import Session
+        from engine.keys import KeyEvent, ScriptedKeys
+        from engine.realtime import Clock, FakeClock
+        fc = FakeClock()
+        session = Session("templates/station").start()
+        sim = S.make(session.game.data, name)
+        term = Term(out=io.StringIO(), width=size[0], height=size[1], color=3, unicode=True, animate=False, env={},
+                    glyphs="full")
+        keys = ScriptedKeys([KeyEvent(k) if isinstance(k, str) else k for k in script], mode=mode, clock=fc)
+        rec = S.play_frame(sim, term, keys=keys, clock=Clock(20, now=fc.now), game=session.game if game else None,
+                           touch=touch)
+        return sim, rec, strip_ansi(term.out.getvalue()), session
+
+    def test_esc_opens_the_games_menu_and_time_stands(self):
+        sim, rec, text, session = self.play("reactor", ["enter"] + [None] * 30 + ["esc"] + [None] * 60 + ["r"]
+                                            + [None] * 30 + ["p", None, "4", "down", "enter"])
+        self.assertIn("RESUME", text)
+        self.assertIn("KEYS", text)
+        self.assertIn("Esc menu", text)
+        self.assertNotIn("PAUSED", text)
+        self.assertEqual(sim.over, "quit")                                   # left by the menu, asked first
+        names = [n for _, evs in rec.journal for n, _ in evs]
+        self.assertEqual(names, ["enter"])                                   # the menu's keys are not the console's
+        self.assertLess(sim.ticks, 80)                                       # sixty waits in the menu: not a tick
+
+    def test_without_a_game_round_it_p_still_pauses(self):
+        sim, rec, text, _ = self.play("reactor", ["enter", None, "p", None, None, "q"], game=False)
+        self.assertIn("PAUSED", text)
+        self.assertIn("P pause", text)
+        self.assertNotIn("[MENU]", text)
+        self.assertEqual(sim.over, "quit")
+
+    def test_the_keys_page_names_the_consoles_keys(self):
+        sim = S.make(GameData(STATION), "reactor")
+        self.assertEqual(S.help_lines(sim, True), [("Up / Dn", "Rods out: more, less"), ("Rt / Lt", "Flow: more, less"),
+                                                   ("X", "Scram (hold it)"), ("V", "Vent steam"),
+                                                   ("tap", "A line that names a key is that key")])
+        helm = S.make(GameData(STATION), "helm")
+        self.assertEqual(S.help_lines(helm)[0], ("Up / Dn", "Thrust"))
+        self.assertIn("Esc menu", S.help_line(helm, True))
+
+    def test_a_tap_on_a_line_is_its_key(self):
+        sim = S.make(GameData(STATION), "reactor")
+        from engine.realtime import Pointer
+        runner = S.Runner(sim)
+        runner.pointer = Pointer()
+        runner.menu_on = True
+        runner.rows(112, 34, 3, True)
+        self.assertEqual(runner.pointer.hits[0][4], "esc")                    # [MENU] at the right of the top line
+        self.assertEqual(runner.pointer.key_at(50, 12), "enter")              # not begun: a tap anywhere begins it
+        sim.paused = None
+        rows = runner.rows(112, 34, 3, True)
+        text = ["".join(c[0] or " " for c in r) if isinstance(r, list) else strip_ansi(r) for r in rows]
+        at = {key: (x0, y0, x1) for x0, y0, x1, y1, key in runner.pointer.hits}
+        self.assertEqual(sorted(at), ["down", "esc", "left", "right", "up", "v", "x"])
+        self.assertIn("SCRAM", text[at["x"][1]][at["x"][0]:at["x"][2]])       # the line that names it
+        self.assertIn("RODS OUT", text[at["down"][1]])
+        self.assertLess(at["down"][0], at["up"][0])                           # left of the bar's middle less, right more
+        self.assertIsNone(runner.pointer.key_at(60, 20))
+
+    def test_a_console_played_by_taps(self):
+        probe = S.Runner(S.make(GameData(STATION), "reactor"))
+        from engine.realtime import Pointer
+        probe.pointer = Pointer()
+        probe.sim.paused = None
+        probe.rows(112, 34, 3, True)
+        at = {key: (x0, y0) for x0, y0, x1, y1, key in probe.pointer.hits}
+        up, x = "%d:%d" % at["up"], "%d:%d" % at["x"]
+        script = ["mouse:0:50:12", "mouseup:0:50:12", None, "mouse:0:" + up] + [None] * 60 + ["mouseup:0:" + up] \
+            + [None] * 4 + ["mouse:0:" + x] + [None] * 70 + ["mouseup:0:" + x] + [None] * 6
+        sim, rec, text, _ = self.play("reactor", script, mode="guess", game=False)
+        self.assertTrue(sim.function("scram").done)                           # held by a finger for as long as it takes
+        self.assertEqual(sim.controls["rods"]["value"], 0)                    # and it put the rods in
+        names = {n for _, evs in rec.journal for n, _ in evs}
+        self.assertEqual(names, {"enter", "up", "x", "ctrl-d"})               # the journal holds keys (and the script's end)
+        again = S.make(GameData(STATION), "reactor")
+        replay(again, rec.journal, rate=again.rate)
+        self.assertEqual((again.ticks, again.state_hash()), (sim.ticks, sim.state_hash()))
+
+    def test_a_small_screen_taps_too(self):
+        sim = S.make(GameData(STATION), "reactor")
+        from engine.realtime import Pointer
+        runner = S.Runner(sim)
+        runner.pointer = Pointer()
+        sim.paused = None
+        rows = runner.rows(48, 20, 3, True)                                   # a phone held upright: the ledger
+        text = [strip_ansi(r) if isinstance(r, str) else "".join(c[0] or " " for c in r) for r in rows]
+        at = {key: y0 for x0, y0, x1, y1, key in runner.pointer.hits}
+        self.assertEqual(sorted(at), ["v", "x"])
+        self.assertIn("Scram", text[at["x"]])
+        self.assertIn("Vent", text[at["v"]])
+
+
 if __name__ == "__main__":
     unittest.main()

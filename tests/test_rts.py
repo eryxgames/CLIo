@@ -340,6 +340,28 @@ class UITests(unittest.TestCase):
         self.assertIn("\x1b[?1002l", out)
         self.assertIn("CRYSTAL", out)
 
+    def test_in_a_game_p_opens_its_menu_and_esc_first_calls_off_what_is_begun(self):
+        from helpers import Session
+        fc = FakeClock()
+        game = Session("templates/station").start().game
+        w = world()
+        script = [KeyEvent("space", PRESS), KeyEvent("space", RELEASE), None, "v", None, "esc", None, None, "p"] \
+            + [None] * 40 + ["r", None, None, "esc", None, "4", "down", "enter"]
+        term = Term(out=io.StringIO(), width=90, height=26, color=3, unicode=True, animate=False, env={})
+        ticks = w.tick
+        rec = rts.play_frame(w, term, keys=ScriptedKeys(script, mode="kitty", clock=fc), clock=Clock(20, now=fc.now),
+                             game=game)
+        out = term.out.getvalue()
+        self.assertEqual(w.over, "quit")
+        self.assertIn("RESUME", out)
+        self.assertIn("LEAVE THE BATTLE", out)
+        self.assertNotIn("PAUSED", out)
+        names = [n for _, evs in rec.journal for n, _ in evs]
+        self.assertEqual(names.count("esc"), 1)                  # the one that called off the box; the other was the menu's
+        self.assertNotIn("p", names)
+        self.assertLess(w.tick - ticks, 40)
+        self.assertEqual(out.count("\x1b[?1002h\x1b[?1006h"), 3)   # the battle's mouse, back after each menu
+
 
 class TextTests(unittest.TestCase):
     def test_typed_commands_play_a_skirmish(self):

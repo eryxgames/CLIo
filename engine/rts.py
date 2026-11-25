@@ -1967,6 +1967,19 @@ class Runner:
     def over(self):
         return self.world.over
 
+    def pause_key(self, name):
+        """Whether this key, pressed now, stops the battle for the game's menu (the loop asks): P, and
+        Esc when there is nothing for it to call off."""
+        ui = self.ui
+        if not self.__dict__.get("menu_on", False) or ui.paused or self.world.over:
+            return False
+        return name == "p" or (name == "esc" and not ui.mode)
+
+    def backdrop(self):
+        scr = self.screen
+        W, H = scr.size()
+        return self.rows(W, H, scr.paint.depth, scr.unicode and scr.glyphs.get("half") == "▀")
+
     def step(self, c):
         self.ui.controls(c)
         self.ticks += 1
@@ -2050,7 +2063,8 @@ class Runner:
         W, H = scr.size()
         unicode = scr.unicode and scr.glyphs.get("half") == "▀"
         rows = self.rows(W, H, scr.paint.depth, unicode)
-        help_ = "arrows/mouse  Space/click choose  Enter/right-click go  v box  b build  1-5 train  p pause"
+        help_ = "arrows/mouse  Space/click choose  Enter/right-click go  v box  b build  1-5 train  " + \
+            ("p menu" if self.__dict__.get("menu_on") else "p pause")
         scr.frame(rows, status=self.status(), footer=scr.paint.text([(help_, "dim")], W))
 
 
@@ -2066,14 +2080,30 @@ def paint_role(paint, role):
                                                   "alert": (255, 170, 80)}.get(role, (210, 210, 210))
 
 
-def play_frame(world, term, audio=None, keys=None, clock=None):
-    """Play a skirmish on the terminal's screen (keys, and the mouse where the terminal reports it)."""
+HELP_LINES = [("Arrows, mouse", "The cursor"), ("Spc, click", "Choose"), ("Enter, right click", "Go there, attack"),
+              ("V", "A box round many"), ("B", "Build"), ("1 to 5", "Train"), ("A / S / H", "Attack on the way, stop, hold")]
+
+
+def play_frame(world, term, audio=None, keys=None, clock=None, game=None):
+    """Play a skirmish on the terminal's screen (keys, and the mouse where the terminal reports it).
+    ``game``: the game round it - P, and Esc with nothing to call off, then open its menu, time standing."""
+    from . import menu as menus
     from .frame import Screen
     from .keys import KeyReader
     from .realtime import Loop
     screen = Screen(term, None, {}, term.animate)
     runner = Runner(world, screen, audio)
-    loop = Loop(runner, keys or KeyReader(), 20, clock=clock)
+    opened = None
+    if game is not None:
+        runner.menu_on = True
+
+        def opened(loop):
+            if menus.paused(game, screen, loop.keys, runner.backdrop, title=getattr(world, "name", None),
+                            help_lines=HELP_LINES, leave="Leave the battle",
+                            sure="Leave the battle? It ends as it stands.",
+                            after="\x1b[?1002h\x1b[?1006h") == "quit":
+                world.result = world.over = world.result or "quit"
+    loop = Loop(runner, keys or KeyReader(), 20, clock=clock, menu=opened)
     screen.start()
     out = getattr(term, "out", None)
     try:
@@ -2327,7 +2357,7 @@ def play_scene(game, scene):
     frame = term.is_tty and term.ansi and size_ok and term.inp is None and not settings.get("lines") \
         and not settings.get("scroll_levels")
     if frame:
-        play_frame(world, term, game.audio)
+        play_frame(world, term, game.audio, game=game)
     else:
         def read(prompt):
             try:

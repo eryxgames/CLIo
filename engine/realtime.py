@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import time
 
-from .keys import RELEASE, KeyEvent
+from .keys import PRESS, RELEASE, KeyEvent
 
 RATE = 20                    # ticks a second
 
@@ -170,18 +170,100 @@ def replay(game, journal, rate=RATE, exact=False, ticks=None):
     return rec
 
 
+class Pointer:
+    """Taps and clicks as keys: parts of the picture that stand for a key.
+
+    ``hits``: ``[(x0, y0, x1, y1, key), ...]`` in cells of the screen, set by who draws it. A press on
+    one is a press of its key, and the key stays down until the finger (the button) is let go - so a
+    thing that has to be held can be held. A press anywhere else is nothing. What a game sees, and
+    what its journal keeps, are keys."""
+
+    def __init__(self):
+        self.hits = []
+        self.down = None                         # the key a finger is on now
+
+    def key_at(self, x, y):
+        for x0, y0, x1, y1, key in self.hits:
+            if x0 <= x < x1 and y0 <= y < y1:
+                return key
+        return None
+
+    def turn(self, events):
+        """Key events with the mouse reports among them made keys (those on nothing are dropped)."""
+        out = []
+        for e in events:
+            name = e.name
+            if not name.startswith(("mouse:", "mouseup:")):
+                out.append(e)
+                continue
+            try:
+                kind, b, x, y = name.split(":")
+                b, x, y = int(b), int(x), int(y)
+            except ValueError:
+                continue
+            if kind == "mouseup" or e.kind == RELEASE:
+                if self.down is not None:
+                    out.append(KeyEvent(self.down, RELEASE))
+                    self.down = None
+            elif not b & 64 and not b & 32 and not b & 3:        # the first button going down: not the wheel, not a drag
+                key = self.key_at(x, y)
+                if key is not None:
+                    if self.down is not None and self.down != key:
+                        out.append(KeyEvent(self.down, RELEASE))
+                    self.down = key
+                    out.append(KeyEvent(key))
+        return out
+
+    def held(self):
+        """Once a tick: the key under the finger said again, as a key that is held down repeats."""
+        return [KeyEvent(self.down)] if self.down is not None else []
+
+
 class Loop:
     """A game in real time: keys in, ticks at a fixed rate, a picture after them.
 
     ``game``: ``step(controls)``, ``draw()``, ``over``. ``keys``: a :class:`engine.keys.KeyReader` (or
-    ``ScriptedKeys``). ``clock``: a :class:`Clock` (its ``now`` may be a :class:`FakeClock`'s)."""
+    ``ScriptedKeys``). ``clock``: a :class:`Clock` (its ``now`` may be a :class:`FakeClock`'s).
 
-    def __init__(self, game, keys, rate=RATE, clock=None, behind=5):
+    ``menu``: a function called with the loop when a key is pressed that the game says pauses it now
+    (``game.pause_key(name)``): time stands while it runs - no tick is owed for it, the key is not
+    given to the game and is not in the journal, so a journal plays back the same with or without the
+    stops. A game with a ``pointer`` (a :class:`Pointer`) gets its taps as keys."""
+
+    def __init__(self, game, keys, rate=RATE, clock=None, behind=5, menu=None):
         self.game, self.keys = game, keys
         self.clock = clock or Clock(rate, behind=behind)
         self.rate = rate
         self.recorder = None
         self.mode = None
+        self.menu = menu
+        self.stops = 0                           # times the menu was opened
+
+    def _read(self, timeout):
+        events = self.keys.events(timeout)
+        pointer = getattr(self.game, "pointer", None)
+        return pointer.turn(events) if pointer is not None and events else events
+
+    def _stopped(self, pending):
+        """The menu, if a key just pressed asks for it: True when it was shown (the keys so far are let go)."""
+        asks = getattr(self.game, "pause_key", None)
+        if self.menu is None or asks is None or not pending:
+            return False
+        if not any(e.kind == PRESS and asks(e.name) for e in pending):
+            return False
+        keys, pointer = self.keys, getattr(self.game, "pointer", None)
+        if pointer is not None:
+            pointer.down = None
+        self.stops += 1
+        keys.stop()
+        keys.start(events=False)                 # the menu reads keys one by one
+        try:
+            self.menu(self)
+        finally:
+            keys.stop()
+            keys.start(events=True)
+            self.clock.start()                   # no tick is owed for the time it was open
+        return True
 
     def run(self):
         g, keys, clock = self.game, self.keys, self.clock
@@ -190,14 +272,22 @@ class Loop:
         self.recorder = rec = Recorder(self.rate, exact=self.mode in ("kitty", "console"))
         pending = []
         clock.start()
+        pointer = getattr(g, "pointer", None)
         try:
             g.draw()
             while not g.over:
                 n = clock.due()
                 if n == 0:
-                    pending.extend(keys.events(min(0.05, clock.until())))
+                    pending.extend(self._read(min(0.05, clock.until())))
                     continue
-                pending.extend(keys.events(0))
+                pending.extend(self._read(0))
+                if self._stopped(pending):
+                    pending = []
+                    if not g.over:
+                        g.draw()
+                    continue
+                if pointer is not None:
+                    pending.extend(pointer.held())
                 for i in range(n):
                     g.step(rec.next(pending if i == 0 else ()))
                     if i == 0:

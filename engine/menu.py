@@ -2015,6 +2015,39 @@ def game_menu(game, can=("save", "load", "help", "quit"), title=None, resume=Non
     return Menu(id="game", title=title or game.data.title, look=getattr(game.ui, "menu_look", None) or "bar", items=items)
 
 
+def paused(game, screen, keys, backdrop, title=None, help_lines=(), leave="Leave", sure=None, after=""):
+    """The game's menu over a picture that moves in real time, its clock stopped by who calls
+    (:class:`engine.realtime.Loop`): resume, options, the keys, leaving. ``keys``: the reader, read a
+    key at a time here. ``help_lines``: the kind's keys, a line each. ``leave``, ``sure``: the word for
+    going and the question asked first; a help line is ``(keys, what they do)`` or a sentence.
+    ``"quit"`` when the player leaves; else None."""
+    had = screen.keys
+    screen.keys = keys if getattr(keys, "get", None) is not None else None
+    try:
+        while True:
+            m = game_menu(game, ("help", "quit"), title=title)
+            for item in m.items:
+                if item.id == "quit":
+                    item.label, item.hint = leave, "It asks first."
+                    item.confirm = sure or "Leave? What was done here is lost."
+                elif item.id == "help":
+                    item.label, item.hint, item.key = "Keys", "What the keys do here.", "k"
+            got = over(screen, m, backdrop, game.ui, after=after)
+            act = got.id if got is not None else None
+            if act == "help":
+                rows = [t if isinstance(t, (list, tuple)) else ("", t) for t in help_lines if t]
+                page = Menu(id="keys", title="Keys", look="bar", items=[
+                    Item(id="key%d" % n, label=str(what), note=str(key), stay=True) for n, (key, what) in enumerate(rows)]
+                    + [Item(kind="head"), Item(id="back", label="Back", key="b")])
+                page.to(len(page.rows()) - 1)
+                over(screen, page, backdrop, game.ui, after=after)
+                continue
+            return "quit" if act == "quit" else None
+    finally:
+        screen.keys = had
+        screen.shown = {}
+
+
 # --------------------------------------------------------------------------- #
 # A game's own menus: menus.json
 # --------------------------------------------------------------------------- #

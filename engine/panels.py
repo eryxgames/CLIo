@@ -124,6 +124,7 @@ class View:
         self.models = models or {}
         self.planets = planets or {}                     # a game's planets.json, for planet widgets
         self.looks = {}                                  # how each model is to be drawn (viewer.looks): the host's
+        self.hits = []                                   # where a tap stands for a key (as last drawn)
         self.subjects, self.worlds = {}, {}
         self.scopes = {}                                 # a scope each, kept for its afterglow
         self.wires = {}
@@ -166,6 +167,7 @@ class View:
         "state", "word", "charge", "left", "wait", "tone", "flash"}`` (a simulator's ``shown_functions()``)."""
         self.functions = list(functions or [])
         self.level = level
+        self.hits = []                                   # (x0, y0, x1, y1, key): where a tap stands for a key
         for n in self.plotted:
             h = self.history.setdefault(n, [])
             h.append(float(env.get(n, 0.0)))
@@ -296,6 +298,12 @@ class View:
             cv.put(x, y, label, dim)
             cv.put(x + lw + 1, y, keys.strip(), dim)
             bx = x + lw + 1 + len(keys)
+            if keys:                                     # a tap on its line: left of the bar's middle less, right more
+                pair = [str(k) for k in list(wd["keys"])[:2]]
+                mid = bx + n // 2
+                self.hits.append((mid, y, x + w, y + 1, pair[0]))
+                if len(pair) > 1:
+                    self.hits.append((x, y, mid, y + 1, pair[1]))
             if kind == "center":
                 half = n // 2
                 k = max(-half, min(half, int(round(v / (top or 1.0) * half))))
@@ -427,6 +435,8 @@ class View:
         idle = state in ("locked", "wait", "spent")
         cv.put(x, y, key, dim if idle else ink)
         cv.put(x + len(key), y, label, dim if idle else (tone if live else hi))
+        if f.get("key"):
+            self.hits.append((x, y, x + w, y + 1, str(f["key"])))     # a tap on its line is its key
         dots = w - len(key) - len(label) - len(word) - 2
         if dots > 0:
             cv.put(x + len(key) + len(label) + 1, y, ("·" if uni else ".") * dots, dim)

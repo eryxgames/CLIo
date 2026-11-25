@@ -1020,7 +1020,7 @@ class View:
         return []
 
 
-def help_line(stage, unicode=True):
+def help_line(stage, unicode=True, menu=False):
     arrows = "←→" if unicode else "<>"
     s = "%s move   " % arrows
     if stage.topdown:
@@ -1030,7 +1030,14 @@ def help_line(stage, unicode=True):
         s += "↑↓ ladders   ↓+SPACE drop   " if unicode else "up/down ladders   down+SPACE drop   "
     if stage.gun:
         s += "X fire   "
-    return s + "P pause"
+    return s + ("Esc menu" if menu else "P pause")
+
+
+def help_lines(stage):
+    """The keys a line each, ``(keys, what they do)``, for the menu's page of them."""
+    out = [("Arrows", "Move")] if stage.topdown else [("Lt / Rt", "Move"), ("Spc, Up", "Jump"), ("Up / Dn", "Ladders"),
+                                                       ("Dn + Spc", "Drop through")]
+    return out + ([("X", "Fire")] if stage.gun else [])
 
 
 # --------------------------------------------------------------------------- #
@@ -1047,6 +1054,16 @@ class Runner:
     @property
     def over(self):
         return self.stage.over
+
+    def pause_key(self, name):
+        """Whether this key, pressed now, stops the stage for the game's menu (the loop asks)."""
+        st = self.stage
+        return self.__dict__.get("menu_on", False) and name in PAUSE and not st.paused and not st.result
+
+    def backdrop(self):
+        scr = self.screen
+        W, H = scr.size()
+        return self.rows(W, H, scr.paint.depth, scr.unicode and scr.glyphs.get("half") == "▀")
 
     def step(self, c):
         st = self.stage
@@ -1092,17 +1109,29 @@ class Runner:
         W, H = scr.size()
         unicode = scr.unicode and scr.glyphs.get("half") == "▀"
         rows = self.rows(W, H, scr.paint.depth, unicode)
-        scr.frame(rows, status=self.status(), footer=scr.paint.text([(help_line(self.stage, unicode), "dim")], W))
+        scr.frame(rows, status=self.status(),
+                  footer=scr.paint.text([(help_line(self.stage, unicode, self.__dict__.get("menu_on", False)), "dim")], W))
 
 
-def play_frame(stage, term, audio=None, keys=None, clock=None):
-    """Play a stage on the terminal's own screen until it is over. The Recorder (its journal) is returned."""
+def play_frame(stage, term, audio=None, keys=None, clock=None, game=None):
+    """Play a stage on the terminal's own screen until it is over. The Recorder (its journal) is returned.
+    ``game``: the game round it - Esc and P then open its menu over the picture, time standing."""
+    from . import menu as menus
     from .frame import Screen
     from .keys import KeyReader
     from .realtime import Loop
     screen = Screen(term, None, {}, term.animate)
     runner = Runner(stage, screen, audio)
-    loop = Loop(runner, keys or KeyReader(), stage.rate, clock=clock)
+    opened = None
+    if game is not None:
+        runner.menu_on = True
+
+        def opened(loop):
+            if menus.paused(game, screen, loop.keys, runner.backdrop, title=stage.name,
+                            help_lines=help_lines(stage), leave="Leave the stage",
+                            sure="Leave the stage? It ends as it stands.") == "quit":
+                stage.result = stage.over = stage.result or "quit"
+    loop = Loop(runner, keys or KeyReader(), stage.rate, clock=clock, menu=opened)
     screen.start()
     try:
         loop.run()
@@ -1227,7 +1256,7 @@ def play_scene(game, scene):
     frame = term.is_tty and term.ansi and size_ok and term.inp is None and not settings.get("lines") \
         and not settings.get("scroll_levels")
     if frame:
-        play_frame(stage, term, game.audio)
+        play_frame(stage, term, game.audio, game=game)
     else:
         def read(prompt):
             try:

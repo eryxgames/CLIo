@@ -25,7 +25,7 @@ from engine.data import GameData  # noqa: E402
 from engine.frame import Screen  # noqa: E402
 from engine.keys import PRESS, RELEASE, REPEAT, KeyEvent, kitty_event, vk_name  # noqa: E402
 from engine.level import IDLE, KEYMAP, FrameConsole, Level, beat_of  # noqa: E402
-from engine.realtime import Clock, Controls, FakeClock, Held, Loop, Recorder, replay  # noqa: E402
+from engine.realtime import Clock, Controls, FakeClock, Held, Loop, Pointer, Recorder, replay  # noqa: E402
 from engine.term import Term  # noqa: E402
 
 ROOTLESS = os.path.join(ROOT, "games", "rootless")
@@ -277,6 +277,88 @@ class RealTimeLevelTests(unittest.TestCase):
         self.assertEqual(beat_of(lv), 0.0)
         self.assertEqual(beat_of(lv, 1.5), 1.5)
         self.assertEqual(beat_of(lv, 0), 0.0)
+
+
+class PauseTests(unittest.TestCase):
+    """The loop stops for a menu: time stands, and the journal knows nothing of it."""
+
+    def game(self):
+        g = Runner()
+        g.pause_key = lambda name: name == "p"
+        return g
+
+    def test_the_menu_takes_no_time_and_is_not_in_the_journal(self):
+        fc = FakeClock()
+        opened = []
+
+        def menu(loop):
+            opened.append(loop.recorder.tick)
+            while loop.keys.get(0.1) != "x":                    # the menu reads keys one by one
+                pass
+            fc.advance(90.0)                                    # a minute and a half with it open
+
+        script = ["right"] + [None] * 4 + ["p", None, None, "x"] + [None] * 4 + ["esc"]
+        game = self.game()
+        loop = Loop(game, keys_mod.ScriptedKeys(script, mode="kitty", clock=fc), rate=20, clock=Clock(20, now=fc.now),
+                    menu=menu)
+        rec = loop.run()
+        self.assertEqual((len(opened), loop.stops), (1, 1))
+        self.assertLess(game.ticks, 40)                         # none of the 1800 ticks of that time were run
+        self.assertEqual(loop.clock.dropped, 0)
+        self.assertNotIn("p", [n for _, evs in rec.journal for n, _ in evs])
+        again = Runner()
+        replay(again, rec.journal, rate=20, exact=True)
+        self.assertEqual((again.x, again.ticks, again.over), (game.x, game.ticks, game.over))
+
+    def test_without_a_menu_the_key_is_the_games(self):
+        fc = FakeClock()
+        game = self.game()
+        loop = Loop(game, keys_mod.ScriptedKeys(["p", None, "esc"], mode="kitty", clock=fc), rate=20,
+                    clock=Clock(20, now=fc.now))
+        rec = loop.run()
+        self.assertIn("p", [n for _, evs in rec.journal for n, _ in evs])
+        self.assertEqual(loop.stops, 0)
+
+    def test_the_menu_may_end_the_game(self):
+        fc = FakeClock()
+        game = self.game()
+        loop = Loop(game, keys_mod.ScriptedKeys(["p"] + [None] * 50, mode="kitty", clock=fc), rate=20,
+                    clock=Clock(20, now=fc.now), menu=lambda loop: setattr(game, "over", True))
+        loop.run()
+        self.assertTrue(game.over)
+        self.assertLessEqual(game.ticks, 1)
+
+
+class PointerTests(unittest.TestCase):
+    """Taps and clicks as keys."""
+
+    def test_a_tap_on_a_part_is_its_key_until_it_is_let_go(self):
+        p = Pointer()
+        p.hits = [(0, 4, 20, 5, "x"), (0, 5, 20, 6, "v")]
+        got = p.turn([KeyEvent("mouse:0:3:4"), KeyEvent("up")])
+        self.assertEqual([(e.name, e.kind) for e in got], [("x", PRESS), ("up", PRESS)])
+        self.assertEqual([(e.name, e.kind) for e in p.held()], [("x", PRESS)])     # said again each tick: it is held
+        self.assertEqual([(e.name, e.kind) for e in p.turn([KeyEvent("mouseup:0:3:4")])], [("x", RELEASE)])
+        self.assertEqual((p.held(), p.down), ([], None))
+        self.assertEqual(p.turn([KeyEvent("mouse:0:40:20"), KeyEvent("mouseup:0:40:20")]), [])   # on nothing
+        self.assertEqual(p.turn([KeyEvent("mouse:64:3:4"), KeyEvent("mouse:32:3:4"), KeyEvent("mouse:2:3:4")]), [])
+        slid = p.turn([KeyEvent("mouse:0:3:4"), KeyEvent("mouse:0:3:5")])           # a second finger: the first let go
+        self.assertEqual([(e.name, e.kind) for e in slid], [("x", PRESS), ("x", RELEASE), ("v", PRESS)])
+
+    def test_a_held_tap_holds_the_key_where_releases_are_only_guessed(self):
+        fc = FakeClock()
+        game = Runner()
+        game.pointer = Pointer()
+        game.pointer.hits = [(0, 0, 10, 1, "right")]
+        script = ["mouse:0:2:0"] + [None] * 40 + ["mouseup:0:2:0"] + [None] * 30 + ["esc"]
+        loop = Loop(game, keys_mod.ScriptedKeys(script, mode="guess", clock=fc), rate=20, clock=Clock(20, now=fc.now))
+        rec = loop.run()
+        self.assertGreater(game.x, 15)                          # down all the while the finger was
+        self.assertLess(game.x, 40)                             # and up when it was lifted
+        self.assertFalse(any(n.startswith("mouse") for _, evs in rec.journal for n, _ in evs))
+        again = Runner()
+        replay(again, rec.journal, rate=20)
+        self.assertEqual((again.x, again.ticks), (game.x, game.ticks))
 
 
 if __name__ == "__main__":

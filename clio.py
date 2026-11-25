@@ -536,6 +536,11 @@ def main(argv=None):
                     help="bring a glTF model (.glb or .gltf, e.g. from Blender) into the game's models.json and exit")
     ap.add_argument("--view-model", nargs="?", const="", metavar="NAME",
                     help="look at the game's 3D models and planets: shaded, in lines, cut open, as a plan, by heat")
+    ap.add_argument("--shots", metavar="DIR",
+                    help="draw every console, menu and model of the game into DIR (index.html, and text) and exit")
+    ap.add_argument("--shots-size", metavar="WxH", default="112x34", help="with --shots: a console's screen (112x34)")
+    ap.add_argument("--shots-as", metavar="KINDS", default="full",
+                    help="with --shots: terminals to show them on, commas between (full, 256, 16, none, console, ascii)")
     ap.add_argument("--model-name", metavar="NAME", help="with --import-model: its name (default: the file's)")
     ap.add_argument("--model-scale", type=float, default=0.4,
                     help="with --import-model: cells per metre (0.4: a 2.5 m room is a cell high)")
@@ -607,6 +612,20 @@ def main(argv=None):
         return read_sheet(game_dir, args.import_sheet)
     if args.import_model:
         return import_model(game_dir, args.import_model, args.model_name, args.model_scale)
+    if args.shots:
+        from engine import shots
+        from engine.editor.looks import TERMINALS
+        try:
+            w, h = (int(v) for v in args.shots_size.lower().split("x"))
+        except ValueError:
+            print("--shots-size is columns x lines, as 112x34.")
+            return 2
+        kinds = [k.strip() for k in args.shots_as.split(",") if k.strip()]
+        if not kinds or any(k not in TERMINALS for k in kinds):
+            print("--shots-as: one or more of %s." % ", ".join(TERMINALS))
+            return 2
+        shots.write(game_dir, args.shots, (max(40, min(200, w)), max(14, min(70, h))), kinds)
+        return 0
     if args.view_model is not None:
         from engine import viewer
         return viewer.main([game_dir] + ([args.view_model] if args.view_model else []))

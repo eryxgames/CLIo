@@ -187,6 +187,7 @@ python clio.py [game] [options]
   --no-sound      run silently
   --sounds SET    another set of sound effects (rootless: ballistic)
   --get-picture   install CLIo Picture for this machine (faster first-person pictures)
+  --shots DIR     draw the game's consoles, menus and models into DIR without playing it
   --get-ballistic install Ballistic's C engine for this machine (sounds without Node.js)
   --touch on|off  taps and swipes in first-person levels (on in Termux)
   --termux-keys   print a row of extra keys for Termux that plays the levels

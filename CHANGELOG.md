@@ -6,6 +6,9 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 
 ### Added
 
+- **`--shots DIR`**: a game's consoles (at four moments of the autopilot's run), menus and models
+  drawn by the code the game runs into one page of coloured text and a text file each - at a
+  size (`--shots-size`), as terminals of several kinds show them (`--shots-as`). `engine/shots.py`.
 - **Erebus: Last Watch** (`games/erebus/`), the terminals demo: five consoles opened one after
   another from a wheel of orders on the bridge. Reactor (panels, functions at once and held),
   Scan (a model coming into a scope, a planet and its relief, a beacon that unfolds as far as its

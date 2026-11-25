@@ -3014,6 +3014,16 @@ keys. Not on Windows yet (`--touch on` asks for it there all the same).
 (`games/erebus/` is a whole small game of such consoles, one opening the next from a wheel of
 orders, and `templates/station/` three of them to copy.)
 
+**Seeing it without playing it.** `python clio.py GAME --shots DIR` draws every simulator with
+its screen at four moments of the autopilot's run (before it begins, a third and two thirds
+through, at its end), every menu of `menus.json` in its look, and every model as its look has
+it and through its clips, by the code the game runs - into `DIR/index.html` (coloured text,
+nothing to install) with each picture as plain text beside it. `--shots-size 80x24` is another
+screen; `--shots-as full,256,ascii,console` shows them as those terminals do. Change the data,
+run it again, look. It also says for each console whether the autopilot can do it, and in how
+many seconds. (A browser's font may set braille a shade wider than a terminal does; the text
+files are exact.)
+
 **A screen of its own** (`"panels"`): instead of the instruments in a column, a sim can lay its
 screen out as panels - a bridge console, an engineering station. Panels stand side by side
 (`"cols"`) or one over another (`"rows"`), each in a frame with a `title`, each with `widgets`

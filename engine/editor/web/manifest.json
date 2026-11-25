@@ -42,6 +42,7 @@
   "engine/rts.py",
   "engine/schema.py",
   "engine/sheets.py",
+  "engine/shots.py",
   "engine/sim.py",
   "engine/snapshot.py",
   "engine/sprite.py",

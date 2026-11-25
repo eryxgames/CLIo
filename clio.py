@@ -536,6 +536,8 @@ def main(argv=None):
                     help="bring a glTF model (.glb or .gltf, e.g. from Blender) into the game's models.json and exit")
     ap.add_argument("--view-model", nargs="?", const="", metavar="NAME",
                     help="look at the game's 3D models and planets: shaded, in lines, cut open, as a plan, by heat")
+    ap.add_argument("--schema", metavar="DIR",
+                    help="write a JSON Schema for each data file into DIR (key completion in VS Code and others) and exit")
     ap.add_argument("--add", nargs=2, metavar=("KIND", "NAME"),
                     help="paste a working piece into the game and exit: console reactor|scan|helm|bay|approach, "
                          "menu wheel|ring|bar, model door|beacon|hauler (NAME 'list' lists them)")
@@ -583,6 +585,10 @@ def main(argv=None):
         return display_test(term, args.logo)
     if args.termux_keys:
         print(TERMUX_KEYS)
+        return 0
+    if args.schema:
+        from engine import jsonschema
+        jsonschema.write(args.schema)
         return 0
     if args.keys:
         from engine.realtime import key_test

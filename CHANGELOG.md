@@ -6,6 +6,11 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 
 ### Added
 
+- **`--schema DIR`** (`engine/jsonschema.py`): a JSON Schema for each data file, written from
+  what the editor knows, and the `json.schemas` settings that tie them to the files - so VS Code
+  and other editors complete keys, say what each is for and offer what may be chosen (a
+  console's widgets and panels, effects, looks). They describe and forbid nothing; `--check`
+  stays the judge.
 - **`"console"` in `game.json`**: one name for how a game's consoles look - its panels' colour
   and frame, its menus' look and frame, how its models are drawn. `green`, `amber`, `ice`,
   `paper`, `alert`, `violet`, or a map (`{"like": "ice", "border": "heavy"}`). What the game, a

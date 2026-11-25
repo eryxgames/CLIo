@@ -189,6 +189,7 @@ python clio.py [game] [options]
   --get-picture   install CLIo Picture for this machine (faster first-person pictures)
   --shots DIR     draw the game's consoles, menus and models into DIR without playing it
   --add KIND NAME paste a working console, menu or model into the game (--add console list)
+  --schema DIR    write JSON Schemas of the data files, for key completion in your editor
   --get-ballistic install Ballistic's C engine for this machine (sounds without Node.js)
   --touch on|off  taps and swipes in first-person levels (on in Termux)
   --termux-keys   print a row of extra keys for Termux that plays the levels

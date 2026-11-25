@@ -23,6 +23,7 @@
   "engine/fx.py",
   "engine/game.py",
   "engine/gltf.py",
+  "engine/jsonschema.py",
   "engine/keys.py",
   "engine/land.py",
   "engine/level.py",

@@ -34,6 +34,7 @@ MOST = 64 * 1024 * 1024                 # a game larger than this is not a folde
 LEFT_OUT = ("__pycache__", "saves")     # folders that are not part of a game
 DEMOS = ("depths", "derelict")          # the games the page offers; a game of your own in games/ is not put on show
 PLAYED = ("rootless", "depths", "derelict")     # the games play.html plays (engine/web.py)
+CARRIED = "engine/motion/clio_motion/"          # CLIo Motion's package: its data (JSON) goes where its modules go
 
 
 # ------------------------------------------------------------------- the list
@@ -59,15 +60,16 @@ def _played():
     """What play.html's worker fetches besides the engine's modules: clio.py, the engine's own art, demos and
     looks, and the games it plays (not the web pages, nor Ballistic's engine, which needs Node.js)."""
     data = [f for f in _files(os.path.join(ROOT, "engine"), lambda name: not name.endswith((".py", ".pyc")))
-            if not f.startswith(("engine/editor/", "engine/audio/ballistic/"))]
+            if not f.startswith(("engine/editor/", "engine/audio/ballistic/", CARRIED))]
     games = [f for g in PLAYED for f in _files(os.path.join(ROOT, "games", g), lambda name: not name.endswith(".pyc"))]
     return ["clio.py"] + data + games
 
 
 def manifest():
-    """What the page fetches: the engine's modules, the games it can open without being given one, and what
-    play.html needs to play."""
-    return {"engine": _files(os.path.join(ROOT, "engine"), lambda name: name.endswith(".py")),
+    """What the page fetches: the engine's modules (with the data of CLIo Motion's package, which the editor
+    draws models with too), the games it can open without being given one, and what play.html needs to play."""
+    return {"engine": [f for f in _files(os.path.join(ROOT, "engine"), lambda name: name.endswith((".py", ".json")))
+                       if f.endswith(".py") or f.startswith(CARRIED)],
             "starter": _game("templates/starter"),
             "games": [_game("games/" + g) for g in DEMOS],
             "play": _played()}

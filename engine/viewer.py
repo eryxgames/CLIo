@@ -153,7 +153,7 @@ class Subject:
         verts = model.pose(clip, 0.0)
         # a model whose parts move (tracks, frames): corners of different parts stay apart, and each
         # corner of the lines remembers which of the model's it is, to be put where a pose has it
-        self.moving = bool(model.tracks or model.frames)
+        self.moving = bool(model.tracks or model.frames or model.motion is not None)
         apart = None
         if self.moving:
             apart = [0] * len(verts)

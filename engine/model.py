@@ -17,6 +17,8 @@ drawn. **Frames** (``frames``: clip -> the mesh's corners, picture by picture) f
 on bones); a clip's frames may be a list of lists of numbers or **packed** (:func:`pack_frames`:
 whole numbers, the differences from frame to frame, deflated, as text - about a seventh the size).
 When a model is destroyed, its triangles (or its groups) fly apart as shards: ``shards()``.
+A model with ``"motion"`` is kept in neither way: it is a character of CLIo Motion (engine/motion), whose shape
+and clips the library works out; destroyed, it falls and lies (``"break": "fall"``).
 
 Everything here is drawing: nothing in a level's rules depends on it.
 """
@@ -358,6 +360,11 @@ class Model:
         self.name = name
         self.spec = spec
         mats = spec.get("materials") or {}
+        self.motion = None                                # moved by CLIo Motion (engine/motion): its shape and its clips
+        if spec.get("motion") is not None:
+            from . import motion as motion_mod
+            self.motion = motion_mod.Moves(spec)
+            mats = dict(self.motion.materials, **mats)
         self.materials = [Material(k, v) for k, v in mats.items()] or [Material("plain", {})]
         index = {m.name: i for i, m in enumerate(self.materials)}
         self.verts, self.faces = [], []                   # faces: (a, b, c, material, colour or None, group)
@@ -378,6 +385,9 @@ class Model:
             self.faces += [(a + o, b + o, c + o, mi, tint, self.groups.index(g)) for a, b, c in f]
             self.pieces += [part_no] * len(f)
         mesh = spec.get("mesh") or {}
+        if self.motion is not None:
+            mesh = self.motion.mesh_spec
+        self._mesh_at = len(self.verts)                   # where the mesh's corners start, after the parts'
         if mesh.get("v"):
             o = len(self.verts)
             self.verts += [tuple(float(c) for c in p[:3]) for p in mesh["v"]]
@@ -398,7 +408,10 @@ class Model:
             if g in self.groups and isinstance(how, dict):
                 self.group_spin[self.groups.index(g)] = (how.get("axis", "z"), float(how.get("speed", 180)))
         self.scale = float(spec.get("scale", 1.0))
-        self.breaks = spec.get("break", "shards")         # destroyed: into "shards", its "parts" or its "groups"
+        # destroyed: into "shards", its "parts" or its "groups"; one moved by CLIo Motion falls and lies ("fall")
+        self.breaks = spec.get("break", "fall" if self.motion is not None else "shards")
+        if self.breaks == "fall" and (self.motion is None or "die" not in self.motion.clip_names):
+            self.breaks = "shards"
         self.smooth = bool(spec.get("smooth"))
         self.bob = spec.get("bob")                        # [height, beats a bob takes]
         self.turning = float(spec.get("turning", 0.0))     # degrees a beat, the whole model (a pickup)
@@ -443,7 +456,11 @@ class Model:
         """The vertices at time ``t`` (beats) playing ``clip``: frames if the model has them, turning groups,
         the whole bobbing and turning."""
         frames = self.frames.get(clip) or self.frames.get("idle")
-        if frames:
+        if self.motion is not None:
+            verts = self.motion.pose(clip, t)
+            if self._mesh_at:                             # parts of its own stand where they were put
+                verts = self.verts[:self._mesh_at] + list(verts)
+        elif frames:
             k = int(t * self.fps) % len(frames)
             flat = frames[k]
             verts = [(flat[i], flat[i + 1], flat[i + 2]) for i in range(0, len(flat) - 2, 3)]
@@ -452,7 +469,8 @@ class Model:
         else:
             verts = self.verts
         moving = self.tracks.get(clip) or self.tracks.get("idle")
-        if moving and not (frames and clip in self.frames):   # its parts moved along their tracks, at this very time
+        # its parts moved along their tracks, at this very time
+        if moving and self.motion is None and not (frames and clip in self.frames):
             length, loop, tracks = moving
             at = (t % length) if loop else min(t, length)
             verts = list(verts)
@@ -489,15 +507,18 @@ class Model:
     @property
     def clips(self):
         """The names of what it can play (its frames' and its tracks')."""
-        return list(dict.fromkeys(list(self.frames) + list(self.tracks)))
+        moved = self.motion.clip_names if self.motion is not None else []
+        return list(dict.fromkeys(list(self.frames) + list(self.tracks) + moved))
 
     @property
     def moves(self):
         """Whether it is ever anything but its pose at rest."""
-        return bool(self.frames or self.tracks or self.group_spin or self.bob)
+        return bool(self.frames or self.tracks or self.group_spin or self.bob or self.motion is not None)
 
     def beats(self, clip):
         """How long a clip is, in beats (0 when it has none)."""
+        if self.motion is not None and clip in self.motion.clip_names:
+            return self.motion.beats(clip)
         if clip in self.frames:
             return len(self.frames[clip]) / (self.fps or 1.0)
         return self.tracks[clip][0] if clip in self.tracks else 0.0
@@ -516,6 +537,7 @@ def load(table):
 
 
 BREAKS = ("shards", "parts", "groups")                 # how a model comes apart when it is destroyed
+FALL = "fall"                                          # ...or does not: one moved by CLIo Motion falls and lies
 
 
 def problems(table, where="models.json"):
@@ -553,10 +575,20 @@ def problems(table, where="models.json"):
                     and 0 <= span[0] and span[0] + span[1] <= n):
                 out.append("%s: model '%s': the mesh's part '%s' should be [first corner, how many] within the mesh"
                            % (where, name, pname))
-        if not spec.get("parts") and not n:
+        moved = spec.get("motion") is not None
+        if moved:
+            from . import motion as motion_mod
+            wrong = motion_mod.problems(name, spec, where)
+            out += wrong
+            if wrong:
+                continue
+            if spec.get("mesh") or spec.get("frames"):
+                out.append("%s: model '%s' is moved by CLIo Motion: its mesh and frames are not used" % (where, name))
+        if not spec.get("parts") and not n and not moved:
             out.append("%s: model '%s' has neither parts nor a mesh" % (where, name))
-        if spec.get("break", "shards") not in BREAKS:
-            out.append("%s: model '%s': break '%s' should be one of %s" % (where, name, spec.get("break"), ", ".join(BREAKS)))
+        if spec.get("break", "shards") not in BREAKS + ((FALL,) if moved else ()):
+            out.append("%s: model '%s': break '%s' should be one of %s" % (where, name, spec.get("break"),
+                                                                         ", ".join(BREAKS + ((FALL,) if moved else ()))))
         try:
             Model(name, spec)
         except (TypeError, ValueError, IndexError, KeyError) as e:

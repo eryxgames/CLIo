@@ -7,6 +7,10 @@ engine/audio/ballistic/engine.js is a copy of the sound engine of Ballistic
 Foley Lab (https://github.com/eigensoundlab/ballistic), copyright 2026
 Daniel Sandner, also under the Apache License, Version 2.0.
 
+engine/motion/clio_motion/ is a copy of the Python package of CLIo Motion
+(https://github.com/eryxgames/clio-motion), copyright 2026 Daniel Sandner,
+also under the Apache License, Version 2.0.
+
 Not covered by that licence: the demonstration games in games/derelict and
 games/depths. Their story, text, characters, art, sprites and music are
 copyright Daniel Sandner, all rights reserved; see the LICENSE.md file in each

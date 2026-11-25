@@ -35,6 +35,7 @@ DECAY = 0.64                 # apparent size falls to 64% with each cell of dist
 FAR = 10                     # cells of walls drawn ahead (a wall further off is under a pixel high)
 SIGHT = 7                    # cells of things drawn ahead - and seen, aimed at, shot at (the level's rules)
 BACK = 4                     # cells behind the player whose walls still show at the edges of the picture
+LYING_MOST, LYING_FAR = 6, 8.0   # bodies lying (models moved by CLIo Motion): how many are drawn, and how far off
 REF_H, REF_W = 18, 12        # the yardstick: a sprite this big is a person's size
 DIRS = ((0, -1), (1, 0), (0, 1), (-1, 0))          # north, east, south, west
 RENDERS = ("classic", "mesh")                       # how rooms are drawn: this module's picture, or engine/mesh.py's
@@ -649,6 +650,14 @@ CEIL, CEIL_LINE, LIGHT = (30, 30, 36), (24, 24, 29), (168, 162, 122)
 TOXIC, TOXIC_HI = (36, 140, 54), (130, 240, 110)
 HAZE = (16, 16, 20)
 AUTO_LOW = 40000             # pixels in a picture above which "auto" detail draws the floor and ceiling at half width
+
+
+def _fast(m):
+    """Whether a monster comes two cells a beat or more: one moved by CLIo Motion runs then."""
+    try:
+        return float((m.spec.get("attack") or {}).get("speed", 1) or 1) >= 2
+    except (TypeError, ValueError, AttributeError):
+        return False
 
 
 class FX:
@@ -1602,16 +1611,24 @@ class View:
             a, z = rel(wx, wy)
             if 0.12 < z <= sight:
                 items.append((z - 0.005, 6, 0, "part", (a, h, col, size)))
+        models = getattr(lv, "models", None) or {}
+        lying = []                                           # bodies that fell (models moved by CLIo Motion) lie there
         for m in lv.monsters:
-            if m.gone or (m.dead and m.id not in fx.dissolve):
+            body = m.dead and m.id not in fx.dissolve
+            if m.gone or (body and not (m.model in models and models[m.model].breaks == "fall")):
                 continue
             mx, my = fx.pos.get(m.id, (m.x, m.y))
             a, z = rel(mx, my)
             if -0.4 < z <= sight + 0.5:
-                if m.model and m.model in getattr(lv, "models", {}):
+                if body:
+                    if z <= LYING_FAR and abs(a) <= z + 1.5:
+                        lying.append((z, m.id, a, m, mx, my))
+                elif m.model and m.model in models:
                     items.append((z, 3, 0, "model", (a, m, mx, my)))
                 else:
                     items.append((z, 3, 0, "mob", (a, m)))
+        for z, _id, a, m, mx, my in sorted(lying)[:LYING_MOST]:   # the nearest few: each is a model drawn again
+            items.append((z, 3, 0, "model", (a, m, mx, my)))
         shots = fx.shots if fx.shots is not None else [(s.x, s.y) for s in lv.shots]
         for sx_, sy_ in shots:
             a, z = rel(sx_, sy_)
@@ -2103,10 +2120,24 @@ class View:
             heading = math.atan2(m.y - my, m.x - mx)                  # the way it is going
         else:
             heading = m.heading
-        if m.dead and m.id not in fx.dissolve:
+        falls = mdl.breaks == "fall"                               # moved by CLIo Motion: it falls, and lies where it fell
+        if m.dead and m.id not in fx.dissolve and not falls:
             return
         clip = ("attack" if m.intent in ("aim", "windup", "spin") or m.id in fx.emuzzle else
                 "walk" if m.id in fx.pos else "idle")
+        gone = fx.dissolve.get(m.id, 0.0) if m.dead or m.id in fx.dissolve else 0.0
+        if mdl.motion is not None:
+            ending = falls and (m.dead or m.id in fx.dissolve)
+            if ending:                                             # it lies the way it faced when it fell
+                heading = mdl.motion.falls.setdefault(m.id, heading)
+            else:
+                mdl.motion.falls.pop(m.id, None)
+            biting = m.id in fx.lunge                              # a bite, a claw: its attack played through
+            clip, t = mdl.motion.playing(m.id, "attack" if biting else clip, t, tick=fx.tick,
+                                         firing=biting or m.id in fx.emuzzle, struck=m.id in fx.flash and not ending, fast=_fast(m),
+                                         falling=fx.dissolve.get(m.id) if ending else None, dead=ending and m.dead)
+            if ending:
+                gone = 0.0
         lift = m.float * 0.6 + (fx.rise.get(m.id, 0.0) if fx.rise else 0.0)
         g = lv.ground(mx, my) if self.persp is not None else 0.0     # open land, or rooms with heights in the mesh
         lift += g
@@ -2118,8 +2149,7 @@ class View:
             heading = m.heading or 0.0
             gap = math.hypot(m.x - mx, m.y - my)
             roll = (m.rolled - gap) / max(0.05, mdl.height / 2.0 * m.size)
-        got = self.draw_model(px, mdl, mx, my, heading, clip, t, cam, lift=lift, size=m.size,
-                              gone=fx.dissolve.get(m.id, 0.0) if m.dead or m.id in fx.dissolve else 0.0, seed=m.id,
+        got = self.draw_model(px, mdl, mx, my, heading, clip, t, cam, lift=lift, size=m.size, gone=gone, seed=m.id,
                               flash=m.id in fx.flash, tint=fx.tint.get(m.id), roll=roll)
         if got and labels is not None and not m.dead and m.seen:
             top, x = got

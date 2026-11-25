@@ -68,6 +68,11 @@ MODELS = {
                   "leaf": {"t": [0, 0.5, 2], "about": [0, 0, 1.0], "turn": [[0, 0, 0], [0, 0, 0], [95, 0, 0]]}}}}}),
     "beacon": ("a tripod that unfolds and a mast that rises (Erebus's)", (EREBUS, "beacon")),
     "hauler": ("a simple cargo hauler in named groups, for the structure, plan and heat views", (STATION, "hauler")),
+    "soldier": ("a soldier moved by CLIo Motion: he strides, levels his rifle and fires, staggers, falls and lies",
+                {"motion": "soldier"}),
+    "hound": ("a hound moved by CLIo Motion: it trots and runs, bites, falls and lies", {"motion": "hyena"}),
+    "walker": ("a two-legged machine moved by CLIo Motion, a cell high, that comes apart part by part",
+               {"motion": {"character": "mech", "scale": 0.2}, "break": "parts"}),
 }
 KINDS = {"console": CONSOLES, "menu": MENUS, "model": MODELS}
 
@@ -162,9 +167,13 @@ def add(game_dir, kind, name, as_id=None):
         models[mid] = copy.deepcopy(spec)
         _write(game_dir, "models", models)
         clips = list((models[mid].get("tracks") or {}))
+        if models[mid].get("motion") is not None:
+            more = ' A level\'s monster with "model": "%s" walks, attacks and falls with it.' % mid
+        else:
+            more = (' A panel shows it moving with {"scope": {"model": "%s", "view": "solid", "clip": "%s", "at": VALUE}}.'
+                    % (mid, clips[0]) if clips else "")
         said.append('models.json: the model "%s" (%s).%s python clio.py GAME --view-model %s shows it.' % (
-            mid, table[name][0], ' A panel shows it moving with {"scope": {"model": "%s", "view": "solid", "clip": "%s", '
-            '"at": VALUE}}.' % (mid, clips[0]) if clips else "", mid))
+            mid, table[name][0], more, mid))
     else:
         source, sim_id, what = table[name]
         sims = _read(game_dir, "sims") or {}

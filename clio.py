@@ -540,7 +540,7 @@ def main(argv=None):
                     help="write a JSON Schema for each data file into DIR (key completion in VS Code and others) and exit")
     ap.add_argument("--add", nargs=2, metavar=("KIND", "NAME"),
                     help="paste a working piece into the game and exit: console reactor|scan|helm|bay|approach, "
-                         "menu wheel|ring|bar, model door|beacon|hauler (NAME 'list' lists them)")
+                         "menu wheel|ring|bar, model door|beacon|hauler|soldier|hound|walker (NAME 'list' lists them)")
     ap.add_argument("--as", dest="add_as", metavar="ID", help="with --add: the name it gets in the game")
     ap.add_argument("--shots", metavar="DIR",
                     help="draw every console, menu and model of the game into DIR (index.html, and text) and exit")

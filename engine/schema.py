@@ -374,7 +374,8 @@ KINDS = [
         R("lost_text", "ref", "Text when it is lost (and nothing else is said)", of="texts")]},
     {"key": "models", "file": "models", "label": "3D models", "one": "model", "shape": "map", "editor": "model", "fields": [
         F("smooth", "bool", "Smooth (lit at the corners: round things)"), F("scale", "number", "Scale (1: as built)"),
-        F("break", "choice", "Destroyed, it breaks into", options=["shards", "parts", "groups"]),
+        F("break", "choice", "Destroyed, it breaks into (fall: one moved by CLIo Motion falls and lies)",
+          options=["shards", "parts", "groups", "fall"]),
         F("turning", "number", "Turns this many degrees a beat (a pickup)"), F("fps", "number", "Frames a beat"),
         R("look", "group", "How it is drawn (over the game's own)", fields=LOOK)]},
 ]

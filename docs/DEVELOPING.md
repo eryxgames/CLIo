@@ -98,6 +98,7 @@ engine/
   level.py           first-person levels      firstperson.py  the view
   levelbot.py        a player that proves a level can be finished
   model.py           3D models in levels      gltf.py     glTF from Blender
+  motion/            models moved by CLIo Motion: the glue, and the library's Python package carried (clio_motion/)
   frame.py  keys.py  the redrawn screen and single keys
   realm.py           realms: strategy by turns (seasons, stocks, works, threats), and its steward
   vector.py          vector displays: 3D in lines (wire and hidden-line), dots or strokes, afterglow
@@ -129,7 +130,7 @@ guide.
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 1089 tests, about a minute
+python -m unittest discover -s tests     # 1102 tests, about a minute
 python -m engine.vector                  # the vector display's reel (Ctrl-C ends)
 python -m engine.realm templates/realm 8 # a steward plays the realm starter over eight seeds
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
@@ -205,3 +206,10 @@ python3 -m http.server     # plus the two headers, or try GitHub Pages' way: coi
 The optional libraries are released from their own repositories; CLIo follows one release of
 each (`RELEASE` and `SHA256` in `engine/picture/fetch.py` and `engine/audio/ballistic/fetch.py`,
 sizes in `engine/downloads.py`).
+
+CLIo Motion is carried, not downloaded: `engine/motion/clio_motion/` is a copy of its Python
+package (pure Python, the characters and their rigs as JSON beside it), which the engine does
+not change. A newer one is brought in from a checkout of
+[clio-motion](https://github.com/eryxgames/clio-motion) with
+`python tools/clio/carry.py PATH/TO/CLIo` (`--check` says whether the copy here is that
+version), then `python -m engine.editor.hosted` and the tests here.

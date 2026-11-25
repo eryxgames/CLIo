@@ -6,6 +6,17 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 
 ### Added
 
+- **Models moved by CLIo Motion**: a model with `"motion"` (`"hound": {"motion": "hyena"}`) is one
+  of twelve characters that walk by rule - a soldier with three kits, two machines, a hound, a
+  horse, a raptor, a scorpion, a mantis, a wasp, a dragon, an octopus and a plain four-legged
+  one. Its shape is the character's stand-in and its clips (`idle`, `walk`, `run`, `attack`,
+  `hit`, `die`, or any of the character's own) are worked out when first asked for, so the
+  game's files hold none. In a level its monster strides, runs if it is fast, aims and fires
+  or bites, staggers when hit, falls as a rag doll in one of three ways and lies where it fell
+  (`"break": "fall"`). `"style"`, `"scale"`, `"detail"`, `"colors"` and materials by group
+  change it; the viewer, the vector display, `--shots` and the editor show it as any model;
+  `--check` checks it; `--add model soldier|hound|walker` puts one in a game. The library's
+  Python package is carried in `engine/motion/clio_motion/` (nothing to install).
 - **A console anywhere**: the effect `{"console": "reactor"}` (or `{"sim", "done", "fail",
   "quit"}`) opens a simulator from a scene's action, a conversation, an item, a menu, the effects
   after a level; it sets `<sim>_done` or `<sim>_failed` and the game goes on where it was.

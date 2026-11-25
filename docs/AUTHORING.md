@@ -2434,8 +2434,51 @@ labelled as a sprite is. Model space: x to the right, y forward, z up; one unit 
   stay. Keep models low: a few hundred triangles each - every one is lit and filled in
   Python, about 1 ms for a 200-triangle model.
 
-`--check` checks the shapes, sizes, materials and mesh of every model, and that what names
-a model has one.
+- **Moved by CLIo Motion**: a model with `"motion"` is a character that walks by rule. It has
+  no parts, mesh or clips in the file: its shape is the character's stand-in (a few hundred
+  triangles bound to its joints) and its clips are worked out by the motion library when they
+  are first asked for (about a tenth of a second each), so they cost a game's files nothing.
+
+  ```json
+  "hound": {"motion": "hyena"},
+  "guard": {"motion": {"character": "soldier", "kit": "pistols", "style": {"bounce": 1.3}},
+            "colors": {"torso": "#3b6ea8"}, "materials": {"prop0": {"color": "#888888", "metal": 0.9, "rough": 0.3}}},
+  "walker": {"motion": {"character": "mech", "scale": 0.2}, "break": "parts"}
+  ```
+
+  The characters, with their size at the usual scale (cells high, long and wide):
+  `soldier` (0.68, with `"kit"`: `rifle`, `pistols` or `sword` and shield), `mech` (a
+  two-legged machine, 2.0 high: scale it down for a room), `quad` (0.34 x 0.68), `hyena` (0.41
+  x 0.57), `horse` (0.71 x 0.93), `raptor` (0.58 x 1.09), `spider` (a six-legged machine, 0.74
+  x 1.08 x 1.15), `scorpion` (0.50), `mantis` (0.51), `wasp` (0.22), `dragon` (0.97 x 2.13 x
+  1.22), `octopus` (0.25 x 0.46). In `"motion"`: `"scale"` is cells to a metre (0.4, as for a
+  model from Blender); `"style"` changes how it moves (`bounce`, `stride`, `arm`, `lean`,
+  `step`: 1 is plain; `snap`: how sharply a foot is put down, 0.3; `still`: 0 to 1, the life
+  taken out of its standing); `"detail"` 0 to 3 is how round its parts are (0 if not said: about 290 to 830
+  triangles, which is what a level's picture shows anyway; each step up about a fifth more); `"armed": false` leaves a soldier's weapons
+  put away; `"clips"` names the clips it has, if not `idle`, `walk`, `run`, `attack`, `hit` and
+  `die` - any of the character's own (`--check` lists them when one is not known: `sneak`,
+  `jump`, `turn`, a soldier's `reload` and `throw`, a beast's `pounce`...). A beat of a clip is a
+  second of the motion.
+
+  `"colors"` repaints it: by one of its groups (`torso`, `head`, `leg0`, `arm1`, `prop0`, `tail`,
+  `body`... - `--view-model`'s structure view shows them) or by one of its own colours
+  (`"#c26a1e": "#3b6ea8"`). Its two materials are `body` and `glow` (eyes, lamps); give either
+  in `"materials"` to change it, and a material named after a group is used for that group.
+
+  In a level, a monster with such a model strides while it moves (runs, if it comes two cells a
+  beat or more and can), holds its attack's first moment while it aims and plays it while it
+  fires or bites, staggers when it is hit, and when it dies falls as a rag doll - one of three
+  ways, by the monster - and **lies where it fell** (`"break": "fall"`, what these models do
+  unless they say `shards`, `parts` or `groups`, which break them apart as other models; a
+  model without the `die` clip breaks into shards). A body lying is only drawn: nothing in the
+  rules knows it. The library is carried in the engine (`engine/motion/clio_motion/`: pure
+  Python, nothing to install); it is [CLIo Motion](https://github.com/eryxgames/clio-motion),
+  which also makes clips for other engines and has the characters' templates for artists.
+  `python clio.py GAME --add model soldier` (or `hound`, `walker`) puts one in a game.
+
+`--check` checks the shapes, sizes, materials and mesh of every model, what a model's
+`"motion"` asks for, and that what names a model has one.
 
 In the editor, **3D models** shows each model in a small room as a level draws it - turn it
 (◀ ▶, *Turn round*), *Break it*, play its frames - with its triangles, size and anything
@@ -3050,7 +3093,7 @@ console of CLIo's own into your game: its simulator into `sims.json`, the models
 panels show (where your game has none by that name), and a scene that runs it, reached from
 your first scene, that sets the flag `reactor_done` when it is done and comes back. There are
 `reactor`, `scan`, `helm`, `bay` and `approach`; `--as ID` gives it a name of your own;
-`--add menu wheel|ring|bar` and `--add model door|beacon|hauler` do the same for a menu and a
+`--add menu wheel|ring|bar` and `--add model door|beacon|hauler|soldier|hound|walker` do the same for a menu and a
 model; `--add console list` says what there is. Nothing your game has is changed or replaced,
 and the game is checked afterwards. `python -m engine.panels --gallery` shows every widget once
 with the JSON that makes it.

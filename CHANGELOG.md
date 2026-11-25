@@ -6,6 +6,12 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 
 ### Added
 
+- **`--add KIND NAME`** (`engine/recipes.py`): a working piece pasted into a game - a console
+  (`reactor`, `scan`, `helm`, `bay`, `approach`) with its simulator, the models and planets its
+  panels show and a scene that runs it and sets `<id>_done`; a menu (`wheel`, `ring`, `bar`); a
+  model (`door`, `beacon`, `hauler`). `--as ID` names it; nothing of the game's own is replaced;
+  the game is checked afterwards. `python -m engine.panels --gallery`: every widget once, with
+  the JSON that makes it.
 - **Two haulers** in `games/erebus/models.json`, built of parts after two design drawings:
   `hauler_heavy` (a spine, three rows of cargo pods either side, a forked prow with the bridge's
   ball between; 660 triangles) and `hauler_light` (an eight-sided body on a nose leg, three

@@ -107,6 +107,7 @@ engine/
   ahead.py           what is ahead, in lines: the view forward over a simulator's map, as ground or as space; rocks
   viewer.py          views of a model (shaded, lines, cut open, a plan, by heat) and of a planet; --view-model
   shots.py           --shots: a game's consoles, menus and models as a page of pictures, without playing it
+  recipes.py         --add: a working console, menu or model pasted into a game
   demo.py            the demos (engine/demos/clio.json, a game's demo.json)
   editor/            the editor (a page in the browser, also served as a web site)
 games/               derelict/  depths/  rootless/

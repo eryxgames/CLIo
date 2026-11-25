@@ -3014,6 +3014,16 @@ keys. Not on Windows yet (`--touch on` asks for it there all the same).
 (`games/erebus/` is a whole small game of such consoles, one opening the next from a wheel of
 orders, and `templates/station/` three of them to copy.)
 
+**Starting from a piece that works.** `python clio.py GAME --add console reactor` pastes a
+console of CLIo's own into your game: its simulator into `sims.json`, the models and planets its
+panels show (where your game has none by that name), and a scene that runs it, reached from
+your first scene, that sets the flag `reactor_done` when it is done and comes back. There are
+`reactor`, `scan`, `helm`, `bay` and `approach`; `--as ID` gives it a name of your own;
+`--add menu wheel|ring|bar` and `--add model door|beacon|hauler` do the same for a menu and a
+model; `--add console list` says what there is. Nothing your game has is changed or replaced,
+and the game is checked afterwards. `python -m engine.panels --gallery` shows every widget once
+with the JSON that makes it.
+
 **Seeing it without playing it.** `python clio.py GAME --shots DIR` draws every simulator with
 its screen at four moments of the autopilot's run (before it begins, a third and two thirds
 through, at its end), every menu of `menus.json` in its look, and every model as its look has

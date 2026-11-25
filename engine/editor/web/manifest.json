@@ -38,6 +38,7 @@
   "engine/quests.py",
   "engine/realm.py",
   "engine/realtime.py",
+  "engine/recipes.py",
   "engine/records.py",
   "engine/rts.py",
   "engine/schema.py",

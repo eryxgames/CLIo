@@ -536,6 +536,10 @@ def main(argv=None):
                     help="bring a glTF model (.glb or .gltf, e.g. from Blender) into the game's models.json and exit")
     ap.add_argument("--view-model", nargs="?", const="", metavar="NAME",
                     help="look at the game's 3D models and planets: shaded, in lines, cut open, as a plan, by heat")
+    ap.add_argument("--add", nargs=2, metavar=("KIND", "NAME"),
+                    help="paste a working piece into the game and exit: console reactor|scan|helm|bay|approach, "
+                         "menu wheel|ring|bar, model door|beacon|hauler (NAME 'list' lists them)")
+    ap.add_argument("--as", dest="add_as", metavar="ID", help="with --add: the name it gets in the game")
     ap.add_argument("--shots", metavar="DIR",
                     help="draw every console, menu and model of the game into DIR (index.html, and text) and exit")
     ap.add_argument("--shots-size", metavar="WxH", default="112x34", help="with --shots: a console's screen (112x34)")
@@ -612,6 +616,18 @@ def main(argv=None):
         return read_sheet(game_dir, args.import_sheet)
     if args.import_model:
         return import_model(game_dir, args.import_model, args.model_name, args.model_scale)
+    if args.add:
+        from engine import recipes
+        kind, name = args.add
+        if name == "list" or kind == "list":
+            print("\n".join(recipes.listing(kind if kind in recipes.KINDS else None)))
+            return 0
+        try:
+            print("\n".join(recipes.add(game_dir, kind, name, args.add_as)))
+        except recipes.RecipeError as e:
+            print(e)
+            return 2
+        return 0
     if args.shots:
         from engine import shots
         from engine.editor.looks import TERMINALS

@@ -768,10 +768,64 @@ SAMPLE = {"colour": "green", "rows": [
         {"title": "HULL SCAN", "colour": "cyan", "widgets": [{"scope": {"scene": "hauler"}}]}]}]}
 
 
+# Every widget once, with values to show it by: (what it is for, its JSON, rows it is given)
+GALLERY = (
+    ("a value as a bar, with its number; warn and hot colour it from a share of max (negative: below)",
+     {"gauge": "heat", "max": 1000, "unit": "K", "warn": 0.6, "hot": 0.85}, 1),
+    ("a value about a middle: left and right of it", {"center": "drift", "max": 10}, 1),
+    ("a number; big: in large figures", {"number": "power", "big": True, "unit": "%"}, 3),
+    ("a value the player's keys set, with the keys", {"control": "rods", "max": 100, "keys": ["up", "down"]}, 1),
+    ("a heading as a strip of compass", {"compass": "heading"}, 1),
+    ("lamps, lit while their conditions hold", {"lamps": [{"label": "LOCK", "if": "power > 50", "tone": "good"},
+                                                         {"label": "OVERHEAT", "if": "heat > 900", "tone": "hot"}]}, 1),
+    ("words, with values in them", {"text": "CORE {heat:.0f} K   OUTPUT {power:.0f}%"}, 1),
+    ("values over time, in dots", {"plot": ["heat", "power"], "min": 0, "max": 1000, "rows": 5}, 6),
+    ("what the console does when asked: key, name, state", {"functions": True}, 3),
+    ("a line across", {"rule": True}, 1),
+    ("a vector display: a scene by name, or a model of the game's in a view",
+     {"scope": {"scene": "hauler"}}, 9),
+    ("a planet of planets.json, turning", {"planet": "world", "view": "surface"}, 9),
+    ("a surface scan: a planet's relief, or (\"scan\": true) the simulator's own map", {"scan": {"planet": "world"}}, 9),
+    ("the simulator's map (a vehicle sim gives it)", {"map": True}, 3),
+    ("the view ahead of the vehicle, in lines (a vehicle sim gives it)", {"ahead": True}, 3),
+)
+GALLERY_PLANET = {"name": "World", "legend": {"~": {"name": "sea", "colour": "#1f4f78", "height": 0.0},
+                                              "g": {"name": "land", "colour": "#7d9a4a", "height": 0.3},
+                                              "m": {"name": "hills", "colour": "#8a7f78", "height": 0.9}},
+                  "map": ["~~~~gggg~~~~~~mm~~~~~~~~", "~~gggggggg~~~mmmm~~~gg~~", "~ggggmmggggg~~mm~~~gggg~", "~~ggmmmmgggg~~~~~~~ggmg~",
+                          "~~~ggmmggg~~~~~~~~~~gg~~", "~~~~~ggg~~~~~gggg~~~~~~~"]}
+
+
+def gallery(width=64, unicode=True, t=14.0):
+    """Every widget once: ``[(kind, what it is for, its JSON as text, rows of cells)]``."""
+    import json
+    env = {"heat": 780.0, "drift": 3.5, "power": 62.0, "rods": 40.0, "heading": 70.0, "time": t}
+    does = [{"id": "scram", "label": "Scram", "key": "x", "state": "ready", "word": "READY", "tone": "hot"},
+            {"id": "vent", "label": "Vent steam", "key": "v", "state": "wait", "word": "WAIT", "wait": 7},
+            {"id": "beacon", "label": "Deploy beacon", "key": "b", "state": "hold", "word": "HOLD", "charge": 0.6}]
+    out = []
+    for what, spec, rows in GALLERY:
+        kind = next(k for k in WIDGETS if k in spec)
+        from .sim import formula
+        view = View({"title": kind.upper(), "widgets": [spec]}, formula, None, {"world": GALLERY_PLANET})
+        for i in range(40 if kind == "plot" else 1):         # (a plot needs a while of values)
+            cells = view.rows(width, rows + 2, dict(env, heat=780 + 150 * math.sin(i / 5.0), power=62 + 20 * math.cos(i / 7.0)),
+                              t, unicode=unicode, functions=does)
+        out.append((kind, what, json.dumps(spec), cells))
+    return out
+
+
 def main(argv=None):
-    """``python -m engine.panels``: a sample screen, drawn once as text (``--live``: on the terminal, moving)."""
+    """``python -m engine.panels``: a sample screen, drawn once as text (``--live``: on the terminal, moving;
+    ``--gallery``: every widget once, with the JSON that makes it)."""
     import sys
     argv = list(sys.argv[1:] if argv is None else argv)
+    if "--gallery" in argv:
+        for kind, what, spec, cells in gallery(unicode="--ascii" not in argv):
+            cv = Canvas(len(cells[0]), len(cells))
+            cv.rows = cells
+            print("%s: %s\n  %s\n%s\n" % (kind, what, spec, "\n".join(cv.plain())))
+        return 0
     view = View(SAMPLE)
 
     def env(t):

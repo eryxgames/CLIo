@@ -27,6 +27,7 @@ import math
 from array import array
 
 from . import model as model_mod
+from . import motion as motion_mod
 from . import picture
 from .picture import frame as picture_frame
 from .frame import mix, shade, lum
@@ -652,12 +653,26 @@ HAZE = (16, 16, 20)
 AUTO_LOW = 40000             # pixels in a picture above which "auto" detail draws the floor and ceiling at half width
 
 
-def _fast(m):
+def deep(lv, x, y):
+    """Whether the cell there is deep water: one moved by CLIo Motion that swims, swims there."""
+    try:
+        return bool(lv.cell(int(round(x)), int(round(y))).deep)
+    except (AttributeError, IndexError, TypeError):
+        return False
+
+
+def fast(m):
     """Whether a monster comes two cells a beat or more: one moved by CLIo Motion runs then."""
     try:
         return float((m.spec.get("attack") or {}).get("speed", 1) or 1) >= 2
     except (TypeError, ValueError, AttributeError):
         return False
+
+
+def doing(m, fx):
+    """The clip a monster's model plays for what it does in this frame: attack, walk or idle."""
+    return ("attack" if m.intent in ("aim", "windup", "spin") or m.id in fx.emuzzle else
+            "walk" if m.id in fx.pos else "idle")
 
 
 class FX:
@@ -1618,6 +1633,8 @@ class View:
             if m.gone or (body and not (m.model in models and models[m.model].breaks == "fall")):
                 continue
             mx, my = fx.pos.get(m.id, (m.x, m.y))
+            if getattr(m, "actor", None) is not None:       # run live (engine/motion): it is where its feet took it
+                mx, my = m.actor.x, m.actor.y
             a, z = rel(mx, my)
             if -0.4 < z <= sight + 0.5:
                 if body:
@@ -1969,12 +1986,14 @@ class View:
         return self.half + a * self.LW * t, self.yh + self.FS * t - h * (self.FS + self.CH) * t, z
 
     def draw_model(self, px, mdl, wx, wy, heading, clip, t, cam, lift=0.0, size=1.0, gone=0.0, seed=0,
-                   flash=False, tint=None, roll=0.0):
+                   flash=False, tint=None, roll=0.0, verts=None):
         """A model standing at (wx, wy) facing ``heading`` (radians: 0 east, pi/2 south), posed for
         ``clip`` at time ``t``; ``gone`` (0..1): blown apart that far; ``roll``: turned forward about its
         middle that far (radians: a ball rolling). Returns its top and middle on the picture (y, x), or None
-        if none of it showed."""
-        verts = mdl.pose(clip, t)
+        if none of it showed. ``verts``: its corners as they are, in place of a clip's (a body run live:
+        engine/motion's Actor)."""
+        if verts is None:
+            verts = mdl.pose(clip, t)
         if roll:
             c, s, zc = math.cos(roll), math.sin(roll), mdl.height / 2.0
             verts = [(x, y * c + (z - zc) * s, zc - y * s + (z - zc) * c) for x, y, z in verts]
@@ -2123,22 +2142,18 @@ class View:
         falls = mdl.breaks == "fall"                               # moved by CLIo Motion: it falls, and lies where it fell
         if m.dead and m.id not in fx.dissolve and not falls:
             return
-        clip = ("attack" if m.intent in ("aim", "windup", "spin") or m.id in fx.emuzzle else
-                "walk" if m.id in fx.pos else "idle")
+        clip = doing(m, fx)
         gone = fx.dissolve.get(m.id, 0.0) if m.dead or m.id in fx.dissolve else 0.0
-        if mdl.motion is not None:
-            ending = falls and (m.dead or m.id in fx.dissolve)
-            if ending:                                             # it lies the way it faced when it fell
-                heading = mdl.motion.falls.setdefault(m.id, heading)
-            else:
-                mdl.motion.falls.pop(m.id, None)
-            biting = m.id in fx.lunge                              # a bite, a claw: its attack played through
-            clip, t = mdl.motion.playing(m.id, "attack" if biting else clip, t, tick=fx.tick,
-                                         firing=biting or m.id in fx.emuzzle, struck=m.id in fx.flash and not ending, fast=_fast(m),
-                                         falling=fx.dissolve.get(m.id) if ending else None, dead=ending and m.dead)
+        sinks = 0.0
+        live = None
+        actor = getattr(m, "actor", None)
+        if actor is not None and mdl.motion is not None:           # run live: as it is, where it is
+            live, heading, gone = actor.corners(), 0.0, 0.0
+        elif mdl.motion is not None:                               # what it shows of what the monster does
+            clip, t, heading, sinks, ending = motion_mod.shown(mdl, m, fx, clip, t, heading, fast(m), deep(lv, mx, my))
             if ending:
                 gone = 0.0
-        lift = m.float * 0.6 + (fx.rise.get(m.id, 0.0) if fx.rise else 0.0)
+        lift = m.float * 0.6 * (1.0 - sinks) + (fx.rise.get(m.id, 0.0) if fx.rise else 0.0)
         g = lv.ground(mx, my) if self.persp is not None else 0.0     # open land, or rooms with heights in the mesh
         lift += g
         tz = self.tz(z)
@@ -2150,7 +2165,7 @@ class View:
             gap = math.hypot(m.x - mx, m.y - my)
             roll = (m.rolled - gap) / max(0.05, mdl.height / 2.0 * m.size)
         got = self.draw_model(px, mdl, mx, my, heading, clip, t, cam, lift=lift, size=m.size, gone=gone, seed=m.id,
-                              flash=m.id in fx.flash, tint=fx.tint.get(m.id), roll=roll)
+                              flash=m.id in fx.flash, tint=fx.tint.get(m.id), roll=roll, verts=live)
         if got and labels is not None and not m.dead and m.seen:
             top, x = got
             text, role = m.label()

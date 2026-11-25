@@ -582,8 +582,10 @@ def problems(table, where="models.json"):
             out += wrong
             if wrong:
                 continue
-            if spec.get("mesh") or spec.get("frames"):
-                out.append("%s: model '%s' is moved by CLIo Motion: its mesh and frames are not used" % (where, name))
+            if (spec.get("mesh") and not spec.get("skin")) or spec.get("frames"):
+                out.append("%s: model '%s' is moved by CLIo Motion: its %s not used (a mesh of its own needs a skin: "
+                           "--import-model FILE --motion SKELETON)" % (where, name, "frames are" if spec.get("skin") else
+                                                                       "mesh and frames are"))
         if not spec.get("parts") and not n and not moved:
             out.append("%s: model '%s' has neither parts nor a mesh" % (where, name))
         if spec.get("break", "shards") not in BREAKS + ((FALL,) if moved else ()):

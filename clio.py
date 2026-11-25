@@ -349,15 +349,16 @@ def compact_json(obj, indent=0):
     return json.dumps(obj, ensure_ascii=False, separators=(", ", ": ") if not isinstance(obj, list) else (",", ":"))
 
 
-def import_model(game_dir, path, name=None, scale=0.4):
+def import_model(game_dir, path, name=None, scale=0.4, motion=None):
     """``--import-model``: a glTF file into the game's models.json (a model of that name keeps how it was set
-    to move - bob, turning, smooth, spin, scale - and takes the rest from the file)."""
+    to move - bob, turning, smooth, spin, scale - and takes the rest from the file). ``motion``: it is built on
+    that skeleton of CLIo Motion's, and is moved by it."""
     import json
     from collections import OrderedDict
     from engine import gltf, model
     try:
-        spec, notes = gltf.to_model(path, scale=scale)
-    except (OSError, gltf.GltfError, KeyError, IndexError, struct_error()) as e:
+        spec, notes = gltf.to_model(path, scale=scale, motion=motion)
+    except (OSError, ValueError, KeyError, IndexError, struct_error()) as e:
         print("Cannot read %s: %s" % (path, e))
         return 2
     name = name or "".join(c if c.isalnum() or c in "-_" else "_" for c in
@@ -368,7 +369,7 @@ def import_model(game_dir, path, name=None, scale=0.4):
         with open(target, encoding="utf-8") as f:
             table = json.load(f, object_pairs_hook=OrderedDict)
     old = table.get(name) or {}
-    new = OrderedDict((k, v) for k, v in old.items() if k in ("bob", "turning", "smooth", "spin", "scale"))
+    new = OrderedDict((k, v) for k, v in old.items() if k in ("bob", "turning", "smooth", "spin", "scale", "break"))
     new.update(spec)
     new.pop("notes", None)
     table[name] = new
@@ -384,6 +385,8 @@ def import_model(game_dir, path, name=None, scale=0.4):
                        for k, v in (new.get("tracks") or {}).items()]
                       + ["%s (%d frames)" % (k, v["count"] if isinstance(v, dict) else len(v))
                          for k, v in (new.get("frames") or {}).items()]) or "none"
+    if m.motion is not None:
+        clips = "moved by CLIo Motion (%s)" % ", ".join(m.clips)
     print("Model '%s' in %s: %d triangles, %d materials, %.2f cells high; animations: %s."
           % (name, target, len(m.faces), len(m.materials), m.height, clips))
     for n in notes:
@@ -548,6 +551,9 @@ def main(argv=None):
     ap.add_argument("--shots-as", metavar="KINDS", default="full",
                     help="with --shots: terminals to show them on, commas between (full, 256, 16, none, console, ascii)")
     ap.add_argument("--model-name", metavar="NAME", help="with --import-model: its name (default: the file's)")
+    ap.add_argument("--motion", metavar="SKELETON",
+                    help="with --import-model: the model is built on this skeleton of CLIo Motion's (soldier, "
+                         "soldier_pistols, hyena... - its templates/3d) and is moved by it")
     ap.add_argument("--model-scale", type=float, default=0.4,
                     help="with --import-model: cells per metre (0.4: a 2.5 m room is a cell high)")
     ap.add_argument("--import-sheet", metavar="FILE",
@@ -621,7 +627,7 @@ def main(argv=None):
     if args.import_sheet:
         return read_sheet(game_dir, args.import_sheet)
     if args.import_model:
-        return import_model(game_dir, args.import_model, args.model_name, args.model_scale)
+        return import_model(game_dir, args.import_model, args.model_name, args.model_scale, args.motion)
     if args.add:
         from engine import recipes
         kind, name = args.add

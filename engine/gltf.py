@@ -350,16 +350,26 @@ def _tracks(sc, anim, length, nodes, rest, scale, per_beat=8, most=96):
     return {"length": round(length / BEAT, 4), "parts": parts}
 
 
-def to_model(path, scale=1.0, fps=4, max_frames=48, tracks=True, packed=True):
+def to_model(path, scale=1.0, fps=4, max_frames=48, tracks=True, packed=True, motion=None):
     """A model for models.json, and notes on what was left out: ``(spec, notes)``.
 
     An animation of parts that stay stiff (nodes moved, turned, sized) is kept as ``tracks`` - a few keys
     for each part, played at any moment; one that bends a skin, or shears a part, as ``frames`` of the
     mesh (``fps`` a beat, ``max_frames`` at most), ``packed`` unless asked otherwise. ``tracks=False``:
-    frames for all of them."""
+    frames for all of them.
+
+    ``motion``: the model is one built on a skeleton of CLIo Motion (its templates/3d: ``soldier``,
+    ``soldier_pistols``, ``hyena``...) and is to be moved by it (engine/motion): its mesh comes in as it stands,
+    with a ``skin`` - for each corner, the skeleton's joints that carry it and how much each. The file's own
+    animations are not taken."""
     doc, buffers, folder = read(path)
     sc = Scene(doc, buffers, folder)
     notes = sc.notes
+    rig = carried = None
+    if motion:
+        from . import motion as motion_mod
+        rig = motion_mod.rig_named(motion)                # raises GltfError's kin (ValueError) if there is none
+        carried = _carriers(sc, rig, notes)
     # materials
     taken, mats, mat_names, textures = set(), {}, [], {}
     for i, m in enumerate(doc.get("materials") or []):
@@ -395,6 +405,7 @@ def to_model(path, scale=1.0, fps=4, max_frames=48, tracks=True, packed=True):
                 notes.append("morph targets are not taken")
             pieces.append((ni, prim, node.get("skin")))
     verts, keys, faces = [], {}, {}
+    holds = []                                           # moved by CLIo Motion: what carries each kept corner
     sources = []                                         # for frames: each kept vertex -> (node, prim no, index)
     spans, part_names = {}, {}                           # a mesh node that is no skin: its corners, and its name as a part
     for pi, (ni, prim, skin) in enumerate(pieces):
@@ -420,10 +431,15 @@ def to_model(path, scale=1.0, fps=4, max_frames=48, tracks=True, packed=True):
             q = apply(w, p) if skin is None else _skinned(sc, at, k, p, w)
             c = _clio(q, scale)
             key = (round(c[0], 4), round(c[1], 4), round(c[2], 4), pi if skin is not None else ni)
+            if rig is not None:                          # corners in one place carried differently stay two
+                held = _carried_by(doc, buffers, at, k, skin, ni, carried)
+                key += (tuple(sorted(held.items())),)
             if key not in keys:
                 keys[key] = len(verts)
                 verts.append(c)
                 sources.append((pi, k))
+                if rig is not None:
+                    holds.append(held)
             local.append(keys[key])
         tex = textures.get(mi)
         for t in range(0, len(idx) - 2, 3):
@@ -449,6 +465,25 @@ def to_model(path, scale=1.0, fps=4, max_frames=48, tracks=True, packed=True):
         raise GltfError("no triangles in %s" % os.path.basename(path))
     spec = {"source": os.path.basename(path), "materials": mats,
             "mesh": {"v": [[round(c, 4) for c in p] for p in verts], "faces": faces}}
+    if rig is not None:                                  # moved by CLIo Motion: what carries each corner
+        names, rows = [], []
+        for pairs in holds:
+            total = sum(pairs.values())
+            row = []
+            for name, w in sorted(pairs.items(), key=lambda nw: -nw[1]):
+                if w / total < 0.005 and row:
+                    continue
+                if name not in names:
+                    names.append(name)
+                row += [names.index(name), round(w / total, 3)]
+            rows.append(row)
+        spec["motion"] = dict({"character": rig["id"]}, **({"kit": rig["kit"]} if rig["name"] != rig["id"] else {}),
+                              **({"scale": scale} if abs(scale - motion_mod.METRE) > 1e-9 else {}))
+        spec["skin"] = {"joints": names, "weights": rows}
+        if doc.get("animations"):
+            notes.append("the file's own animations are not taken: CLIo Motion moves it")
+        spec["notes"] = sorted(set(notes))
+        return spec, sorted(set(notes))
     stiff = bool(spans) and all(skin is None for _ni, _prim, skin in pieces)
     if len(spans) > 1 or (stiff and tracks and doc.get("animations")):      # its nodes are its named parts
         spec["mesh"]["parts"] = {part_names[ni]: list(span) for ni, span in spans.items() if span[1]}
@@ -491,6 +526,60 @@ def to_model(path, scale=1.0, fps=4, max_frames=48, tracks=True, packed=True):
         spec["tracks"] = moving
     spec["notes"] = sorted(set(notes))
     return spec, sorted(set(notes))
+
+
+def _carried_by(doc, buffers, at, k, skin, ni, carried):
+    """What carries corner ``k`` of a primitive: ``{the skeleton's joint: how much}``. A corner of a skin by its
+    bones (each bone by the joint that carries it); a stiff piece by the joint its node hangs on."""
+    if skin is None or "JOINTS_0" not in at:
+        return {carried[ni]: 1.0}
+    js = accessor_cache(doc, buffers, at["JOINTS_0"])[k]
+    ws = accessor_cache(doc, buffers, at["WEIGHTS_0"])[k] if "WEIGHTS_0" in at else (1, 0, 0, 0)
+    nodes, pairs = doc["skins"][skin]["joints"], {}
+    for j, w in zip(js, ws):
+        if w > 0:
+            name = carried[nodes[int(j)]]
+            pairs[name] = round(pairs.get(name, 0.0) + float(w), 4)
+    return pairs or {carried[ni]: 1.0}
+
+
+def _carriers(sc, rig, notes):
+    """For each node of the file, the name of the skeleton's joint that carries what hangs on it: the node
+    itself if it is one of the rig's joints, else the nearest above it that is, else the rig's first."""
+    names = {j["name"] for j in rig["joints"]}
+    root = next((j["name"] for j in rig["joints"] if j["parent"] < 0), rig["joints"][0]["name"])
+    out, strangers = {}, set()
+    for i in range(len(sc.nodes)):
+        k = i
+        while k is not None and sc.nodes[k].get("name") not in names:
+            k = sc.parent.get(k)
+        out[i] = sc.nodes[k]["name"] if k is not None else root
+        if sc.nodes[i].get("name") not in names and i in {j for s in sc.doc.get("skins") or [] for j in s.get("joints") or []}:
+            strangers.add(sc.nodes[i].get("name") or "?")
+    found = {sc.nodes[i].get("name") for i in range(len(sc.nodes))} & names
+    if len(found) < 0.5 * len(names):
+        raise GltfError("this is not a model on the %s's skeleton: it has %d of its %d joints by name (%s...)"
+                        % (rig["name"], len(found), len(names), ", ".join(sorted(names)[:4])))
+    # the joints have to stand where the skeleton has them in its template pose: that is the pose it is moved from
+    worlds, off = sc.worlds(), []
+    place = {j["name"]: (-j["o"][2], j["o"][1], j["o"][0]) for j in rig["joints"]}     # on glTF's axes
+    for i, n in enumerate(sc.nodes):
+        if n.get("name") in place and i in worlds:
+            w = apply(worlds[i], (0.0, 0.0, 0.0))
+            off.append(math.sqrt(sum((a - b) ** 2 for a, b in zip(w, place[n["name"]]))))
+    off.sort()
+    leg = float(rig.get("leg") or 1.0)
+    if off and off[len(off) // 2] > 0.2 * leg:
+        raise GltfError("its joints do not stand where the %s's do in its template pose (half of them are more than "
+                        "%.2f m off): is it built on another skeleton, or is its armature moved or resized?"
+                        % (rig["name"], off[len(off) // 2]))
+    if off and off[-1] > 0.1 * leg:
+        notes.append("a joint stands %.2f m from where the skeleton has it: what hangs on it will sit off by that"
+                     % off[-1])
+    if strangers:
+        notes.append("bones that are not the skeleton's (%s) are carried by the joint they hang on"
+                     % ", ".join(sorted(strangers)[:6]))
+    return out
 
 
 def model_pack(frames):

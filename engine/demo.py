@@ -20,6 +20,7 @@ how long it plays (a clip whose game ends sooner moves on). Adding a clip, or a 
 (``KINDS``), is all it takes to make a demo longer.
 """
 import copy
+import math
 import os
 import time
 
@@ -27,8 +28,8 @@ from .term import strip_ansi, visible_len
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TECH = os.path.join(ROOT, "engine", "demos", "clio.json")
-KINDS = ("card", "logo", "level", "sim", "stage", "skirmish", "models", "adventure")
-SECONDS = {"card": 4, "logo": 5, "level": 25, "sim": 20, "stage": 20, "skirmish": 25, "models": 4,
+KINDS = ("card", "logo", "level", "sim", "stage", "skirmish", "models", "crowd", "adventure")
+SECONDS = {"card": 4, "logo": 5, "level": 25, "sim": 20, "stage": 20, "skirmish": 25, "models": 4, "crowd": 15,
            "adventure": 30}
 def _idle():
     try:
@@ -107,12 +108,19 @@ def problems(spec, data=None, where="demo.json"):
             out.append("%s: no game '%s'" % (at, game))
             continue
         table = {"level": d.levels, "sim": d.sims, "stage": d.stages, "skirmish": d.skirmishes,
-                 "models": d.models}.get(kind)
+                 "models": d.models, "crowd": d.models}.get(kind)
         names = clip[kind] if isinstance(clip[kind], list) else [clip[kind]]
+        if kind == "crowd" and all(n not in table for n in names):      # one of CLIo Motion's characters, as it comes
+            from . import motion
+            table = dict(table, **{n: {"motion": n} for n in motion.characters()})
         if table is not None:
             for n in names:
                 if n not in table:
-                    out.append("%s: %s has no %s '%s'" % (at, d.title, "model" if kind == "models" else kind, n))
+                    out.append("%s: %s has no %s '%s'" % (at, d.title, "model" if kind in ("models", "crowd") else kind, n))
+                elif kind == "crowd" and not (isinstance(table[n], dict) and table[n].get("motion") is not None):
+                    out.append("%s: a crowd is of a model moved by CLIo Motion (\"motion\"); '%s' is not" % (at, n))
+        if kind == "crowd" and not (isinstance(clip.get("count", 12), int) and 1 <= clip.get("count", 12) <= 200):
+            out.append("%s: \"count\" should be a whole number from 1 to 200" % at)
         for v in clip.get("views") or []:
             if v not in ("pixel", "dots", "dots-fill"):
                 out.append("%s: no view '%s' (pixel, dots, dots-fill)" % (at, v))
@@ -458,6 +466,58 @@ class Player:
                 self.show([list(r) for r in rows], extra=style)
                 self.wait(1 / 15.0)
 
+    # -- a crowd, each body run live ----------------------------------------- #
+    def play_crowd(self, clip):
+        """Bodies of one model (moved by CLIo Motion) wandering a yard under the sky, every one run live by the
+        motion core - none in step with another. The caption says how many, and what the motion took."""
+        from . import model as model_mod
+        from . import motion
+        from .firstperson import FX, View
+        from .level import Level, TextConsole
+        data = self.data(clip)
+        name = clip["crowd"] if isinstance(clip["crowd"], str) else clip["crowd"][0]
+        spec = (data.models or {}).get(name)
+        if spec is None and name in motion.characters():   # one of the library's characters, as it comes
+            spec = {"motion": name}
+        if spec is None:
+            raise KeyError(name)
+        count = max(1, min(200, int(clip.get("count", 12))))
+        yard = _Yard(data, name, count, spec)
+        lv = Level(yard, "_yard", seed=1)
+        lv.console = TextConsole(lambda _t: None, None)
+        lv.player.weapon = None
+        mdl = lv.models.get(name) or model_mod.Model(name, spec)
+        lv.models[name] = mdl
+        for row in lv.grid:
+            for c in row:
+                c.sky = c.sky or c.kind != "wall"
+        mobs = [m for m in lv.monsters if m.model == name]
+        crowd = motion.Crowd(mdl, [(m.x, m.y) for m in mobs], yard.bounds, seed=int(clip.get("seed", 1)))
+        for m, a in zip(mobs, crowd.actors):
+            m.actor, m.seen = a, False
+        views = clip.get("views") or ["pixel"]
+        each = float(clip.get("seconds", SECONDS["crowd"])) / len(views)
+        sc = self.screen
+        view, size, last, took = None, None, self.now(), 0.0
+        start = last
+        while self.left() > 0:
+            W, H = sc.size()
+            style = views[min(len(views) - 1, int((self.now() - start) / each))]
+            if (W, H, style) != size:
+                size, view = (W, H, style), View(W, max(6, H - 3), style)
+            now = self.now()
+            t = time.perf_counter()
+            crowd.step(max(0.0, min(0.1, now - last)))
+            took = 0.8 * took + 0.2 * (time.perf_counter() - t) * 1000.0 if took else (time.perf_counter() - t) * 1000.0
+            last = now
+            t = time.perf_counter()
+            rows = view.render(lv, FX(), 0)
+            self.ms = (time.perf_counter() - t) * 1000.0
+            self.note = "%s%d %s, each run live: %.1f ms the motion" % (
+                clip.get("caption", "") + "  " if clip.get("caption") else "", len(mobs), name.replace("_", " "), took)
+            self.show([list(r) for r in rows], extra=style)
+            self.wait(1 / 30.0)
+
     # -- a text adventure, typed --------------------------------------------- #
     def play_adventure(self, clip):
         import io
@@ -556,6 +616,37 @@ class _Showroom:
             "name": "Showroom", "facing": "n", "sky": SHOWROOM_SKY,
             "map": ["#########"] + rows + ["#########"],
             "legend": {"m": "_showroom_model", "o": {"sky": True}}})
+
+    def __getattr__(self, name):
+        return getattr(self._data, name)
+
+
+YARD_SKY = {"top": "#27456e", "horizon": "#d8b890", "stars": 0.0}
+
+
+class _Yard:
+    """A game's data with one more level: a wide yard open to the sky with ``count`` of a model standing about
+    in it, seen from the middle of its south side."""
+
+    def __init__(self, data, model, count, spec):
+        self._data = data
+        self.models = dict(data.models or {}, **{model: spec})
+        self.monsters = dict(data.monsters or {}, _crowd={"name": model.replace("_", " "), "tag": "c", "model": model,
+                                                          "hp": 1, "attack": {"kind": "melee", "damage": [0, 0]}})
+        W = max(13, min(41, 9 + 2 * int(math.ceil(math.sqrt(count * 2.5)))))
+        D = max(8, min(30, 4 + int(math.ceil(count * 2.0 / (W - 6)))))
+        grid = [["o"] * W for _ in range(D)]
+        px = W // 2
+        spots = sorted((abs(x - px) * 0.7 + (D - 1 - y), y, x) for y in range(D - 2) for x in range(1, W - 1)
+                       if (x + y) % 2 == 0 and abs(x - px) <= (D - 1 - y) + 1)
+        for _d, y, x in spots[:count]:
+            grid[y][x] = "c"
+        grid[D - 1][px] = "@"
+        self.bounds = (max(1.0, px - 6.0), max(0.0, D - 9.0), min(W - 2.0, px + 6.0), D - 2.0)   # in sight of the eye
+        self.levels = dict(data.levels, _yard={
+            "name": "Yard", "facing": "n", "sky": YARD_SKY,
+            "map": ["#" * (W + 2)] + ["#" + "".join(r) + "#" for r in grid] + ["#" * (W + 2)],
+            "legend": {"c": "_crowd", "o": {"sky": True}}})
 
     def __getattr__(self, name):
         return getattr(self._data, name)

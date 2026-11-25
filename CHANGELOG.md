@@ -17,6 +17,18 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   change it; the viewer, the vector display, `--shots` and the editor show it as any model;
   `--check` checks it; `--add model soldier|hound|walker` puts one in a game. The library's
   Python package is carried in `engine/motion/clio_motion/` (nothing to install).
+- **Moved models fly and swim**: a monster that floats and whose model can fly (the wasp, the
+  dragon) beats its wings, hangs in the air where it can, and comes down as it falls; the
+  octopus swims in deep water.
+- **A model of your own on a skeleton**: `--import-model FILE --motion SKELETON` brings in a
+  glTF model built on one of CLIo Motion's templates with a `"skin"` (what carries each corner),
+  and the library moves it as it moves its own. One not on that skeleton is refused.
+- **Models in a level's lines**: with `"view": "lines"` a monster that has a 3D model is drawn as
+  that model in lines, posed for what it does, in place of a lamp on legs; a moved model as a
+  body of a few dozen lines, lying where it fell.
+- **Bodies run live**: `engine/motion`'s `Actor` runs one body with the motion core itself, step
+  by step; a monster with `actor` set is drawn from it. The demo clip `crowd` shows a yard of
+  them, and the tech demo has two.
 - **A console anywhere**: the effect `{"console": "reactor"}` (or `{"sim", "done", "fail",
   "quit"}`) opens a simulator from a scene's action, a conversation, an item, a menu, the effects
   after a level; it sets `<sim>_done` or `<sim>_failed` and the game goes on where it was.

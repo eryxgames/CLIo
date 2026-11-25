@@ -11,7 +11,8 @@ part's joint, so the whole model follows a skeleton with no skinning:
         m["parts"][part]["color"]               # "#rrggbb"; also "group", "glow", and the rig's own part under "def"
 
 Faces are wound anticlockwise seen from outside (x forward, y up, z to the right).  ``rest(m)`` gives the corners
-in the template pose.  The shapes are low on purpose: a capsule is a prism with a blunt point at each end, a thin
+in the template pose.  ``lines(rig)`` is the same body for a display that draws lines: outlines of the thick
+parts, one line for each thin one.  The shapes are low on purpose: a capsule is a prism with a blunt point at each end, a thin
 one has fewer sides, a ball is a double pyramid unless it is one of the big ones (a head, a hull).
 """
 from __future__ import annotations
@@ -85,6 +86,41 @@ def build(rig, sides=6, thin=4):
     for k, j in enumerate(joint):
         by_joint.setdefault(j, []).append((k, local[k][0], local[k][1], local[k][2]))
     return {"rig": rig, "joint": joint, "local": local, "faces": faces, "face_part": face_part, "parts": parts, "by_joint": sorted(by_joint.items())}
+
+
+def lines(rig, sides=4, thick=0.5):
+    """The stand-in model for a display that draws lines (a vector display, a plotter): a part at least ``thick``
+    times as thick as the rig's thickest is the outline of a prism of ``sides`` sides (a ball: of a double
+    pyramid), a thinner one a single line along its length, a small ball nothing.  Returns what ``build`` returns
+    (so ``place`` and ``rest`` take it), with ``"edges"``: pairs of corners.  Its faces are the thick parts' only:
+    they are there to hide the lines behind them."""
+    most = max([q["r"] for q in rig["parts"]] or [0.0])
+    joint, local, faces, face_part, edges, parts = [], [], [], [], [], []
+    for i, q in enumerate(rig["parts"]):
+        first = len(local)
+        ball = q["b"] is None or math.dist(q["a"], q["b"]) < 1e-9
+        if q["r"] >= thick * most:
+            n = max(3, sides)
+            pts, fs = _shape(q["a"], q["b"], q["r"], n, bool(q.get("sq")), False)
+            local += pts
+            faces += [(a + first, b + first, c + first) for a, b, c in fs]
+            face_part += [i] * len(fs)
+            if ball:                                        # one ring and two points
+                for k in range(n):
+                    edges += [(first + k, first + (k + 1) % n), (first + k, first + n), (first + k, first + n + 1)]
+            else:                                           # two rings and what joins them
+                for k in range(n):
+                    edges += [(first + k, first + (k + 1) % n), (first + n + k, first + n + (k + 1) % n), (first + k, first + n + k)]
+        elif not ball:
+            local += [list(q["a"]), list(q["b"])]
+            edges.append((first, first + 1))
+        joint += [q["joint"]] * (len(local) - first)
+        parts.append({"color": q["color"], "group": q["group"], "glow": bool(q.get("raw")), "first": first, "count": len(local) - first, "def": q})
+    by_joint = {}
+    for k, j in enumerate(joint):
+        by_joint.setdefault(j, []).append((k, local[k][0], local[k][1], local[k][2]))
+    return {"rig": rig, "joint": joint, "local": local, "faces": faces, "face_part": face_part, "edges": edges, "parts": parts,
+            "by_joint": sorted(by_joint.items())}
 
 
 def place(m, sk):

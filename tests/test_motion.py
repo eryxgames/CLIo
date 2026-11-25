@@ -262,5 +262,324 @@ class Elsewhere(unittest.TestCase):
             shutil.rmtree(folder, True)
 
 
+class InTheAirAndTheWater(unittest.TestCase):
+    def test_one_that_floats_flies(self):
+        wasp, dragon, hound = (model.Model(n, {"motion": n}).motion for n in ("wasp", "dragon", "hyena"))
+        self.assertEqual(wasp.playing(1, "idle", 2.0, aloft=True), ("hover", 2.0))
+        self.assertEqual(wasp.playing(1, "walk", 2.0, aloft=True), ("fly", 2.0))
+        self.assertEqual(dragon.playing(1, "idle", 2.0, aloft=True), ("fly", 2.0))     # it cannot hang in the air
+        self.assertEqual(wasp.playing(1, "walk", 2.0), ("walk", 2.0))                  # on the floor it walks
+        self.assertEqual(hound.playing(1, "walk", 2.0, aloft=True), ("walk", 2.0))     # one that cannot fly walks on air
+        self.assertEqual(wasp.playing(1, "attack", 2.0, aloft=True)[0], "attack")
+        octo = model.Model("o", {"motion": "octopus"}).motion
+        self.assertEqual(octo.playing(1, "walk", 1.0, afloat=True), ("swim", 1.0))
+        self.assertEqual(octo.playing(1, "idle", 1.0, afloat=True), ("hover", 1.0))
+        for mv, clip in ((wasp, "fly"), (wasp, "hover"), (dragon, "fly"), (octo, "swim")):
+            low = min(p[2] for pose in mv.clip(clip)[2] for p in pose)
+            self.assertTrue(0.0 < low < 0.12, (mv.character, clip, low))               # just clear of the floor: the level lifts it
+
+    def test_in_a_level_it_flies_and_comes_down_to_lie(self):
+        flier = dict(GUARD, float=0.6)
+        lv, m = level_with({"motion": {"character": "wasp", "scale": 0.8}}, flier)
+        lw, mw = level_with({"motion": {"character": "wasp", "scale": 0.8}})
+        m.heading = mw.heading = 0.3
+        view = View(80, 20, "pixel")
+        up, down = view.render(lv, FX(), 0), view.render(lw, FX(), 0)
+        self.assertNotEqual(up, down)
+
+        def top(rows):                                    # the first row of the picture where the two levels differ at all
+            return next(i for i, (a, b) in enumerate(zip(rows, base)) if a != b)
+        m.gone = True
+        base = view.render(lv, FX(), 0)
+        m.gone = False
+        beats = [view.render(lv, FX(pos={m.id: (m.x, m.y)}, tick=k), 1) for k in (0.3, 0.6)]
+        self.assertNotEqual(beats[0], beats[1])           # its wings beat
+        high = top(view.render(lv, FX(), 0))
+        m.dead = True
+        low = top(view.render(lv, FX(), 0))
+        self.assertGreater(low, high + 2)                 # it lies on the floor, not in the air
+
+
+class InLines(unittest.TestCase):
+    def test_a_levels_lines_show_models_as_lines(self):
+        from engine.ahead import LevelView
+        lv, m = level_with({"motion": "soldier"})
+        m.heading = 0.4
+        view = LevelView(80, 20)
+
+        def lit(rows):
+            return sum(1 for row in rows for c in row if (c[0] if isinstance(c, (tuple, list)) else c) not in (None, " ", ""))
+        standing = view.render(lv, FX(), 0)
+        m.model = None                                    # as one with no model: a lamp on legs
+        lamp = view.render(lv, FX(), 0)
+        m.model = "g"
+        self.assertGreater(lit(standing), lit(lamp) + 6)
+        walking = [view.render(lv, FX(pos={m.id: (m.x, m.y)}, tick=k), 2) for k in (0.3, 0.7)]
+        self.assertTrue(standing != walking[0] != walking[1])
+        m.dead = True
+        lying = view.render(lv, FX(), 0)
+        m.gone = True
+        empty = view.render(lv, FX(), 0)
+        self.assertNotEqual(lying, empty)                 # the body, in lines
+        self.assertNotEqual(lying, standing)
+
+    def test_any_model_is_shown_so_and_a_broken_one_is_gone(self):
+        from engine.ahead import LevelView
+        from test_models import DRONE
+        lv, m = level_with(DRONE)
+        view = LevelView(80, 20)
+        there = view.render(lv, FX(), 0)
+        m.model = None
+        self.assertNotEqual(there, view.render(lv, FX(), 0))
+        m.model, m.dead = "g", True
+        with_body = view.render(lv, FX(), 0)
+        m.gone = True
+        self.assertEqual(with_body, view.render(lv, FX(), 0))    # it broke into shards: nothing lies there
+
+    def test_the_lines_are_few(self):
+        for name in ("soldier", "hyena", "scorpion"):
+            mv = model.Model(name, {"motion": name}).motion
+            edges, faces = mv.lines()
+            pts = mv.pose("walk", 0.3, lines=True)
+            self.assertTrue(20 < len(edges) < 300, (name, len(edges)))
+            self.assertTrue(all(0 <= a < len(pts) and 0 <= b < len(pts) for a, b in edges), name)
+            self.assertNotEqual(pts, mv.pose("walk", 0.6, lines=True))
+
+
+class EveryStyle(unittest.TestCase):
+    def test_the_pictures_styles_all_show_it(self):
+        from engine import pixels
+        for style in pixels.STYLES:
+            lv, m = level_with({"motion": "hyena"})
+            m.heading = 0.4
+            view = View(80, 20, style)
+            a = view.render(lv, FX(), 0)
+            b = view.render(lv, FX(pos={m.id: (m.x, m.y)}, tick=0.5), 1)
+            m.gone = True
+            self.assertNotEqual(a, view.render(lv, FX(), 0), style)
+            self.assertNotEqual(a, b, style)
+
+    def test_clio_picture_draws_the_same(self):
+        from engine import picture
+        if not picture.load():
+            self.skipTest("CLIo Picture is not here")
+        lv, m = level_with({"motion": "soldier"})
+        m.heading = 0.4
+        frames = [FX(), FX(pos={m.id: (m.x, m.y)}, tick=0.4), FX(dissolve={m.id: 0.5})]
+        with_it = [View(80, 20, "pixel").render(lv, fx, 1) for fx in frames]
+        was, picture._lib = picture._lib, False           # and in Python alone
+        try:
+            alone = [View(80, 20, "pixel").render(lv, fx, 1) for fx in frames]
+        finally:
+            picture._lib = was
+        self.assertEqual(with_it, alone)
+
+
+class OnesOwnModel(unittest.TestCase):
+    """A model built on one of the skeletons (a .glb as Blender exports it, made here) and moved by it."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp(prefix="clio-test-motion-")
+        self.addCleanup(shutil.rmtree, self.dir, True)
+
+    def glb(self, rig_name="quad", shift=0.0, strange=True):
+        from test_models import CUBE, CUBE_TRIS, Builder
+        rig = motion.rig_named(rig_name)
+        b = Builder()
+        at = {j["name"]: (-j["o"][2] + shift, j["o"][1], j["o"][0]) for j in rig["joints"]}     # on glTF's axes
+        names = [j["name"] for j in rig["joints"]]
+        first = names[0]
+        second = next(n for n in names if math.dist(at[n], at[first]) > 0.2)   # another joint, somewhere else
+        self.pair = (first, second)
+        b.doc["nodes"] = [{"name": n, "translation": list(at[n])} for n in names]
+        if strange:                                       # a bone of the artist's own, on the first joint
+            b.doc["nodes"][0]["children"] = [len(names)]
+            b.doc["nodes"].append({"name": "Feather", "translation": [0.0, 0.1, 0.0]})
+        joints = list(range(len(b.doc["nodes"])))
+        ibm = []
+        for i, n in enumerate(b.doc["nodes"]):
+            o = at[n["name"]] if n["name"] in at else tuple(a + c for a, c in zip(at[first], n["translation"]))
+            ibm.append((1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -o[0], -o[1], -o[2], 1))
+        # three small cubes: on the first joint, between the first and the second (half each), on the artist's bone
+        mid = tuple((a + c) / 2 for a, c in zip(at[first], at[second]))
+        spots = [(at[first], [(0, 1.0)]), (mid, [(0, 0.5), (names.index(second), 0.5)])] \
+            + ([(at[first], [(len(names), 1.0)])] if strange else [])
+        pos, js, ws, idx = [], [], [], []
+        for o, carried in spots:
+            k = len(pos)
+            pos += [(o[0] + 0.03 * x, o[1] + 0.03 * y, o[2] + 0.03 * z) for x, y, z in CUBE]
+            js += [tuple(j for j, _w in carried) + (0,) * (4 - len(carried))] * 8
+            ws += [tuple(w for _j, w in carried) + (0.0,) * (4 - len(carried))] * 8
+            idx += [k + i for i in CUBE_TRIS]
+        prim = {"attributes": {"POSITION": b.acc(pos, "VEC3"), "JOINTS_0": b.acc(js, "VEC4", 5121, "B"),
+                               "WEIGHTS_0": b.acc(ws, "VEC4")}, "indices": b.acc(idx, "SCALAR", 5123, "H")}
+        b.doc["meshes"].append({"primitives": [prim]})
+        b.doc["skins"] = [{"joints": joints, "inverseBindMatrices": b.acc(ibm, "MAT4")}]
+        # and a stiff piece that hangs on the second joint: a mesh that is no skin
+        b.doc["meshes"].append({"primitives": [{"attributes": {"POSITION": b.acc([(0.02 * x, 0.02 * y, 0.02 * z) for x, y, z in CUBE], "VEC3")},
+                                                "indices": b.acc(CUBE_TRIS, "SCALAR", 5123, "H")}]})
+        b.doc["nodes"].append({"name": "Skin", "mesh": 0, "skin": 0})
+        b.doc["nodes"].append({"name": "Badge", "mesh": 1, "translation": [0.0, 0.05, 0.0]})
+        b.doc["nodes"][names.index(second)]["children"] = [len(b.doc["nodes"]) - 1]
+        kids = {c for n in b.doc["nodes"] for c in n.get("children", [])}
+        b.doc["scenes"][0]["nodes"] = [i for i in range(len(b.doc["nodes"])) if i not in kids]
+        path = os.path.join(self.dir, "own.glb")
+        with open(path, "wb") as f:
+            f.write(b.glb())
+        return path, rig
+
+    def test_it_comes_in_with_a_skin_and_follows_the_skeleton(self):
+        from engine import gltf
+        path, rig = self.glb()
+        spec, notes = gltf.to_model(path, scale=0.4, motion="quad")
+        self.assertEqual(spec["motion"], {"character": "quad"})
+        self.assertNotIn("frames", spec)
+        self.assertTrue(any("Feather" in n for n in notes))
+        names = spec["skin"]["joints"]
+        self.assertEqual(set(names), set(self.pair))
+        self.assertEqual(len(spec["mesh"]["v"]), 24)        # the artist's cube is where the first is, carried as it is: one
+        rows = spec["skin"]["weights"]
+        self.assertEqual(len(rows), len(spec["mesh"]["v"]))
+        self.assertEqual(sorted({len(r) // 2 for r in rows}), [1, 2])          # carried by one joint, or by two
+        self.assertEqual(model.problems({"own": spec}), [])
+        m = model.Model("own", spec)
+        self.assertEqual(m.breaks, "fall")
+        self.assertEqual(m.pose("idle", 0.0) == m.verts, False)                # standing is not the template pose
+        # each corner is where the library's own moves put it
+        mv, cm = m.motion, motion.lib()
+        index = {j["name"]: k for k, j in enumerate(rig["joints"])}
+        mv.clip("walk")
+        rec = motion._recorded[mv.key + ("walk",)]
+        sk, worst = None, 0.0
+        for pose, got in zip(rec["frames"], mv.clip("walk")[2]):
+            sk = cm.rig.skeleton(mv.ch, pose, sk)
+            for (x, y, z), row, g in zip(m.verts, rows, got):
+                p = (-x / 0.4, z / 0.4, y / 0.4)                                # the corner at rest, on glTF's axes, in metres
+                want = [0.0, 0.0, 0.0]
+                for k in range(0, len(row), 2):
+                    mt = cm.rig.joint_move(sk, index[names[row[k]]])
+                    q = [mt[0] * p[0] + mt[4] * p[1] + mt[8] * p[2] + mt[12], mt[1] * p[0] + mt[5] * p[1] + mt[9] * p[2] + mt[13],
+                         mt[2] * p[0] + mt[6] * p[1] + mt[10] * p[2] + mt[14]]
+                    want = [w + row[k + 1] * c for w, c in zip(want, q)]
+                worst = max(worst, math.dist(g, (-want[0] * 0.4, want[2] * 0.4, want[1] * 0.4)))
+        self.assertLess(worst, 1e-9)
+        self.assertGreater(far(mv.clip("walk")[2][0], mv.clip("walk")[2][4]), 0.005)   # and it does move
+
+    def test_it_is_drawn_in_a_level_and_imported_by_the_command(self):
+        import io
+        from contextlib import redirect_stdout
+        import clio
+        path, _rig = self.glb()
+        game = os.path.join(self.dir, "g")
+        shutil.copytree(os.path.join(ROOT, "templates", "starter"), game)
+        out = io.StringIO()
+        with redirect_stdout(out):
+            self.assertEqual(clio.import_model(game, path, "beast", 0.4, "quad"), 0)
+        self.assertIn("moved by CLIo Motion (idle, walk", out.getvalue())
+        spec = GameData(game).models["beast"]
+        lv, m = level_with(dict(spec, scale=6.0))                              # (three small cubes: made big enough to see)
+        view = View(80, 20, "pixel")
+        a = view.render(lv, FX(), 0)
+        m.gone = True
+        self.assertNotEqual(a, view.render(lv, FX(), 0))
+
+    def test_what_is_not_on_the_skeleton_is_refused(self):
+        from engine import gltf
+        path, _rig = self.glb(shift=0.5)                                       # its armature moved half a metre aside
+        with self.assertRaises(gltf.GltfError) as e:
+            gltf.to_model(path, motion="quad")
+        self.assertIn("do not stand where", str(e.exception))
+        path, _rig = self.glb()
+        with self.assertRaises(gltf.GltfError) as e:
+            gltf.to_model(path, motion="soldier")                              # another skeleton altogether
+        self.assertIn("not a model on the soldier's skeleton", str(e.exception))
+        with self.assertRaises(ValueError) as e:
+            gltf.to_model(path, motion="unicorn")
+        self.assertIn("no skeleton called 'unicorn'", str(e.exception))
+        spec, _ = gltf.to_model(path, motion="quad")
+        bad = dict(spec, skin=dict(spec["skin"], joints=["Nose"] + spec["skin"]["joints"][1:]))
+        self.assertTrue(any("joint 'Nose'" in s for s in model.problems({"m": bad})))
+        short = dict(spec, skin=dict(spec["skin"], weights=spec["skin"]["weights"][:-1]))
+        self.assertTrue(any("each of the mesh's" in s for s in model.problems({"m": short})))
+
+
+class Live(unittest.TestCase):
+    def test_an_actor_goes_where_it_is_sent(self):
+        m = model.Model("h", {"motion": "hyena"})
+        a = motion.Actor(m, 5.0, 5.0, 0.0)
+        self.assertAlmostEqual(a.x, 5.0, places=6)
+        still = a.corners()
+        for _ in range(120):
+            a.step(1 / 30.0, speed=2.0, heading=0.0)
+        self.assertAlmostEqual(a.x, 5.0 + 4.0 * 2.0 * 0.4, delta=0.35)          # four seconds east at 2 m/s, 0.4 cells a metre
+        self.assertAlmostEqual(a.y, 5.0, delta=0.05)
+        self.assertAlmostEqual(a.speed, 2.0, delta=0.05)
+        for _ in range(90):
+            a.step(1 / 30.0, heading=math.pi / 2)                               # south
+        self.assertGreater(a.y, 5.8)
+        self.assertAlmostEqual(a.heading, math.pi / 2, delta=0.1)
+        moving = a.corners()
+        self.assertEqual(len(moving), len(m.verts))
+        self.assertLess(max(math.hypot(p[0], p[1]) for p in moving), 3 * m.radius + 0.3)   # about its own spot
+        self.assertGreater(far(still, moving), 0.05)
+        for _ in range(60):
+            a.step(1 / 30.0, speed=0.0)
+        del a.events[:]
+        a.step(1 / 30.0, attack=True)
+        for _ in range(30):
+            a.step(1 / 30.0)
+        self.assertIn("bite", a.events)
+        a.step(0.0)                                                             # no time: nothing
+        tall = max(p[2] for p in a.corners())
+        a.step(1 / 30.0, speed=0.0, die=True)
+        for _ in range(90):
+            a.step(1 / 30.0)
+        self.assertTrue(a.down)
+        self.assertLess(max(p[2] for p in a.corners()), 0.8 * tall)
+        a.stand()
+        a.step(1 / 30.0)
+        self.assertFalse(a.down)
+        with self.assertRaises(ValueError):
+            motion.Actor(model.Model("d", {"parts": [{"shape": "box"}]}))
+
+    def test_a_level_draws_a_monster_from_its_actor(self):
+        lv, m = level_with({"motion": "hyena"})
+        view = View(80, 20, "pixel")
+        m.heading = 0.0
+        as_clip = view.render(lv, FX(), 0)
+        m.actor = motion.Actor(lv.models["g"], m.x, m.y, 0.0)
+        a = view.render(lv, FX(), 0)
+        for _ in range(20):
+            m.actor.step(1 / 30.0, speed=1.0, heading=0.0)
+        b = view.render(lv, FX(), 0)
+        self.assertNotEqual(a, b)                          # it has walked on, on its own feet
+        self.assertNotEqual(as_clip, b)
+        self.assertEqual((m.x, m.y), (2, 2))               # and the rules know nothing of it
+
+    def test_a_crowd_wanders_and_stays_in_its_yard(self):
+        m = model.Model("h", {"motion": "hyena"})
+        spots = [(3 + 2 * (k % 4), 3 + 2 * (k // 4)) for k in range(12)]
+        crowd = motion.Crowd(m, spots, (1.0, 1.0, 11.0, 9.0), seed=3)
+        again = motion.Crowd(m, spots, (1.0, 1.0, 11.0, 9.0), seed=3)
+        for _ in range(450):                               # fifteen seconds
+            crowd.step(1 / 30.0)
+            again.step(1 / 30.0)
+        places = [(round(a.x, 6), round(a.y, 6)) for a in crowd.actors]
+        self.assertEqual(places, [(round(a.x, 6), round(a.y, 6)) for a in again.actors])     # the same seed, the same wandering
+        self.assertTrue(all(-1.0 < a.x < 13.0 and -1.0 < a.y < 11.0 for a in crowd.actors), places)
+        self.assertGreater(sum(1 for a, s in zip(crowd.actors, spots) if math.hypot(a.x - s[0], a.y - s[1]) > 0.5), 8)
+        self.assertGreater(len({round(a.heading, 2) for a in crowd.actors}), 6)              # none in step with another
+
+    def test_the_demo_plays_a_crowd(self):
+        from engine import demo
+        self.assertEqual(demo.problems({"game": "rootless", "clips": [{"crowd": "hyena", "count": 8}]}), [])
+        said = demo.problems({"game": "rootless", "clips": [{"crowd": "hopper"}, {"crowd": "unicorn"}, {"crowd": "hyena", "count": 0}]})
+        self.assertEqual(len(said), 3)
+        from test_demo import player
+        p, seen, _fc = player([{"crowd": "hyena", "count": 8, "seconds": 1.0}], W=80, H=24)
+        self.assertEqual(p.run(), "done")
+        self.assertTrue(any("8 hyena, each run live" in n for _t, n, _m in seen))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -2472,7 +2472,35 @@ labelled as a sprite is. Model space: x to the right, y forward, z up; one unit 
   ways, by the monster - and **lies where it fell** (`"break": "fall"`, what these models do
   unless they say `shards`, `parts` or `groups`, which break them apart as other models; a
   model without the `die` clip breaks into shards). A body lying is only drawn: nothing in the
-  rules knows it. The library is carried in the engine (`engine/motion/clio_motion/`: pure
+  rules knows it, and of many only the six nearest within eight cells are drawn. One that
+  **floats** (`"float"` in monsters.json) and can fly - the wasp, the dragon - beats its wings
+  (`fly`; the wasp hangs in the air, `hover`, when it is going nowhere) and comes down out of
+  the air as it falls; the octopus swims (`swim`, `hover`) where the water is deep. These clips
+  are added to the six by themselves.
+
+  It is drawn in **every style** as any model is - half blocks, blocks, dots, LED, ASCII, the
+  viewer's views, a scope's lines - and in a level's `"view": "lines"` as a body of a few dozen
+  lines. [CLIo Picture](#playing-it) draws it as it draws other models, the same picture to the
+  dot: on the machine this was tried on (a 100 x 30 terminal) a picture with 40 of them in sight
+  takes about 100 ms in Python and 16 ms with the library.
+
+  **A model of your own** on one of the skeletons: build it in Blender on the character's
+  template (CLIo Motion's `templates/3d`, and its Blender add-on binds a mesh to the bones),
+  export glTF, and `python clio.py GAME --import-model guard.glb --motion soldier` (the
+  skeleton: a character, or `soldier_pistols`, `soldier_sword`). Its mesh and materials come in
+  as any model's, with a `"skin"`: for each corner, the joints that carry it and how much each.
+  A stiff piece (an object parented to a bone) and a bone of your own are carried by the joint
+  they hang on. A file whose joints do not stand where the skeleton's do is refused. The
+  file's own animations are not taken: the library moves it. Keep it low: every corner is
+  moved in Python, a few hundred to a couple of thousand is right.
+
+  **Run live.** All of the above plays clips, the same for every monster of a model, which is
+  what a game by beats wants. `engine/motion`'s `Actor` is one body run by the motion core
+  itself, step by step - told how fast to go and which way, to attack, that it is hit, to fall -
+  so that no two are in step, and a monster with `actor` set to one is drawn where its feet
+  have taken it. The demo clip `{"crowd": "hyena", "count": 24}` shows a yard of them; CLIo's
+  tech demo has two. A live body costs about 0.12 ms a step in Python (0.3 ms when it is in
+  sight and its corners are wanted), so a hundred are about 10 ms of a frame. The library is carried in the engine (`engine/motion/clio_motion/`: pure
   Python, nothing to install); it is [CLIo Motion](https://github.com/eryxgames/clio-motion),
   which also makes clips for other engines and has the characters' templates for artists.
   `python clio.py GAME --add model soldier` (or `hound`, `walker`) puts one in a game.
@@ -3185,7 +3213,9 @@ far round it has turned (a number, or the name of a value; none: by its spin). `
 **Levels in lines.** A first-person level can be drawn by the same lines: `"view": "lines"` in
 `game.json` (or `--view lines`, or on one level) shows what is ahead - the sides of walls that
 face a floor, doors crossed, floors as a net at their heights, the way out by name, and who is
-alive and in sight as a lamp on legs with their first letter. `"view": "scan"` shows the whole
+alive and in sight: one with a 3D model as that model in lines, doing what it does (a model moved
+by CLIo Motion as a body of a few dozen lines, which also lies there when it has fallen), the
+others as a lamp on legs; each with their first letter. `"view": "scan"` shows the whole
 level as a surface scan with the player marked on it. A level's `"goggles": "lines"` makes its
 night-vision goggles show the lines instead of dots. The level plays as it does in any view.
 
@@ -3422,6 +3452,7 @@ there the same way.
 | `stage` | the stage, played by its bot (it looks for the way first: a second or more) |
 | `skirmish` | the skirmish, with the computer on every side; the view follows the fighting |
 | `models` | each model turning in a yard under the sky, `seconds` each, scaled to about one size (`size`) |
+| `crowd` | `count` (12; up to 200) bodies of one model moved by CLIo Motion - or of one of its characters by name (`"hyena"`) - wandering a yard, every one run live by the motion core; `views` take turns; the caption says what the motion took |
 | `adventure` | a game (a folder under games/) played by typed `commands`, or its `"walkthrough"` |
 
 A clip plays its `seconds` (or less, if its game ends); `game` names another game's folder.

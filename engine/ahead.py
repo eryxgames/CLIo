@@ -244,7 +244,13 @@ def draw(scope, sim, spec=None, t=0.0):
         if not rooms or sim.seen(px, -py):
             scope.label(cam, (px, py, pz), word, bright=1.2)
     for thing in (sim.things() if hasattr(sim, "things") else ()):
-        lamp(scope, cam, thing)
+        if thing.get("wire") is not None:                # somebody with a 3D model: the model, in lines
+            scope.draw(cam, thing["wire"], bright=thing.get("bright", 1.2), solid=solid)
+            if thing.get("label"):
+                scope.label(cam, (thing["x"], -thing["y"], thing["top"]), str(thing["label"]), bright=thing.get("bright", 1.2),
+                            dx=1, dy=-1)
+        else:
+            lamp(scope, cam, thing)
     cx, cy = scope.W // 2, scope.H // 2                  # where it heads
     for dx, dy in ((-3, 0), (-2, 0), (2, 0), (3, 0), (0, -2), (0, 2)):
         scope.dot(cx + dx, cy + dy, 0.9)
@@ -473,6 +479,7 @@ class LevelPlace:
         self.W, self.H = lv.w, lv.h
         self.z = self.floor(p.x, p.y)
         self.moved = getattr(fx, "pos", None) or {}
+        self.fx, self.phase = fx, 0
 
     def kind(self, tx, ty):
         if not (0 <= tx < self.W and 0 <= ty < self.H):
@@ -496,17 +503,72 @@ class LevelPlace:
         except Exception:
             return True
 
+    def figure(self, m, x, y, ground):
+        """A monster's 3D model as lines where it stands, posed for what it is doing (as the picture shows it:
+        engine/firstperson.py), and how high it reaches - or None if it has no model, or has broken apart."""
+        models = getattr(self.lv, "models", None) or {}
+        mdl = models.get(getattr(m, "model", None))
+        if mdl is None or not mdl.faces:
+            return None
+        from . import firstperson
+        fx = self.fx if self.fx is not None else firstperson.FX()
+        t = self.phase + (fx.tick or 0.0)
+        if m.intent in ("aim", "windup", "spin", "charge") or m.id in fx.emuzzle or m.heading is None:
+            heading = math.atan2(self.y - (y + 0.5), self.x - (x + 0.5))            # at the player
+        elif m.id in fx.pos and (m.x, m.y) != (x, y):
+            heading = math.atan2(m.y - y, m.x - x)                                  # the way it is going
+        else:
+            heading = m.heading
+        clip, sinks, ending = firstperson.doing(m, fx), 0.0, False
+        if mdl.motion is not None:
+            from . import motion
+            clip, t, heading, sinks, ending = motion.shown(mdl, m, fx, clip, t, heading, firstperson.fast(m),
+                                                           firstperson.deep(self.lv, x, y))
+        if (m.dead or m.id in fx.dissolve) and not ending:
+            return None
+        if mdl.motion is not None:                       # a body of a few dozen lines, made for a display of lines
+            edges, faces = mdl.motion.lines()
+            verts = [(p[0] * mdl.scale, p[1] * mdl.scale, p[2] * mdl.scale) for p in mdl.motion.pose(clip, t, lines=True)]
+            origin, wound = range(len(verts)), True
+        else:
+            kept = getattr(mdl, "_lines", None)
+            if kept is None:                             # its lines at rest, and which of its corners each is
+                apart = [0] * len(mdl.verts)
+                for f in mdl.faces:
+                    for i in f[:3]:
+                        apart[i] = f[5]
+                origin = []
+                kept = mdl._lines = (vector.from_triangles(mdl.verts, [f[:3] for f in mdl.faces], apart=apart, origin=origin),
+                                     origin)
+            (wire, origin), verts = kept, mdl.pose(clip, t)
+            edges, faces, wound = wire.edges, wire.faces, wire.wound
+        size = float(getattr(m, "size", 1.0) or 1.0)
+        fx_, fy_ = math.cos(heading) * size, -math.sin(heading) * size              # (north is +y here)
+        lift = ground + float(getattr(m, "float", 0.0) or 0.0) * 0.6 * (1.0 - sinks)
+        cx, cy = x + 0.5, -(y + 0.5)
+        pts = [(cx + verts[i][0] * fy_ + verts[i][1] * fx_, cy - verts[i][0] * fx_ + verts[i][1] * fy_, lift + verts[i][2] * size)
+               for i in origin]
+        return vector.Wire(pts, edges, faces, wound=wound), max(p[2] for p in pts)
+
     def things(self):
-        """Who is alive and in sight (a lamp on legs, with their first letter), and what there is to take."""
+        """Who is in sight - their 3D model in lines if they have one (one that fell lies there), else a lamp on
+        legs, with their first letter - and what there is to take."""
         out = []
         for m in getattr(self.lv, "monsters", ()) or ():
-            if getattr(m, "dead", False):
+            if getattr(m, "gone", False):
                 continue
             x, y = self.moved.get(getattr(m, "id", None), (m.x, m.y))
             if self.seen(x + 0.5, y + 0.5):
                 ground = self.floor(int(x), int(y))
-                out.append({"x": x + 0.5, "y": y + 0.5, "z": ground + 0.5, "ground": ground, "legs": True, "size": 0.22,
-                            "label": str(getattr(m, "kind", "?"))[:1].upper(), "bright": 1.5})
+                dead = getattr(m, "dead", False)
+                made = self.figure(m, x, y, ground)
+                if made is not None:
+                    out.append({"x": x + 0.5, "y": y + 0.5, "wire": made[0], "top": made[1] + 0.08,
+                                "label": None if dead else str(getattr(m, "kind", "?"))[:1].upper(),
+                                "bright": 0.55 if dead else 1.3})
+                elif not dead:
+                    out.append({"x": x + 0.5, "y": y + 0.5, "z": ground + 0.5, "ground": ground, "legs": True, "size": 0.22,
+                                "label": str(getattr(m, "kind", "?"))[:1].upper(), "bright": 1.5})
         for it in getattr(self.lv, "items", ()) or ():
             if getattr(it, "taken", False) or not self.seen(it.x + 0.5, it.y + 0.5):
                 continue
@@ -533,6 +595,7 @@ class LevelView:
 
     def render(self, lv, fx=None, phase=0):
         place = LevelPlace(lv, fx)
+        place.phase = phase
         scope = self.scope
         scope.clear()
         if self.style == "scan":

@@ -350,7 +350,7 @@ KINDS = [
         R("crystal", "number", "Crystal in each crystal tile"),
         R("on_win", "effects", "When it is won"), R("on_lose", "effects", "When it is lost"),
         R("death_text", "ref", "Text when it is lost (and nothing else is said)", of="texts")]},
-    {"key": "sims", "file": "sims", "label": "Simulators", "one": "sim", "shape": "map", "title": "name",
+    {"key": "sims", "file": "sims", "label": "Simulators", "one": "sim", "shape": "map", "title": "name", "editor": "sim",
      "fields": [
         F("name"), F("title", label="Title shown"), F("intro", "long", "Shown before it starts"),
         F("music", "ref", of="music"), F("mode", "choice", "What it is", options=["vehicle", "systems"]),

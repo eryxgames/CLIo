@@ -94,6 +94,44 @@ def consoles(data, size=(112, 34), terminals=("full",), moments=MOMENTS):
     return out
 
 
+_flown = {}                                               # a sim as it is written -> (the autopilot's journal, how it went)
+
+
+def console(data, sid, moment=0.0, size=(112, 34), terminal="full"):
+    """One simulator's screen at a moment (0..1) of the autopilot's run, for the editor: ``{"rows", "cols",
+    "lines", "verdict", "result", "seconds"}``. The run is kept while the sim's data stays the same."""
+    import json
+    from . import sim as S
+    from .editor.looks import TERMINALS
+    from .realtime import replay
+    key = json.dumps((data.sims or {}).get(sid), sort_keys=True, default=str)
+    got = _flown.get(key)
+    if got is None:
+        flown = S.make(data, sid)
+        journal = S.fly(flown)
+        if len(_flown) > 24:
+            _flown.clear()
+        got = _flown[key] = (journal, flown.result, flown.why, flown.ticks, flown.rate)
+    journal, result, why, last, rate = got
+    sim = S.make(data, sid)
+    k = max(0.0, min(1.0, float(moment)))
+    if k > 0:
+        upto = max(1, int(last * k) - (3 if k >= 1.0 else 0))
+        cut = [e for e in journal if e[0] <= upto]
+        replay(sim, cut, rate=sim.rate, exact=True, ticks=max(0, upto - (cut[-1][0] if cut else 0)))
+    W, H = size
+    uni = TERMINALS.get(terminal, TERMINALS["full"])[1]
+    runner = S.Runner(sim)
+    rows = None
+    for _ in range(2):
+        rows = runner.rows(W, H, 3, uni)
+    runs = runs_of(rows, terminal)
+    verdict = "The autopilot %s in %.1f s." % ({"won": "does it", "lost": "fails (%s)" % why}.get(result, "does not finish it"),
+                                              last / float(rate))
+    return {"rows": runs, "cols": W, "lines": len(runs), "verdict": verdict, "result": result,
+            "seconds": round(last / float(rate), 1), "panels": bool(sim.panels) and W >= 60 and H - 3 >= 14}
+
+
 def menus(game, size=(78, 24), terminals=("full",)):
     """Each menu of the game's own, in its look, as it stands at the start: ``[(title, note, runs)]``."""
     from . import menu as M

@@ -626,6 +626,7 @@ function renderForm() {
   if (mapped) parts.push(levelEditor(kind, thing, hit.id));
   if (kind.editor === "weapon") parts.push(weaponSheet(kind, thing, hit.id));
   if (kind.editor === "model") parts.push(modelSheet(kind, thing, hit.id, built), lookSheet(kind, thing, hit.id));
+  if (kind.editor === "sim") parts.push(simSheet(kind, thing, hit.id));
 
   // everything the schema does not describe is still here, as JSON
   const rest = restArea(kind, thing, known, kind.fields.length || drawn ? "" : "This kind has no form yet: edit it as JSON.");
@@ -2516,6 +2517,80 @@ function lookSheet(kind, thing, id) {
       "Light is from the right, from above and from the eye's side. View, line colour, palette, shades and dither are the fields \"How it is drawn\" above; " +
       "the game's own are on the Game page."),
     groupsBox);
+}
+
+// A simulator's screen as the game draws it, at a moment of the autopilot's run; whether it can be done; and its
+// panels: where a widget can be put, every widget there is.
+const SIM_STARTER = { title: "CONSOLE", widgets: [{ text: "A console of its own: add widgets below." }, { functions: true }] };
+function simSheet(kind, thing, id) {
+  const canvas = el("canvas", { class: "banner-canvas", role: "img", "aria-label": "The simulator's screen, as the game draws it" });
+  const verdict = el("p", { class: "note" }), note = el("p", { class: "note" }), tools = el("div", {});
+  const moment = el("select", { "aria-label": "Moment of the autopilot's run" },
+    ...[[0, "Before it begins"], [0.35, "A third through"], [0.7, "Two thirds through"], [1, "At its end"]].map(([v, t], i) =>
+      el("option", { value: String(v), selected: i === 2 }, t)));
+  const size = el("select", { "aria-label": "Size in characters" }, ...[[112, 34], [80, 24], [60, 20], [48, 20]].map(([c, r], i) =>
+    el("option", { value: `${c}x${r}`, selected: i === 0 }, `${c} by ${r}`)));
+  const terminal = el("select", { "aria-label": "Terminal" }, ...LOOK_TERMINALS.map(([v, label]) => el("option", { value: v }, label)));
+  let wait = null, asked = 0;
+  async function show() {
+    const mine = ++asked;
+    const [cols, rows] = size.value.split("x").map(Number);
+    let got;
+    try { got = await api("/api/console", { pending: pending(), name: id, moment: +moment.value, cols, rows, terminal: terminal.value }); }
+    catch (err) { note.classList.add("bad"); note.textContent = "It cannot be drawn: " + err.message; return; }
+    if (mine !== asked) return;
+    note.classList.toggle("bad", got.problems.length > 0);
+    note.textContent = got.problems.join(" ");
+    verdict.textContent = got.verdict + (got.verdict && !got.panels && got.has_panels ? " At this size it is shown as a column of instruments: its panels need 60 by 17." : "");
+    verdict.classList.toggle("bad", got.result !== null && got.result !== "won");
+    if (got.rows.length) paintCells(canvas, got.rows, got.cols, got.lines);
+    drawTools(got);
+  }
+  const later = () => { clearTimeout(wait); wait = setTimeout(show, 400); };
+  function at(path) { let node = thing.panels; for (const step of path) node = node[step]; return node; }
+  function drawTools(got) {
+    if (!got.has_panels) {
+      tools.replaceChildren(el("p", { class: "note" }, "It has no screen of its own: its instruments stand in a column. "),
+        el("button", { type: "button", class: "quiet", onclick: () => { thing.panels = JSON.parse(JSON.stringify(SIM_STARTER)); touched(kind); renderForm(); } }, "Give it panels"));
+      return;
+    }
+    const where = el("select", { "aria-label": "Panel to add it to" }, ...got.places.map((p, i) =>
+      el("option", { value: String(i) }, `${p.title} (${p.widgets.join(", ") || "empty"})`)));
+    const what = el("select", { "aria-label": "Widget" }, ...got.widgets.map((w, i) => el("option", { value: String(i) }, w.kind)));
+    const about = el("p", { class: "note" });
+    const code = el("pre", { class: "code" });
+    const say = () => { const w = got.widgets[+what.value]; about.textContent = w.what + "."; code.textContent = JSON.stringify(w.spec); };
+    what.addEventListener("change", say);
+    say();
+    const change = (fn) => { const p = got.places[+where.value]; if (!p) return; fn(at(p.path)); touched(kind); renderForm(); };
+    tools.replaceChildren(
+      el("div", { class: "row" }, what, el("span", {}, "to"), where,
+        el("button", { type: "button", class: "quiet", onclick: () => change((node) => node.widgets.push(JSON.parse(JSON.stringify(got.widgets[+what.value].spec)))) }, "Add the widget"),
+        el("button", { type: "button", class: "quiet warn", onclick: () => change((node) => node.widgets.pop()) }, "Remove that panel's last")),
+      about, code,
+      el("div", { class: "row" },
+        el("button", { type: "button", class: "quiet", title: "A new panel beside or under the chosen one", onclick: () => {
+          const p = got.places[+where.value];
+          if (!p) return;
+          const fresh = { title: "NEW", widgets: [] };
+          if (!p.path.length) thing.panels = { colour: thing.panels.colour, cols: [Object.assign({}, thing.panels, { colour: undefined }), fresh] };
+          else at(p.path.slice(0, -1)).splice(p.path[p.path.length - 1] + 1, 0, fresh);
+          touched(kind); renderForm();
+        } }, "Add a panel after it")));
+  }
+  for (const s of [moment, size, terminal]) s.addEventListener("change", show);
+  setTimeout(() => {
+    const form = canvas.closest("#form");
+    if (form) { form.addEventListener("input", later); form.addEventListener("change", later); }
+  }, 0);
+  show();
+  return el("div", { class: "sheet" },
+    el("h3", {}, "Its screen, as the game draws it"), canvas,
+    el("div", { class: "row" }, moment, size, terminal), verdict, note,
+    el("h3", {}, "Its panels"),
+    el("p", { class: "note" }, "Pick a widget and a panel: it is added with values to change in the JSON of \"panels\" below - the names it shows are this simulator's values " +
+      "(its systems, controls and functions). The picture is drawn anew as you type."),
+    tools);
 }
 
 // ---------------------------------------------------------------------- enemies: make one, try one

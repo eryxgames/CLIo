@@ -76,5 +76,49 @@ class ShotsTests(unittest.TestCase):
         self.assertIn("it cannot be drawn", got[0][1])
 
 
+class EditorConsoleTests(unittest.TestCase):
+    """The editor's page of a simulator: its screen at a moment, whether it can be done, where widgets go."""
+
+    def test_a_console_at_a_moment_and_where_its_widgets_are(self):
+        from engine.editor import looks, service
+        got = looks.console(STATION, "reactor", moment=0.7, cols=100, rows=30)
+        self.assertEqual((got["problems"], got["result"], got["cols"], got["lines"]), ([], "won", 100, 28))
+        self.assertIn("The autopilot does it in", got["verdict"])
+        text = "".join(run[0] for row in got["rows"] for run in row)
+        self.assertIn("[X] SCRAM", text)
+        self.assertTrue(got["has_panels"] and got["panels"])
+        first = got["places"][0]
+        self.assertEqual(sorted(first), ["path", "title", "widgets"])
+        spec = GameData(STATION).sims["reactor"]["panels"]
+        node = spec
+        for step in first["path"]:
+            node = node[step]
+        self.assertEqual(len(node["widgets"]), len(first["widgets"]))            # the path leads to that panel
+        self.assertEqual(len(got["widgets"]), 15)
+        self.assertEqual(sorted(got["widgets"][0]), ["kind", "spec", "what"])
+        begun = service.handle(STATION, "/api/console", {"name": "reactor", "moment": 0, "cols": 48, "rows": 20})
+        self.assertFalse(begun["panels"])                                         # too small for panels: the column
+        self.assertNotEqual(begun["rows"], got["rows"])
+        self.assertEqual(len(shots._flown), 1)                                   # flown once for both
+        with self.assertRaises(Exception):
+            looks.console(STATION, "nothing")
+
+    def test_what_is_on_the_page_is_what_is_drawn_and_judged(self):
+        from engine.editor import looks
+        sims = dict(GameData(STATION).sims)
+        sims["reactor"] = dict(sims["reactor"], fail_if="time >= 2")             # it cannot be done like this
+        hard = looks.console(STATION, "reactor", {"sims": sims}, moment=1.0, cols=100, rows=30)
+        self.assertEqual(hard["result"], "lost")
+        self.assertIn("The autopilot fails", hard["verdict"])
+        sims["reactor"] = dict(sims["reactor"], win_if="nothing_there >= 1")
+        wrong = looks.console(STATION, "reactor", {"sims": sims})
+        self.assertEqual(wrong["rows"], [])
+        self.assertEqual(len(wrong["problems"]), 1)
+        bare = dict(GameData(STATION).sims["reactor"])
+        bare.pop("panels")
+        sims["reactor"] = bare
+        self.assertFalse(looks.console(STATION, "reactor", {"sims": sims})["has_panels"])
+
+
 if __name__ == "__main__":
     unittest.main()

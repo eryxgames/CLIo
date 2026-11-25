@@ -83,6 +83,9 @@ def handle(game_dir, path, body=None):
         return looks.model_look(game_dir, str(body.get("name") or ""), pending, body.get("view"), body.get("cols") or 60,
                                 body.get("rows") or 24, str(body.get("terminal") or "full"),
                                 body.get("yaw", 30.0) or 0.0, body.get("pitch", 20.0) or 0.0, body.get("turns") or 0)
+    if path == "/api/console":                              # a simulator's screen at a moment of the autopilot's run
+        return looks.console(game_dir, str(body.get("name") or ""), pending, body.get("moment") or 0.0,
+                             body.get("cols") or 112, body.get("rows") or 34, str(body.get("terminal") or "full"))
     if path == "/api/modelimport":                          # a glTF file from Blender, made a model (not written)
         return levels.model_import(body.get("data"), str(body.get("name") or ""), body.get("scale") or 0.4)
     if path == "/api/levelcheck":                           # the level bot plays the level a few times

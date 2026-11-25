@@ -228,6 +228,48 @@ def model_look(game_dir, name, pending=None, view=None, cols=60, rows=24, termin
                 look={k: v for k, v in look.items() if k in viewer.LOOK_KEYS})
 
 
+def console(game_dir, name, pending=None, moment=0.0, cols=112, rows=34, terminal="full"):
+    """A simulator's screen as the game draws it, at a moment of the autopilot's run - from what is on
+    the page, saved or not - with whether it can be done, what is wrong with it, where widgets can be
+    put (each panel that holds widgets: its path in the layout and its title) and every widget there
+    is with the JSON that makes it."""
+    import json
+    from .. import panels, shots
+    from .. import sim as sims
+    from ..data import GameData
+    from . import EditorError, workdir
+    with workdir(game_dir, pending) as work:
+        data = GameData(work)
+    if name not in (data.sims or {}):
+        raise EditorError("There is no simulator called %s." % name)
+    cols, rows = max(40, min(200, int(cols or 112))), max(14, min(70, int(rows or 34)))
+    wrong = [w for w in sims.problems(data) if w.startswith("sim '%s'" % name)]
+    places = []
+
+    def walk(node, path, said):
+        if not isinstance(node, dict):
+            return
+        title = str(node.get("title") or said)
+        if isinstance(node.get("widgets"), list):
+            places.append({"path": path, "title": title, "widgets": [next((k for k in panels.WIDGETS if k in w), "?")
+                                                                     for w in node["widgets"] if isinstance(w, dict)]})
+        for key in ("cols", "rows"):
+            for i, child in enumerate(node.get(key) or []):
+                walk(child, path + [key, i], "%s %s %d" % (title, key[:-1], i + 1))
+    spec = data.sims[name]
+    walk(spec.get("panels"), [], "the screen")
+    out = {"rows": [], "cols": cols, "lines": rows, "verdict": "", "result": None, "problems": wrong, "places": places,
+           "has_panels": isinstance(spec.get("panels"), dict),
+           "widgets": [{"kind": k, "what": what, "spec": json.loads(js)} for k, what, js, _cells in panels.gallery(48)]}
+    if wrong:
+        return out
+    try:
+        out.update(shots.console(data, name, moment, (cols, rows), terminal))
+    except Exception as err:                                # data the simulator cannot be made of is the person's to see
+        out["problems"] = ["It cannot be drawn like this: %s" % err]
+    return out
+
+
 def picture(game_dir, name, pending=None):
     """A sprite drawn in its style, as scenes, portraits and the title screen show it.
 

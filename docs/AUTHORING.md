@@ -3024,6 +3024,12 @@ or from one of these: `"console": {"like": "ice", "border": "heavy", "model_look
 game (`menu_look`, `menu_border`, `model_look`), a simulator's panels (`colour`, `border`) or a
 model (`look`) says itself goes over it.
 
+**In the editor** a simulator's page shows its screen as the game draws it - before it begins, a
+third and two thirds through and at the end of the autopilot's run, at four sizes (down to a
+phone held upright), as terminals of the six kinds show it - drawn anew as you type, with
+whether the autopilot can do it and what is wrong. Under it, every widget there is can be added
+to any of its panels (and a panel after any other); what they show is then changed in the JSON.
+
 **By example.** [COOKBOOK.md](COOKBOOK.md) answers "how do I make..." for consoles a task at a
 time - a thing that has to be held, things done in order, a hatch as far open as a value, a
 wheel of orders, a model from Blender - each with JSON that the tests build and play.

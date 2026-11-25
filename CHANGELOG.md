@@ -6,6 +6,10 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 
 ### Added
 
+- **The editor's page of a simulator** shows its screen as the game draws it (`/api/console`): at
+  four moments of the autopilot's run, four sizes and six kinds of terminal, from what is on the
+  page, with the autopilot's verdict and what is wrong. Any widget can be added to any of its
+  panels, a panel after another, and panels given to a simulator that has none.
 - **Pictures in a browser stand in their cells**: the editor's painter of cells now draws frames
   as lines (light, heavy, double, rounded, half lines, diagonals) as it already drew braille as
   dots and blocks as boxes - and the page `--shots` writes is painted by that same painter, a

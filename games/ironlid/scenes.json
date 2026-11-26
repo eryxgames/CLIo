@@ -1,0 +1,49 @@
+[
+ {
+  "id": "outpost",
+  "name": "Research Outpost Halden",
+  "area": "Halden",
+  "description": "A research outpost on the dry side of the planet: labs, a store, a hangar.",
+  "level": "outpost",
+  "on_level_death": [
+   {
+    "story": "outpost_fall"
+   },
+   {
+    "pause": true
+   },
+   {
+    "goto": "relocation"
+   }
+  ],
+  "on_level_exit": [
+   {
+    "story": "outpost_held"
+   },
+   {
+    "pause": true
+   },
+   {
+    "goto": "relocation"
+   }
+  ]
+ },
+ {
+  "id": "relocation",
+  "name": "Relocation Yard",
+  "area": "Halden",
+  "description": "Where the machines gather what they take, and the ship that carries it off.",
+  "level": "relocation",
+  "on_level_exit": [
+   {
+    "story": "relocation_end"
+   },
+   {
+    "pause": true
+   },
+   {
+    "win": "outro"
+   }
+  ]
+ }
+]

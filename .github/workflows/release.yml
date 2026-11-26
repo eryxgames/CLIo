@@ -65,3 +65,6 @@ jobs:
           ./butler/butler -V
           ./butler/butler push "pack/clio-$VERSION" "$ITCH_PROJECT:win-linux-mac" --userversion "$VERSION"
           ./butler/butler push "clio-editor-$VERSION.zip" "$ITCH_PROJECT:html5" --userversion "$VERSION"
+          # what itch.io made of them (a build that is still processing, or failed there, is said here)
+          ./butler/butler status "$ITCH_PROJECT:win-linux-mac" || true
+          ./butler/butler status "$ITCH_PROJECT:html5" || true

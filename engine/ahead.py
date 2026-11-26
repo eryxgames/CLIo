@@ -249,6 +249,8 @@ def draw(scope, sim, spec=None, t=0.0):
             if thing.get("label"):
                 scope.label(cam, (thing["x"], -thing["y"], thing["top"]), str(thing["label"]), bright=thing.get("bright", 1.2),
                             dx=1, dy=-1)
+            if thing.get("critical"):                    # where a shot counts for more, now: a mark on it
+                critical(scope, cam, thing, t)
         else:
             lamp(scope, cam, thing)
     cx, cy = scope.W // 2, scope.H // 2                  # where it heads
@@ -298,6 +300,24 @@ def lamp(scope, cam, thing):
         scope.line(cam, pts[3], (x, y, thing.get("ground", 0.0)), light * 0.6)
     if thing.get("label"):
         scope.label(cam, (x, y, z + r * 1.6), str(thing["label"]), bright=light, dx=1, dy=-1)
+
+
+def critical(scope, cam, thing, t=0.0):
+    """The mark on somebody who is open to a shot (a level's criticals): a diamond with a cross through it at
+    two thirds of its height, facing the eye, that beats; shown through whatever is before it."""
+    x, y = thing["x"], -thing["y"]
+    z = thing.get("ground", 0.0) + (thing["top"] - thing.get("ground", 0.0)) * 0.62
+    if cam.see((x, y, z))[2] <= 0.1:
+        return
+    r = 0.11 + 0.03 * (int(t * 6) % 2)
+    rx, ry = cam.right[0] * r, cam.right[1] * r
+    pts = [(x - rx, y - ry, z), (x, y, z + r), (x + rx, y + ry, z), (x, y, z - r)]
+    was, scope.depth = scope.depth, None
+    for i in range(4):
+        scope.line(cam, pts[i], pts[(i + 1) % 4], 1.8, "white")
+    scope.line(cam, pts[0], pts[2], 1.8, "white")
+    scope.line(cam, pts[1], pts[3], 1.8, "white")
+    scope.depth = was
 
 
 def marks(scope, cam, sim, space=False, far=FAR, t=0.0):
@@ -370,14 +390,15 @@ def field(scope, t=0.0, speed=2.6, count=26, reach=34.0, seed=3, beat=0.0):
     return "A field of rocks, flown through"
 
 
-def heights_of(place):
+def heights_of(place, window=None):
     """A place's map as rows of heights (the first row the northmost): a simulator's by what stands on
-    each tile, a level's by its floors and walls."""
+    each tile, a level's by its floors and walls. ``window``: only that part of it, ``(x, y, across, down)``."""
     floor = getattr(place, "floor", None)
+    x0, y0, W, H = window or (0, 0, place.W, place.H)
     out = []
-    for ty in range(place.H):
+    for ty in range(y0, y0 + H):
         row = []
-        for tx in range(place.W):
+        for tx in range(x0, x0 + W):
             kind = place.kind(tx, ty)
             if floor is not None:                        # a level
                 row.append(-0.4 if kind == "void" else (WALL + 0.0 if kind in SHUT else floor(tx, ty)))
@@ -417,12 +438,14 @@ def _sampled(heights, nx, ny):
     return out
 
 
-def scan(scope, heights, t=0.0, title="SURFACE SCAN", unit="", beat=0.0, at=None, profiles=22, across=44):
+def scan(scope, heights, t=0.0, title="SURFACE SCAN", unit="", beat=0.0, at=None, profiles=22, across=44, marks=None):
     """A surface scan of real ground: its heights as profiles one behind another, each hiding what lies
     behind it, and a bright sweep that goes over them. ``heights``: rows of numbers, the first row the
     northmost. ``at``: a place on it to mark (column, row, of the heights' own). ``beat``: how strongly
     the music hits now (0-1): the relief swells with it. Returns the profile the sweep is on, and its
-    highest point."""
+    highest point. ``marks``: other places on it, each ``{"at": (column, row), "label": ..., "bright": 1.0,
+    "blink": False, "tall": 0.7, "ring": False}`` - a post with its word; one that blinks is somebody, a ring is a
+    place to go to."""
     H, W = len(heights), len(heights[0])
     across, profiles = min(across, max(8, scope.W // 4)), min(profiles, max(6, scope.H // 5))   # no finer than shows
     nx, ny = max(8, min(across, max(W * 2, 8))), max(6, min(profiles, max(H * 2, 6)))
@@ -451,6 +474,32 @@ def scan(scope, heights, t=0.0, title="SURFACE SCAN", unit="", beat=0.0, at=None
             for dx, dy in ((-0.2, 0), (0.2, 0), (0, 0)):
                 scope.line(cam, (px + dx, py + dy, pz + 1.1), (px, py, pz + 1.45), 1.6, "white")
         scope.depth = was
+    if marks:
+        was, scope.depth = scope.depth, None
+        for mk in marks:
+            u, v = mk["at"][0] / float(max(1, W - 1)), 1.0 - mk["at"][1] / float(max(1, H - 1))
+            i, j = min(nx - 1, max(0, int(round(u * (nx - 1))))), min(ny - 1, max(0, int(round(v * (ny - 1)))))
+            px, py, pz = x0 + u * (nx - 1) * sx, -(ny - 1) * sy / 2.0 + v * (ny - 1) * sy, hs[j][i]
+            light, tall = float(mk.get("bright", 1.0)), float(mk.get("tall", 0.7))
+            if mk.get("blink") and int(t * 4 + mk["at"][0]) % 2:
+                light *= 0.45
+            top = (px, py, pz + tall)
+            scope.line(cam, (px, py, pz), top, light)
+            r = 0.13
+            scope.line(cam, (px - r, py, top[2]), (px, py, top[2] + r * 1.6), light)
+            scope.line(cam, (px, py, top[2] + r * 1.6), (px + r, py, top[2]), light)
+            scope.line(cam, (px + r, py, top[2]), (px, py, top[2] - r * 1.6), light)
+            scope.line(cam, (px, py, top[2] - r * 1.6), (px - r, py, top[2]), light)
+            if mk.get("ring"):                           # a place to go to: a ring on the ground round its post
+                ring = [(px + 0.42 * math.cos(math.pi / 4 * k), py + 0.42 * math.sin(math.pi / 4 * k), pz + 0.03) for k in range(8)]
+                for k in range(8):
+                    scope.line(cam, ring[k], ring[(k + 1) % 8], light)
+            at = scope.project(cam, (px, py, top[2] + r * 1.6)) if mk.get("label") else None
+            if at:                                       # its word, kept on the display (the far edge is at the very top)
+                word = str(mk["label"])
+                scope.text(max(0, min(scope.cols - len(word), int(at[0]) // 2 + 1)),
+                           max(1, min(scope.rows_n - 2, int(at[1]) // 4 - 1)), word, bright=max(0.7, light))
+        scope.depth = was
     if title:
         scope.text(1, 0, title[:scope.cols - 2].upper(), bright=1.0)
     relief = max(heights[min(H - 1, int(round((1.0 - row / float(ny - 1)) * (H - 1))))])
@@ -459,6 +508,9 @@ def scan(scope, heights, t=0.0, title="SURFACE SCAN", unit="", beat=0.0, at=None
         words = ("%02d/%02d  %+0.2f %s" % (row + 1, ny, relief, unit)).rstrip()
     scope.text(1, scope.rows_n - 1, words, bright=0.6)
     return row, relief
+
+
+SCANNED = (64, 44)           # the part of a level without end that a scan shows, round the player (cells)
 
 
 class LevelPlace:
@@ -571,9 +623,11 @@ class LevelPlace:
                 dead = getattr(m, "dead", False)
                 made = self.figure(m, x, y, ground)
                 if made is not None:
-                    out.append({"x": x + 0.5, "y": y + 0.5, "wire": made[0], "top": made[1] + 0.08,
+                    open_to = getattr(self.lv, "open_to", None)
+                    out.append({"x": x + 0.5, "y": y + 0.5, "wire": made[0], "top": made[1] + 0.08, "ground": ground,
                                 "label": None if dead else str(getattr(m, "kind", "?"))[:1].upper(),
-                                "bright": 0.55 if dead else 1.3})
+                                "bright": 0.55 if dead else 0.8 if getattr(m, "civil", False) else 1.3,
+                                "critical": bool(open_to(m)) if open_to is not None and not dead else False})
                 elif not dead:
                     out.append({"x": x + 0.5, "y": y + 0.5, "z": ground + 0.5, "ground": ground, "legs": True, "size": 0.22,
                                 "label": str(getattr(m, "kind", "?"))[:1].upper(), "bright": 1.5})
@@ -581,6 +635,34 @@ class LevelPlace:
             if getattr(it, "taken", False) or not self.seen(it.x + 0.5, it.y + 0.5):
                 continue
             out.append({"x": it.x + 0.5, "y": it.y + 0.5, "z": self.floor(it.x, it.y) + 0.18, "size": 0.1, "bright": 0.9})
+        return out
+
+    def marks(self):
+        """What a scan of the level marks beside the player: every one of them that is awake (it blinks, with its
+        letter), ours (a short steady post, ``+``), the places the map names (a cell's ``"mark"``: a ring and the
+        name) and the way out."""
+        lv = self.lv
+        named = lv.__dict__.get("_named") if hasattr(lv, "__dict__") else None
+        if named is None:                                # the places with a name: found once (they do not move)
+            named = []
+            if getattr(lv, "world", None) is None:       # (a level without end has no map to read them from)
+                for row in getattr(lv, "grid", ()) or ():
+                    for c in row:
+                        name = getattr(c, "mark", None) or ("EXIT" if c.kind == "exit" else None)
+                        if name:
+                            named.append({"at": (c.x, c.y), "label": str(name).upper(), "bright": 1.0, "tall": 1.0,
+                                          "ring": c.kind != "exit"})
+            if hasattr(lv, "__dict__"):
+                lv.__dict__["_named"] = named
+        out = list(named)
+        for m in getattr(lv, "monsters", ()) or ():
+            if m.dead or m.gone or m.barrel or getattr(m, "vehicle", None):
+                continue
+            x, y = self.moved.get(m.id, (m.x, m.y))
+            if getattr(m, "civil", False):
+                out.append({"at": (x, y), "label": "+", "bright": 0.9, "tall": 0.45})
+            elif m.awake:
+                out.append({"at": (x, y), "label": str(m.kind)[:1].upper(), "bright": 1.4, "tall": 0.7, "blink": True})
         return out
 
 
@@ -607,7 +689,14 @@ class LevelView:
         scope = self.scope
         scope.clear()
         if self.style == "scan":
-            scan(scope, heights_of(place), phase / 20.0, "SCAN  %s" % getattr(lv, "name", ""), at=(place.x - 0.5, place.y - 0.5))
+            x0, y0, W, H = 0, 0, place.W, place.H
+            if W * H > SCANNED[0] * SCANNED[1] * 4:      # a level without end: what is round him
+                W, H = SCANNED
+                x0, y0 = int(place.x) - W // 2, int(place.y) - H // 2
+            marks = [dict(m, at=(m["at"][0] - x0, m["at"][1] - y0)) for m in place.marks()
+                     if x0 <= m["at"][0] < x0 + W and y0 <= m["at"][1] < y0 + H]
+            scan(scope, heights_of(place, (x0, y0, W, H)), phase / 20.0, "SCAN  %s" % getattr(lv, "name", ""),
+                 at=(place.x - 0.5 - x0, place.y - 0.5 - y0), marks=marks)
         else:
             draw(scope, place, {"far": 11, "fov": 84}, phase / 20.0)
         return scope.rows("dots", True)

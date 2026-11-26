@@ -1,0 +1,286 @@
+{
+ "outpost": {
+  "name": "Research Outpost Halden",
+  "title": "HALDEN   THE OUTPOST",
+  "intro": [
+   "Keep the staff alive. The scanner is on the bench: F2."
+  ],
+  "par": 220,
+  "facing": "e",
+  "goggles": "scan",
+  "tint": "green",
+  "music": {
+   "generate": {
+    "mood": "tense",
+    "seed": 7,
+    "sound": "rich"
+   }
+  },
+  "map": [
+   "##############################",
+   "#.....#.......#........#.....#",
+   "#.@...+!..p...#...q....+..w.2#",
+   "#.n...#.......+........#.....#",
+   "#.....#..&....#...m....#..c..#",
+   "###+#######+#######+#####+####",
+   "#..!.....#........#.........##",
+   "#...p....+...z....+....b.a..##",
+   "#........#........#.........##",
+   "#..m.....#...s....#..h.h.h..##",
+   "#####+########+#######+#######",
+   "#.........#.........#........#",
+   "#..q......+....a.a..+...g.a..#",
+   "#.....k..3#..i....b.#........#",
+   "#.........J..i.f....#....m...#",
+   "###########HHHH###############",
+   "#............................#",
+   "#.............S......4.......#",
+   "#............................#",
+   "##############X###############",
+   "##############.###############",
+   "##############E###############"
+  ],
+  "legend": {
+   "n": "scanner",
+   "m": "medkit",
+   "c": "mag",
+   "s": "shells",
+   "k": {
+    "item": "scattergun",
+    "on_pickup": "second_wave"
+   },
+   "!": {
+    "on_enter": "alarm"
+   },
+   "p": {
+    "monster": "scientist"
+   },
+   "q": {
+    "monster": "technician"
+   },
+   "z": {
+    "monster": "hazmat"
+   },
+   "w": {
+    "monster": "researcher"
+   },
+   "a": {
+    "monster": "android",
+    "wake_on": "alarm",
+    "squad": "line"
+   },
+   "b": {
+    "monster": "breacher",
+    "wake_on": "alarm",
+    "squad": "line"
+   },
+   "h": {
+    "monster": "hound",
+    "wake_on": "alarm",
+    "squad": "pack"
+   },
+   "g": {
+    "monster": "gunner",
+    "wake_on": "alarm"
+   },
+   "f": {
+    "monster": "burner",
+    "wake_on": "second_wave"
+   },
+   "i": {
+    "monster": "hound",
+    "wake_on": "second_wave"
+   },
+   "J": {
+    "wall": "hazard",
+    "opens_on": "second_wave"
+   },
+   "H": {
+    "wall": "hazard",
+    "opens_on": "spider"
+   },
+   "S": {
+    "monster": "spider",
+    "wake_on": "spider",
+    "on_death": "spider_down"
+   },
+   "X": {
+    "door": true,
+    "opens_on": "spider_down"
+   },
+   "2": {
+    "mark": "LAB"
+   },
+   "3": {
+    "mark": "STORE"
+   },
+   "4": {
+    "mark": "HANGAR"
+   }
+  },
+  "squads": {
+   "line": {
+    "tactic": "fire_team"
+   },
+   "pack": {
+    "tactic": "swarm"
+   }
+  },
+  "events": {
+   "alarm": "The alarm. They are inside: squads, and a pack.",
+   "second_wave": "The store's back wall comes down. Something was waiting behind it.",
+   "spider": "Halden is quiet. Then the hangar wall folds like paper.",
+   "spider_down": "The way out of the hangar unlocks."
+  },
+  "on_clear": "spider",
+  "death_after": "spider",
+  "fall_lines": [
+   "THANE IS DOWN",
+   "The Spider stands over what is left."
+  ],
+  "protect": {
+   "need": 3,
+   "text": "Too few of Halden's staff are left alive."
+  },
+  "death_text": "outro_lose",
+  "bot": [
+   "scanner",
+   "s",
+   "k",
+   "m",
+   "c",
+   "g",
+   "4",
+   "E"
+  ]
+ },
+ "relocation": {
+  "name": "Relocation Yard",
+  "title": "HALDEN   THE RELOCATION YARD",
+  "intro": [
+   "In lines now. A mark on one of them: it is open - shoot.",
+   "Open: as it aims, as it reels, from behind."
+  ],
+  "par": 260,
+  "facing": "n",
+  "view": "lines",
+  "criticals": 2,
+  "music": {
+   "generate": {
+    "mood": "battle",
+    "seed": 23,
+    "sound": "rich"
+   }
+  },
+  "player": {
+   "health": 130,
+   "max_health": 130,
+   "armor": 25,
+   "weapons": [
+    "1",
+    "4"
+   ],
+   "weapon": "4",
+   "ammo": {
+    "bullets": 0,
+    "shells": 4,
+    "cells": 70
+   },
+   "max_ammo": {
+    "bullets": 200,
+    "shells": 40,
+    "cells": 200
+   }
+  },
+  "map": [
+   "###############E##############",
+   "###############.##############",
+   "###############X##############",
+   "#............................#",
+   "#.....a...g......w.....a.....#",
+   "#...........w.......r........#",
+   "#.......r....................#",
+   "######+##############+########",
+   "#......#..............#......#",
+   "#..a...#..........w..!+...m..#",
+   "#......+!....t........#......#",
+   "#..a...#..............#..c...#",
+   "###+####......h..h....####+###",
+   "#......#..............#......#",
+   "#..f...+!.....h..h...!+..b...#",
+   "#...b..#......!.......#...k..#",
+   "####+#####+###!####+#####+####",
+   "#.........#........#.........#",
+   "#....c....+...@....+....m..r.#",
+   "#..b......#........#.........#",
+   "##############################"
+  ],
+  "legend": {
+   "m": "medkit",
+   "c": "cell",
+   "k": "scattergun",
+   "a": {
+    "monster": "android",
+    "squad": "west"
+   },
+   "b": {
+    "monster": "breacher"
+   },
+   "f": {
+    "monster": "burner"
+   },
+   "g": {
+    "monster": "gunner",
+    "squad": "ramp",
+    "on_death": "ramp"
+   },
+   "X": {
+    "door": true,
+    "opens_on": "ramp"
+   },
+   "h": {
+    "monster": "hound",
+    "squad": "pack",
+    "wake_on": "yard"
+   },
+   "t": {
+    "monster": "mantis",
+    "wake_on": "yard"
+   },
+   "r": {
+    "monster": "stalker"
+   },
+   "w": {
+    "monster": "wasp",
+    "squad": "ramp"
+   },
+   "!": {
+    "on_enter": "yard"
+   }
+  },
+  "squads": {
+   "west": {
+    "tactic": "fire_team"
+   },
+   "pack": {
+    "tactic": "swarm"
+   },
+   "ramp": {
+    "tactic": "hold",
+    "guard": 7
+   }
+  },
+  "events": {
+   "yard": "The yard wakes: a pack, and something with claws.",
+   "ramp": "The gunner was the lock: the way to the ramp stands open."
+  },
+  "death_text": "outro_lose",
+  "bot": [
+   "c",
+   "m",
+   "k",
+   "g",
+   "E"
+  ]
+ }
+}

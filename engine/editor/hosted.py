@@ -33,7 +33,7 @@ GAMES = "/games"                        # where opened games live, in the browse
 MOST = 64 * 1024 * 1024                 # a game larger than this is not a folder of text
 LEFT_OUT = ("__pycache__", "saves")     # folders that are not part of a game
 DEMOS = ("depths", "derelict")          # the games the page offers; a game of your own in games/ is not put on show
-PLAYED = ("rootless", "depths", "derelict")     # the games play.html plays (engine/web.py)
+PLAYED = ("rootless", "ironlid", "erebus", "depths", "derelict")     # the games play.html plays (engine/web.py)
 CARRIED = "engine/motion/clio_motion/"          # CLIo Motion's package: its data (JSON) goes where its modules go
 
 

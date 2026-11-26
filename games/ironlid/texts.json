@@ -1,0 +1,30 @@
+{
+ "intro": {
+  "text": "9TH EXOPLANETARY GARRISON - Halden, on the dry side.\n\nThe supply drop came down last spring, a hundred years late. Nobody had lost it: it left when it was meant to and flew as fast as a drop can be flown, and at that speed a few years aboard are a century here. So the garrison fights in what it was sent - carbines older than anyone's grandfather, and the helmet the crates call HELMET, COMBAT, DISPLAY and everybody else calls the iron lid: a picture in one colour, and a scanner on a battery.\n\nYou are Thane. Three weeks ago you were reassigned to Research Outpost Halden, to stand at a door while forty civilians measure dust.\n\nThis morning the dust is walking. Machines, and things that were people and are machines now, coming in by squads. Keep the staff alive. The scanner is on the bench beside you (F2): it shows the outpost from above, who is in it, and where you are needed.",
+  "show_once": false
+ },
+ "outpost_fall": {
+  "text": "The spider does not hurry. It never had to.\n\nThe lid's display breaks up into loose dots, and the dots go out one by one.\n\n...\n\nA table. A light that is not green. Hands that are not hands hold yours up for you to look at, and they are not yours either: plate, cable, a cannon where the forearm was. Halden's surgeons - the ones you kept alive - have built what was left of you into the only body they had parts for.\n\nThe picture is different now. No dots: lines, clean and thin, every edge of the room - and on whatever moves, a mark where it is open.\n\nThe order is one line long. The machines carried the rest of the staff to their relocation yard. There is a ship there. Go and get it.",
+  "show_once": false
+ },
+ "outpost_held": {
+  "text": "The spider folds its legs under it and is still. Nobody at Halden has seen one do that.\n\nThen its reactor does what the rest of it could not.\n\n...\n\nA table. A light that is not green. The surgeons you kept alive have built what was left of you into the only body they had parts for: plate, cable, a cannon where the forearm was. The picture is lines now, and on whatever moves there is a mark where it is open.\n\nThe machines carried the rest of the staff to their relocation yard. There is a ship there. Go and get it.",
+  "show_once": false
+ },
+ "relocation_end": {
+  "text": "The ramp comes down under your hand as if it had been waiting for one like it.\n\nInside, in rows, in the dark: the staff of Halden, asleep and whole. And past them a bridge built for something with more legs than you have.",
+  "show_once": false
+ },
+ "outro": {
+  "text": "END OF THE TEST DEMO.\n\nTwo levels, to try what moves: squads and packs, civilians, the scan, the lines and their criticals. `python clio.py ironlid --demo` shows the crowds.",
+  "show_once": false
+ },
+ "outro_lose": {
+  "text": "Thane is down. Halden goes quiet, a room at a time.",
+  "show_once": false
+ },
+ "outpost_lost": {
+  "text": "There is nobody left at Halden to keep alive.",
+  "show_once": false
+ }
+}

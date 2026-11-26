@@ -112,7 +112,7 @@ engine/
   jsonschema.py      --schema: JSON Schemas of the data files, from schema.py, for editors that complete
   demo.py            the demos (engine/demos/clio.json, a game's demo.json)
   editor/            the editor (a page in the browser, also served as a web site)
-games/               derelict/  depths/  rootless/
+games/               derelict/  depths/  rootless/  ironlid/
 templates/starter/   a tiny complete game to copy (Apache-2.0)
 templates/realm/     a tiny complete realm to copy (Apache-2.0)
 templates/station/   three simulators with screens of panels to copy: helm, reactor, scan; a wheel menu (Apache-2.0)
@@ -130,7 +130,7 @@ guide.
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 1157 tests, a few minutes
+python -m unittest discover -s tests     # 1195 tests, a few minutes
 python -m engine.vector                  # the vector display's reel (Ctrl-C ends)
 python -m engine.realm templates/realm 8 # a steward plays the realm starter over eight seeds
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
@@ -147,6 +147,7 @@ python tests/levelbot.py 10 rootless e1m7  # ...and E1M7, on the ceiling over th
 python tests/levelbot.py 10 rootless e1m8  # ...and E1M8, up the face and the shaft to the Metacron
 python tests/levelbot.py 10 rootless sim1  # ...and the Simulatron's fens without end (also sim2, sim3)
 python tests/levelbot.py 10 rootless sim4  # ...and the Kill House, a room for each kind of squad
+python tests/levelbot.py 10 ironlid relocation   # ...and Ironlid's yard (its outpost ends in "fallen": he is meant to)
 ```
 
 The tests play the adventure and the dungeon to every ending from scripts, walk Rootless's
@@ -174,7 +175,7 @@ embed options once - playing needs it (below).
 
 ### In the browser
 
-`engine/editor/web/play.html` plays CLIo in a web page: `play.html?game=rootless` (or `depths`,
+`engine/editor/web/play.html` plays CLIo in a web page: `play.html?game=rootless` (or `ironlid`, `erebus`, `depths`,
 `derelict`; none: CLIo's own menu; `?demo`: the tech demo; `?edited=ID`: the game the editor's
 *Play* handed over - the whole game under its id in IndexedDB `clio-editor-play`, written under
 `/edited/ID` and run by its path, without fetching CLIo's own games). Its worker (`play.js`) runs Python

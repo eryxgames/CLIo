@@ -1,0 +1,182 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024-2026 Daniel Sandner
+"""IRONLID, the test demo: its files are right, its two levels play as they are meant to - the outpost is cleaned,
+its staff kept alive, and he falls to the Spider; the yard is won in lines - and the game goes from one to the
+other."""
+import io
+import os
+import sys
+import unittest
+from unittest import mock
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+sys.path.insert(0, ROOT)
+sys.path.insert(0, HERE)
+
+from engine import demo, firstperson, levelbot, motion  # noqa: E402
+from engine.audio import Silent  # noqa: E402
+from engine.data import GameData  # noqa: E402
+from engine.game import Game  # noqa: E402
+from engine.level import KEYMAP, FrameConsole, Level  # noqa: E402
+from engine.term import Term, strip_ansi  # noqa: E402
+from test_demo import player  # noqa: E402
+
+IRONLID = os.path.join(ROOT, "games", "ironlid")
+
+
+class Files(unittest.TestCase):
+    def test_nothing_is_wrong_with_them(self):
+        data = GameData(IRONLID)
+        self.assertEqual(data.validate(), [])
+        self.assertEqual(sorted(data.levels), ["outpost", "relocation"])
+
+    def test_everybody_is_moved_by_clio_motion(self):
+        data = GameData(IRONLID)
+        for mid, m in data.monsters.items():
+            self.assertIn(m["model"], data.models, mid)
+            self.assertIn("motion", data.models[m["model"]], mid)
+        kinds = {motion.spec_of(spec)["character"] for spec in data.models.values()}
+        self.assertEqual(kinds, {"soldier", "gunner", "hyena", "raptor", "mantis", "wasp", "spider", "scientist",
+                                 "technician", "hazmat", "woman"})
+        civil = [mid for mid, m in data.monsters.items() if m.get("civilian")]
+        self.assertEqual(sorted(civil), ["hazmat", "researcher", "scientist", "technician"])
+        self.assertTrue(data.monsters["spider"]["spares_civilians"])
+
+    def test_every_sound_and_sprite_named_is_there(self):
+        data = GameData(IRONLID)
+        for mid, m in data.monsters.items():
+            for what, name in (m.get("sounds") or {}).items():
+                self.assertIn(name, data.sounds, "%s %s" % (mid, what))
+        for wid, w in data.weapons.items():
+            self.assertIn(w["sound"], data.sounds, wid)
+            self.assertIn(w["sprite"], data.sprites, wid)
+        for iid, it in data.items.items():
+            self.assertIn(it["pickup"]["sprite"], data.sprites, iid)
+
+
+class TheOutpost(unittest.TestCase):
+    def test_cleaned_then_he_falls_to_the_spider(self):
+        data = GameData(IRONLID)
+        for seed in (0, 1, 2):
+            outcome, lv = levelbot.play(data, "outpost", seed)
+            self.assertEqual(outcome, "fallen", seed)
+            self.assertEqual(lv.stats["kills"], lv.total_kills - 1, seed)        # everybody but the Spider
+            self.assertEqual(sorted(lv.events), ["alarm", "second_wave", "spider"], seed)
+            alive = lv.total_civil - lv.stats["lost"]
+            self.assertEqual(lv.total_civil, 6)
+            self.assertGreaterEqual(alive, 3, seed)
+            self.assertIsNone(lv.failed)
+            spider = next(m for m in lv.monsters if m.kind == "spider")
+            self.assertTrue(spider.awake and not spider.dead and spider.grudge is None)
+            self.assertEqual(lv.end_lines()[0], ("THANE IS DOWN", "hurt"))
+            self.assertTrue(any("civilians" in t and "of 6 alive" in t for t, _r in lv.end_lines()))
+
+    def test_nothing_happens_until_he_leaves_the_barracks(self):
+        lv = Level(GameData(IRONLID), "outpost", seed=1)
+        for _ in range(12):
+            lv.end_beat()
+        self.assertEqual((lv.events, lv.stats["lost"]), (set(), 0))
+        self.assertFalse(any(m.awake for m in lv.monsters if not m.civil))
+
+    def test_the_helmet_shows_one_colour_and_the_scanner_the_whole_outpost(self):
+        lv = Level(GameData(IRONLID), "outpost", seed=1)
+        self.assertTrue(firstperson.tinted(lv))
+        term = Term(out=io.StringIO(), width=100, height=30, color=3, unicode=True, animate=False, env={})
+        con = FrameConsole(term, "pixel", keys=False, keymap=KEYMAP, animate=False)
+        con.layout()
+        self.assertEqual(con.view_for(lv).__class__.__name__, "View")
+        colours = [c for row in con.snapshot(lv) for cell in row for c in cell[1:] if c]
+        self.assertTrue(all(g >= r and g >= b for r, g, b in colours))
+        bot = levelbot.Bot(lv, ["scanner"])
+        lv.console = bot
+        for _ in range(6):
+            if lv.player.goggles:
+                break
+            lv.run_line(bot.read(lv))
+        self.assertTrue(lv.player.nightvision)                  # taken from the bench: it is on
+        self.assertEqual(con.view_for(lv).style, "scan")
+        text = "\n".join("".join(c[0] or " " for c in row) for row in con.snapshot(lv))
+        for word in ("SCAN", "STORE", "HANGAR", "LAB", "EXIT", "+"):
+            self.assertIn(word, text)
+
+
+class TheYard(unittest.TestCase):
+    def test_won_in_lines_with_criticals(self):
+        data = GameData(IRONLID)
+        for seed in (0, 1, 2):
+            outcome, lv = levelbot.play(data, "relocation", seed)
+            self.assertEqual(outcome, "exit", seed)
+            self.assertIn("ramp", lv.events)                    # the gunner was the lock
+            self.assertGreater(lv.stats["criticals"], 0, seed)
+            self.assertGreater(lv.player.hp, 0)
+
+    def test_he_begins_it_as_what_was_made_of_him(self):
+        lv = Level(GameData(IRONLID), "relocation", seed=1, player={"health": 12, "armor": 0, "weapons": ["1", "2", "3"],
+                                                                     "weapon": "3"})
+        p = lv.player
+        self.assertEqual((p.hp, p.max_hp, p.armor, p.weapons, p.weapon), (130, 130, 25, ["1", "4"], "4"))
+        self.assertEqual(lv.weapons["4"]["name"], "arm cannon")
+        self.assertEqual(lv.criticals, 2.0)
+        term = Term(out=io.StringIO(), width=100, height=30, color=3, unicode=True, animate=False, env={})
+        con = FrameConsole(term, "pixel", keys=False, keymap=KEYMAP, animate=False)
+        con.layout()
+        self.assertEqual((con.view_for(lv).__class__.__name__, con.view_for(lv).style), ("LevelView", "lines"))
+
+
+class TheGame(unittest.TestCase):
+    def play(self):
+        term = Term(out=io.StringIO(), inp=lambda p: "", width=80, height=24, color=0, unicode=True, animate=False, env={})
+        g = Game(IRONLID, term=term, audio=Silent())
+        real, outcomes = Level.run, []
+
+        def by_its_bot(lv, console):
+            outcomes.append((lv.id, real(lv, levelbot.Bot(lv, lv.spec.get("bot") or ["E"]))))
+            return outcomes[-1][1]
+        with mock.patch.object(Level, "run", by_its_bot):
+            g.run()
+        return g, outcomes, strip_ansi(term.out.getvalue())
+
+    def test_from_the_outpost_to_the_ship(self):
+        g, outcomes, out = self.play()
+        self.assertEqual(outcomes, [("outpost", "fallen"), ("relocation", "exit")])
+        self.assertEqual(g.over, "win")
+        for words in ("a hundred years late", "The spider does not hurry", "The ramp comes down", "END OF THE TEST DEMO"):
+            self.assertIn(words, out)
+        self.assertNotIn("Thane is down. Halden goes quiet", out)                # (the text for losing)
+        w = g.world
+        self.assertTrue(w.flags.get("outpost_fallen"))
+        self.assertGreaterEqual(w.vars["levels"]["outpost"]["saved"], 3)
+        self.assertEqual(w.vars["levels"]["outpost"]["civilians_total"], 6)
+        self.assertGreater(w.vars["levels"]["relocation"]["criticals"], 0)
+
+    def test_a_death_before_the_spider_is_a_death(self):
+        term = Term(out=io.StringIO(), inp=lambda p: "", width=80, height=24, color=0, unicode=True, animate=False, env={})
+        g = Game(IRONLID, term=term, audio=Silent())
+
+        def shot(lv, console):
+            lv.over = "dead"
+            return "dead"
+        with mock.patch.object(Level, "run", shot):
+            g.run()
+        self.assertEqual(g.over, "lose")
+        self.assertIn("Halden goes quiet", strip_ansi(term.out.getvalue()))
+
+
+class TheDemo(unittest.TestCase):
+    def test_its_clips_are_right_and_play(self):
+        spec = demo.of_game(IRONLID)
+        self.assertEqual(demo.problems(spec, GameData(IRONLID)), [])
+        self.assertEqual([demo.kind_of(c) for c in spec["clips"]], ["card", "crowd", "crowd", "crowd", "level", "card"])
+        clips = [dict(c, seconds=min(2.0, float(c.get("seconds", 3))), count=min(8, int(c.get("count", 8))))
+                 if demo.kind_of(c) == "crowd" else dict(c, seconds=min(2.0, float(c.get("seconds", 3))))
+                 for c in spec["clips"]]
+        p, seen, fc = player(clips, W=80, H=24, game=IRONLID, title=spec["title"])
+        self.assertEqual(p.run(), "done")
+        out = strip_ansi(p.term.out.getvalue())
+        self.assertNotIn("(level:", out)
+        self.assertNotIn("(crowd:", out)
+
+
+if __name__ == "__main__":
+    unittest.main()

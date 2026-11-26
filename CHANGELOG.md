@@ -2,6 +2,42 @@
 
 Notable changes to CLIo. Versions follow [semantic versioning](https://semver.org).
 
+## Unreleased
+
+### Added
+
+- **IRONLID** (`games/ironlid`), a test demo of what moves: two first-person levels whose every
+  body is moved by CLIo Motion. *Halden, the outpost*: a garrison a hundred years behind its own
+  supplies, a helmet that shows one colour, six of the staff to keep alive while squads of
+  androids and a pack of hounds come in - and when the place is quiet, the Spider. *The
+  relocation yard*: what the surgeons made of him sees in lines, with a mark on whoever is open
+  to a shot. `python clio.py ironlid`; `--demo` shows its crowds.
+- **Civilians in a level**: a monster with `"civilian": true` harms nobody, runs from the others
+  and is what they go for unless the player is nearer; he changes places with one he walks into,
+  and his gun never picks one by itself. `"protect"` on a level says how many must live;
+  `"spares_civilians"` keeps a monster after the player alone.
+- **A level that knows it is clean**: `"on_clear"` sets off an event when nobody is left to fight.
+- **A fall that is not the end**: after a level's `"death_after"` event the player's death runs
+  the scene's `"on_level_death"` effects, and the story goes on. `"player"` on a level is what he
+  begins it with, whatever he came with.
+- **Criticals**: with `"criticals": 2` a shot at one who is open - while it aims, while it reels,
+  from behind - counts twice, and a level in lines marks who is open now.
+- **A scan with marks**: `"view": "scan"` shows who is awake, the civilians, the way out and the
+  cells the map names (`"mark": "STORE"`); `"goggles": "scan"` makes a level's goggles a scanner.
+- `"tint": "green"` draws a level in one colour, as an old display has it; `first_person`'s
+  `"death_lines"` are a game's own words for a death.
+- **In the browser**: the page's menu has *Erebus: Last Watch* and *IRONLID* beside the three games
+  it had (it plays the games it is given, and was given three).
+
+### Fixed
+
+- The level bot takes the weapon it has rounds for by that weapon's own ammunition (a game whose
+  fourth weapon is not fed with bullets had it fight with the fist).
+- A level's "no such target in sight" names the game, not Rootless.
+- `--view scan` in a level without end shows what is round the player; it tried to scan all two
+  million cells a side, and ran out of memory.
+- The release says what itch.io made of the two uploads (`butler status`).
+
 ## 3.6.0 - 2026-11-26
 
 ### Added

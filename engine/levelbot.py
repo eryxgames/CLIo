@@ -111,7 +111,7 @@ class Bot(TextConsole):
             if found:
                 dx, dy = found
                 m = lv.monster_at(p.x + dx, p.y + dy)
-                if m is not None and not m.vehicle:             # blocked by a monster: face it and shoot
+                if m is not None and not m.vehicle and not getattr(m, "civil", False):             # blocked by a monster: face it and shoot
                     return self.face(lv, dx, dy) or "f"
                 return self.face(lv, dx, dy) or "k"
         return None
@@ -165,7 +165,7 @@ class Bot(TextConsole):
             return None
         _, dx, dy = best
         m = lv.monster_at(p.x + dx, p.y + dy)
-        if m is not None and not m.vehicle:             # blocked by a monster: face it and shoot
+        if m is not None and not m.vehicle and not getattr(m, "civil", False):             # blocked by a monster: face it and shoot
             return self.face(lv, dx, dy) or "f"
         return self.face(lv, dx, dy) or "k"
 
@@ -189,7 +189,7 @@ class Bot(TextConsole):
         if not self.open_cell(lv, (nx, ny), True):
             self.plan = None
             m = lv.monster_at(nx, ny)
-            if m is not None and not m.vehicle:
+            if m is not None and not m.vehicle and not getattr(m, "civil", False):
                 return self.face(lv, nx - p.x, ny - p.y) or "f"
             path = self.window_path(lv, x, y, R)
             if len(path) < 2:
@@ -200,7 +200,7 @@ class Bot(TextConsole):
             self.plan = ((x, y), lv.beat, path)
             return turn
         m = lv.monster_at(nx, ny)
-        if m is not None and not m.vehicle:
+        if m is not None and not m.vehicle and not getattr(m, "civil", False):
             return "f"
         self.plan = ((x, y), lv.beat, path[1:])
         return "k"
@@ -684,12 +684,14 @@ class Bot(TextConsole):
         if not cone:
             return None
         d = lv.dist(cone[0])
+        def rounds(slot, kind):                          # what he has for the weapon in that slot (its own ammunition)
+            return p.ammo.get((lv.weapons.get(slot) or {}).get("ammo") or kind, 0)
         want = "1"
-        if p.ammo.get("bullets", 0) > 0:
+        if rounds("2", "bullets") > 0:
             want = "2"
-        if "4" in p.weapons and p.ammo.get("bullets", 0) >= 2:
+        if "4" in p.weapons and rounds("4", "bullets") >= int((lv.weapons.get("4") or {}).get("burst", 2)):
             want = "4"
-        if "3" in p.weapons and p.ammo.get("shells", 0) > 0 and (d <= 3 or want == "1"):
+        if "3" in p.weapons and rounds("3", "shells") > 0 and (d <= 3 or want == "1"):
             want = "3"
         if want != p.weapon and want in p.weapons:
             return want

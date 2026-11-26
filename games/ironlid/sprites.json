@@ -1,0 +1,168 @@
+{
+ "w_fist": {
+  "palette": {
+   "s": "#c89678",
+   "S": "#9a6e58",
+   "k": "#3a3f47"
+  },
+  "pixels": [
+   "..ssss....",
+   ".ssssss...",
+   ".sSsSsS...",
+   ".ssssss...",
+   "..kkkk....",
+   "..kkkk....",
+   "..kkkk...."
+  ]
+ },
+ "w_carbine": {
+  "palette": {
+   "k": "#3a3f47",
+   "K": "#6f7783",
+   "w": "#6b4a2c",
+   "s": "#c89678"
+  },
+  "pixels": [
+   "....kk....",
+   "....kk....",
+   "....KK....",
+   "...kKKk...",
+   "...kKKk...",
+   "..wkKKkw..",
+   "..wwkkww..",
+   ".swwwwwws.",
+   "ssswwwwsss"
+  ]
+ },
+ "w_scattergun": {
+  "palette": {
+   "k": "#3a3f47",
+   "K": "#6f7783",
+   "w": "#6b4a2c",
+   "s": "#c89678"
+  },
+  "pixels": [
+   "...kkkk...",
+   "...kkkk...",
+   "...KKKK...",
+   "...KKKK...",
+   "..kKKKKk..",
+   "..wwkkww..",
+   ".swwwwwws.",
+   "ssswwwwsss",
+   "ssswwwwsss"
+  ]
+ },
+ "w_cannon": {
+  "palette": {
+   "k": "#2b3038",
+   "K": "#7c8794",
+   "g": "#9cffb0",
+   "p": "#4d5661"
+  },
+  "pixels": [
+   "...kKKk...",
+   "...kggk...",
+   "...kKKk...",
+   "..pKKKKp..",
+   "..pKggKp..",
+   ".ppKKKKpp.",
+   ".pppkkppp.",
+   "pppppppppp",
+   "pppppppppp"
+  ]
+ },
+ "scanner": {
+  "palette": {
+   "k": "#20242a",
+   "g": "#2fa04a",
+   "G": "#9cffb0"
+  },
+  "pixels": [
+   "kkkkkkkk",
+   "kgGggGgk",
+   "kggGgggk",
+   "kGgggGgk",
+   "kkkkkkkk",
+   "..kkkk.."
+  ]
+ },
+ "medkit": {
+  "palette": {
+   "w": "#d9d9cf",
+   "r": "#c22a2a",
+   "g": "#8b8b84"
+  },
+  "pixels": [
+   ".wwwwwwww.",
+   "wwwwrrwwww",
+   "wwrrrrrrww",
+   "wwrrrrrrww",
+   "wwwwrrwwww",
+   "gggggggggg"
+  ]
+ },
+ "plates": {
+  "palette": {
+   "k": "#4b5560",
+   "K": "#8d98a5"
+  },
+  "pixels": [
+   "kKKKKKKk",
+   "KKkkkkKK",
+   "KKkkkkKK",
+   "kKKKKKKk",
+   ".kKKKKk."
+  ]
+ },
+ "mag": {
+  "palette": {
+   "k": "#3a3f47",
+   "y": "#b48c32"
+  },
+  "pixels": [
+   ".kkkk.",
+   ".kyyk.",
+   ".kyyk.",
+   ".kkkk.",
+   ".kkkk."
+  ]
+ },
+ "shells": {
+  "palette": {
+   "r": "#b0382c",
+   "y": "#d9b44a"
+  },
+  "pixels": [
+   "r.r.r.r",
+   "r.r.r.r",
+   "y.y.y.y"
+  ]
+ },
+ "cell": {
+  "palette": {
+   "k": "#2b3038",
+   "g": "#2fa04a",
+   "G": "#9cffb0"
+  },
+  "pixels": [
+   ".kkkk.",
+   "kgGGgk",
+   "kgGGgk",
+   "kgGGgk",
+   ".kkkk."
+  ]
+ },
+ "scattergun": {
+  "palette": {
+   "k": "#3a3f47",
+   "K": "#6f7783",
+   "w": "#6b4a2c"
+  },
+  "pixels": [
+   "KKKKKKKKKKKKkk..",
+   "kkkkkkkkkkkkwww.",
+   ".........kk.www."
+  ]
+ }
+}

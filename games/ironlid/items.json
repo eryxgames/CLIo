@@ -1,0 +1,81 @@
+{
+ "scanner": {
+  "name": "scanner",
+  "description": "A slab the size of a hand that clips to the lid. The battery is original.",
+  "pickup": {
+   "power": "goggles",
+   "beats": 160,
+   "sprite": "scanner",
+   "size": 0.4,
+   "sound": "scanner_on",
+   "text": "The scanner: the outpost from above, in the lid. F2 switches it; the battery runs only while it is on."
+  }
+ },
+ "medkit": {
+  "name": "medkit",
+  "description": "A field dressing, a hundred years in its wrapper.",
+  "pickup": {
+   "health": 25,
+   "sprite": "medkit",
+   "text": "A field dressing. (+25)"
+  }
+ },
+ "plates": {
+  "name": "plates",
+  "description": "Armour plates for a vest.",
+  "pickup": {
+   "armor": 50,
+   "sprite": "plates",
+   "text": "Armour plates. (50)"
+  }
+ },
+ "mag": {
+  "name": "magazine",
+  "description": "Twelve rounds for the carbine.",
+  "pickup": {
+   "ammo": {
+    "bullets": 12
+   },
+   "sprite": "mag",
+   "size": 0.4,
+   "text": "A magazine. (+12 rounds)"
+  }
+ },
+ "shells": {
+  "name": "shells",
+  "description": "Four shells.",
+  "pickup": {
+   "ammo": {
+    "shells": 4
+   },
+   "sprite": "shells",
+   "size": 0.45,
+   "text": "Four shells."
+  }
+ },
+ "cell": {
+  "name": "power cell",
+  "description": "A cell for the arm cannon.",
+  "pickup": {
+   "ammo": {
+    "cells": 20
+   },
+   "sprite": "cell",
+   "size": 0.45,
+   "text": "A power cell. (+20)"
+  }
+ },
+ "scattergun": {
+  "name": "scattergun",
+  "description": "From the store's bottom shelf. Still greased.",
+  "pickup": {
+   "weapon": 3,
+   "ammo": {
+    "shells": 8
+   },
+   "sprite": "scattergun",
+   "size": 0.8,
+   "text": "The store's scattergun. (3)"
+  }
+ }
+}

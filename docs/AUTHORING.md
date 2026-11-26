@@ -1921,6 +1921,60 @@ played back (or on another machine) goes the same way. For games of moves and an
 cards - the engine has a search too (engine/ai/search.py): minimax with alpha-beta, and Monte
 Carlo tree search, both stopped by a budget of positions looked at, not by time.
 
+### Civilians, a clean level, a fall that is not the end
+
+`games/ironlid` is a small game made of these.
+
+**Civilians.** A monster with `"civilian": true` is one of ours:
+
+```json
+"scientist": {"name": "scientist", "tag": "c", "model": "scientist", "hp": 30, "civilian": true,
+              "death": "%s is killed."}
+```
+
+It is awake from the start, harms nobody, and gets away from whoever of the others it sees
+within six cells - with one at arm's length it stays where it is - and walks back to where it
+was put when it sees none. The others **go for it**: each beat one of them takes the nearest
+civilian it sees for its target, unless the player is nearer and in its sight; it comes at
+him, aims and fires or bites as it would at the player (`a2 goes for c1`). Shot by the player
+it turns on him, and leaves civilians alone for six beats. So standing between them is how
+they are kept alive. `"spares_civilians": true` on a monster keeps it after the player alone.
+
+The player's gun never picks a civilian by itself (`f c1` shoots him by name), a blow with
+one in front is held, and walking into one changes places with him. They are not kills: the
+status line has `ours 5/6`, the level's last page `civilians 83% (5 of 6 alive)`, and its
+numbers in `levels` have `saved` and `civilians_total`. A level's `"protect": 3` (or
+`{"need": 3, "text": "Too few are left."}`) loses the level when fewer are alive.
+
+**A clean level.** `"on_clear": "name"` on a level sets off that event when nobody is left
+that counts as a kill - not civilians, barrels, a boss, nor whoever wakes on the event
+itself. A wall that `opens_on` it, a monster that wakes on it: what comes when a place has
+been made quiet.
+
+**A fall that is not the end.** `"death_after": "name"` on a level (or `true`: from the
+start): once that event has happened, the player's death does not lose the game. The level
+ends on its `"fall_lines"` (a heading and what is said under it), the scene's
+`"on_level_death"` effects run - a story text, a `goto` - the flag `<level>_fallen` is set,
+and what he carried is gone. Before the event a death is a death.
+
+```json
+"outpost": {"on_clear": "spider", "death_after": "spider", "fall_lines": ["THANE IS DOWN", "..."],
+            "protect": {"need": 3, "text": "Too few of the staff are left alive."}}
+{"id": "outpost", "level": "outpost", "on_level_death": [{"story": "outpost_fall"}, {"goto": "relocation"}]}
+```
+
+**A level's own player.** `"player"` on a level is what he begins it with whatever he came
+with - any of the keys of `first_person`'s `"start"`; what is not named is carried over as
+usual: `"player": {"health": 130, "max_health": 130, "weapons": ["1", "4"], "weapon": "4"}`.
+
+**Criticals.** `"criticals": 2` on a level (or in game.json's `first_person`; `true` is 2):
+a shot at one who is *open* counts that many times, and is not sidestepped. A monster is open
+while it takes aim, winds up or spins its barrels up (it stands still for it), while it reels,
+from behind it or from its side (it faces another way), and while it is at a civilian. The
+line says so (`ZAK. Critical, as it aims: a2 takes 26`), the level's last page counts them,
+and a level in lines marks whoever is open now with a diamond and a cross that beats (see
+[Levels in lines](#simulators)).
+
 ### Pick-ups, weapons and the player
 
 Anything lying in a level is an ordinary item (items.json) with a `pickup` block, taken by
@@ -3293,9 +3347,16 @@ far round it has turned (a number, or the name of a value; none: by its spin). `
 face a floor, doors crossed, floors as a net at their heights, the way out by name, and who is
 alive and in sight: one with a 3D model as that model in lines, doing what it does (a model moved
 by CLIo Motion as a body of a few dozen lines, which also lies there when it has fallen), the
-others as a lamp on legs; each with their first letter. `"view": "scan"` shows the whole
-level as a surface scan with the player marked on it. A level's `"goggles": "lines"` makes its
-night-vision goggles show the lines instead of dots. The level plays as it does in any view.
+others as a lamp on legs; each with their first letter - and, in a level with
+[criticals](#civilians-a-clean-level-a-fall-that-is-not-the-end), a mark on whoever is open to
+one now. `"view": "scan"` shows the whole level as a surface scan with the player marked on
+it, and beside him every one of the others that is awake (a post that blinks, with its
+letter), civilians (a short steady post, `+`), the way out, and the places the map names: a
+cell with `"mark": "STORE"` has a ring and its name - a mission's points. A level's
+`"goggles": "lines"` makes its night-vision goggles show the lines instead of dots, and
+`"goggles": "scan"` makes them a **scanner**: F2 (or `scanner`) shows the scan and goes back,
+on the goggles' battery. `"tint": "green"` on a level (or in `first_person`) draws its
+picture in one colour, as an old display has it. The level plays as it does in any view.
 
 The rocks alone, flown through without end, are the vector scene `asteroids` (with music
 playing, they flare with its low hits): `{"scope":

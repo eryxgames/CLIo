@@ -152,7 +152,7 @@ class Cell:
                  "open_for", "closes_at", "from_side", "on_open", "height", "ceiling_height", "step",
                  "slope", "rise", "ceiling_slope", "ceiling_rise", "wet", "vacuum",
                  "ceiling_mag", "mag_off_on", "mag_delay", "high", "hatch", "mag_ceiling", "lamp", "world_up",
-                 "sheds")
+                 "sheds", "mark")
 
     def __init__(self, x, y, ch, spec):
         self.x, self.y, self.ch = x, y, ch
@@ -164,6 +164,7 @@ class Cell:
         self.mag_delay = int(spec.get("mag_delay") or 0)  # ... so many beats after the event
         self.high = bool(spec.get("high"))              # a switch, exit or locker up by the ceiling: reached from it
         self.hatch = spec.get("hatch")                  # a hatch in the ceiling to the other of its name (the deck above)
+        self.mark = spec.get("mark") or None            # a place with a name: a scan shows it (a mission's point)
         self.lamp = spec.get("lamp") or None            # a lamp here: its colour, reach, power... (engine/atmosphere.py)
         up = FACING.get(str(spec.get("world_up") or "").lower())
         self.world_up = up                              # a wall walked as a floor: which way in the map the world's up is
@@ -401,7 +402,7 @@ class Monster:
     # what a monster's mind holds (engine/ai): an older save's monsters get these
     DEFAULTS = {"tactic": None, "role": None, "squad": None, "seen_at": None, "post": None, "side": 0, "goal": None,
                 "said": None, "spot": None, "grenades_left": 0, "mines_left": 0, "lobbed": None, "dived": False,
-                "on_death": None}
+                "on_death": None, "civil": False, "spared": 0, "fled": -99}
 
     def __init__(self, mid, kind, spec, x, y, tag):
         self.id, self.kind, self.spec = mid, kind, spec
@@ -418,7 +419,10 @@ class Monster:
         self.size = float(spec.get("size", 1.0))
         self.float = float(spec.get("float", 0.0))
         self.attack = spec.get("attack") or {}
-        self.awake = bool(spec.get("awake"))
+        self.civil = bool(spec.get("civilian"))         # one of ours: it harms nobody, and the others go for it
+        self.awake = bool(spec.get("awake")) or self.civil
+        self.spared = 0                                 # the beat until which it leaves ours alone (he shot it)
+        self.fled = -99                                 # the beat one of ours last ran from somebody
         self.wake_on = None
         self.on_death = None                            # its death sets off this event (its map cell's "on_death")
         self.intent = None
@@ -464,7 +468,8 @@ class Monster:
 
     def label(self):
         mark = STATE_MARK.get(self.intent, "")
-        role = STATE_ROLE.get(self.intent, "dim" if self.barrel else "boss" if self.spec.get("boss") else "tag")
+        role = STATE_ROLE.get(self.intent, "dim" if self.barrel else "boss" if self.spec.get("boss") else
+                              "good" if self.civil else "tag")
         if self.grudge is not None:
             role = "alert"
         return self.tag + mark, role
@@ -607,7 +612,10 @@ class Level:
         own = {str(k): v for k, v in (getattr(data, "weapons", None) or {}).items() if isinstance(v, dict)}
         self.weapons = {str(k): v for k, v in (self.cfg.get("weapons") or ({} if own else WEAPONS)).items()}
         self.weapons.update(own)                         # weapons.json, over game.json's first_person "weapons"
+        if isinstance(spec.get("player"), dict):         # this level begins with these, whatever he came with
+            player = dict(player or {}, **spec["player"])
         self.player = Player(player, self.cfg)
+        self.failed = None                               # why the level was lost, when not by his death
         self.monsters, self.items, self.shots, self.decals = [], [], [], []
         self.grenades = []
         self.holes = []                                  # (x, y, face, along, down): bullet holes in walls
@@ -623,7 +631,7 @@ class Level:
         self.seen_cells = set()
         self.events = set()
         self.noise_at = None
-        self.stats = {"kills": 0, "items": 0, "secrets": 0, "taken": 0, "fired": 0, "hits": 0}
+        self.stats = {"kills": 0, "items": 0, "secrets": 0, "taken": 0, "fired": 0, "hits": 0, "lost": 0, "criticals": 0}
         self.boots_said = False
         self.exit_kind = None
         self.vrng = random.Random(repr(seed) + "/looks")   # for what is only seen: the game's own chances stay as they were
@@ -679,6 +687,7 @@ class Level:
         self.plate_cells, self.held_cells, self.pads, self.lifts, self.belts, self.rides = [], [], [], [], [], []
         self.fires = {}
         self.total_kills = self.total_items = self.total_secrets = 0
+        self.total_civil = 0                             # civilians in the level (monsters that are ours)
         self.world = Chunks(self, wspec)
         self.grid = self.world
         self.cell = self.world.cell                      # the cells come from the world's chunks
@@ -799,7 +808,8 @@ class Level:
         self.timed_cells = [c for c in cells if c.open_for]
         self.belts = [c for c in cells if c.conveyor is not None]
         self.fires = {}                                  # (x, y) -> beats it burns on
-        self.total_kills = sum(1 for m in self.monsters if not m.barrel and not m.spec.get("boss"))
+        self.total_kills = sum(1 for m in self.monsters if not m.barrel and not m.spec.get("boss") and not m.civil)
+        self.total_civil = sum(1 for m in self.monsters if m.civil)
         self.total_items = sum(1 for it in self.items if not it.mine) + sum(
             sum(1 for i in (c.locker or ()) + (c.supply or ()) if not self.mine_id(i)) for c in cells)
         self.total_secrets = sum(1 for row in self.grid for c in row if c.secret)
@@ -1297,7 +1307,10 @@ class Level:
                     continue
                 with console.busy():
                     self.run_line(line)
-            if self.over in ("exit", "dead"):
+            after = self.spec.get("death_after")
+            if self.over == "dead" and not self.failed and after and (after is True or after in self.events):
+                self.over = "fallen"
+            if self.over in ("exit", "dead", "fallen"):
                 console.ending(self)
                 console.page(self, self.end_lines())
         except KeyboardInterrupt:
@@ -1324,8 +1337,14 @@ class Level:
         s = self.stats
         def pct(a, b):
             return "%d%%" % (100 * a // b) if b else "-"
-        if self.over == "dead":
-            head = [("Process terminated.", "hurt"), ("exit status 137 (SIGKILL)", "dim")]
+        if self.over == "fallen":                        # he fell where the story has him fall: it goes on
+            said = self.spec.get("fall_lines") or [self.name.upper() + "  LOST"]
+            head = [(str(t), "hurt" if not i else "dim") for i, t in enumerate(said)]
+        elif self.over == "dead" and self.failed:
+            head = [(self.failed, "hurt")]
+        elif self.over == "dead":
+            said = self.cfg.get("death_lines") or ["Process terminated.", "exit status 137 (SIGKILL)"]
+            head = [(str(t), "hurt" if not i else "dim") for i, t in enumerate(said)]
         else:
             head = [(self.name.upper() + "  FINISHED", "good")]
         lines = head + [("", "text"),
@@ -1335,6 +1354,13 @@ class Level:
                                                          self.total_secrets), "secret" if s["secrets"] else "text"),
                         ("beats      %d%s" % (self.beat, ("   par %d" % self.par) if self.par else ""),
                          "hit" if self.par and self.beat <= self.par and self.over == "exit" else "text")]
+        if self.total_civil:
+            alive = self.total_civil - s.get("lost", 0)
+            lines.insert(len(head) + 2, ("civilians  %s   (%d of %d alive)" % (pct(alive, self.total_civil), alive,
+                                                                              self.total_civil),
+                                         "good" if alive == self.total_civil else "text" if alive else "hurt"))
+        if self.spec.get("criticals") or self.cfg.get("criticals"):
+            lines.append(("criticals  %d" % s.get("criticals", 0), "hit" if s.get("criticals") else "text"))
         if self.boss is not None and self.boss.gone:
             lines += [("", "text"), (self.spec.get("boss_escaped_line", "%s got away." % self.boss.name), "boss")]
         return lines
@@ -1543,7 +1569,7 @@ class Level:
         m = re.fullmatch(r"look(?:\s+(up|down|ahead|level))?", t)
         if m:
             return self.look_at(m.group(1))
-        m = re.fullmatch(r"(?:goggles|nv)(?:\s+(on|off))?", t)
+        m = re.fullmatch(r"(?:goggles|nv|scanner|scan)(?:\s+(on|off))?", t)
         if m:
             return self.goggles(m.group(1))
         m = re.fullmatch(r"(?:mag|magboots)(?:\s+(on|off))?", t)
@@ -1938,21 +1964,24 @@ class Level:
     def goggles(self, how=None):
         """Put the TTY goggles on or take them off (a free action, as turning is): their battery lasts longer."""
         p = self.player
+        scan = self.spec.get("goggles") == "scan"        # this level's are a scanner: the level from above
+        name = "scanner" if scan else "goggles"
         if not p.goggles:
-            self.say("The goggles' battery is flat." if p.had_goggles else "You have no goggles.", "dim")
+            self.say(("The %s's battery is flat." if p.had_goggles else "You have no %s.") % name, "dim")
             return True
         want = (not p.goggles_on) if how is None else how == "on"
         if want == p.goggles_on:
-            self.say("The goggles are already %s." % ("on" if want else "off"), "dim")
+            self.say("The %s %s already %s." % (name, "is" if scan else "are", "on" if want else "off"), "dim")
             return True
         p.goggles_on = want
         if want:
             self.sfx("goggles_on")
-            self.say("Goggles on: the world in dots, and what is hollow shows. (%d beats of battery)" % p.goggles,
+            self.say(("Scanner on: the level from above, who is in it and what is marked. (%d beats of battery)" if scan else
+                      "Goggles on: the world in dots, and what is hollow shows. (%d beats of battery)") % p.goggles,
                      "secret")
         else:
             self.sfx("goggles_off", "click")
-            self.say("Goggles off. The battery keeps %d beats." % p.goggles, "dim")
+            self.say("%s off. The battery keeps %d beats." % (name.capitalize(), p.goggles), "dim")
         self.update_seen()
         return True
 
@@ -2058,6 +2087,10 @@ class Level:
             return self.push_ball(m, nx - p.x, ny - p.y)
         if m is not None and m.barrel and not m.vehicle and not m.ball:
             return self.push_barrel(m, nx - p.x, ny - p.y)
+        if m is not None and m.civil and v is None and not flying and not p.ceiling:
+            m.x, m.y = p.x, p.y                          # one of ours: he gives way, into the place just left
+            self.say("%s lets you by." % m.tag, "dim")
+            m = None
         if m is not None:
             self.say("%s is in the way." % m.tag, "dim")
             return False
@@ -3567,7 +3600,7 @@ class Level:
     def cone(self):
         """What a shot with no target goes for: everything in sight, the nearest and most central first.
         (With only quarter turns, much is never straight ahead; the gun finds it anyway.)"""
-        return sorted([m for m in self.visible() if m.awake or not m.spec.get("boss")],
+        return sorted([m for m in self.visible() if (m.awake or not m.spec.get("boss")) and not m.civil],
                       key=lambda m: (self.dist(m) + abs(self.rel(m.x, m.y)[0]) * 0.5, m.id))
 
     def set_target(self, tag=None):
@@ -3578,10 +3611,14 @@ class Level:
         if tag:
             found = [m for m in vis if m.tag.lower() == tag] or [m for m in vis if len(tag) == 1 and m.tag[0].lower() == tag]
             if not found:
-                self.say("rootless: %s: no such target in sight" % tag, "dim")
+                self.say("%s: %s: no such target in sight" % (self.data.config.get("id") or "rootless", tag), "dim")
                 return False
             self.target = found[0]
         else:
+            vis = [m for m in vis if not m.civil]        # (one of ours is aimed at only by name)
+            if not vis:
+                self.say("Nobody to aim at.", "dim")
+                return False
             i = vis.index(self.target) + 1 if self.target in vis else 0
             self.target = vis[i % len(vis)]
         self.update_seen()
@@ -3606,7 +3643,7 @@ class Level:
             vis = self.visible()
             found = [m for m in vis if m.tag.lower() == tag] or [m for m in vis if len(tag) == 1 and m.tag[0].lower() == tag]
             if not found:
-                self.say("rootless: %s: no such target in sight" % tag, "dim")
+                self.say("%s: %s: no such target in sight" % (self.data.config.get("id") or "rootless", tag), "dim")
                 return False
             target = min(found, key=self.dist)
         elif self.target is not None and self.target.seen and not melee:
@@ -3635,6 +3672,9 @@ class Level:
             ax, ay = self.ahead()
             if target is None or (target.x, target.y) != (ax, ay):
                 target = self.monster_at(ax, ay)
+                if target is not None and target.civil and not tag:      # one of ours: the blow is held
+                    self.say("%s is in the way. You hold the blow." % target.tag, "dim")
+                    return False
             if target is None:
                 cell = self.cell(ax, ay)
                 self.anim([FX(recoil=-2), FX(recoil=-3), FX(recoil=-1)], 0.04)
@@ -3686,7 +3726,12 @@ class Level:
                         if near:
                             m = rng.choice(near)
                             hits[m] = hits.get(m, 0) + rng.randint(lo, hi)
+        crit = self.open_to(target) if target in hits else None
         dodge = float(target.spec.get("dodge", 0) or 0)
+        if crit:                                         # where it is open: the shot counts for more (and is not dodged)
+            hits[target] = int(round(hits[target] * self.criticals))
+            self.stats["criticals"] = self.stats.get("criticals", 0) + 1
+            dodge = 0.0
         if target in hits and dodge and target.awake and d >= 2 and not melee and rng.random() < dodge:
             rx_, ry_ = DIRS[(p.facing + 1) % 4]
             sides = [(target.x + rx_, target.y + ry_), (target.x - rx_, target.y - ry_)]
@@ -3710,6 +3755,8 @@ class Level:
                 self.stray(target.x, target.y, 0.6 if w.get("pellets", 1) > 1 else 0.3)
         if hits:
             sound = w.get("text", {"melee": "THUD."}.get(w.get("kind"), "BLAM." if w.get("pellets", 1) > 1 else "BANG."))
+            if crit:
+                sound = "%s Critical, %s:" % (sound, crit)
             self.damage(sorted(hits.items(), key=lambda kv: kv[0] is not target), lead=sound)
             if (melee and w.get("stagger") and target in hits and not target.dead and not target.barrel
                     and not target.spec.get("boss")):                    # it reels: no aim, no step
@@ -3731,6 +3778,34 @@ class Level:
         self.after_shot(w)
         self.end_beat()
         return target in hits
+
+    @property
+    def criticals(self):
+        """What a shot is worth where its target is open (``"criticals"`` of the level, or of the game): 0 for none."""
+        k = self.spec.get("criticals", self.cfg.get("criticals"))
+        try:
+            return max(0.0, float(2.0 if k is True else k or 0.0))
+        except (TypeError, ValueError):
+            return 0.0
+
+    def open_to(self, m):
+        """Where a shot at this one counts for more, in words - or None: while it takes aim or winds up (it stands
+        still for it), while it reels, and from behind it or from its side (it faces another way)."""
+        if not self.criticals or m.dead or m.gone or m.barrel or m.civil or m.spec.get("boss") or not m.awake:
+            return None
+        if m.intent in ("aim", "windup", "spin"):
+            return "as it aims"
+        if m.stun:
+            return "as it reels"
+        if m.heading is not None and m.grudge is None and m.intent != "charge":
+            p = self.player
+            to = math.atan2(p.y - m.y, p.x - m.x)
+            off = abs((to - m.heading + math.pi) % (2 * math.pi) - math.pi)
+            if off > math.radians(100):
+                return "from behind"
+        if m.grudge is not None and m.grudge.civil:
+            return "while it is at %s" % m.grudge.tag
+        return None
 
     def after_shot(self, w):
         p = self.player
@@ -3792,7 +3867,9 @@ class Level:
             m.hp -= d
             if not m.awake:
                 self.wake(m, quiet=True)
-            if (source is not None and not source.dead and m is not source and not m.barrel
+            if source is None and m.grudge is not None and m.grudge.civil and not lead.startswith("The "):
+                m.grudge, m.spared = None, self.beat + 6     # his shot: it leaves the civilian for him, for a while
+            if (source is not None and not source.dead and m is not source and not m.barrel and not m.civil
                     and m.hp > 0 and m.grudge is not source and not m.spec.get("boss")):
                 m.grudge = source
                 turned.append(m)
@@ -3842,6 +3919,22 @@ class Level:
             if m.on_death and not self.over:
                 self.event(m.on_death)
             return
+        if m.civil:                                      # one of ours is down
+            self.stats["lost"] = self.stats.get("lost", 0) + 1
+            alive = self.total_civil - self.stats["lost"]
+            self.say((m.spec.get("death") or "%s is down.") % m.tag + "  (%d of %d alive)" % (alive, self.total_civil), "hurt")
+            self.sfx((m.spec.get("sounds") or {}).get("death") or "hurt")
+            self.interrupt = self.interrupt or "%s is down" % m.tag
+            if m.on_death:
+                self.event(m.on_death)
+            need = self.spec.get("protect")
+            need, why = (need.get("need", 1), need.get("text")) if isinstance(need, dict) else (need, None)
+            if need and alive < int(need) and not self.over:
+                self.failed = why or "Too many of them are dead."
+                self.say(self.failed, "hurt")
+                self.over = "dead"
+            self.update_seen()
+            return
         if not m.spec.get("boss") and not m.spec.get("falls"):
             self.stats["kills"] += 1
         if m is self.boss and self.marks:                # its schedule dies with it: no more fire marked
@@ -3867,6 +3960,11 @@ class Level:
                 self.total_items += 1
                 self.anim([FX(lift_items={it: h}) for h in (0.45, 0.6, 0.45, 0.15, 0.05, 0.0)], 0.035)
         self.update_seen()
+        clear = self.spec.get("on_clear")                # the level is clean: nobody left that counts as a kill
+        if clear and clear not in self.events and not self.over and not any(
+                not o.dead and not o.gone and not o.barrel and not o.civil and not o.spec.get("boss")
+                and not o.spec.get("falls") and o.wake_on != clear for o in self.monsters):
+            self.event(clear)
 
     def explode(self, b):
         self.say("%s explodes!" % b.tag, "alert")
@@ -4305,9 +4403,12 @@ class Level:
             p.goggles -= 1
             if not p.goggles:
                 p.goggles_on = False
-                self.say("The goggles flicker out. Colours come back.", "dim")
+                self.say("The scanner goes dark." if self.spec.get("goggles") == "scan" else
+                         "The goggles flicker out. Colours come back.", "dim")
             elif p.goggles == 5:
-                self.say("The goggles' battery is low: 5 more beats. (goggles off saves it)", "alert")
+                self.say("The scanner's battery is low: 5 more beats. (scanner off saves it)"
+                         if self.spec.get("goggles") == "scan" else
+                         "The goggles' battery is low: 5 more beats. (goggles off saves it)", "alert")
         if p.sudo:
             p.sudo -= 1
             if not p.sudo:
@@ -4532,6 +4633,10 @@ class Level:
             return
         if m.grudge is not None and (m.grudge.dead or m.grudge.gone):
             m.grudge = None
+        if m.civil:
+            return self.civil_act(m)
+        if self.total_civil:
+            self.marks_civilian(m)
         if ai.brain.has(self, m):                        # a brain: it weighs what to do (engine/ai)
             return ai.brain.act(self, m)
         foe = m.grudge
@@ -4651,6 +4756,50 @@ class Level:
                     self.step_towards(m, field)
                 elif d < keep[0]:
                     self.step_towards(m, field, away=True)
+
+    def civil_act(self, m):
+        """One of ours: it gets away from whoever of them it sees within six cells - but with one at arm's length
+        it stays where it is (there is no outrunning that) - and when it sees none goes back, every other beat, to
+        where it was."""
+        threat = None
+        for o in self.monsters:
+            if o.civil or o.dead or o.gone or o.barrel or not o.awake or o.vehicle or o.spec.get("falls"):
+                continue
+            d = max(abs(o.x - m.x), abs(o.y - m.y))
+            if d <= 6 and (threat is None or d < threat[0]) and self.sees(m.x, m.y, o.x, o.y):
+                threat = (d, o)
+        if threat is not None:
+            m.fled = self.beat
+            if abs(threat[1].x - m.x) + abs(threat[1].y - m.y) > 1:
+                self.step_towards(m, self.ways(threat[1].x, threat[1].y, limit=14), away=True)
+        elif (m.x, m.y) != tuple(m.post) and (self.beat + m.id) % 2 == 0 and self.beat - m.fled > 4:
+            self.step_towards(m, self.ways(m.post[0], m.post[1], limit=40))
+
+    def marks_civilian(self, m):
+        """Whom this one is after: the nearest of ours it sees, if he is not nearer and in its sight (and has not
+        just shot it) - then it goes for that one as for another monster it has a grudge against."""
+        if (m.barrel or m.spec.get("boss") or m.vehicle or m.spec.get("spares_civilians")
+                or (m.grudge is not None and not m.grudge.civil)):
+            return
+        p = self.player
+        sight = int(m.spec.get("sight", 8))
+        dp = max(abs(m.x - p.x), abs(m.y - p.y))
+        best = None
+        if self.beat >= m.spared:
+            for c in self.monsters:
+                if not c.civil or c.dead or c.gone:
+                    continue
+                d = max(abs(c.x - m.x), abs(c.y - m.y))
+                if d <= sight and (best is None or d < best[0]) and self.sees(m.x, m.y, c.x, c.y):
+                    best = (d, c)
+        if best is not None and dp <= best[0] and dp <= sight and self.sees(m.x, m.y, p.x, p.y):
+            best = None                                  # he is nearer, and in its sight: him
+        want = best[1] if best is not None else None
+        if want is not m.grudge:
+            m.grudge = want
+            if want is not None and (m.seen or want.seen):
+                self.say("%s goes for %s." % (m.tag, want.tag), "alert")
+                self.interrupt = self.interrupt or "%s goes for %s" % (m.tag, want.tag)
 
     def ranged(self, m, foe, d):
         if m.dead or m.gone:
@@ -5134,6 +5283,9 @@ class FrameConsole:
                 segs += [(text, "dim"), ("  ", "text")]
             else:
                 segs += [(text, role), (" %d  " % max(0, m.hp), "dim")]
+        if lv.total_civil:
+            alive = lv.total_civil - lv.stats.get("lost", 0)
+            segs.append((" ours %d/%d " % (alive, lv.total_civil), "good" if alive == lv.total_civil else "alert"))
         if lv.shots:
             segs.append((g["fire"] + " fire", "wind"))
         if lv.player.sudo:
@@ -5141,8 +5293,9 @@ class FrameConsole:
         if lv.player.boots:
             segs.append(("  boots: %d" % lv.player.boots, "toxic"))
         if lv.player.goggles:
-            segs.append(("  goggles: %d" % lv.player.goggles, "secret") if lv.player.goggles_on else
-                        ("  goggles off: %d" % lv.player.goggles, "dim"))
+            name = "scanner" if lv.spec.get("goggles") == "scan" else "goggles"
+            segs.append(("  %s: %d" % (name, lv.player.goggles), "secret") if lv.player.goggles_on else
+                        ("  %s off: %d" % (name, lv.player.goggles), "dim"))
         p = lv.player
         if p.magboots:
             segs.append(("  mag: ceiling" if p.ceiling else "  mag" if p.mag_on else "  mag off",
@@ -5320,7 +5473,7 @@ class FrameConsole:
         self.screen.play(frames, lambda cells: self.draw(lv, prompt=None, cells=cells), 0.06)
 
     def ending(self, lv):
-        if lv.over == "dead":
+        if lv.over in ("dead", "fallen"):
             self.screen.play([FX(hurt=0.6, fade=k) for k in (0.15, 0.3, 0.45, 0.6, 0.72)],
                              lambda fx: self.draw(lv, fx, prompt=None), 0.08)
         else:
@@ -5694,6 +5847,7 @@ def play_scene(game, scene, resume_from=None):
         break
     w.vars["_fp_player"] = lv.player.keep()
     stats = dict(lv.stats, beats=lv.beat, par=lv.par, secrets_total=lv.total_secrets, kills_total=lv.total_kills,
+                 civilians_total=lv.total_civil, saved=lv.total_civil - lv.stats.get("lost", 0),
                  items_total=lv.total_items)
     w.vars.setdefault("levels", {})[lv.id] = stats
     if outcome == "exit":
@@ -5704,7 +5858,11 @@ def play_scene(game, scene, resume_from=None):
             effects = scene.get("on_secret_exit") or effects
         if effects:
             conditions.run(effects, game)
-    elif outcome == "dead":
+    elif outcome == "fallen" and scene.get("on_level_death"):      # he fell where the story has him fall
+        w.vars.pop("_fp_player", None)                   # (what he carried is gone with him)
+        w.flags["%s_fallen" % lv.id] = True
+        conditions.run(scene["on_level_death"], game)
+    elif outcome in ("dead", "fallen"):
         w.vars.pop("_fp_player", None)
         game.end_game("lose", lv.spec.get("death_text") or "outro_lose")
     else:
@@ -5793,6 +5951,13 @@ def duel_problems(data):
                 if v.get("switch") is None:
                     out.append("level '%s' legend '%s': a duel is on a switch (a terminal)" % (lid, ch))
     return out
+
+
+def mon_of(spec):
+    """The monster a legend entry puts on the map (its id), or None."""
+    if isinstance(spec, str):
+        return spec
+    return spec.get("monster") if isinstance(spec, dict) else None
 
 
 def validate(data):
@@ -5999,6 +6164,44 @@ def validate(data):
             if isinstance(lv.get(key), dict) and isinstance(lv[key].get("events"), dict):
                 listening |= set(lv[key]["events"])
         listening |= set((lv.get("events") or {}))
+        clear, after = lv.get("on_clear"), lv.get("death_after")
+        if clear is not None and (not isinstance(clear, str) or not clear):
+            problems.append("level '%s': on_clear should be the name of the event set off when nobody is left to fight" % lid)
+        elif clear and clear not in listening:
+            problems.append("level '%s': on_clear sets off '%s', but nothing opens, closes or wakes on it" % (lid, clear))
+        if after is not None:
+            scenes = getattr(data, "scenes", None) or {}
+            scenes = [sc for sc in (scenes.values() if isinstance(scenes, dict) else scenes)
+                      if isinstance(sc, dict) and sc.get("level") == lid]
+            if after is not True and (not isinstance(after, str) or not after):
+                problems.append("level '%s': death_after should be the name of an event (from then on his death goes on "
+                                "with the story), or true" % lid)
+            elif isinstance(after, str) and after != clear and after not in listening and not any(
+                    isinstance(legend.get(ch), dict) and after in (legend[ch].get("on_enter"), legend[ch].get("on_pickup"),
+                                                                   legend[ch].get("switch"), legend[ch].get("on_death"),
+                                                                   legend[ch].get("on_open")) for ch in used):
+                problems.append("level '%s': death_after '%s' is an event nothing in the level sets off" % (lid, after))
+            if scenes and not any(sc.get("on_level_death") for sc in scenes):
+                problems.append("level '%s' has death_after, but its scene has no on_level_death (what happens then)" % lid)
+        need = lv.get("protect")
+        need = need.get("need") if isinstance(need, dict) else need
+        if need is not None:
+            civil = sum(row.count(ch) for row in (lv.get("map") or []) for ch in set(row)
+                        if isinstance((data.monsters or {}).get(mon_of(legend.get(ch))), dict)
+                        and (data.monsters or {})[mon_of(legend.get(ch))].get("civilian"))
+            if isinstance(need, bool) or not isinstance(need, int) or need < 1:
+                problems.append("level '%s': protect should be how many civilians must live (1 or more), or "
+                                "{\"need\": n, \"text\": ...}" % lid)
+            elif need > civil:
+                problems.append("level '%s': protect needs %d civilians alive, and its map has %d" % (lid, need, civil))
+        if lv.get("tint") not in (None, False, "green"):
+            problems.append("level '%s': tint should be green (the picture in one colour, as an old display has it)" % lid)
+        k = lv.get("criticals")
+        if k is not None and k is not True and (isinstance(k, bool) or not isinstance(k, (int, float)) or k < 1):
+            problems.append("level '%s': criticals should be what a shot is worth where its target is open (2: twice), or true" % lid)
+        if lv.get("player") is not None and not isinstance(lv["player"], dict):
+            problems.append("level '%s': player should be an object (health, armor, weapons, weapon, ammo...: what he "
+                            "begins this level with, whatever he came with)" % lid)
         counts = {}
         for ch in used:
             sp = legend.get(ch)

@@ -1,0 +1,437 @@
+{
+ "carbine": [
+  {
+   "wave": "noise",
+   "noise_rate": 5200,
+   "freq": 0,
+   "dur": 0.13,
+   "vol": 0.5,
+   "decay": 0.117,
+   "sustain": 0
+  },
+  {
+   "wave": "square",
+   "freq": [
+    380,
+    100
+   ],
+   "dur": 0.091,
+   "vol": 0.25
+  }
+ ],
+ "scattergun": [
+  {
+   "wave": "noise",
+   "noise_rate": 2200,
+   "freq": 0,
+   "dur": 0.4,
+   "vol": 0.7,
+   "decay": 0.38,
+   "sustain": 0
+  },
+  {
+   "wave": "triangle",
+   "freq": [
+    160,
+    42
+   ],
+   "dur": 0.32,
+   "vol": 0.6
+  }
+ ],
+ "cannon": [
+  {
+   "wave": "saw",
+   "freq": [
+    900,
+    180
+   ],
+   "dur": 0.1,
+   "vol": 0.3
+  },
+  {
+   "wave": "saw",
+   "freq": [
+    900,
+    180
+   ],
+   "dur": 0.1,
+   "vol": 0.3,
+   "delay": 0.1
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 3800,
+   "freq": 0,
+   "dur": 0.2,
+   "vol": 0.3,
+   "decay": 0.18,
+   "sustain": 0
+  }
+ ],
+ "butt": {
+  "wave": "triangle",
+  "freq": [
+   140,
+   60
+  ],
+  "dur": 0.12,
+  "vol": 0.5
+ },
+ "android_sight": [
+  {
+   "wave": "square",
+   "freq": [
+    240,
+    180
+   ],
+   "dur": 0.1,
+   "vol": 0.2
+  },
+  {
+   "wave": "square",
+   "freq": [
+    360,
+    140
+   ],
+   "dur": 0.16,
+   "vol": 0.18,
+   "delay": 0.1
+  }
+ ],
+ "android_shot": [
+  {
+   "wave": "noise",
+   "noise_rate": 6400,
+   "freq": 0,
+   "dur": 0.1,
+   "vol": 0.4,
+   "decay": 0.09000000000000001,
+   "sustain": 0
+  },
+  {
+   "wave": "square",
+   "freq": [
+    460,
+    140
+   ],
+   "dur": 0.06999999999999999,
+   "vol": 0.2
+  }
+ ],
+ "android_down": {
+  "wave": "saw",
+  "freq": [
+   280,
+   36
+  ],
+  "dur": 0.55,
+  "vol": 0.25
+ },
+ "cyborg_sight": [
+  {
+   "wave": "saw",
+   "freq": [
+    110,
+    150
+   ],
+   "dur": 0.2,
+   "vol": 0.22
+  },
+  {
+   "wave": "saw",
+   "freq": [
+    150,
+    90
+   ],
+   "dur": 0.25,
+   "vol": 0.22,
+   "delay": 0.2
+  }
+ ],
+ "cyborg_down": [
+  {
+   "wave": "saw",
+   "freq": [
+    200,
+    30
+   ],
+   "dur": 0.8,
+   "vol": 0.28
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 400,
+   "freq": 0,
+   "dur": 0.5,
+   "vol": 0.3,
+   "decay": 0.4,
+   "sustain": 0
+  }
+ ],
+ "chaingun": [
+  {
+   "wave": "noise",
+   "noise_rate": 5600,
+   "freq": 0,
+   "dur": 0.08,
+   "vol": 0.45,
+   "decay": 0.07,
+   "sustain": 0
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 5600,
+   "freq": 0,
+   "dur": 0.08,
+   "vol": 0.45,
+   "decay": 0.07,
+   "sustain": 0,
+   "delay": 0.09
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 5600,
+   "freq": 0,
+   "dur": 0.08,
+   "vol": 0.45,
+   "decay": 0.07,
+   "sustain": 0,
+   "delay": 0.18
+  }
+ ],
+ "spinup": {
+  "wave": "saw",
+  "freq": [
+   70,
+   400
+  ],
+  "dur": 0.7,
+  "vol": 0.2
+ },
+ "flame": [
+  {
+   "wave": "noise",
+   "noise_rate": 2400,
+   "freq": 0,
+   "dur": 0.55,
+   "vol": 0.32,
+   "decay": 0.2,
+   "sustain": 0.75
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 550,
+   "freq": 0,
+   "dur": 0.55,
+   "vol": 0.18
+  }
+ ],
+ "flame_click": {
+  "wave": "square",
+  "freq": [
+   1400,
+   900
+  ],
+  "dur": 0.05,
+  "vol": 0.2
+ },
+ "hound_sight": [
+  {
+   "wave": "saw",
+   "freq": [
+    520,
+    700
+   ],
+   "dur": 0.09,
+   "vol": 0.18
+  },
+  {
+   "wave": "saw",
+   "freq": [
+    700,
+    420
+   ],
+   "dur": 0.12,
+   "vol": 0.18,
+   "delay": 0.09
+  }
+ ],
+ "hound_bite": {
+  "wave": "square",
+  "freq": [
+   560,
+   180
+  ],
+  "dur": 0.08,
+  "vol": 0.25
+ },
+ "hound_down": {
+  "wave": "saw",
+  "freq": [
+   620,
+   80
+  ],
+  "dur": 0.3,
+  "vol": 0.2
+ },
+ "mantis_sight": {
+  "wave": "saw",
+  "freq": [
+   90,
+   260
+  ],
+  "dur": 0.4,
+  "vol": 0.25
+ },
+ "mantis_claw": [
+  {
+   "wave": "noise",
+   "noise_rate": 1800,
+   "freq": 0,
+   "dur": 0.12,
+   "vol": 0.4,
+   "decay": 0.1,
+   "sustain": 0
+  },
+  {
+   "wave": "square",
+   "freq": [
+    300,
+    90
+   ],
+   "dur": 0.12,
+   "vol": 0.25
+  }
+ ],
+ "wasp_sight": [
+  {
+   "wave": "square",
+   "freq": [
+    900,
+    1350
+   ],
+   "dur": 0.08,
+   "vol": 0.16
+  },
+  {
+   "wave": "square",
+   "freq": [
+    1350,
+    1000
+   ],
+   "dur": 0.1,
+   "vol": 0.14,
+   "delay": 0.08
+  }
+ ],
+ "wasp_shot": {
+  "wave": "square",
+  "freq": [
+   1500,
+   500
+  ],
+  "dur": 0.07,
+  "vol": 0.2
+ },
+ "wasp_down": {
+  "wave": "square",
+  "freq": [
+   1200,
+   200
+  ],
+  "dur": 0.25,
+  "vol": 0.18
+ },
+ "spider_wake": [
+  {
+   "wave": "noise",
+   "noise_rate": 200,
+   "freq": 0,
+   "dur": 1.0,
+   "vol": 0.6,
+   "decay": 0.3,
+   "sustain": 0.6
+  },
+  {
+   "wave": "saw",
+   "freq": [
+    40,
+    34
+   ],
+   "dur": 1.0,
+   "vol": 0.35
+  },
+  {
+   "wave": "saw",
+   "freq": [
+    60,
+    180
+   ],
+   "dur": 0.5,
+   "vol": 0.2,
+   "delay": 0.5
+  }
+ ],
+ "spider_strike": [
+  {
+   "wave": "noise",
+   "noise_rate": 700,
+   "freq": 0,
+   "dur": 0.25,
+   "vol": 0.6,
+   "decay": 0.2,
+   "sustain": 0
+  },
+  {
+   "wave": "triangle",
+   "freq": [
+    120,
+    30
+   ],
+   "dur": 0.3,
+   "vol": 0.6
+  }
+ ],
+ "spider_down": [
+  {
+   "wave": "saw",
+   "freq": [
+    160,
+    20
+   ],
+   "dur": 1.2,
+   "vol": 0.35
+  },
+  {
+   "wave": "noise",
+   "noise_rate": 300,
+   "freq": 0,
+   "dur": 1.0,
+   "vol": 0.4,
+   "decay": 0.8,
+   "sustain": 0
+  }
+ ],
+ "civilian_down": {
+  "wave": "triangle",
+  "freq": [
+   420,
+   160
+  ],
+  "dur": 0.3,
+  "vol": 0.3
+ },
+ "scanner_on": {
+  "notes": "e5 b5 e6:2",
+  "tempo": 700,
+  "wave": "square",
+  "vol": 0.22
+ },
+ "goggles_on": {
+  "notes": "e5 b5 e6:2",
+  "tempo": 700,
+  "wave": "square",
+  "vol": 0.22
+ }
+}

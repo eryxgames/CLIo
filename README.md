@@ -40,6 +40,7 @@ downloads (CLIo Picture, Ballistic's sounds); every game and the tech demo play.
 | **The Hollow** (`depths`) | A dungeon crawler that is different every time: three classes, tactical fights where every enemy shows what it is about to do, loot, shrines, a peddler. **Rogue mode** (`--mode rogue`): one life, no bottom, a table of the best runs. **Deck mode** (`--mode cards`): every fight is a card battle. |
 | **Derelict** (`derelict`) | A short sci-fi text adventure aboard an abandoned cargo hauler: puzzles, conversations, a fight that can be talked around, three endings. |
 | **Erebus: Last Watch** (`erebus`) | The terminals demo: the last watch aboard a cargo hauler, on five consoles opened from a wheel of orders - wake the core, scan for a place to land and leave a beacon, open the bay, fly the lander through the drift and set it down. Panels, scopes, scans, models that move as values say; the autopilot can do each console (`python -m engine.sim games/erebus`). |
+| **IRONLID** (`ironlid`) | A test demo of bodies moved by CLIo Motion, in two first-person levels. A garrison a hundred years behind its own supplies holds a research outpost: keep its staff alive while squads of androids and a pack of hounds come in (the helmet shows one colour; its scanner, the outpost from above with everybody on it). Then the Spider - and a second level seen in lines, with a mark on whoever is open to a shot. `--demo` shows its crowds. |
 | **Tech demo** | `python clio.py --demo`: CLIo shows what it can do, by itself. Any key goes back. |
 
 RØØTLESS also has a **simulatron** of training programs, each its own kind of game. Start one
@@ -245,7 +246,7 @@ CLIo is open source so that anyone can make games with it, including games they 
 | The engine: `engine/`, `clio.py`, `tests/`, `utils/`, `docs/` | [Apache-2.0](LICENSE) |
 | Everything the engine ships for games to use: the themes, the built-in sound effects, the music composer, the sprite generator, the CLIo logo art | Apache-2.0 - reuse and edit freely |
 | `templates/starter/`, `templates/realm/`, `templates/station/`, the terminals demo `games/erebus/` and the sandbox in `game_files/` | Apache-2.0 - copy them as a starting point |
-| The demo games `games/derelict/`, `games/depths/` and `games/rootless/` (story, text, characters, art, sprites, levels, music) | Copyright Daniel Sandner, all rights reserved - see the `LICENSE.md` in each folder |
+| The demo games `games/derelict/`, `games/depths/`, `games/rootless/` and `games/ironlid/` (story, text, characters, art, sprites, levels, music) | Copyright Daniel Sandner, all rights reserved - see the `LICENSE.md` in each folder |
 
 **What you make is yours.** A game you write for CLIo is your own work under whatever
 terms you choose, and so are the music, sound effects and sprites the engine generates

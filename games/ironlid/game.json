@@ -1,0 +1,76 @@
+{
+ "id": "ironlid",
+ "title": "IRONLID",
+ "subtitle": "A test demo: the outpost, and what was made of him",
+ "description": "First-person action in the terminal. A garrison a hundred years behind its own supplies, an outpost of civilians to keep alive, and machines that walk. A test demo.",
+ "author": "Daniel Sandner",
+ "version": "0.1",
+ "order": 4,
+ "style": "default",
+ "initial_scene": "outpost",
+ "intro": "intro",
+ "on_start": [
+  {
+   "pause": true
+  }
+ ],
+ "title_banner": {
+  "text": "IRONLID",
+  "style": "led",
+  "palette": "phosphor"
+ },
+ "show_title": false,
+ "title_music": {
+  "generate": {
+   "mood": "dark",
+   "seed": 41,
+   "sound": "rich"
+  }
+ },
+ "music_sound": "rich",
+ "player_stats": {
+  "health": 100,
+  "max_health": 100
+ },
+ "first_person": {
+  "view": "pixel",
+  "start": {
+   "health": 100,
+   "armor": 25,
+   "weapons": [
+    "1",
+    "2"
+   ],
+   "weapon": "2",
+   "ammo": {
+    "bullets": 60,
+    "shells": 0,
+    "cells": 0
+   },
+   "max_ammo": {
+    "bullets": 200,
+    "shells": 40,
+    "cells": 200
+   }
+  },
+  "death_lines": [
+   "Thane is down.",
+   "The lid's display holds its last picture, in green."
+  ],
+  "saves": 3,
+  "autosave": true
+ },
+ "help": "Arrows step and turn, Ctrl+arrows or , . strafe, space fires, Enter opens, Tab shows the map, F2 the scanner.",
+ "about": "A test demo of CLIo's bodies moved by CLIo Motion: squads, packs, civilians to keep alive, a scan of the level, a level in lines with criticals.",
+ "website": "eryxian.com",
+ "license": "All rights reserved - see LICENSE.md in this game's folder",
+ "end_screen": {
+  "heading": "IRONLID - END OF THE TEST DEMO",
+  "next": "Next: the relocation ship lifts",
+  "credits": [
+   "IRONLID - a game by Daniel Sandner",
+   "made with CLIo"
+  ],
+  "tick": "HALDEN RELAY  no carrier  retry in 100 years"
+ }
+}

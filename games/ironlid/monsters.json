@@ -1,0 +1,401 @@
+{
+ "scientist": {
+  "name": "scientist",
+  "role": "civilian",
+  "tag": "c",
+  "model": "scientist",
+  "hp": 30,
+  "civilian": true,
+  "death": "%s is killed.",
+  "sounds": {
+   "death": "civilian_down"
+  },
+  "man": [
+   "One of Halden's scientists, in a lab coat.",
+   "",
+   "Harms nobody. Runs from what it sees coming."
+  ]
+ },
+ "technician": {
+  "name": "technician",
+  "role": "civilian",
+  "tag": "c",
+  "model": "technician",
+  "hp": 30,
+  "civilian": true,
+  "death": "%s is killed.",
+  "sounds": {
+   "death": "civilian_down"
+  },
+  "man": [
+   "One of Halden's technicians, with a tool box.",
+   "",
+   "Harms nobody. Runs from what it sees coming."
+  ]
+ },
+ "hazmat": {
+  "name": "dust lab hand",
+  "role": "civilian",
+  "tag": "c",
+  "model": "hazmat",
+  "hp": 30,
+  "civilian": true,
+  "death": "%s is killed.",
+  "sounds": {
+   "death": "civilian_down"
+  },
+  "man": [
+   "Someone from the dust lab, still in the suit.",
+   "",
+   "Harms nobody. Runs from what it sees coming."
+  ]
+ },
+ "researcher": {
+  "name": "researcher",
+  "role": "civilian",
+  "tag": "c",
+  "model": "researcher",
+  "hp": 30,
+  "civilian": true,
+  "death": "%s is killed.",
+  "sounds": {
+   "death": "civilian_down"
+  },
+  "man": [
+   "One of Halden's researchers.",
+   "",
+   "Harms nobody. Runs from what it sees coming."
+  ]
+ },
+ "android": {
+  "name": "line android",
+  "role": "rifle squad",
+  "tag": "a",
+  "model": "android",
+  "hp": 22,
+  "sight": 9,
+  "dodge": 0.1,
+  "attack": {
+   "kind": "hitscan",
+   "damage": [
+    4,
+    8
+   ],
+   "range": 8,
+   "keep": [
+    3,
+    6
+   ],
+   "eager": 0.5,
+   "accuracy": [
+    0.9,
+    0.85,
+    0.75,
+    0.6,
+    0.5,
+    0.4,
+    0.32,
+    0.26,
+    0.2
+   ]
+  },
+  "brain": "soldier",
+  "drops": "mag",
+  "sounds": {
+   "sight": "android_sight",
+   "attack": "android_shot",
+   "death": "android_down"
+  },
+  "death": "%s folds at the knees.",
+  "man": [
+   "A machine built to the measure of a rifleman, and drilled like one.",
+   "",
+   "Takes cover, keeps its distance, works round your side. In a squad, half pin you down."
+  ]
+ },
+ "breacher": {
+  "name": "breacher",
+  "role": "shotgun android",
+  "tag": "b",
+  "model": "breacher",
+  "hp": 30,
+  "sight": 9,
+  "attack": {
+   "kind": "hitscan",
+   "damage": [
+    3,
+    6
+   ],
+   "pellets": 3,
+   "range": 6,
+   "keep": [
+    1,
+    4
+   ],
+   "eager": 0.55,
+   "accuracy": [
+    0.95,
+    0.9,
+    0.78,
+    0.6,
+    0.45,
+    0.32,
+    0.22
+   ]
+  },
+  "brain": "assault",
+  "drops": "shells",
+  "sounds": {
+   "sight": "android_sight",
+   "attack": "scattergun",
+   "death": "android_down"
+  },
+  "death": "%s goes over backwards.",
+  "man": [
+   "The one that comes through the door first.",
+   "",
+   "Comes at you. Worst at arm's length."
+  ]
+ },
+ "burner": {
+  "name": "burner",
+  "role": "flamethrower cyborg",
+  "tag": "f",
+  "model": "burner",
+  "hp": 45,
+  "sight": 8,
+  "burst_fire": 2,
+  "attack": {
+   "kind": "flame",
+   "damage": [
+    7,
+    12
+   ],
+   "range": 3,
+   "burn": 3,
+   "eager": 0.75
+  },
+  "sounds": {
+   "sight": "cyborg_sight",
+   "windup": "flame_click",
+   "attack": "flame",
+   "death": "cyborg_down"
+  },
+  "death": "%s goes down, tanks first.",
+  "man": [
+   "It was a man once: the tanks are bolted where his pack was.",
+   "",
+   "Gets in line with you, three cells off, and levels its nozzle a beat before it sprays.",
+   "Its tanks burst when it dies. Do not stand next to it then."
+  ]
+ },
+ "gunner": {
+  "name": "heavy gunner",
+  "role": "chaingun cyborg",
+  "tag": "g",
+  "model": "heavy",
+  "hp": 70,
+  "size": 1.12,
+  "sight": 10,
+  "attack": {
+   "kind": "hitscan",
+   "damage": [
+    2,
+    5
+   ],
+   "pellets": 4,
+   "range": 10,
+   "spinup": 2,
+   "move_every": 2,
+   "accuracy": [
+    0.9,
+    0.8,
+    0.65,
+    0.5,
+    0.4,
+    0.32,
+    0.25,
+    0.2,
+    0.15,
+    0.12
+   ]
+  },
+  "brain": "heavy",
+  "drops": "mag",
+  "sounds": {
+   "sight": "cyborg_sight",
+   "spinup": "spinup",
+   "attack": "chaingun",
+   "death": "cyborg_down"
+  },
+  "death": "%s comes down like a wall.",
+  "man": [
+   "Armour, a drum on its back, a chaingun at the hip.",
+   "",
+   "Its barrels take two beats to come up: that is when to be somewhere else, or to shoot."
+  ]
+ },
+ "hound": {
+  "name": "hound",
+  "role": "pack machine",
+  "tag": "h",
+  "model": "hound",
+  "hp": 12,
+  "sight": 9,
+  "attack": {
+   "kind": "melee",
+   "damage": [
+    3,
+    6
+   ],
+   "speed": 2
+  },
+  "brain": "swarm",
+  "squad_tactic": "swarm",
+  "bite": "%s bites you.",
+  "sounds": {
+   "sight": "hound_sight",
+   "attack": "hound_bite",
+   "death": "hound_down"
+  },
+  "death": "%s skids and lies still.",
+  "man": [
+   "Four legs, a jaw, no hide.",
+   "",
+   "A pack keeps off until enough of it is near, then all come at once."
+  ]
+ },
+ "stalker": {
+  "name": "stalker",
+  "role": "fast machine",
+  "tag": "r",
+  "model": "stalker",
+  "hp": 28,
+  "sight": 9,
+  "attack": {
+   "kind": "melee",
+   "damage": [
+    6,
+    11
+   ],
+   "speed": 2
+  },
+  "brain": "skirmisher",
+  "bite": "%s rakes you.",
+  "sounds": {
+   "sight": "hound_sight",
+   "attack": "hound_bite",
+   "death": "hound_down"
+  },
+  "death": "%s folds up, tail last.",
+  "man": [
+   "Two legs and a long tail for balance. It runs faster than you do.",
+   "",
+   "Works round your side and falls back when hurt."
+  ]
+ },
+ "mantis": {
+  "name": "mantis",
+  "role": "heavy machine",
+  "tag": "t",
+  "model": "mantis",
+  "hp": 60,
+  "size": 1.25,
+  "sight": 8,
+  "attack": {
+   "kind": "melee",
+   "damage": [
+    10,
+    16
+   ],
+   "speed": 1
+  },
+  "brain": "brute",
+  "bite": "%s's claws close on you.",
+  "sounds": {
+   "sight": "mantis_sight",
+   "attack": "mantis_claw",
+   "death": "android_down"
+  },
+  "death": "%s settles on its claws.",
+  "man": [
+   "Two claws held folded, four legs under a long body.",
+   "",
+   "Comes at you and does not turn away."
+  ]
+ },
+ "wasp": {
+  "name": "wasp",
+  "role": "flying gun",
+  "tag": "w",
+  "model": "wasp",
+  "hp": 10,
+  "float": 0.5,
+  "sight": 9,
+  "dodge": 0.3,
+  "attack": {
+   "kind": "hitscan",
+   "damage": [
+    2,
+    5
+   ],
+   "range": 7,
+   "keep": [
+    2,
+    5
+   ],
+   "eager": 0.5,
+   "accuracy": [
+    0.85,
+    0.8,
+    0.7,
+    0.55,
+    0.45,
+    0.35,
+    0.3,
+    0.25
+   ]
+  },
+  "sounds": {
+   "sight": "wasp_sight",
+   "attack": "wasp_shot",
+   "death": "wasp_down"
+  },
+  "death": "%s drops out of the air.",
+  "man": [
+   "A gun with wings, the size of a helmet.",
+   "",
+   "Hangs in the air where it has a line on you. Sidesteps."
+  ]
+ },
+ "spider": {
+  "name": "the Spider",
+  "role": "what takes an outpost",
+  "tag": "S",
+  "model": "spider",
+  "hp": 2400,
+  "size": 1.3,
+  "sight": 12,
+  "spares_civilians": true,
+  "attack": {
+   "kind": "melee",
+   "damage": [
+    20,
+    28
+   ],
+   "speed": 2
+  },
+  "bite": "%s comes down on you.",
+  "sounds": {
+   "sight": "spider_wake",
+   "attack": "spider_strike",
+   "death": "spider_down"
+  },
+  "death": "%s folds its legs under it.",
+  "man": [
+   "Six legs, a turret, the mass of a truck. It comes when a place has been made quiet.",
+   "",
+   "Nobody at Halden has a weapon for it."
+  ]
+ }
+}

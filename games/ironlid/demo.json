@@ -1,0 +1,64 @@
+{
+ "title": "IRONLID: what moves",
+ "game": "ironlid",
+ "clips": [
+  {
+   "card": "IRONLID",
+   "palette": "phosphor",
+   "seconds": 4,
+   "text": [
+    "a test demo of what moves",
+    "any key goes back"
+   ]
+  },
+  {
+   "crowd": [
+    "scientist",
+    "technician",
+    "hazmat",
+    "researcher"
+   ],
+   "count": 28,
+   "seconds": 16,
+   "caption": "Halden's staff: four kinds of people, each run live"
+  },
+  {
+   "crowd": [
+    "android",
+    "breacher",
+    "burner",
+    "heavy"
+   ],
+   "count": 20,
+   "seconds": 16,
+   "caption": "The squads: rifle, shotgun, flamethrower, chaingun"
+  },
+  {
+   "crowd": [
+    "hound",
+    "stalker",
+    "mantis"
+   ],
+   "count": 30,
+   "seconds": 16,
+   "views": [
+    "dots",
+    "lines"
+   ],
+   "caption": "The pack, the stalkers, a mantis"
+  },
+  {
+   "level": "relocation",
+   "seconds": 40,
+   "caption": "The relocation yard, in lines: the bot plays"
+  },
+  {
+   "card": "IRONLID",
+   "palette": "phosphor",
+   "seconds": 3,
+   "text": [
+    "Enter on the title screen: play"
+   ]
+  }
+ ]
+}

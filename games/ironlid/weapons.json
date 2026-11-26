@@ -1,0 +1,49 @@
+{
+ "1": {
+  "name": "fist",
+  "kind": "melee",
+  "damage": [
+   6,
+   13
+  ],
+  "sprite": "w_fist",
+  "sound": "butt",
+  "text": "THUD."
+ },
+ "2": {
+  "name": "carbine",
+  "ammo": "bullets",
+  "damage": [
+   8,
+   14
+  ],
+  "sprite": "w_carbine",
+  "sound": "carbine",
+  "text": "PAK."
+ },
+ "3": {
+  "name": "scattergun",
+  "ammo": "shells",
+  "damage": [
+   5,
+   9
+  ],
+  "pellets": 7,
+  "spread": 0.35,
+  "sprite": "w_scattergun",
+  "sound": "scattergun",
+  "text": "BLAM."
+ },
+ "4": {
+  "name": "arm cannon",
+  "ammo": "cells",
+  "damage": [
+   6,
+   10
+  ],
+  "burst": 2,
+  "sprite": "w_cannon",
+  "sound": "cannon",
+  "text": "ZAK-ZAK."
+ }
+}

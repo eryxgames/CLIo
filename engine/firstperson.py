@@ -77,6 +77,13 @@ def _goggled(c):
     return int(v * 0.35), min(255, int(v * 1.25) + 18), int(v * 0.45)
 
 
+def tinted(lv):
+    """Whether the level is drawn in one colour, as an old display has it (``"tint": "green"`` on the level, or in
+    the game's ``first_person``): the goggles' green, without what the goggles show."""
+    spec, cfg = getattr(lv, "spec", None) or {}, getattr(lv, "cfg", None) or {}
+    return (spec.get("tint", cfg.get("tint")) or None) == "green"
+
+
 # --------------------------------------------------------------------------- #
 # the sky over open cells
 # --------------------------------------------------------------------------- #
@@ -1832,7 +1839,7 @@ class View:
             px = self.recolour(px, 1, 1.35, None, lambda c: shade(c, 1.35))
         if lv.player.sudo:
             px = self.recolour(px, 2, 0.0, None, lambda c: mix(c, (255 - int(lum(c)),) * 3, 0.85))
-        if getattr(lv.player, "nightvision", False):
+        if getattr(lv.player, "nightvision", False) or tinted(lv):
             px = self.recolour(px, 3, 0.0, None, _goggled)
         if getattr(lv.player, "diving", False):            # under water: all of it through the water's green
             px = self.recolour(px, 4, UNDERWATER_K, UNDERWATER, lambda c: mix(c, UNDERWATER, UNDERWATER_K))

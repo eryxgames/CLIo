@@ -2897,5 +2897,265 @@
     ]
    ]
   }
+ },
+ "gunner": {
+  "id": "gunner",
+  "label": "Gunner",
+  "kind": "biped",
+  "L": 0.92,
+  "rootHeight": 0.89,
+  "crouchDrop": 0.4,
+  "runDrop": 0.05,
+  "vmax": 5.4,
+  "viewH": 2.25,
+  "jumpH": 0.45,
+  "bob": 1,
+  "sway": 1,
+  "liftWalk": 0.075,
+  "liftRun": 0.3,
+  "runStride": 1.18,
+  "legs": [
+   {
+    "name": "R",
+    "side": 1,
+    "attach": [
+     0,
+     0,
+     0.1
+    ],
+    "rest": [
+     0.02,
+     0.1
+    ],
+    "upper": 0.44,
+    "lower": 0.43,
+    "pole": [
+     1,
+     0,
+     0
+    ],
+    "foot": {
+     "fb": 0.15,
+     "hb": 0.06,
+     "toe": 0.07,
+     "ah": 0.08,
+     "heelLift": 1.05,
+     "strike": 0.28
+    }
+   },
+   {
+    "name": "L",
+    "side": -1,
+    "attach": [
+     0,
+     0,
+     -0.1
+    ],
+    "rest": [
+     0.02,
+     -0.1
+    ],
+    "upper": 0.44,
+    "lower": 0.43,
+    "pole": [
+     1,
+     0,
+     0
+    ],
+    "foot": {
+     "fb": 0.15,
+     "hb": 0.06,
+     "toe": 0.07,
+     "ah": 0.08,
+     "heelLift": 1.05,
+     "strike": 0.28
+    }
+   }
+  ],
+  "gait": {
+   "walk": {
+    "phases": [
+     0,
+     0.5
+    ],
+    "duty": [
+     0.66,
+     0.58
+    ]
+   },
+   "run": {
+    "phases": [
+     0,
+     0.5
+    ],
+    "duty": [
+     0.4,
+     0.27
+    ]
+   },
+   "frRun": 0.5,
+   "frMax": 5
+  },
+  "torso": {
+   "len": 0.5,
+   "neck": 0.13,
+   "headR": 0.115,
+   "shoulderW": 0.19
+  },
+  "arms": {
+   "upper": 0.29,
+   "lower": 0.27
+  },
+  "mount": {
+   "type": "held",
+   "kit": "chaingun",
+   "omega": 38,
+   "aimOmega": 16,
+   "min": -0.9,
+   "max": 1.1,
+   "yaw": 1
+  },
+  "fight": {
+   "stance": [
+    [
+     -0.17,
+     0.05
+    ],
+    [
+     0.16,
+     -0.03
+    ]
+   ]
+  }
+ },
+ "commando": {
+  "id": "commando",
+  "label": "Jungle commando",
+  "kind": "biped",
+  "L": 0.92,
+  "rootHeight": 0.89,
+  "crouchDrop": 0.4,
+  "runDrop": 0.05,
+  "vmax": 5.4,
+  "viewH": 2.25,
+  "jumpH": 0.45,
+  "bob": 1,
+  "sway": 1,
+  "liftWalk": 0.075,
+  "liftRun": 0.3,
+  "runStride": 1.18,
+  "legs": [
+   {
+    "name": "R",
+    "side": 1,
+    "attach": [
+     0,
+     0,
+     0.1
+    ],
+    "rest": [
+     0.02,
+     0.1
+    ],
+    "upper": 0.44,
+    "lower": 0.43,
+    "pole": [
+     1,
+     0,
+     0
+    ],
+    "foot": {
+     "fb": 0.15,
+     "hb": 0.06,
+     "toe": 0.07,
+     "ah": 0.08,
+     "heelLift": 1.05,
+     "strike": 0.28
+    }
+   },
+   {
+    "name": "L",
+    "side": -1,
+    "attach": [
+     0,
+     0,
+     -0.1
+    ],
+    "rest": [
+     0.02,
+     -0.1
+    ],
+    "upper": 0.44,
+    "lower": 0.43,
+    "pole": [
+     1,
+     0,
+     0
+    ],
+    "foot": {
+     "fb": 0.15,
+     "hb": 0.06,
+     "toe": 0.07,
+     "ah": 0.08,
+     "heelLift": 1.05,
+     "strike": 0.28
+    }
+   }
+  ],
+  "gait": {
+   "walk": {
+    "phases": [
+     0,
+     0.5
+    ],
+    "duty": [
+     0.66,
+     0.58
+    ]
+   },
+   "run": {
+    "phases": [
+     0,
+     0.5
+    ],
+    "duty": [
+     0.4,
+     0.27
+    ]
+   },
+   "frRun": 0.5,
+   "frMax": 5
+  },
+  "torso": {
+   "len": 0.5,
+   "neck": 0.13,
+   "headR": 0.115,
+   "shoulderW": 0.19
+  },
+  "arms": {
+   "upper": 0.29,
+   "lower": 0.27
+  },
+  "mount": {
+   "type": "held",
+   "kit": "chaingun",
+   "omega": 38,
+   "aimOmega": 16,
+   "min": -0.9,
+   "max": 1.1,
+   "yaw": 1
+  },
+  "fight": {
+   "stance": [
+    [
+     -0.17,
+     0.05
+    ],
+    [
+     0.16,
+     -0.03
+    ]
+   ]
+  }
  }
 }

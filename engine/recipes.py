@@ -73,6 +73,9 @@ MODELS = {
     "hound": ("a hound moved by CLIo Motion: it trots and runs, bites, falls and lies", {"motion": "hyena"}),
     "walker": ("a two-legged machine moved by CLIo Motion, a cell high, that comes apart part by part",
                {"motion": {"character": "mech", "scale": 0.2}, "break": "parts"}),
+    "gunner": ("a heavy gunner in armour with a chaingun at the hip, moved by CLIo Motion", {"motion": "gunner"}),
+    "twin_gunner": ("a heavy gunner with a chaingun in each hand", {"motion": {"character": "gunner", "kit": "chainguns"}}),
+    "commando": ("a jungle commando - bare arms, a headband, a belt of rounds - with a chaingun", {"motion": "commando"}),
     # people for a crowd (CLIo Motion's four who are not soldiers, and what they carry)
     "person": ("a person in plain clothes moved by CLIo Motion: walks, runs, staggers, falls and lies", {"motion": "person"}),
     "commuter": ("a person with a briefcase in the hand", {"motion": {"character": "person", "kit": "case"}}),

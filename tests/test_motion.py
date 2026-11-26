@@ -9,6 +9,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -39,7 +40,7 @@ def far(a, b):
 
 class EveryCharacter(unittest.TestCase):
     def test_each_is_a_model_with_its_clips(self):
-        self.assertEqual(len(motion.characters()), 17)
+        self.assertEqual(len(motion.characters()), 19)
         for name in motion.characters():
             m = model.Model(name, {"motion": name})
             self.assertIsNotNone(m.motion, name)
@@ -130,7 +131,7 @@ class People(unittest.TestCase):
                 said = model.problems({"a": {"motion": {"character": who, "kit": bad}}})
                 self.assertTrue(said and "carries one of: case, hands, trolley" in said[0], (who, said))
         said = model.problems({"a": {"motion": {"character": "soldier", "kit": "case"}}})
-        self.assertTrue(said and "carries one of: pistols, rifle, sword" in said[0], said)
+        self.assertTrue(said and "carries one of: chaingun, chainguns, pistols, rifle, sword" in said[0], said)
 
     def test_they_are_dressed_differently(self):
         looks = {}
@@ -330,6 +331,87 @@ class TheWardrobe(unittest.TestCase):
             self.assertEqual(model.problems({name: spec}), [], name)
             self.assertIn(name, motion.PEOPLE)
         self.assertEqual(motion.spec_named("woman_in_red"), self.RED)
+
+
+class Gunners(unittest.TestCase):
+    """The heavy gunner and the jungle commando, their chainguns - and any weapon in any armed body's hands."""
+
+    def test_the_recipes(self):
+        for name, kit, props in (("gunner", None, 1), ("twin_gunner", "chainguns", 2), ("commando", None, 1)):
+            spec = motion.spec_named(name)
+            self.assertEqual(model.problems({name: spec}), [], name)
+            m = model.Model(name, spec)
+            self.assertEqual(m.motion.kit, kit)
+            self.assertEqual(sum(1 for g in m.groups if g.startswith("prop")), props, name)
+            for clip in ("idle", "walk", "run", "attack", "hit", "die"):
+                self.assertIsNotNone(m.motion.clip(clip), (name, clip))
+            self.assertAlmostEqual(m.motion.clip("attack")[0], 1.0, delta=0.1)       # the barrels come up, then the burst
+        heavy, plain = model.Model("g", {"motion": "gunner"}), model.Model("s", {"motion": "soldier"})
+        self.assertGreater(max(abs(p[0]) for p in heavy.verts), 1.1 * max(abs(p[0]) for p in plain.verts))
+
+    def test_any_weapon_in_any_armed_hands(self):
+        arms = ("chaingun", "chainguns", "pistols", "rifle", "sword")
+        for who in ("soldier", "gunner", "commando"):
+            for kit in arms:
+                self.assertEqual(model.problems({"a": {"motion": {"character": who, "kit": kit}}}), [], (who, kit))
+            said = model.problems({"a": {"motion": {"character": who, "kit": "case"}}})
+            self.assertTrue(said and "carries one of: chaingun, chainguns, pistols, rifle, sword" in said[0], said)
+        said = model.problems({"a": {"motion": {"character": "person", "kit": "chaingun"}}})
+        self.assertTrue(said and "carries one of: case, hands, trolley" in said[0], said)
+        a = model.Model("a", {"motion": {"character": "soldier", "kit": "chainguns"}})
+        b = model.Model("b", {"motion": {"character": "commando", "kit": "sword"}})
+        self.assertEqual((a.motion.kit, b.motion.kit), ("chainguns", "sword"))
+        self.assertIsNotNone(a.motion.clip("attack"))
+        self.assertIsNotNone(b.motion.clip("attack"))
+
+    def test_live_the_trigger_is_held_through_a_burst(self):
+        for kit, least in ((None, 8), ("chainguns", 10)):
+            spec = {"motion": {"character": "gunner", "kit": kit} if kit else "gunner"}
+            a = motion.Actor(model.Model("g", spec), 1.0, 1.0, 0.0)
+            shots, when = 0, []
+            for i in range(240):
+                a.step(1 / 60, speed=0.0, heading=0.0, attack=(i == 60))
+                n = sum(1 for e in a.events if e == "fire" or (isinstance(e, dict) and e.get("type") == "fire"))
+                if n:
+                    when.append(i / 60.0)
+                shots += n
+                del a.events[:]
+            self.assertGreaterEqual(shots, least, (kit, shots))
+            self.assertGreater(when[0], 1.0 + 0.3)                                   # the barrels came up first
+            self.assertLess(when[-1], 1.0 + 1.1)                                     # and the burst ends
+        s = motion.Actor(model.Model("s", {"motion": "soldier"}), 1.0, 1.0, 0.0)     # a rifle fires at once, one round
+        got = []
+        for i in range(60):
+            s.step(1 / 60, speed=0.0, heading=0.0, attack=(i == 20))
+            got += [e for e in s.events if e == "fire" or (isinstance(e, dict) and e.get("type") == "fire")]
+            del s.events[:]
+        self.assertEqual(len(got), 1)
+
+    def test_a_library_older_than_the_weapon_is_not_asked(self):
+        class Old:                                        # stands in for a C library of before the chainguns
+            asked = []
+
+            @staticmethod
+            def has_kit(kit):
+                Old.asked.append(kit)
+                return kit in (None, "pistols", "sword")
+
+            @staticmethod
+            def Body(character, style):
+                raise AssertionError("the library should not be given %s" % character)
+        with mock.patch.object(motion, "fast", lambda: Old):
+            a = motion.Actor(model.Model("s", {"motion": {"character": "soldier", "kit": "chainguns"}}), 1.0, 1.0, 0.0)
+        self.assertIsNone(a.body)
+        self.assertEqual(Old.asked, ["chainguns"])
+        for _ in range(30):
+            a.step(1 / 60, speed=1.0, heading=0.0)
+        self.assertGreater(len(a.corners()), 200)
+
+    def test_a_squad_in_a_yard(self):
+        from test_demo import player
+        p, seen, _fc = player([{"crowd": ["gunner", "twin_gunner", "commando", "soldier"], "count": 8, "seconds": 1.0}], W=80, H=24)
+        self.assertEqual(p.run(), "done")
+        self.assertTrue(any("8 bodies of 4 kinds, each run live" in n for _t, n, _m in seen), [n for _t, n, _m in seen][:2])
 
 
 class WhatIsPlayed(unittest.TestCase):
@@ -908,7 +990,7 @@ class TheCrowdCommand(unittest.TestCase):
             self.assertEqual(clio.play_crowd(term, None, "unicorn", 5), 2)
             self.assertEqual(clio.play_crowd(term, None, "hyena", 5), 2)      # nothing to draw on here
         self.assertIn("has no model 'unicorn'", out.getvalue())
-        self.assertIn("characters: dragon, hazmat, horse, hyena", out.getvalue())
+        self.assertIn("characters: commando, dragon, gunner, hazmat, horse, hyena", out.getvalue())
         self.assertIn("needs a terminal", out.getvalue())
 
 

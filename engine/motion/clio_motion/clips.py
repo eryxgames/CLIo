@@ -219,12 +219,15 @@ def record(ch, name, frames=8, fps=None, kit=None, style=None, armed=True, impul
             once("grab", {})
         elif S.kit == "sword":
             once("swing", {"kind": "slash"})
+        elif KITS.get(S.kit, {}).get("spin"):              # a chaingun: the trigger is held while the barrels come up
+            inp["fire"] = True
         else:
             inp["fire"] = True
             stp(DT)
             inp["fire"] = False
-        dur = 0.75 if S.kit == "sword" else 0.5
+        dur = 0.75 if S.kit == "sword" else 1.0 if inp.get("fire") else 0.5
         out, loop = timed(dur, fps or 12), False
+        inp["fire"] = False
     elif name in ("chop", "thrust", "block"):
         # only with sword and shield: the other two swings, and the shield brought up and held
         if S.kit != "sword":

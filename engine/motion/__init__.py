@@ -627,6 +627,8 @@ class Actor:
         self.terrain = (lambda X, Z: ground(X * k, Z * k) / k) if ground is not None else _flat
         self.body, self.S = None, None
         native = fast() if ground is None else None       # (a ground of its own: in Python, which can ask it)
+        if native is not None and not native.has_kit(mv.kit):
+            native = None                                 # a library older than the weapon: this one in Python
         if native is not None:
             try:
                 self.body = native.Body(mv.character, mv.style)
@@ -640,6 +642,7 @@ class Actor:
             cm.place(self.S, mv.ch, self.terrain, x / k, y / k, heading)
         self.inp = {"speed": 0.0, "armed": mv.armed, "kit": mv.kit, "heading": heading}
         self.sk, self.events, self.down, self.pose = None, [], False, None
+        self._burst = 0.0                                 # seconds a trigger is still to be held (a chaingun's burst)
         self._again = True                                # the inputs have changed since the C core was last given them
         self.step(MOST)
         if mv.kit:                                        # its other weapons brought up
@@ -694,7 +697,16 @@ class Actor:
             elif ch["mount"].get("civil"):
                 pass                                      # people in plain clothes attack nobody here
             else:
-                once["fire"] = True
+                spin = (lib().KITS.get(mv.kit or ch["mount"].get("kit")) or {}).get("spin")
+                if spin:                                  # a chaingun: the trigger is held while the barrels come up, and
+                    self._burst = spin + 0.6              # through a burst
+                else:
+                    once["fire"] = True
+        if self._burst > 0 or inp.get("fire"):
+            self._burst -= dt
+            held = self._burst > 0 and not self.down and not die
+            if bool(inp.get("fire")) != held:
+                inp["fire"], self._again = held, True
         if hit:
             once["hit"] = {"impulse": [1.6 * hit[0], 0.0, 1.6 * hit[1]]}
         if die and not self.down:

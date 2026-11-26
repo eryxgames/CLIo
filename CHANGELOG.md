@@ -7,9 +7,10 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 ### Added
 
 - **Models moved by CLIo Motion**: a model with `"motion"` (`"hound": {"motion": "hyena"}`) is one
-  of seventeen characters that walk by rule - a soldier with three kits, two machines, a hound, a
-  horse, a raptor, a scorpion, a mantis, a wasp, a dragon, an octopus, a plain four-legged
-  one, and five people for a crowd. Its shape is the character's stand-in and its clips (`idle`, `walk`, `run`, `attack`,
+  of nineteen characters that walk by rule - three soldiers and their five weapons, two
+  machines, a hound, a horse, a raptor, a scorpion, a mantis, a wasp, a dragon, an octopus, a
+  plain four-legged one, and five people for a crowd. Its shape is the character's stand-in and
+  its clips (`idle`, `walk`, `run`, `attack`,
   `hit`, `die`, or any of the character's own) are worked out when first asked for, so the
   game's files hold none. In a level its monster strides, runs if it is fast, aims and fires
   or bites, staggers when hit, falls as a rag doll in one of three ways and lies where it fell
@@ -36,6 +37,11 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   their corners go to CLIo Picture as they are - with both, a thousand live bodies are about
   45 ms a frame where two hundred took 135 ms in Python. Checked against the Python when it is
   loaded; nothing needs it.
+- **Gunners** (CLIo Motion 0.28): `gunner` and `commando`, two more bodies that bear arms, and
+  two more weapons, `"chaingun"` and `"chainguns"`. Any armed body now carries any weapon
+  (`{"character": "soldier", "kit": "chainguns"}`, `{"character": "commando", "kit":
+  "sword"}`). `--add model gunner|twin_gunner|commando`. A body run live that attacks with a
+  chaingun holds the trigger through the barrels' coming up and a burst.
 - **Anyone at all** (CLIo Motion 0.27): a fifth person, `woman`, and for all five `"wear"`
   (hair, a hat, a hood, a coat, a skirt, short sleeves, bare legs, a backpack, boots, a man's
   body or a woman's), `"colors"` by name (`skin`, `hair`, `top`, `suit`, `skirt`, `shoe`...),

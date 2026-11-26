@@ -41,7 +41,7 @@ EVENTS = ("hit", "jump", "land", "fire", "reload", "loaded", "throw", "grab", "p
 MODES = ("ground", "ladder", "ragdoll", "swim", "fly", "ledge", "ride")
 CALLS = {"enter_swim": 1, "leave_swim": 2, "enter_fly": 3, "leave_fly": 4, "enter_ladder": 5, "leave_ladder": 6, "grab_ledge": 7,
          "place": 8, "stand": 9, "dismount": 11}
-_KIT = {"rifle": 1, "pistols": 2, "sword": 3, "hands": 4, "case": 5, "trolley": 6}
+_KIT = {"rifle": 1, "pistols": 2, "sword": 3, "hands": 4, "case": 5, "trolley": 6, "chaingun": 7, "chainguns": 8}
 _PUNCH = {"jab": 1, "cross": 2, "hook": 3}
 _SWING = {"slash": 1, "chop": 2, "thrust": 3}
 
@@ -165,6 +165,21 @@ def status():
     """What is in use, in a line."""
     load()
     return _why
+
+
+_KIT_SINCE = {"hands": (0, 26), "case": (0, 26), "trolley": (0, 26), "chaingun": (0, 28), "chainguns": (0, 28)}
+
+
+def has_kit(kit):
+    """Whether the library that is loaded knows this kit. (An older one passes over a kit it does not know, and
+    the body keeps what it had: whoever draws it from this package's rig for the kit would draw it wrong.)"""
+    if kit is None:
+        return load() is not None
+    try:
+        v = tuple(int(x) for x in (version() or "").split(".")[:2])
+    except ValueError:
+        return False
+    return len(v) == 2 and kit in _KIT and v >= _KIT_SINCE.get(kit, (0, 0))
 
 
 def version():

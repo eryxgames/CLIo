@@ -124,7 +124,8 @@ def rig_for(ch, pose):
         if ch["mount"].get("civil"):                    # a person who is not a soldier: nothing, a case, or a case on wheels
             kit = "case" if "case" in kinds else "trolley" if "trolley" in kinds else "hands"
         else:
-            kit = "sword" if "sword" in kinds else "pistols" if "pistol" in kinds else "rifle"
+            kit = ("chainguns" if "sidegun" in kinds else "chaingun" if "chaingun" in kinds else "sword" if "sword" in kinds
+                   else "pistols" if "pistol" in kinds else "rifle")
         if kit != ch["mount"]["kit"]:
             name += "_" + kit
     return rigs()[name]
@@ -198,7 +199,7 @@ def joints(ch, pose, rig=None):
         add("Spine", "Hips", mid, p["chest"], rt_u)
         add("Head", "Spine", p["head"], _add(p["head"], perp_u(p["gaze"])), rt_u)
         for k, w in enumerate(p.get("props") or ()):
-            pistol = w["kind"] == "pistol"
+            pistol = w["kind"] in ("pistol", "sidegun")          # one of a pair: its joints have a side
             civil = w["kind"] in ("case", "trolley")
             nm = side_name("Weapon", k) if pistol else "Shield" if w["kind"] == "shield" else "Case" if civil else "Weapon"
             sv = _cross(w["dir"], w["up"])
@@ -312,7 +313,7 @@ def _held_layers(pose):
     o = {}
     for k, w in enumerate(pose.get("props") or ()):
         st = w["stow"] > 0.5
-        if w["kind"] == "pistol":
+        if w["kind"] in ("pistol", "sidegun"):
             o["prop%d" % k] = ((2.1 if st else 3.1) if k == 0 else (-2.1 if st else -2.9), 3 if k == 0 else 1)
         elif w["kind"] == "sword":
             o["prop%d" % k] = (-2.3 if st else 3.1, 3)

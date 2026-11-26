@@ -38,17 +38,33 @@ PROPS = {
              "kick": 0, "rise": 0, "rounds": 0, "reload": 0, "seat": 0},
     "trolley": {"len": 0.98, "body": 0.56, "grip": [0.98, 0], "gripLow": [0.90, 0], "fore": None, "magA": [0.03, 0.11], "magB": [0.56, 0.11],
                 "kick": 0, "rise": 0, "rounds": 0, "reload": 0, "seat": 0, "wheel": 0.035},
+    # a gunner's: a chaingun carried at the hip by its rear grip and the handle on top, its barrels from 'body' to the muzzle and
+    # its ammunition in a box under it ('magA' to 'magB'); and the same gun as one of a pair, one in each hand
+    "chaingun": {"len": 1.05, "body": 0.50, "grip": [0.10, -0.07], "gripLow": [0.08, -0.16], "fore": [0.42, 0.11], "magA": [0.30, -0.07],
+                 "magB": [0.30, -0.24], "kick": 0.32, "rise": 0.5, "rounds": 200, "reload": 3.2, "seat": 0.80},
+    "sidegun": {"len": 1.05, "body": 0.50, "grip": [0.10, -0.07], "gripLow": [0.08, -0.16], "fore": None, "magA": [0.30, -0.07],
+                "magB": [0.30, -0.24], "kick": 0.32, "rise": 0.5, "rounds": 150, "reload": 3.2, "seat": 0.80},
 }
 # civil: a kit for people who are not soldiers (and only for them); it is in the hand whether or not weapons are asked for.
 # pace: the fastest it can be taken along, as a Froude number's root (1 is a hurried jog)
 KITS = {"rifle": {"props": ["rifle"], "rate": 9}, "pistols": {"props": ["pistol", "pistol"], "rate": 7},
         "sword": {"props": ["sword", "shield"], "rate": 0, "melee": True},
         "hands": {"props": [], "rate": 0, "melee": True, "civil": True}, "case": {"props": ["case"], "rate": 0, "melee": True, "civil": True},
-        "trolley": {"props": ["trolley"], "rate": 0, "melee": True, "civil": True, "pace": 1.0}}
+        "trolley": {"props": ["trolley"], "rate": 0, "melee": True, "civil": True, "pace": 1.0},
+        # spin: seconds a chaingun's barrels take to come up to speed once the trigger is pulled - let go of it and they must
+        # come up again. bodyKick: how hard each round pushes the body back, where that is not the body's own (0.5)
+        "chaingun": {"props": ["chaingun"], "rate": 22, "spin": 0.35, "pace": 0.85, "bodyKick": 0.10},
+        "chainguns": {"props": ["sidegun", "sidegun"], "rate": 30, "spin": 0.35, "pace": 0.70, "bodyKick": 0.10}}
 
 
 def kit_fits(ch, name):
-    return name in KITS and (not KITS[name].get("civil")) == (not ch["mount"].get("civil"))
+    """Any body that bears arms carries any weapon; people who are not soldiers carry their own things, and only those."""
+    return ch["mount"].get("type") == "held" and name in KITS and (not KITS[name].get("civil")) == (not ch["mount"].get("civil"))
+
+
+def kits_of(ch):
+    """The kits a character can carry; none for one that holds nothing in its hands."""
+    return [k for k in KITS if kit_fits(ch, k)] if ch["mount"].get("type") == "held" else []
 SWINGS = {"slash": {"dur": 0.62}, "chop": {"dur": 0.70}, "thrust": {"dur": 0.55}}
 CRATE = {"d": 0.44, "h": 0.36, "w": 0.50}
 PUNCH = {"jab": {"hand": 1, "dur": 0.34, "hit": 0.36}, "cross": {"hand": 0, "dur": 0.50, "hit": 0.42}, "hook": {"hand": 1, "dur": 0.56, "hit": 0.46}}
@@ -105,6 +121,10 @@ def _stow_place(kind, k, root, u, f, zc):
     down = math.atan2(-u[1], -u[0])
     if kind == "rifle":         # muzzle down across the back
         return {"o": [root[0] + 0.65 * u[0] - 0.22 * f[0], root[1] + 0.65 * u[1] - 0.22 * f[1]], "th": down, "z": zc - 0.02}
+    if kind == "chaingun":      # the same, and more of it
+        return {"o": [root[0] + 0.72 * u[0] - 0.25 * f[0], root[1] + 0.72 * u[1] - 0.25 * f[1]], "th": down, "z": zc - 0.02}
+    if kind == "sidegun":
+        return {"o": [root[0] + 0.72 * u[0] - 0.25 * f[0], root[1] + 0.72 * u[1] - 0.25 * f[1]], "th": down, "z": zc + (0.11 if k == 0 else -0.11)}
     if kind == "sword":         # in a scabbard on the left hip, point down and back
         return {"o": [root[0] + 0.10 * u[0] + 0.06 * f[0], root[1] + 0.10 * u[1] + 0.06 * f[1]], "th": down - 0.45, "z": root[2] - 0.17}
     if kind == "shield":        # slung on the back, face outwards
@@ -122,6 +142,14 @@ def _ready_place(kind, k, chest, u, f, W, kick):
         a = kick - 0.15                                      # the butt sits in the shoulder pocket
         return {"o": [chest[0] - 0.11 * u[0] + 0.10 * f[0] + math.cos(W) * a, chest[1] - 0.11 * u[1] + 0.10 * f[1] + math.sin(W) * a],
                 "th": W, "z": chest[2] + 0.04}
+    # a chaingun is fired from the hip: it turns about a point in front of the right hip, and recoil drives it straight back.
+    # One of a pair is out at its own side
+    if kind == "chaingun":
+        return {"o": [chest[0] - 0.36 * u[0] + 0.10 * f[0] + math.cos(W) * (kick - 0.30), chest[1] - 0.36 * u[1] + 0.10 * f[1] + math.sin(W) * (kick - 0.30)],
+                "th": W, "z": chest[2] + 0.13}
+    if kind == "sidegun":
+        return {"o": [chest[0] - 0.34 * u[0] + 0.06 * f[0] + math.cos(W) * (kick - 0.26), chest[1] - 0.34 * u[1] + 0.06 * f[1] + math.sin(W) * (kick - 0.26)],
+                "th": W, "z": chest[2] + (0.25 if k == 0 else -0.25)}
     if kind == "sword":         # held low at the right side, point up and forward
         return {"o": [chest[0] - 0.24 * u[0] + 0.20 * f[0], chest[1] - 0.24 * u[1] + 0.20 * f[1]], "th": 0.95 + 0.3 * W, "z": chest[2] + 0.21}
     if kind == "shield":        # upright on the left forearm, in front of the body
@@ -170,6 +198,8 @@ def _fire_control(S, ch, inp, dt):
         S.flash[0] = S.flash[1] = 0
         return
     S.cool -= dt
+    if kit and kit.get("spin") and not inp.get("fire"):      # a chaingun's barrels come up to speed before the first round
+        S.cool = kit["spin"]
     for i in range(2):
         S.flash[i] = max(0, S.flash[i] - dt / 0.06)
         S.kick[i].step(0, m["omega"], 0.6, dt)
@@ -198,7 +228,7 @@ def _fire_control(S, ch, inp, dt):
     S.flash[g] = 1
     S.kick[g].v -= D["kick"]
     S.rise.v += D["rise"]
-    S.lean.v -= m.get("bodyKick") or 0.5
+    S.lean.v -= (kit and kit.get("bodyKick")) or m.get("bodyKick") or 0.5
     S.events.append({"type": "fire", "gun": g})
 
 
@@ -482,6 +512,8 @@ def upper_body(S, ch, inp, st, dt, legs, B):
                 Wi -= 0.32 * smooth(0, 0.12, rel) * (1 - smooth(0.84, 1, rel))
             if kind == "rifle":
                 Wi -= 0.45 * tk
+            if kind in ("chaingun", "sidegun") and rel >= 0:     # a new belt: the muzzle goes down while it is fed in
+                Wi -= 0.5 * smooth(0, 0.15, rel) * (1 - smooth(0.8, 1, rel))
             place = _ready_place(kind, i, chest, u, f, Wi, S.kick[i].x)
             if kind == "pistol" and rel >= 0:
                 # one-handed: the pistol comes down to the belt, the magazine drops into the holder and a fresh one is pushed home

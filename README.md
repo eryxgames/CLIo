@@ -122,7 +122,7 @@ Three **optional downloads** make CLIo nicer. The launcher offers them under **D
 - **CLIo Picture** (about 100 KB, `--get-picture`): draws the first-person picture several times
   faster - the same picture, to the last pixel - and, from its release 0.10, the consoles' line
   displays, scans and views ahead.
-- **CLIo Motion's C core** (about 150 KB, `--get-motion`): steps bodies that are run live thirty
+- **CLIo Motion's C core** (about 200 KB, `--get-motion`): steps bodies that are run live thirty
   to forty times faster; with CLIo Picture beside it, a yard of a thousand of them (`--crowd`,
   the tech demo's crowds).
 - **Ballistic's C engine** (about 1 MB, `--get-ballistic`): physically modelled shots, ricochets

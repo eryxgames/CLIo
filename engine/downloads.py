@@ -17,8 +17,8 @@ PICTURE_SIZE = {
     "linux-x64": 72449, "macos-universal": 117616, "windows-arm64": 109058, "windows-x64": 126736,
 }
 MOTION_SIZE = {
-    "android-arm64-v8a": 147163, "android-armeabi-v7a": 148204, "android-x86_64": 150288, "linux-arm64": 143610,
-    "linux-x64": 153968, "macos-universal": 252360, "windows-arm64": 183434, "windows-x64": 209088,
+    "android-arm64-v8a": 155274, "android-armeabi-v7a": 155489, "android-x86_64": 159168, "linux-arm64": 152677,
+    "linux-x64": 163451, "macos-universal": 263131, "windows-arm64": 189585, "windows-x64": 215516,
 }
 BALLISTIC_SIZE = {
     "android-arm64-v8a": 1206755, "android-armeabi-v7a": 1111941, "android-x86_64": 1332340, "linux-arm64": 703726,

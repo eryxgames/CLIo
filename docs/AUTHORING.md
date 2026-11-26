@@ -2530,7 +2530,7 @@ labelled as a sprite is. Model space: x to the right, y forward, z up; one unit 
   keeps libraries; it is run against the Python on a short walk first and not used if the two
   differ. `python clio.py --get-motion` (and the launcher's **Downloads**) fetches it into your
   data folder as `--get-picture` fetches CLIo Picture - from the release of CLIo Motion that
-  CLIo follows (0.25.0), checked against that release's checksum; where no release is listed
+  CLIo follows (0.26.0), checked against that release's checksum; where no release is listed
   for your machine it says how to build the library. `--crowd` says
   in its caption which is stepping the bodies. A body given a ground of its own is stepped in
   Python. The library is carried in the engine (`engine/motion/clio_motion/`: pure

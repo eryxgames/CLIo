@@ -229,7 +229,7 @@ leaves it out.)
 its files:
 
 ```
-python -m engine.follow motion 0.25.0    # or: picture 0.10.0; --check only says what would change
+python -m engine.follow motion 0.26.0    # or: picture 0.10.0; --check only says what would change
 ```
 
 It reads the release's `checksums.txt`, downloads every zip, checks each against that list and

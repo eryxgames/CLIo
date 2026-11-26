@@ -38,9 +38,12 @@ def rigs():
 def rig_for(ch, pose):
     """The rig a pose belongs to: the character's, or for a soldier the one of the kit in the pose."""
     name = ch["id"]
-    if ch["mount"]["type"] == "held" and pose.get("props"):
-        kinds = [w["kind"] for w in pose["props"]]
-        kit = "sword" if "sword" in kinds else "pistols" if "pistol" in kinds else "rifle"
+    if ch["mount"]["type"] == "held" and (pose.get("props") or ch["mount"].get("civil")):
+        kinds = [w["kind"] for w in pose.get("props") or ()]
+        if ch["mount"].get("civil"):                    # a person who is not a soldier: nothing, a case, or a case on wheels
+            kit = "case" if "case" in kinds else "trolley" if "trolley" in kinds else "hands"
+        else:
+            kit = "sword" if "sword" in kinds else "pistols" if "pistol" in kinds else "rifle"
         if kit != ch["mount"]["kit"]:
             name += "_" + kit
     return rigs()[name]
@@ -115,10 +118,11 @@ def joints(ch, pose, rig=None):
         add("Head", "Spine", p["head"], _add(p["head"], perp_u(p["gaze"])), rt_u)
         for k, w in enumerate(p.get("props") or ()):
             pistol = w["kind"] == "pistol"
-            nm = side_name("Weapon", k) if pistol else "Shield" if w["kind"] == "shield" else "Weapon"
+            civil = w["kind"] in ("case", "trolley")
+            nm = side_name("Weapon", k) if pistol else "Shield" if w["kind"] == "shield" else "Case" if civil else "Weapon"
             sv = _cross(w["dir"], w["up"])
             add(nm, "Hips", w["o"], w["muzzle"], sv)
-            if w["kind"] in ("sword", "shield"):
+            if w["kind"] in ("sword", "shield", "case", "trolley"):
                 continue
             add(side_name("Magazine", k) if pistol else "Magazine", nm, w["magA"], w["magB"], sv)
         gr = p.get("grenade")
@@ -233,6 +237,10 @@ def _held_layers(pose):
             o["prop%d" % k] = (-2.3 if st else 3.1, 3)
         elif w["kind"] == "shield":
             o["prop%d" % k] = (-0.6 if st else -2.6, 1)
+        elif w["kind"] == "case":
+            o["prop%d" % k] = (2.6, 3)
+        elif w["kind"] == "trolley":
+            o["prop%d" % k] = (-2.4, 1)
         else:
             o["prop%d" % k] = (-0.5 if st else 0.5, 2)
     if (pose.get("kind") or "") == "biped":

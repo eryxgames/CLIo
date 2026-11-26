@@ -260,8 +260,12 @@ def play_demo(term, game=None, loop=False):
 
 
 def play_crowd(term, game, name, count, view=None):
-    """--crowd: a yard of one model moved by CLIo Motion (or of one of its characters), every body run live."""
+    """--crowd: a yard of one model moved by CLIo Motion (or of one of its characters, or of several kinds:
+    ``person,traveller,scientist``; ``people`` is all six of CLIo's people), every body run live."""
     from engine import demo, motion
+    names = [n for n in (x.strip() for x in str(name).split(",")) if n]
+    names = [p for n in names for p in (motion.PEOPLE if n == "people" else (n,))]
+    name = names[0] if len(names) == 1 else names
     game_dir = resolve_game(game) if game else os.path.join(ROOT, "games", "rootless")
     if not game_dir:
         print("No game called '%s'. Try --list." % game)
@@ -273,6 +277,8 @@ def play_crowd(term, game, name, count, view=None):
     if wrong:
         print("\n".join(w.replace("--crowd: clip 1: ", "") for w in wrong))
         print("CLIo Motion's characters: %s." % ", ".join(motion.characters()))
+        print("People for a crowd: %s (all of them: --crowd people; several kinds: --crowd person,traveller)."
+              % ", ".join(motion.PEOPLE))
         return 2
     if demo.play(term, spec) is None:
         print("A crowd needs a terminal it can draw on (not a pipe, not TERM=dumb).")
@@ -534,7 +540,8 @@ def main(argv=None):
                     help="like --demo, but over and over until a key is pressed (a kiosk, a shop window)")
     ap.add_argument("--crowd", metavar="MODEL",
                     help="show a crowd of one model moved by CLIo Motion, or of one of its characters (hyena, soldier, "
-                         "raptor, scorpion...), wandering a yard, every body run live; any key ends it")
+                         "raptor, scorpion...), wandering a yard, every body run live; several kinds with commas "
+                         "(person,traveller,scientist); 'people' is all six of CLIo's people; any key ends it")
     ap.add_argument("--count", type=int, default=24, metavar="N", help="with --crowd: how many (24; up to 1000)")
     ap.add_argument("--termux-keys", action="store_true",
                     help="print a row of extra keys for Termux's keyboard that plays first-person levels, and exit")

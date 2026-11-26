@@ -2501,7 +2501,21 @@ labelled as a sprite is. Model space: x to the right, y forward, z up; one unit 
   have taken it. `python clio.py --crowd hyena --count 100` shows a yard of them (`--view
   lines` in lines; any model of a game moved by CLIo Motion, or one of the characters by name),
   as does the demo clip `{"crowd": "hyena", "count": 24}`; CLIo's tech demo (`python clio.py
-  --demo`) has two.
+  --demo`) has three. A crowd can be of several kinds: `--crowd person,traveller,scientist`, or
+  `"crowd": ["person", "traveller", "scientist"]` in a clip (twenty kinds at most), each name a
+  model of the game, one of the characters, or one of the recipes below.
+
+  **People for a crowd.** Four of the characters are people who are not soldiers - `person`
+  (plain clothes), `technician` (an overall, a hard hat, a tool box), `scientist` (a lab coat)
+  and `hazmat` (a suit with a hood, a visor and an air tank) - the soldier's body dressed
+  otherwise, in the library's simple models. `"kit"` says what is in the hand: `"hands"`
+  (nothing), `"case"` (a briefcase; for the technician and the one in the hazmat suit a
+  thicker box) or `"trolley"` (a case on wheels pulled behind, its wheels on the floor; it is
+  taken at a jog at most). So `{"motion": {"character": "person", "kit": "trolley"}}` is a
+  traveller, and `"colors"` makes one of them many (`{"torso": "#7a2e2e", "leg0": "#2b2b2b",
+  "leg1": "#2b2b2b"}`). They carry no weapon: a soldier's kits are refused them, as theirs are
+  a soldier; a monster with such a model that attacks throws a jab, and run live they attack
+  nobody. `python clio.py --crowd people` is a yard of all six of CLIo's.
 
   In Python a live body costs about 0.12 ms a step (0.3 ms when it is in sight and its corners
   are wanted). **CLIo Motion's C core** steps it thirty to forty times as fast, the same to
@@ -2522,7 +2536,9 @@ labelled as a sprite is. Model space: x to the right, y forward, z up; one unit 
   Python. The library is carried in the engine (`engine/motion/clio_motion/`: pure
   Python, nothing to install); it is [CLIo Motion](https://github.com/eryxgames/clio-motion),
   which also makes clips for other engines and has the characters' templates for artists.
-  `python clio.py GAME --add model soldier` (or `hound`, `walker`) puts one in a game.
+  `python clio.py GAME --add model soldier` (or `hound`, `walker`, and the people: `person`,
+  `commuter` with a briefcase, `traveller` with a case on wheels, `technician`, `scientist`,
+  `hazmat`) puts one in a game.
 
 `--check` checks the shapes, sizes, materials and mesh of every model, what a model's
 `"motion"` asks for, and that what names a model has one.
@@ -3140,7 +3156,7 @@ console of CLIo's own into your game: its simulator into `sims.json`, the models
 panels show (where your game has none by that name), and a scene that runs it, reached from
 your first scene, that sets the flag `reactor_done` when it is done and comes back. There are
 `reactor`, `scan`, `helm`, `bay` and `approach`; `--as ID` gives it a name of your own;
-`--add menu wheel|ring|bar` and `--add model door|beacon|hauler|soldier|hound|walker` do the same for a menu and a
+`--add menu wheel|ring|bar` and `--add model door|beacon|hauler|soldier|hound|walker|person|commuter|traveller|technician|scientist|hazmat` do the same for a menu and a
 model; `--add console list` says what there is. Nothing your game has is changed or replaced,
 and the game is checked afterwards. `python -m engine.panels --gallery` shows every widget once
 with the JSON that makes it.

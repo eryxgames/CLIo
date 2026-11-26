@@ -41,7 +41,7 @@ EVENTS = ("hit", "jump", "land", "fire", "reload", "loaded", "throw", "grab", "p
 MODES = ("ground", "ladder", "ragdoll", "swim", "fly", "ledge", "ride")
 CALLS = {"enter_swim": 1, "leave_swim": 2, "enter_fly": 3, "leave_fly": 4, "enter_ladder": 5, "leave_ladder": 6, "grab_ledge": 7,
          "place": 8, "stand": 9, "dismount": 11}
-_KIT = {"rifle": 1, "pistols": 2, "sword": 3}
+_KIT = {"rifle": 1, "pistols": 2, "sword": 3, "hands": 4, "case": 5, "trolley": 6}
 _PUNCH = {"jab": 1, "cross": 2, "hook": 3}
 _SWING = {"slash": 1, "chop": 2, "thrust": 3}
 
@@ -282,6 +282,10 @@ class Body:
         if style:
             st = (ctypes.c_double * 7)(*[float(style[k]) for k in ("bounce", "stride", "arm", "lean", "step", "snap", "still")])
         if lib.cm_body_init(self.ptr, character.encode("ascii"), st) != 0:
+            from . import characters
+            if character in characters():           # known here, so the library is an older one
+                raise ValueError("the library (CLIo Motion %s) has no character called '%s': it is older than this package (%s)"
+                                 % (lib.cm_version().decode("ascii", "replace"), character, __import__(__package__).__version__))
             raise ValueError("there is no character called '%s'" % character)
         self._in = (ctypes.c_double * NIN)()
         self._in[24] = 1.0                               # armed

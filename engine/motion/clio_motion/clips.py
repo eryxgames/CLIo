@@ -206,6 +206,8 @@ def record(ch, name, frames=8, fps=None, kit=None, style=None, armed=True, impul
                 tail += 1
         dur, loop = len(out) / rate, False
     elif name == "attack":
+        if ch["mount"].get("civil"):                       # people in plain clothes have no weapon to attack with
+            return None
         level_weapons()
         if ch.get("beast"):                                # an animal's attack is its bite
             once("bite", {})
@@ -297,7 +299,7 @@ def record(ch, name, frames=8, fps=None, kit=None, style=None, armed=True, impul
                 end += 1
         dur, loop = len(out) / rate, False
     elif name == "throw":
-        if ch["kind"] != "biped":
+        if ch["kind"] != "biped" or ch["mount"].get("civil"):
             return None
         level_weapons()
         once("throw", {"target": [9 * ch["L"], 0, 0]})

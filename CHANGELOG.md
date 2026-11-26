@@ -7,9 +7,9 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 ### Added
 
 - **Models moved by CLIo Motion**: a model with `"motion"` (`"hound": {"motion": "hyena"}`) is one
-  of twelve characters that walk by rule - a soldier with three kits, two machines, a hound, a
-  horse, a raptor, a scorpion, a mantis, a wasp, a dragon, an octopus and a plain four-legged
-  one. Its shape is the character's stand-in and its clips (`idle`, `walk`, `run`, `attack`,
+  of sixteen characters that walk by rule - a soldier with three kits, two machines, a hound, a
+  horse, a raptor, a scorpion, a mantis, a wasp, a dragon, an octopus, a plain four-legged
+  one, and four people for a crowd. Its shape is the character's stand-in and its clips (`idle`, `walk`, `run`, `attack`,
   `hit`, `die`, or any of the character's own) are worked out when first asked for, so the
   game's files hold none. In a level its monster strides, runs if it is fast, aims and fires
   or bites, staggers when hit, falls as a rag doll in one of three ways and lies where it fell
@@ -36,6 +36,16 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   their corners go to CLIo Picture as they are - with both, a thousand live bodies are about
   45 ms a frame where two hundred took 135 ms in Python. Checked against the Python when it is
   loaded; nothing needs it.
+- **People for a crowd** (CLIo Motion 0.26): four more characters - `person`, `technician`,
+  `scientist`, `hazmat` - who are the soldier's body in plain clothes, an overall and hard hat,
+  a lab coat or a hazmat suit, with `"kit"`: `"hands"`, `"case"` or `"trolley"` (a case on
+  wheels pulled behind). `--add model person|commuter|traveller|technician|scientist|hazmat`
+  puts one in a game. A monster with such a model that attacks throws a jab.
+- **A crowd of several kinds**: `--crowd person,traveller,scientist` and
+  `{"crowd": ["person", "traveller"]}` in a demo's clip; `--crowd people` is all six of CLIo's
+  people, and the tech demo has a yard of them. A crowd's names may be CLIo's recipes for moved
+  models too. With a library older than a character (0.25.0 has no people), that body is
+  stepped in Python and the caption says so.
 - **`--get-motion`**, and CLIo Motion's C core in the launcher's Downloads: the library for this
   machine from the release of CLIo Motion that CLIo follows, checked against that release's
   SHA-256, into your data folder, and then against CLIo's Python before it is used - as

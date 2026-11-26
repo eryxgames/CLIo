@@ -73,6 +73,13 @@ MODELS = {
     "hound": ("a hound moved by CLIo Motion: it trots and runs, bites, falls and lies", {"motion": "hyena"}),
     "walker": ("a two-legged machine moved by CLIo Motion, a cell high, that comes apart part by part",
                {"motion": {"character": "mech", "scale": 0.2}, "break": "parts"}),
+    # people for a crowd (CLIo Motion's four who are not soldiers, and what they carry)
+    "person": ("a person in plain clothes moved by CLIo Motion: walks, runs, staggers, falls and lies", {"motion": "person"}),
+    "commuter": ("a person with a briefcase in the hand", {"motion": {"character": "person", "kit": "case"}}),
+    "traveller": ("a person pulling a case on wheels", {"motion": {"character": "person", "kit": "trolley"}}),
+    "technician": ("a technician in an overall and a hard hat, with a tool box", {"motion": "technician"}),
+    "scientist": ("a scientist in a lab coat", {"motion": "scientist"}),
+    "hazmat": ("a scientist in a hazmat suit: hood, visor, air tank", {"motion": "hazmat"}),
 }
 KINDS = {"console": CONSOLES, "menu": MENUS, "model": MODELS}
 

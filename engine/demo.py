@@ -111,9 +111,14 @@ def problems(spec, data=None, where="demo.json"):
         table = {"level": d.levels, "sim": d.sims, "stage": d.stages, "skirmish": d.skirmishes,
                  "models": d.models, "crowd": d.models}.get(kind)
         names = clip[kind] if isinstance(clip[kind], list) else [clip[kind]]
-        if kind == "crowd" and all(n not in table for n in names):      # one of CLIo Motion's characters, as it comes
+        if kind == "crowd":                 # also CLIo Motion's characters as they come, and CLIo's recipes for moved models
             from . import motion
-            table = dict(table, **{n: {"motion": n} for n in motion.characters()})
+            table = dict(table or {})
+            for n in names:
+                if n not in table and isinstance(n, str) and motion.spec_named(n) is not None:
+                    table[n] = motion.spec_named(n)
+            if len(names) > MOST_KINDS:
+                out.append("%s: a crowd is of %d kinds at most" % (at, MOST_KINDS))
         if table is not None:
             for n in names:
                 if n not in table:
@@ -476,24 +481,27 @@ class Player:
         from .firstperson import FX, View
         from .level import Level, TextConsole
         data = self.data(clip)
-        name = clip["crowd"] if isinstance(clip["crowd"], str) else clip["crowd"][0]
-        spec = (data.models or {}).get(name)
-        if spec is None and name in motion.characters():   # one of the library's characters, as it comes
-            spec = {"motion": name}
-        if spec is None:
-            raise KeyError(name)
+        names = [clip["crowd"]] if isinstance(clip["crowd"], str) else list(clip["crowd"])[:MOST_KINDS]
+        specs = {}
+        for n in names:                                    # the game's model, a character as it comes, or a recipe's
+            specs[n] = motion.spec_named(n, data.models)
+            if specs[n] is None:
+                raise KeyError(n)
+        name = names[0] if len(names) == 1 else "bodies of %d kinds" % len(names)
         count = max(1, min(MOST_CROWD, int(clip.get("count", 12))))
-        yard = _Yard(data, name, count, spec)
+        yard = _Yard(data, names, count, specs)
         lv = Level(yard, "_yard", seed=1)
         lv.console = TextConsole(lambda _t: None, None)
         lv.player.weapon = None
-        mdl = lv.models.get(name) or model_mod.Model(name, spec)
-        lv.models[name] = mdl
+        for n in names:
+            if lv.models.get(n) is None:
+                lv.models[n] = model_mod.Model(n, specs[n])
         for row in lv.grid:
             for c in row:
                 c.sky = c.sky or c.kind != "wall"
-        mobs = [m for m in lv.monsters if m.model == name]
-        crowd = motion.Crowd(mdl, [(m.x, m.y) for m in mobs], yard.bounds, seed=int(clip.get("seed", 1)))
+        mobs = [m for m in lv.monsters if m.model in specs]
+        crowd = motion.Crowd([lv.models[m.model] for m in mobs], [(m.x, m.y) for m in mobs], yard.bounds,
+                             seed=int(clip.get("seed", 1)))
         for m, a in zip(mobs, crowd.actors):
             m.actor, m.seen = a, False
         views = clip.get("views") or ["pixel"]
@@ -520,7 +528,7 @@ class Player:
             self.ms = (time.perf_counter() - t) * 1000.0
             self.note = "%s%d %s, each run live: %.1f ms the motion (%s)" % (
                 clip.get("caption", "") + "  " if clip.get("caption") else "", len(mobs), name.replace("_", " "), took,
-                "in C" if motion.fast() is not None else "Python")
+                "in C" if crowd.fast else "Python")
             self.show([list(r) for r in rows], extra=style)
             self.wait(1 / 30.0)
 
@@ -630,29 +638,36 @@ class _Showroom:
 YARD_SKY = {"top": "#27456e", "horizon": "#d8b890", "stars": 0.0}
 
 
-class _Yard:
-    """A game's data with one more level: a wide yard open to the sky with ``count`` of a model standing about
-    in it, seen from the middle of its south side."""
+MOST_KINDS = 20           # of body in one crowd
+_KIND = "abcdefghijklmnpqrstuvwxyz"      # a yard's map: a letter for each kind ('o' is its open ground)
 
-    def __init__(self, data, model, count, spec):
+
+class _Yard:
+    """A game's data with one more level: a wide yard open to the sky with ``count`` bodies standing about in it -
+    of one model, or of several in turn - seen from the middle of its south side."""
+
+    def __init__(self, data, models, count, specs):
         self._data = data
-        self.models = dict(data.models or {}, **{model: spec})
-        self.monsters = dict(data.monsters or {}, _crowd={"name": model.replace("_", " "), "tag": "c", "model": model,
-                                                          "hp": 1, "attack": {"kind": "melee", "damage": [0, 0]}})
+        models = list(models)[:MOST_KINDS]
+        self.models = dict(data.models or {}, **{n: specs[n] for n in models})
+        self.monsters = dict(data.monsters or {})
+        for i, n in enumerate(models):
+            self.monsters["_crowd%d" % i] = {"name": n.replace("_", " "), "tag": _KIND[i], "model": n, "hp": 1,
+                                             "attack": {"kind": "melee", "damage": [0, 0]}}
         W = max(13, min(81, 9 + 2 * int(math.ceil(math.sqrt(count * 2.5)))))
         D = max(8, min(60, 4 + int(math.ceil(count * 2.6 / (W - 6)))))
         grid = [["o"] * W for _ in range(D)]
         px = W // 2
         spots = sorted((abs(x - px) * 0.7 + (D - 1 - y), y, x) for y in range(D - 2) for x in range(1, W - 1)
                        if (x + y) % 2 == 0)
-        for _d, y, x in spots[:count]:
-            grid[y][x] = "c"
+        for i, (_d, y, x) in enumerate(spots[:count]):
+            grid[y][x] = _KIND[i % len(models)]
         grid[D - 1][px] = "@"
         self.bounds = (max(1.0, px - 6.0), max(0.0, D - 9.0), min(W - 2.0, px + 6.0), D - 2.0)   # in sight of the eye
         self.levels = dict(data.levels, _yard={
             "name": "Yard", "facing": "n", "sky": YARD_SKY,
             "map": ["#" * (W + 2)] + ["#" + "".join(r) + "#" for r in grid] + ["#" * (W + 2)],
-            "legend": {"c": "_crowd", "o": {"sky": True}}})
+            "legend": dict({_KIND[i]: "_crowd%d" % i for i in range(len(models))}, o={"sky": True})})
 
     def __getattr__(self, name):
         return getattr(self._data, name)

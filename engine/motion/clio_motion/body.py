@@ -31,9 +31,24 @@ PROPS = {
               "kick": 0, "rise": 0, "rounds": 0, "reload": 0, "seat": 0},
     "shield": {"len": 0.62, "body": 0.31, "grip": [0.31, 0.06], "gripLow": [0.31, 0.02], "fore": None, "magA": [0.26, 0.0], "magB": [0.36, 0.0],
                "kick": 0, "rise": 0, "rounds": 0, "reload": 0, "seat": 0},
+    # what people who are not soldiers carry. A case by its handle: 'o' and 'muzzle' are its top corners, 'magA' and 'magB' its bottom
+    # ones. A case on wheels pulled by its handle: 'o' is the axle, 'body' where the case ends and the handle's rods begin, 'muzzle'
+    # the grip; 'magA' to 'magB' is the middle line of the case itself, which lies on the side of the rods away from the ground.
+    "case": {"len": 0.42, "body": 0.21, "grip": [0.21, 0.035], "gripLow": [0.21, 0], "fore": None, "magA": [0, -0.30], "magB": [0.42, -0.30],
+             "kick": 0, "rise": 0, "rounds": 0, "reload": 0, "seat": 0},
+    "trolley": {"len": 0.98, "body": 0.56, "grip": [0.98, 0], "gripLow": [0.90, 0], "fore": None, "magA": [0.03, 0.11], "magB": [0.56, 0.11],
+                "kick": 0, "rise": 0, "rounds": 0, "reload": 0, "seat": 0, "wheel": 0.035},
 }
+# civil: a kit for people who are not soldiers (and only for them); it is in the hand whether or not weapons are asked for.
+# pace: the fastest it can be taken along, as a Froude number's root (1 is a hurried jog)
 KITS = {"rifle": {"props": ["rifle"], "rate": 9}, "pistols": {"props": ["pistol", "pistol"], "rate": 7},
-        "sword": {"props": ["sword", "shield"], "rate": 0, "melee": True}}
+        "sword": {"props": ["sword", "shield"], "rate": 0, "melee": True},
+        "hands": {"props": [], "rate": 0, "melee": True, "civil": True}, "case": {"props": ["case"], "rate": 0, "melee": True, "civil": True},
+        "trolley": {"props": ["trolley"], "rate": 0, "melee": True, "civil": True, "pace": 1.0}}
+
+
+def kit_fits(ch, name):
+    return name in KITS and (not KITS[name].get("civil")) == (not ch["mount"].get("civil"))
 SWINGS = {"slash": {"dur": 0.62}, "chop": {"dur": 0.70}, "thrust": {"dur": 0.55}}
 CRATE = {"d": 0.44, "h": 0.36, "w": 0.50}
 PUNCH = {"jab": {"hand": 1, "dur": 0.34, "hit": 0.36}, "cross": {"hand": 0, "dur": 0.50, "hit": 0.42}, "hook": {"hand": 1, "dur": 0.56, "hit": 0.46}}
@@ -94,6 +109,10 @@ def _stow_place(kind, k, root, u, f, zc):
         return {"o": [root[0] + 0.10 * u[0] + 0.06 * f[0], root[1] + 0.10 * u[1] + 0.06 * f[1]], "th": down - 0.45, "z": root[2] - 0.17}
     if kind == "shield":        # slung on the back, face outwards
         return {"o": [root[0] + 0.10 * u[0] - 0.20 * f[0], root[1] + 0.10 * u[1] - 0.20 * f[1]], "th": down + math.pi, "z": zc}
+    if kind == "case":          # let go of: against the right thigh
+        return {"o": [root[0] - 0.12 * u[0] - 0.21 * f[0], root[1] - 0.12 * u[1] - 0.21 * f[1]], "th": math.atan2(f[1], f[0]), "z": root[2] + 0.20}
+    if kind == "trolley":       # let go of: standing behind
+        return {"o": [root[0] - 0.80 * u[0] - 0.34 * f[0], root[1] - 0.80 * u[1] - 0.34 * f[1]], "th": down + math.pi, "z": zc + 0.22}
     return {"o": [root[0] + 0.05 * u[0] + 0.03 * f[0], root[1] + 0.05 * u[1] + 0.03 * f[1]], "th": down + 0.2,
             "z": root[2] + (0.15 if k == 0 else -0.15)}                 # hip holsters
 
@@ -108,6 +127,12 @@ def _ready_place(kind, k, chest, u, f, W, kick):
     if kind == "shield":        # upright on the left forearm, in front of the body
         return {"o": [chest[0] - 0.36 * u[0] + 0.30 * f[0], chest[1] - 0.36 * u[1] + 0.30 * f[1]], "th": math.atan2(u[1], u[0]) - 0.12,
                 "z": chest[2] - 0.20}
+    # a case hangs level from the right hand at the end of a straight arm; a case on wheels leans from its axle up to the hand held low behind
+    if kind == "case":
+        return {"o": [chest[0] - 0.04 * u[0] - 0.19, chest[1] - 0.04 * u[1] - 0.565], "th": 0, "z": chest[2] + 0.25}
+    if kind == "trolley":
+        return {"o": [chest[0] - 0.04 * u[0] - 0.20 - 0.98 * math.cos(0.85), chest[1] - 0.04 * u[1] - 0.50 - 0.98 * math.sin(0.85)],
+                "th": 0.85, "z": chest[2] + 0.22}
     r = 0.50 + kick                                          # arm's length; recoil also flips the muzzle up
     return {"o": [chest[0] + 0.03 * u[0] + math.cos(W) * r, chest[1] + 0.03 * u[1] + math.sin(W) * r], "th": W - 8 * kick,
             "z": chest[2] + (0.08 if k == 0 else -0.08)}
@@ -315,7 +340,7 @@ def upper_body(S, ch, inp, st, dt, legs, B):
     if S.ammo is None and m.get("kit"):
         S.ammo = full_ammo(m["kit"])
     # kits: the weapons are put away before changing to another set, then the new ones come up
-    kit_want = (inp.get("kit") if inp.get("kit") in KITS else S.kit) if m["type"] == "held" else None
+    kit_want = (inp.get("kit") if inp.get("kit") and kit_fits(ch, inp.get("kit")) else S.kit) if m["type"] == "held" else None
     if kind_ch == "biped":
         AC = _act_tick(S, ch, inp, dt, B)
     elif ch.get("beast"):
@@ -328,7 +353,7 @@ def upper_body(S, ch, inp, st, dt, legs, B):
         AC = {"lean": 0.0, "tw": 0.0, "ext": 0.0, "load": 0.0}
     # hands that are busy with a load or a fight cannot hold weapons: those are put away first
     busy = bool(S.carry) or S.guard.x > 0.05 or (kind_ch == "biped" and bool(inp.get("guard")))
-    ready = bool(inp.get("armed")) and kit_want == S.kit and not busy
+    ready = (bool(inp.get("armed")) or bool(m.get("civil"))) and kit_want == S.kit and not busy
     if kit_want != S.kit and S.armed.x < 0.04:
         S.kit = kit_want
         S.ammo = full_ammo(S.kit)
@@ -475,6 +500,21 @@ def upper_body(S, ch, inp, st, dt, legs, B):
                     so = [-0.14 * wd + 0.30 * ht, 0.14 * wd + 0.20 * ht]
                     place["z"] = lerp(place["z"], chest[2] + 0.12, ht)
                 place["o"] = [place["o"][0] + f[0] * so[0] + u[0] * so[1], place["o"][1] + f[1] * so[0] + u[1] * so[1]]
+            if kind == "case":
+                # it swings a little with the arm that holds it, against the leg on that side
+                cs = -0.09 * st["arm"] * gp["moving"] * S.legs[0].fwd
+                place["o"] = [place["o"][0] + cs, place["o"][1] + 0.8 * cs * cs]
+                place["th"] = 0.5 * cs
+            if kind == "trolley":
+                # the hand stays where it is; the axle is put on the ground behind, wherever the ground is there
+                PT = PROPS["trolley"]
+                hx = place["o"][0] + PT["len"] * math.cos(place["th"])
+                hy = place["o"][1] + PT["len"] * math.sin(place["th"])
+                for _pass in range(2):                  # twice: where the axle comes to rest depends on how high the ground is there
+                    gw = B["terrain"](place["o"][0], place["z"])
+                    if gw > hy - 1.3 * PT["len"]:
+                        tt = math.asin(clamp((hy - gw - PT["wheel"]) / PT["len"], 0.12, 0.97))
+                        place = {"o": [hx - PT["len"] * math.cos(tt), hy - PT["len"] * math.sin(tt)], "th": tt, "z": place["z"]}
             if kind == "shield":
                 # blocking brings the shield up and across in front of the face and chest; a swing of the sword opens it a little
                 bk2 = clamp(S.block.x, 0, 1)

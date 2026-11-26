@@ -152,7 +152,7 @@ def problems(name, spec, where="models.json"):
     for key in m:
         if key not in KEYS:
             out.append("%s: model '%s': motion does not know '%s' (it takes: %s)" % (where, name, key, ", ".join(KEYS)))
-    kits = sorted(lib().KITS) if ch["mount"].get("type") == "held" else []
+    kits = sorted(k for k in lib().KITS if lib().kit_fits(ch, k)) if ch["mount"].get("type") == "held" else []
     if m.get("kit") is not None and m["kit"] not in kits:
         carries = "the %s carries one of: %s" % (cid, ", ".join(kits)) if kits else "the %s carries no kit" % cid
         out.append("%s: model '%s': motion kit '%s' - %s" % (where, name, m["kit"], carries))
@@ -184,6 +184,24 @@ def problems(name, spec, where="models.json"):
             out.append("%s: model '%s': colors names '%s', which is neither a colour of the %s nor one of its groups (%s)"
                        % (where, name, key, cid, ", ".join(sorted(groups))))
     return out
+
+
+PEOPLE = ("person", "commuter", "traveller", "technician", "scientist", "hazmat")    # a crowd of people: these, mixed
+
+
+def spec_named(name, models=None):
+    """What a moved model called ``name`` is: one of the game's ``models``, one of the library's characters as it
+    comes, or one of CLIo's recipes for a moved model (``commuter``, ``traveller``...). None if it is none of them."""
+    spec = (models or {}).get(name)
+    if spec is not None:
+        return spec
+    if name in characters():
+        return {"motion": name}
+    from .. import recipes
+    made = recipes.MODELS.get(name)
+    if made and isinstance(made[1], dict) and made[1].get("motion") is not None:
+        return dict(made[1])
+    return None
 
 
 def _flat(x, z):
@@ -230,7 +248,7 @@ class Moves:
         self.ch = ch = chars[self.character]
         kit = m.get("kit")
         held = ch["mount"].get("type") == "held"
-        if kit is not None and (not held or kit not in cm.KITS):
+        if kit is not None and (not held or not cm.kit_fits(ch, kit)):
             raise ValueError("motion kit '%s' is not one the %s carries" % (kit, self.character))
         self.kit = kit if held and kit != ch["mount"].get("kit") else None
         style = dict(cm.STYLE)
@@ -391,7 +409,9 @@ class Moves:
         base, fall = name, 0
         if name in ("die2", "die3"):
             base, fall = "die", int(name[3]) - 1
-        if base not in self.clip_names:
+        if base == "attack" and self.ch["mount"].get("civil"):
+            base = "jab"                                  # people in plain clothes have fists, and no other weapon
+        elif base not in self.clip_names:
             return None
         mine = (self.shape if not lines else self.key + ("lines",), self.metre, name)
         if mine in _posed:
@@ -511,8 +531,12 @@ class Actor:
         self.body, self.S = None, None
         native = fast() if ground is None else None       # (a ground of its own: in Python, which can ask it)
         if native is not None:
+            try:
+                self.body = native.Body(mv.character, mv.style)
+            except ValueError:                            # a library older than the character: this one in Python
+                native = None
+        if native is not None:
             self.native = native
-            self.body = native.Body(mv.character, mv.style)
             self.body.place(x / k, y / k, heading)
         else:
             self.S = cm.create_state(mv.ch, self.terrain)
@@ -570,6 +594,8 @@ class Actor:
                 once["grab"] = {}
             elif (mv.kit or ch["mount"].get("kit")) == "sword":
                 once["swing"] = {"kind": "slash"}
+            elif ch["mount"].get("civil"):
+                pass                                      # people in plain clothes attack nobody here
             else:
                 once["fire"] = True
         if hit:
@@ -648,18 +674,28 @@ class Actor:
 class Crowd:
     """Bodies wandering about a yard, each run live (``Actor``): they stroll, stand, trot, turn back at the
     edge and now and then strike at nothing. ``step(dt)`` moves them all on; ``actors`` are they. The same
-    ``seed`` gives the same wandering."""
+    ``seed`` gives the same wandering. ``mdl``: the model they all are, or a list with one for each spot (a
+    crowd of several kinds)."""
 
     def __init__(self, mdl, spots, bounds, seed=1):
         import random
         self.rng = random.Random(seed)
         self.bounds = bounds                              # (x0, y0, x1, y1), in cells
         cm = lib()
-        ch = mdl.motion.ch
-        self.walk, self.run = cm.clips.walk_speed(ch), min(cm.clips.run_speed(ch), 2.2 * cm.clips.walk_speed(ch))
-        self.actors = [Actor(mdl, x, y, self.rng.uniform(-math.pi, math.pi)) for x, y in spots]
-        self.minds = [{"until": self.rng.uniform(0.0, 2.0), "speed": 0.0, "heading": a.heading} for a in self.actors]
+        mdls = list(mdl) if isinstance(mdl, (list, tuple)) else [mdl] * len(spots)
+        self.actors = [Actor(m, x, y, self.rng.uniform(-math.pi, math.pi)) for m, (x, y) in zip(mdls, spots)]
+        self.minds = []
+        for a in self.actors:
+            ch = a.moves.ch
+            walk = cm.clips.walk_speed(ch)
+            self.minds.append({"until": self.rng.uniform(0.0, 2.0), "speed": 0.0, "heading": a.heading, "walk": walk,
+                               "run": min(cm.clips.run_speed(ch), 2.2 * walk)})
         self.t = 0.0
+
+    @property
+    def fast(self):
+        """Whether the bodies are stepped in C (all of them: a library older than a character leaves it to Python)."""
+        return bool(self.actors) and all(a.body is not None for a in self.actors)
 
     def step(self, dt):
         self.t += dt
@@ -670,7 +706,7 @@ class Crowd:
             out = a.x < x0 or a.x > x1 or a.y < y0 or a.y > y1
             if out and not mind.get("back"):               # at the edge: back towards the middle
                 mind.update(heading=math.atan2((y0 + y1) / 2 - a.y, (x0 + x1) / 2 - a.x) + rng.uniform(-0.5, 0.5),
-                            speed=self.walk, until=self.t + 2.0, back=True)
+                            speed=mind["walk"], until=self.t + 2.0, back=True)
             elif self.t >= mind["until"]:
                 roll = rng.random()
                 mind["back"] = False
@@ -678,6 +714,6 @@ class Crowd:
                     mind.update(speed=0.0, until=self.t + rng.uniform(1.0, 3.0))
                     attack = rng.random() < 0.4
                 else:
-                    mind.update(speed=self.run if roll > 0.85 else self.walk, heading=mind["heading"] + rng.uniform(-1.6, 1.6),
+                    mind.update(speed=mind["run"] if roll > 0.85 else mind["walk"], heading=mind["heading"] + rng.uniform(-1.6, 1.6),
                                 until=self.t + rng.uniform(1.5, 4.0))
             a.step(dt, speed=mind["speed"], heading=mind["heading"], attack=attack)

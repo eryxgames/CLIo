@@ -38,7 +38,7 @@ def far(a, b):
 
 class EveryCharacter(unittest.TestCase):
     def test_each_is_a_model_with_its_clips(self):
-        self.assertEqual(len(motion.characters()), 12)
+        self.assertEqual(len(motion.characters()), 16)
         for name in motion.characters():
             m = model.Model(name, {"motion": name})
             self.assertIsNotNone(m.motion, name)
@@ -104,6 +104,138 @@ class EveryCharacter(unittest.TestCase):
         here = os.path.join(ROOT, "engine", "motion", "clio_motion")
         for name in ("characters.json", "rigs.json", "clips.py", "mesh.py", "rig.py"):
             self.assertTrue(os.path.isfile(os.path.join(here, name)), name)
+
+
+class People(unittest.TestCase):
+    """The four who are not soldiers, for a crowd: plain clothes, and nothing, a case or a case on wheels in the hand."""
+    PEOPLE = ("person", "technician", "scientist", "hazmat")
+
+    def test_what_they_carry(self):
+        for who in self.PEOPLE:
+            plain = model.Model(who, {"motion": {"character": who, "kit": "hands"}})
+            case = model.Model(who, {"motion": {"character": who, "kit": "case"}})
+            wheels = model.Model(who, {"motion": {"character": who, "kit": "trolley"}})
+            self.assertEqual(model.problems({"a": {"motion": {"character": who, "kit": "trolley"}}}), [], who)
+            self.assertNotIn("prop0", plain.groups, who)
+            self.assertIn("prop0", case.groups, who)
+            self.assertGreater(len(case.faces), len(plain.faces), who)
+            self.assertGreater(len(wheels.faces), len(plain.faces), who)
+            self.assertAlmostEqual(plain.height, 0.4 * 1.72, delta=0.06, msg=who)      # a person's height, in cells
+            # the case on wheels trails behind (model space: y forward) with its wheels on the floor
+            back = min(p[1] for p in wheels.verts)
+            self.assertLess(back, min(p[1] for p in plain.verts) - 0.15, who)
+            self.assertAlmostEqual(min(p[2] for p in wheels.verts), 0.0, delta=0.02, msg=who)
+            for bad in ("rifle", "pistols", "sword"):
+                said = model.problems({"a": {"motion": {"character": who, "kit": bad}}})
+                self.assertTrue(said and "carries one of: case, hands, trolley" in said[0], (who, said))
+        said = model.problems({"a": {"motion": {"character": "soldier", "kit": "case"}}})
+        self.assertTrue(said and "carries one of: pistols, rifle, sword" in said[0], said)
+
+    def test_they_are_dressed_differently(self):
+        looks = {}
+        for who in self.PEOPLE:
+            m = model.Model(who, {"motion": who})
+            looks[who] = sorted(set(str(f[3:]) for f in m.faces))
+            self.assertEqual(model.problems({"a": {"motion": who, "colors": {"torso": "#aa3333"}}}), [], who)
+        self.assertEqual(len(set(map(tuple, looks.values()))), 4, "each has colours of its own")
+
+    def test_clips(self):
+        for who, kit in (("person", "trolley"), ("technician", None), ("hazmat", "case")):
+            spec = {"motion": {"character": who, "kit": kit} if kit else who}
+            m = model.Model(who, spec)
+            mv = m.motion
+            for name in ("idle", "walk", "run", "hit", "die", "die2"):
+                self.assertIsNotNone(mv.clip(name), (who, name))
+            walk = mv.clip("walk")
+            self.assertTrue(0.5 < walk[0] < 1.6, (who, walk[0]))
+            # no weapon: an attack is a jab; it differs from standing
+            self.assertIsNotNone(mv.clip("attack"), who)
+            a, b = mv.pose("attack", 0.5 * mv.clip("attack")[0]), mv.pose("idle", 0.0)
+            self.assertGreater(max(abs(p[i] - q[i]) for p, q in zip(a, b) for i in range(3)), 0.05, who)
+        self.assertIsNone(model.Model("s", {"motion": "soldier"}).motion.clip("jab"))        # (a soldier's attack is his own)
+
+    def test_one_in_a_level_and_live(self):
+        lv, m = level_with({"motion": {"character": "person", "kit": "trolley"}})
+        m.heading = 0.0
+        view = View(80, 20, "pixel")
+        standing = view.render(lv, FX(), 0)
+        m.gone = True
+        empty = view.render(lv, FX(), 0)
+        m.gone = False
+        self.assertNotEqual(standing, empty)
+        steps = [view.render(lv, FX(pos={m.id: (m.x, m.y)}, tick=k), 3) for k in (1 / 3.0, 2 / 3.0, 1.0)]
+        self.assertTrue(steps[0] != steps[1] != steps[2] and standing not in steps)
+        m.dead = True                                             # it has fallen, and lies
+        self.assertNotIn(view.render(lv, FX(), 0), (standing, empty))
+        a = motion.Actor(model.Model("p", {"motion": {"character": "person", "kit": "trolley"}}), 1.0, 1.0, 0.0)
+        for _ in range(180):
+            a.step(1 / 60, speed=9.0, heading=0.0, attack=True)
+        self.assertTrue(2.5 < a.speed < 3.2, a.speed)             # a case on wheels is taken at a jog, however fast it is asked
+        self.assertGreater(len(a.corners()), 200)
+        b = motion.Actor(model.Model("p", {"motion": "scientist"}), 1.0, 1.0, 0.0)
+        for _ in range(180):
+            b.step(1 / 60, speed=9.0, heading=0.0)
+        self.assertGreater(b.speed, 4.5)
+
+    def test_a_crowd_of_several_kinds(self):
+        import io
+        from contextlib import redirect_stdout
+        import clio
+        from engine import demo
+        from engine.term import Term
+        from test_demo import player
+        self.assertEqual(motion.spec_named("traveller"), {"motion": {"character": "person", "kit": "trolley"}})
+        self.assertEqual(motion.spec_named("hyena"), {"motion": "hyena"})
+        self.assertIsNone(motion.spec_named("door"))                 # a recipe, but not of a moved model
+        self.assertIsNone(motion.spec_named("unicorn"))
+        self.assertEqual(motion.spec_named("x", {"x": {"motion": "mech"}}), {"motion": "mech"})
+        kinds = list(motion.PEOPLE)
+        self.assertEqual(demo.problems({"game": "rootless", "clips": [{"crowd": kinds, "views": ["pixel", "lines"]}]}), [])
+        said = demo.problems({"game": "rootless", "clips": [{"crowd": ["person", "unicorn"]}]})
+        self.assertTrue(len(said) == 1 and "no model 'unicorn'" in said[0], said)
+        self.assertEqual(len(demo.problems({"game": "rootless", "clips": [{"crowd": ["person"] * 21}]})), 1)
+        p, seen, _fc = player([{"crowd": kinds, "count": 13, "seconds": 1.0, "views": ["pixel", "lines"]}], W=80, H=24)
+        self.assertEqual(p.run(), "done")
+        self.assertTrue(any("13 bodies of 6 kinds, each run live" in n for _t, n, _m in seen), [n for _t, n, _m in seen][:3])
+        mdls = [model.Model(n, motion.spec_named(n)) for n in kinds]
+        crowd = motion.Crowd([mdls[i % 6] for i in range(12)], [(2.0 + i, 3.0) for i in range(12)], (1.0, 1.0, 14.0, 6.0), seed=3)
+        self.assertEqual([a.moves.character for a in crowd.actors][:6], ["person", "person", "person", "technician", "scientist", "hazmat"])
+        self.assertEqual([a.moves.kit for a in crowd.actors][:6], [None, "case", "trolley", None, None, None])
+        for _ in range(240):
+            crowd.step(1 / 30)
+        self.assertTrue(any(a.speed > 0.3 for a in crowd.actors) and all(a.speed == a.speed for a in crowd.actors))
+        self.assertTrue(all(a.speed < 3.3 for a in crowd.actors if a.moves.kit == "trolley"))
+        self.assertGreater(len({len(a.corners()) for a in crowd.actors}), 2)             # they are not all one body
+        term = Term(out=io.StringIO(), width=80, height=24, color=0, unicode=True, animate=False, env={})
+        out = io.StringIO()
+        with redirect_stdout(out):
+            self.assertEqual(clio.play_crowd(term, None, "people", 12), 2)                # (nothing to draw on here)
+            self.assertEqual(clio.play_crowd(term, None, "person,unicorn", 5), 2)
+        self.assertEqual(out.getvalue().count("needs a terminal"), 1)
+        self.assertIn("has no model 'unicorn'", out.getvalue())
+        self.assertIn("--crowd people", out.getvalue())
+
+    def test_the_recipes(self):
+        folder = tempfile.mkdtemp(prefix="clio-test-people-")
+        try:
+            game = os.path.join(folder, "g")
+            shutil.copytree(os.path.join(ROOT, "templates", "starter"), game)
+            names = ("person", "commuter", "traveller", "technician", "scientist", "hazmat")
+            for name in names:
+                recipes.add(game, "model", name)
+            data = GameData(game)
+            self.assertEqual(model.problems(data.models), [])
+            built = model.load(data.models)
+            self.assertEqual(sorted(built), sorted(names))
+            self.assertEqual(built["traveller"].motion.kit, "trolley")
+            self.assertIsNone(built["technician"].motion.kit)                       # his tool box is what he starts with
+            self.assertIn("prop0", built["technician"].groups)
+            self.assertNotIn("prop0", built["hazmat"].groups)
+            self.assertNotIn("prop0", built["scientist"].groups)
+            for name in names:                                                  # a recipe is what --crowd makes of its name
+                self.assertEqual(motion.spec_named(name), data.models[name], name)
+        finally:
+            shutil.rmtree(folder, True)
 
 
 class WhatIsPlayed(unittest.TestCase):
@@ -682,7 +814,7 @@ class TheCrowdCommand(unittest.TestCase):
             self.assertEqual(clio.play_crowd(term, None, "unicorn", 5), 2)
             self.assertEqual(clio.play_crowd(term, None, "hyena", 5), 2)      # nothing to draw on here
         self.assertIn("has no model 'unicorn'", out.getvalue())
-        self.assertIn("characters: dragon, horse, hyena", out.getvalue())
+        self.assertIn("characters: dragon, hazmat, horse, hyena", out.getvalue())
         self.assertIn("needs a terminal", out.getvalue())
 
 

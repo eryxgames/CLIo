@@ -239,6 +239,10 @@ def step_ground(S, ch, inp, st, terrain_w, dt, upper=None):
     vT = clamp(inp.get("speed") or 0, 0, ch["vmax"] * (1 - 0.65 * min(S.crouch, 1)))
     if S.carry:
         vT = 0 if S.act else min(vT, 0.62 * math.sqrt(G * L))
+    from .body import held_kit                         # (the body module is built on this one)
+    kit_now = held_kit(S, ch)
+    if kit_now and kit_now.get("pace") and S.armed.x > 0.5:    # nor is a case on wheels run with
+        vT = min(vT, kit_now["pace"] * math.sqrt(G * L))
     if heading is not None:
         vT *= clamp(1.5 - abs(he) / 0.8, 0, 1)             # brake for a sharp turn, pivot, then go
     a_max = (0.4 if vT > S.v else 0.65) * G

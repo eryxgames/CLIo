@@ -53,8 +53,8 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   `"build"` and `"height"` in a model's `"motion"`. `--add model woman|woman_in_red|tourist`;
   `--crowd anyone` and `{"crowd": "anyone"}` in a demo's clip are people made up, no two
   alike, and the tech demo's yard of people is of them. The Gait Bench's panel "Who it is"
-  writes the line for `models.json`. (The library CLIo follows, 0.26.0, has no `woman`: she is
-  stepped in Python until CLIo follows 0.27.0.)
+  writes the line for `models.json`. (A library older than 0.27.0 has no `woman`: with
+  one, she is stepped in Python.)
 - **People for a crowd** (CLIo Motion 0.26): four more characters - `person`, `technician`,
   `scientist`, `hazmat` - who are the soldier's body in plain clothes, an overall and hard hat,
   a lab coat or a hazmat suit, with `"kit"`: `"hands"`, `"case"` or `"trolley"` (a case on
@@ -68,8 +68,12 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 - **`--get-motion`**, and CLIo Motion's C core in the launcher's Downloads: the library for this
   machine from the release of CLIo Motion that CLIo follows, checked against that release's
   SHA-256, into your data folder, and then against CLIo's Python before it is used - as
-  `--get-picture` does. CLIo follows **CLIo Motion 0.26.0** (150 to 220 KB; 260 on macOS), which
-  knows the people.
+  `--get-picture` does. CLIo follows **CLIo Motion 0.29.0** (170 to 230 KB; 290 on macOS), which
+  knows the people, the gunners and all eight weapons.
+- `engine.follow` where this Python cannot reach GitHub: `--from FOLDER` takes the release's
+  `checksums.txt` and zips from a folder a browser saved them to (a list saved as `checksums
+  (6).txt` is found too), and a certificate that cannot be checked is said to be that - by
+  `--get-motion` and `--get-picture` as well - and no longer taken for a release without files.
 - **`python -m engine.follow picture|motion VERSION`**, for those who look after CLIo: writes the
   release CLIo follows, the checksum of each machine's zip and the sizes the launcher quotes
   from the release's own `checksums.txt`, after downloading and checking every zip.

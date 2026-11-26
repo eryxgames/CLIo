@@ -19,18 +19,18 @@ import sys
 import urllib.request
 import zipfile
 
-RELEASE = "0.26.0"
+RELEASE = "0.29.0"
 URL = "https://github.com/eryxgames/clio-motion/releases/download/v{v}/clio-motion-{v}-{p}.zip"
 SOURCE = "https://github.com/eryxgames/clio-motion"
 SHA256 = {                      # from the release's checksums.txt
-    "android-arm64-v8a": "5de7798d8bfdf6fabe787831dc0b8634c6849e7d7676d91dc6b16dcce9c09be6",
-    "android-armeabi-v7a": "0a17b85f05ef0dab287717c057a89a124f138b60a2462e05100930500e265b52",
-    "android-x86_64": "73bbae0f2e39e9781f7ce8c4b05d5e00f13002e4b320ab936d4a7fe0889de5cf",
-    "linux-arm64": "fdf95e1827e0733b9c535833af189fd0dcc1cb081d1f2578900b5324a3dc19c7",
-    "linux-x64": "43cecc9549d5d996ba9a594fde70a68c913839a2b6c3eb451402e44cb03c25a0",
-    "macos-universal": "ab47720c92a9282eced9774e23f983c634093b25f20ce03f3f676c7bd778bc33",
-    "windows-arm64": "a56559084d7abb8e5da255a335253a7bb235099d29ad61e3d3216ce3cbf29c4e",
-    "windows-x64": "f3ef590ad579a65b9d4fc4a508e6194ab6f4e68eec276527e0408a19cec330ac",
+    "android-arm64-v8a": "29be7305747934e91320dc66ef650388903e67f3f3733077424ed6efedcd83ca",
+    "android-armeabi-v7a": "5f6cc81a2b140d8ea3677b9bc8992d2b2a847e0f321b6b9540280383037d9644",
+    "android-x86_64": "99491488bb1f83394c9f4ba1f52bc16029a592870af2c2da65961400bd6811ac",
+    "linux-arm64": "abbc391412688b3642411d606b1a0f2fb908f3a2f1f789b4aa587cf262094d22",
+    "linux-x64": "967559978e658d9ded8f08a826359f0cc605ab17cf41fbee31f55d384ef0e1f5",
+    "macos-universal": "0739ff8f34a1524a8b434630f2cd9120b83b2925138333d926fdf112db5c4adf",
+    "windows-arm64": "bf90b8870562f5b9598bf7b95ad7b25f9bd509d0875ed0405c40f2594d305188",
+    "windows-x64": "c910f07b97bc9ed62b916aae30fa5a7414b9912d71574c5f0c96e4799c313874",
 }
 
 
@@ -80,6 +80,9 @@ def get(out=print, env=None, plat=None, opener=None):
             data = r.read()
     except Exception as e:                               # no network, a proxy, a missing file
         out("Could not download %s: %s" % (url, e))
+        from .. import follow
+        if follow.why(e):
+            out(follow.why(e))
         return 1
     if hashlib.sha256(data).hexdigest() != SHA256[plat]:
         out("The download does not match the checksum CLIo expects for %s: nothing was installed." % plat)

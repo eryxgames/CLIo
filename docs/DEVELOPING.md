@@ -130,7 +130,7 @@ guide.
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 1155 tests, a few minutes
+python -m unittest discover -s tests     # 1157 tests, a few minutes
 python -m engine.vector                  # the vector display's reel (Ctrl-C ends)
 python -m engine.realm templates/realm 8 # a steward plays the realm starter over eight seeds
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
@@ -229,7 +229,7 @@ leaves it out.)
 its files:
 
 ```
-python -m engine.follow motion 0.26.0    # or: picture 0.10.0; --check only says what would change
+python -m engine.follow motion 0.29.0    # or: picture 0.10.0; --check only says what would change
 ```
 
 It reads the release's `checksums.txt`, downloads every zip, checks each against that list and
@@ -237,3 +237,9 @@ that the library is where `--get-...` looks for it, and writes `RELEASE`, `SHA25
 sizes the launcher quotes (`engine/downloads.py`) - or nothing, if any zip is not right. Then
 the tests, and commit. `tests/test_follow.py` fails if the committed tables are not as the
 script writes them (the sizes were once left from an earlier release).
+
+If this Python cannot reach GitHub - `CERTIFICATE_VERIFY_FAILED` is a proxy or an antivirus
+reading HTTPS, or a Python without the system's certificates (try cmd or PowerShell where Git
+Bash fails) - save the release's `checksums.txt` and its eight zips to a folder with a browser
+and give it that: `python -m engine.follow motion 0.29.0 --from C:\Users\you\Downloads`. The
+zips are checked against the list in the same way.

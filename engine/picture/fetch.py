@@ -75,6 +75,9 @@ def get(out=print, env=None, plat=None, opener=None):
             data = r.read()
     except Exception as e:                               # no network, a proxy, a missing file
         out("Could not download %s: %s" % (url, e))
+        from .. import follow
+        if follow.why(e):
+            out(follow.why(e))
         return 1
     if hashlib.sha256(data).hexdigest() != SHA256[plat]:
         out("The download does not match the checksum CLIo expects for %s: nothing was installed." % plat)

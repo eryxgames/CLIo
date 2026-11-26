@@ -87,6 +87,7 @@ class Follow(unittest.TestCase):
         code, said = self.run_it(Release(sums=False))
         self.assertEqual(code, 1)
         self.assertIn("Could not read", said)
+        self.assertIn("one that has no files yet", said)
         self.assertIn("Nothing was changed.", said)
 
     def test_a_zip_that_is_not_the_one_listed(self):
@@ -103,7 +104,46 @@ class Follow(unittest.TestCase):
         r = Release()
         del r.files["clio-motion-%s-linux-x64.zip" % V]
         code, said = self.run_it(r)
-        self.assertIn("Could not download the zip for linux-x64", said)
+        self.assertIn("Could not get the zip for linux-x64", said)
+
+    def test_from_a_folder_where_the_network_cannot_be_used(self):
+        import tempfile
+        r = Release()
+        folder = tempfile.mkdtemp(prefix="clio-test-follow-")
+        for name, data in r.files.items():
+            # the list as a browser saves a sixth copy of it; and an older release's list beside it
+            with open(os.path.join(folder, "checksums (6).txt" if name == "checksums.txt" else name), "wb") as f:
+                f.write(data)
+        with open(os.path.join(folder, "checksums (5).txt"), "w") as f:
+            f.write("%s  clio-motion-0.0.1-linux-x64.zip\n" % ("0" * 64))
+        code, said = self.run_it(None, ("motion", V, "--from", folder, "--check"))
+        self.assertEqual(code, 1, said)
+        self.assertIn("These would change", said)
+        self.assertIn("linux-x64", said)
+        os.remove(os.path.join(folder, "clio-motion-%s-windows-x64.zip" % V))
+        code, said = self.run_it(None, ("motion", V, "--from", folder, "--check"))
+        self.assertIn("Could not get the zip for windows-x64", said)
+        self.assertIn("is not in", said)
+        os.remove(os.path.join(folder, "checksums (6).txt"))
+        code, said = self.run_it(None, ("motion", V, "--from", folder))
+        self.assertEqual(code, 1)
+        self.assertIn("checksums.txt is not in", said)
+        self.assertNotIn("--from FOLDER", said)                  # (it was asked that way already)
+        code, said = self.run_it(None, ("motion", V, "--from", os.path.join(folder, "nowhere")))
+        self.assertEqual(code, 2)
+        self.assertIn("--from takes a folder that is there", said)
+
+    def test_why_the_network_failed_is_said(self):
+        def refused(url, timeout=None):
+            raise OSError("<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get issuer certificate>")
+        code, said = self.run_it(refused)
+        self.assertEqual(code, 1)
+        self.assertIn("could not check GitHub's certificate", said)
+        self.assertIn("--from FOLDER", said)
+        self.assertNotIn("has no files yet", said)               # nothing is known of the release
+        code, said = self.run_it(Release(sums=False))
+        self.assertIn("no such release, or one that has no files yet", said)
+        self.assertIsNone(follow.why(OSError("timed out")))
 
     def test_what_it_is_asked(self):
         for args in ((), ("motion",), ("sound", "1.0.0"), ("motion", "latest")):

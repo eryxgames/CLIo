@@ -69,6 +69,10 @@ class GetMotion(unittest.TestCase):
         code, said, _served = self.get(OSError("no route"), pins={PLAT: "0" * 64})
         self.assertEqual(code, 1)
         self.assertIn("Could not download", said)
+        self.assertNotIn("certificate", said)
+        code, said, _served = self.get(OSError("[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed"), pins={PLAT: "0" * 64})
+        self.assertEqual(code, 1)
+        self.assertIn("could not check GitHub's certificate", said)
 
     def test_a_download_that_does_not_match_is_not_installed(self):
         e = env()

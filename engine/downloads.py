@@ -16,7 +16,9 @@ PICTURE_SIZE = {
     "android-arm64-v8a": 74778, "android-armeabi-v7a": 75937, "android-x86_64": 77768, "linux-arm64": 70521,
     "linux-x64": 72449, "macos-universal": 117616, "windows-arm64": 109058, "windows-x64": 126736,
 }
-MOTION_SIZE = {                   # (none yet: CLIo follows no release of it yet - engine/motion/fetch.py)
+MOTION_SIZE = {
+    "android-arm64-v8a": 147163, "android-armeabi-v7a": 148204, "android-x86_64": 150288, "linux-arm64": 143610,
+    "linux-x64": 153968, "macos-universal": 252360, "windows-arm64": 183434, "windows-x64": 209088,
 }
 BALLISTIC_SIZE = {
     "android-arm64-v8a": 1206755, "android-armeabi-v7a": 1111941, "android-x86_64": 1332340, "linux-arm64": 703726,

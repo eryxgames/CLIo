@@ -116,17 +116,20 @@ CLIo makes its own music and sound effects and hands them to a player already on
 Without one, a game is simply silent; the in-game `sound` command says what it found.
 `--no-sound` (or `CLIO_AUDIO=off`) turns it off.
 
-Two **optional downloads** make RØØTLESS nicer. The launcher offers them under **Downloads**
+Three **optional downloads** make CLIo nicer. The launcher offers them under **Downloads**
 (it says the size first and installs nothing without a yes):
 
 - **CLIo Picture** (about 100 KB, `--get-picture`): draws the first-person picture several times
   faster - the same picture, to the last pixel - and, from its release 0.10, the consoles' line
   displays, scans and views ahead.
+- **CLIo Motion's C core** (about 150 KB, `--get-motion`): steps bodies that are run live thirty
+  to forty times faster; with CLIo Picture beside it, a yard of a thousand of them (`--crowd`,
+  the tech demo's crowds).
 - **Ballistic's C engine** (about 1 MB, `--get-ballistic`): physically modelled shots, ricochets
   and blasts for RØØTLESS's Ballistic sound set (`--sounds ballistic`) - some of them; with
   [Node.js](https://nodejs.org) installed, all of them.
 
-Both are checked against their published checksums and go into your user data folder, not into
+All are checked against their published checksums and go into your user data folder, not into
 CLIo's.
 
 ## Looks

@@ -221,9 +221,9 @@ are then stepped in it. With `CLIO_MOTION_LIB` set, `tests/test_motion.py`'s `Th
 the two; without it those tests are passed over. `--get-motion` (`engine/motion/fetch.py`) is
 `--get-picture` again: the zip for this machine from the release CLIo follows, its SHA-256
 against the one noted in `fetch.py`, the library and its LICENSE and NOTICE into the data
-folder, then the same check against the Python. While `SHA256` there is empty CLIo follows no
-release: `--get-motion` says how to build the library and the launcher's Downloads leaves it
-out.
+folder, then the same check against the Python. (With `SHA256` there empty CLIo would follow
+no release: `--get-motion` then says how to build the library and the launcher's Downloads
+leaves it out.)
 
 **Following a release** of CLIo Picture or CLIo Motion is one command, once the release has
 its files:

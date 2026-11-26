@@ -39,9 +39,7 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 - **`--get-motion`**, and CLIo Motion's C core in the launcher's Downloads: the library for this
   machine from the release of CLIo Motion that CLIo follows, checked against that release's
   SHA-256, into your data folder, and then against CLIo's Python before it is used - as
-  `--get-picture` does. CLIo follows no release of it yet (0.25.0's has no files so far), so
-  for now `--get-motion` says how to build the library and Downloads does not list it;
-  `python -m engine.follow motion VERSION` is what makes CLIo follow one.
+  `--get-picture` does. CLIo follows **CLIo Motion 0.25.0** (about 150 KB; 250 on macOS).
 - **`python -m engine.follow picture|motion VERSION`**, for those who look after CLIo: writes the
   release CLIo follows, the checksum of each machine's zip and the sizes the launcher quotes
   from the release's own `checksums.txt`, after downloading and checking every zip.

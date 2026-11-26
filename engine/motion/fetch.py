@@ -22,7 +22,15 @@ import zipfile
 RELEASE = "0.25.0"
 URL = "https://github.com/eryxgames/clio-motion/releases/download/v{v}/clio-motion-{v}-{p}.zip"
 SOURCE = "https://github.com/eryxgames/clio-motion"
-SHA256 = {                      # from the release's checksums.txt (none yet: the release has no files)
+SHA256 = {                      # from the release's checksums.txt
+    "android-arm64-v8a": "001012f74eef485aa83c8806a575d485cd6ef97d5bdca8f61f3c8c96d7c512e7",
+    "android-armeabi-v7a": "ad3ce4f43faa679e6109cb96d03039eac2720801fc889f108de376caec23102e",
+    "android-x86_64": "d1b921847abcb6f7872f6ff44d916da6679f43480a7eea43ee052cef6f531728",
+    "linux-arm64": "8d75987dbf71dc524bb5cd545a4f634eefe795845ffcb3dbbdd525e266b2e20c",
+    "linux-x64": "82325482747ff78527d6775779ff7c5007eab83e8614adfe762cf14701c51cbe",
+    "macos-universal": "9c5af18cdb2fc07519c5dbafd7efbfd8dd320b16f64be16a04aca4c4843e361e",
+    "windows-arm64": "80fe5ca616022b2562805a6f9dd33b1296b60f5f17392b0fc00a931f461901ed",
+    "windows-x64": "72dca458dc281b5a82d8d7058f45e58a0ec276fc516e1d8877b4e2b26a8bd65b",
 }
 
 

@@ -2,6 +2,7 @@
 # Copyright 2026 Daniel Sandner
 """Models moved by CLIo Motion (engine/motion): every character built as a model, its clips, what a level's
 monster shows of it - striding, attacking, struck, falling and lying - the viewer, --check and the recipes."""
+import json
 import math
 import os
 import shutil
@@ -38,7 +39,7 @@ def far(a, b):
 
 class EveryCharacter(unittest.TestCase):
     def test_each_is_a_model_with_its_clips(self):
-        self.assertEqual(len(motion.characters()), 16)
+        self.assertEqual(len(motion.characters()), 17)
         for name in motion.characters():
             m = model.Model(name, {"motion": name})
             self.assertIsNotNone(m.motion, name)
@@ -194,9 +195,10 @@ class People(unittest.TestCase):
         said = demo.problems({"game": "rootless", "clips": [{"crowd": ["person", "unicorn"]}]})
         self.assertTrue(len(said) == 1 and "no model 'unicorn'" in said[0], said)
         self.assertEqual(len(demo.problems({"game": "rootless", "clips": [{"crowd": ["person"] * 21}]})), 1)
+        self.assertEqual(kinds[:6], ["person", "commuter", "traveller", "technician", "scientist", "hazmat"])
         p, seen, _fc = player([{"crowd": kinds, "count": 13, "seconds": 1.0, "views": ["pixel", "lines"]}], W=80, H=24)
         self.assertEqual(p.run(), "done")
-        self.assertTrue(any("13 bodies of 6 kinds, each run live" in n for _t, n, _m in seen), [n for _t, n, _m in seen][:3])
+        self.assertTrue(any("13 bodies of 9 kinds, each run live" in n for _t, n, _m in seen), [n for _t, n, _m in seen][:3])
         mdls = [model.Model(n, motion.spec_named(n)) for n in kinds]
         crowd = motion.Crowd([mdls[i % 6] for i in range(12)], [(2.0 + i, 3.0) for i in range(12)], (1.0, 1.0, 14.0, 6.0), seed=3)
         self.assertEqual([a.moves.character for a in crowd.actors][:6], ["person", "person", "person", "technician", "scientist", "hazmat"])
@@ -236,6 +238,98 @@ class People(unittest.TestCase):
                 self.assertEqual(motion.spec_named(name), data.models[name], name)
         finally:
             shutil.rmtree(folder, True)
+
+
+class TheWardrobe(unittest.TestCase):
+    """A person dressed otherwise, of another build and height, in colours by name - and people made up."""
+    RED = {"motion": {"character": "woman", "wear": {"skirt": "knee", "legs": "bare", "sleeves": "short"}, "build": 0.94,
+                      "height": 1.64},
+           "colors": {"top": "#b3202e", "shoe": "#8f1a26", "hair": "#2a1a14"}}
+
+    def colours(self, m):
+        return {f[4] for f in m.faces}
+
+    def test_a_woman_in_red(self):
+        colour_of = model.colour
+        self.assertEqual(model.problems({"a": self.RED, "w": {"motion": "woman"}}), [])
+        red, plain, man = model.Model("a", self.RED), model.Model("w", {"motion": "woman"}), model.Model("p", {"motion": "person"})
+        want = colour_of("#b3202e")
+        self.assertIn(want, self.colours(red))
+        self.assertNotIn(want, self.colours(plain))
+        n_red = sum(1 for f in red.faces if f[4] == want)
+        self.assertGreater(n_red, 100)                                              # the top, and the skirt after it
+        other = dict(self.RED, colors=dict(self.RED["colors"], skirt="#22252b"))
+        self.assertLess(sum(1 for f in model.Model("o", other).faces if f[4] == want), 0.7 * n_red)
+        self.assertGreater(len(red.faces), len(plain.faces))                        # a skirt is more to draw
+        # a woman is smaller than a man unless her height says; a height is to the top of the head
+        self.assertLess(plain.height, 0.96 * man.height)
+        bare = dict(self.RED, motion=dict(self.RED["motion"], wear={"hair": "none"}))
+        self.assertAlmostEqual(model.Model("b", bare).height, 0.4 * 1.64, delta=0.004)
+        tall = model.Model("t", {"motion": {"character": "person", "height": 1.95, "wear": {"hair": "none"}}})
+        self.assertAlmostEqual(tall.height, 0.4 * 1.95, delta=0.004)
+        # the same joints: her clips are a woman's, and she is drawn in a level
+        self.assertIsNotNone(red.motion.clip("walk"))
+        self.assertEqual(len(red.motion.pose("walk", 0.3)), len(red.verts))
+        self.assertNotEqual(red.motion.pose("walk", 0.3), red.motion.pose("walk", 0.6))
+        lv, m = level_with(self.RED)
+        view = View(80, 20, "pixel")
+        with_her = view.render(lv, FX(), 0)
+        m.gone = True
+        self.assertNotEqual(with_her, view.render(lv, FX(), 0))
+
+    def test_build_and_groups_and_names_together(self):
+        thin = model.Model("a", {"motion": {"character": "person", "build": 0.8}})
+        stout = model.Model("b", {"motion": {"character": "person", "build": 1.4}})
+        self.assertGreater(max(abs(p[0]) for p in stout.verts), 1.07 * max(abs(p[0]) for p in thin.verts))
+        self.assertAlmostEqual(thin.height, stout.height, delta=0.002)               # the head is as it was
+        colour_of = model.colour
+        both = model.Model("c", {"motion": "person", "colors": {"top": "#b3202e", "head": "#00ff00", "#3b4252": "#0000ff"}})
+        seen = self.colours(both)
+        for hexa in ("#b3202e", "#00ff00", "#0000ff"):                               # by name, by group, by its own colour
+            self.assertIn(colour_of(hexa), seen, hexa)
+
+    def test_what_is_wrong_is_said(self):
+        for spec, word in (({"motion": {"character": "soldier", "wear": {"hat": "cap"}}}, "is for people who are not soldiers"),
+                           ({"motion": {"character": "hyena", "height": 1.0}}, "is for people who are not soldiers"),
+                           ({"motion": {"character": "woman", "wear": {"skirt": "mini"}}}, "wear skirt is one of: none, short, knee, long"),
+                           ({"motion": {"character": "woman", "wear": {"cape": "on"}}}, "wear does not know 'cape'"),
+                           ({"motion": {"character": "woman", "wear": "dress"}}, "wear should be an object"),
+                           ({"motion": {"character": "person", "build": 3}}, "build should be a number from 0.6 to 1.6"),
+                           ({"motion": {"character": "person", "height": "tall"}}, "height should be a number"),
+                           ({"motion": "person", "colors": {"top": "red"}}, "colors 'top' should be a colour like"),
+                           ({"motion": "person", "colors": {"cape": "#ffffff"}}, "nor one of its colours by name")):
+            said = model.problems({"a": spec})
+            self.assertTrue(len(said) == 1 and word in said[0], (spec, said))
+        self.assertEqual(model.problems({"a": {"motion": {"character": "person", "wear": {"band": True, "hat": "cap"}}}}), [])
+
+    def test_people_made_up(self):
+        import random
+        a = [motion.anyone(random.Random(7)) for _ in range(1)] + [motion.anyone(random.Random(7))]
+        self.assertEqual(a[0], a[1])                                                 # the same seed, the same person
+        rng = random.Random(11)
+        specs = [motion.anyone(rng) for _ in range(60)]
+        self.assertEqual(model.problems({"p%d" % i: s for i, s in enumerate(specs)}), [])
+        self.assertEqual({s["motion"]["character"] for s in specs}, {"person", "woman"})
+        self.assertGreater(len({json.dumps(s, sort_keys=True) for s in specs}), 55)
+        self.assertTrue(any(s["motion"].get("kit") == "trolley" for s in specs) and any("skirt" in s["motion"]["wear"] for s in specs))
+        built = [model.Model("p%d" % i, s) for i, s in enumerate(specs[:10])]
+        self.assertGreater(len({round(m.height, 3) for m in built}), 6)
+        from test_demo import player
+        from engine import demo
+        self.assertEqual(demo.problems({"game": "rootless", "clips": [{"crowd": "anyone", "count": 8}]}), [])
+        p, seen, _fc = player([{"crowd": "anyone", "count": 7, "seconds": 0.8, "seed": 3}], W=80, H=24)
+        self.assertEqual(p.run(), "done")
+        self.assertTrue(any("7 people, no two alike, each run live" in n for _t, n, _m in seen), [n for _t, n, _m in seen][:2])
+        p, seen, _fc = player([{"crowd": "anyone", "count": 26, "seconds": 0.5}], W=80, H=24)
+        self.assertEqual(p.run(), "done")
+        self.assertTrue(any("26 people of 20 kinds" in n for _t, n, _m in seen), [n for _t, n, _m in seen][:2])
+
+    def test_the_recipes(self):
+        for name in ("woman", "woman_in_red", "tourist"):
+            spec = motion.spec_named(name)
+            self.assertEqual(model.problems({name: spec}), [], name)
+            self.assertIn(name, motion.PEOPLE)
+        self.assertEqual(motion.spec_named("woman_in_red"), self.RED)
 
 
 class WhatIsPlayed(unittest.TestCase):

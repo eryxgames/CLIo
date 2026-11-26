@@ -93,6 +93,7 @@
   "engine/motion/clio_motion/ragdoll.py",
   "engine/motion/clio_motion/rig.py",
   "engine/motion/clio_motion/rigs.json",
+  "engine/motion/clio_motion/wardrobe.json",
   "engine/picture/__init__.py",
   "engine/picture/fetch.py",
   "engine/picture/frame.py"

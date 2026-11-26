@@ -80,6 +80,16 @@ MODELS = {
     "technician": ("a technician in an overall and a hard hat, with a tool box", {"motion": "technician"}),
     "scientist": ("a scientist in a lab coat", {"motion": "scientist"}),
     "hazmat": ("a scientist in a hazmat suit: hood, visor, air tank", {"motion": "hazmat"}),
+    "woman": ("a woman in plain clothes moved by CLIo Motion (\"wear\", \"build\", \"height\" and \"colors\" make her another)",
+              {"motion": "woman"}),
+    "woman_in_red": ("a woman in a red dress",
+                     {"motion": {"character": "woman", "wear": {"skirt": "knee", "legs": "bare", "sleeves": "short"},
+                                 "build": 0.94, "height": 1.64},
+                      "colors": {"top": "#b3202e", "shoe": "#8f1a26", "hair": "#2a1a14"}}),
+    "tourist": ("a tourist: a cap, short sleeves, shorts and a backpack",
+                {"motion": {"character": "person", "wear": {"hat": "cap", "sleeves": "short", "legs": "short", "pack": "on"},
+                            "build": 1.08, "height": 1.74},
+                 "colors": {"top": "#d8793a", "suit": "#b9a57e", "hat": "#2f6690", "pack": "#3f7a4d", "shoe": "#8a8f96"}}),
 }
 KINDS = {"console": CONSOLES, "menu": MENUS, "model": MODELS}
 

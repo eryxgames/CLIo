@@ -35,6 +35,87 @@ def rigs():
     return _rigs
 
 
+_WARDROBE = None
+_HEX = None
+
+
+def wardrobe():
+    """What people who are not soldiers can wear (wardrobe.json): ``options`` (each option and its values, the first
+    what it is when nothing is said), ``colours`` (the names of a person's colours) and ``people`` (by character:
+    ``wear`` as it comes, ``palette``, and every part of every option)."""
+    global _WARDROBE
+    if _WARDROBE is None:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "wardrobe.json"), encoding="utf-8") as f:
+            _WARDROBE = json.load(f)
+    return _WARDROBE
+
+
+def wear_of(character, asked=None):
+    """What a person wears: the character's own, with what is asked for over it. Anything that is not one of an
+    option's values is passed over. None for a character that has no wardrobe (a soldier, an animal)."""
+    W = wardrobe()
+    person = W["people"].get(character)
+    if person is None:
+        return None
+    base, out = person["wear"], {}
+    for k, values in W["options"].items():
+        v = (asked or {}).get(k)
+        if v is None:
+            v = base.get(k)
+        if v is True:
+            v = "on"
+        elif v is False:
+            v = "none"
+        out[k] = v if v in values else (base.get(k) or values[0])
+    return out
+
+
+def dressed(rig, wear=None, colors=None, build=1.0):
+    """``rig`` (one of ``rigs()``) with the parts of a person dressed otherwise: ``wear`` (options over the
+    character's own: ``{"skirt": "knee", "hair": "bun"}``), ``colors`` by name (``{"top": "#b3202e"}``; ``skirt``
+    is the top's unless given) and ``build`` (how thick the body's parts are: 1 as drawn). The joints are the
+    rig's own, so it is posed, meshed and played as the rig is. A ValueError for a rig of a character that has no
+    wardrobe."""
+    global _HEX
+    W = wardrobe()
+    person = W["people"].get(rig["id"])
+    if person is None:
+        raise ValueError("'%s' has no wardrobe: only people who are not soldiers do (%s)" % (rig["id"], ", ".join(sorted(W["people"]))))
+    if _HEX is None:
+        import re
+        _HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
+    w = wear_of(rig["id"], wear)
+    pal = dict(person["palette"])
+    for k, v in (colors or {}).items():
+        if k in W["colours"] and isinstance(v, str) and _HEX.match(v):
+            pal[k] = v.lower()
+    if not pal.get("skirt"):
+        pal["skirt"] = pal["top"]
+    names = {j["name"]: k for k, j in enumerate(rig["joints"])}
+    kit = rig.get("kit") or characters_kit(rig["id"])
+    body, at = person["body"], person["at"]
+    parts = []
+    for q in body[:at] + person["props"].get(kit, []) + body[at:]:
+        if q["tag"]:
+            key, val = q["tag"].split("=")
+            if w[key] != val:
+                continue
+        p = {k: q[k] for k in ("a", "b", "end", "on", "r", "color", "group", "layer", "shade", "part", "of", "raw", "sq")}
+        p["joint"] = names[q["joint"]]
+        if q["ck"]:
+            p["color"] = pal[q["ck"]]
+        if build != 1 and build and q["group"].startswith(("torso", "leg", "arm")):
+            p["r"] = q["r"] * build
+        parts.append(p)
+    return dict(rig, parts=parts)
+
+
+def characters_kit(character):
+    """The kit a character has as it comes (None for one that carries none)."""
+    from . import characters
+    return characters()[character]["mount"].get("kit")
+
+
 def rig_for(ch, pose):
     """The rig a pose belongs to: the character's, or for a soldier the one of the kit in the pose."""
     name = ch["id"]

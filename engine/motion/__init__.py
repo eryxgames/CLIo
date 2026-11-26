@@ -34,7 +34,10 @@ RATE = 12.0                                                  # poses kept for a 
 STEP = 1 / 60.0                                              # the step the motion core is run at
 # the blows that floor a body, so that not all fall alike: from the front, and from either side of it
 FALLS = ((-2.4, 1.0, 0.0), (-2.0, 1.1, 1.3), (-2.0, 1.1, -1.3))
-KEYS = ("character", "kit", "style", "clips", "detail", "scale", "armed")
+KEYS = ("character", "kit", "style", "clips", "detail", "scale", "armed", "wear", "build", "height")
+TALL = 1.70                                                  # metres to the top of a person's head, as the body is
+HEIGHT = {"woman": 1.61}                                     # how tall one is unless "height" says (the others: TALL)
+BUILD, HEIGHTS = (0.6, 1.6), (1.0, 2.3)                      # what "build" and "height" may be
 
 _lib = None
 _recorded = {}            # (character, kit, style, armed, clip) -> the clip as the library records it
@@ -156,6 +159,7 @@ def problems(name, spec, where="models.json"):
     if m.get("kit") is not None and m["kit"] not in kits:
         carries = "the %s carries one of: %s" % (cid, ", ".join(kits)) if kits else "the %s carries no kit" % cid
         out.append("%s: model '%s': motion kit '%s' - %s" % (where, name, m["kit"], carries))
+    out.extend("%s: model '%s': %s" % (where, name, said) for said in _look_problems(cid, m))
     has = lib().clips.names(ch)
     clips = m.get("clips")
     if clips is not None and (not isinstance(clips, list) or not all(isinstance(c, str) for c in clips)):
@@ -179,14 +183,94 @@ def problems(name, spec, where="models.json"):
             groups = {p["group"] for p in Moves(spec).model["parts"]}
         except ValueError as e:
             return ["%s: model '%s': %s" % (where, name, e)]
-    for key in (spec.get("colors") or {}) if isinstance(spec.get("colors"), dict) else ():
-        if not out and key not in groups and not str(key).startswith("#"):
-            out.append("%s: model '%s': colors names '%s', which is neither a colour of the %s nor one of its groups (%s)"
-                       % (where, name, key, cid, ", ".join(sorted(groups))))
+    named = _named_colours(cid)
+    for key, value in (spec.get("colors") or {}).items() if isinstance(spec.get("colors"), dict) else ():
+        if not out and key not in groups and key not in named and not str(key).startswith("#"):
+            out.append("%s: model '%s': colors names '%s', which is neither a colour of the %s nor one of its groups (%s)%s"
+                       % (where, name, key, cid, ", ".join(sorted(groups)),
+                          " nor one of its colours by name (%s)" % ", ".join(named) if named else ""))
+        elif key in named and not (isinstance(value, str) and _HEX.match(value)):
+            out.append("%s: model '%s': colors '%s' should be a colour like \"#b3202e\"" % (where, name, key))
     return out
 
 
-PEOPLE = ("person", "commuter", "traveller", "technician", "scientist", "hazmat")    # a crowd of people: these, mixed
+_HEX = __import__("re").compile(r"^#[0-9a-fA-F]{6}$")
+
+
+def _named_colours(character):
+    """The colours a person has by name (skin, hair, top, suit, skirt, shoe...); none for any other character."""
+    W = lib().rig.wardrobe()
+    return tuple(W["colours"]) if character in W["people"] else ()
+
+
+def _look_problems(character, m):
+    """What is wrong with a motion's "wear", "build" and "height", in words."""
+    out = []
+    W = lib().rig.wardrobe()
+    person = character in W["people"]
+    for key in ("wear", "build", "height"):
+        if m.get(key) is not None and not person:
+            out.append("motion %s is for people who are not soldiers (%s); the %s has none" % (key, ", ".join(sorted(W["people"])), character))
+    if not person:
+        return out
+    wear = m.get("wear")
+    if wear is not None and not isinstance(wear, dict):
+        out.append('motion wear should be an object, like {"skirt": "knee", "hair": "bun"}')
+    for k, v in (wear.items() if isinstance(wear, dict) else ()):
+        if k not in W["options"]:
+            out.append("motion wear does not know '%s' (it takes: %s)" % (k, ", ".join(W["options"])))
+        else:
+            v = "on" if v is True else "none" if v is False else v
+            if v not in W["options"][k]:
+                out.append("motion wear %s is one of: %s" % (k, ", ".join(W["options"][k])))
+    for key, (lo, hi) in (("build", BUILD), ("height", HEIGHTS)):
+        v = m.get(key)
+        if v is not None and not (isinstance(v, (int, float)) and not isinstance(v, bool) and lo <= v <= hi):
+            out.append("motion %s should be a number from %s to %s%s" % (key, lo, hi, " (metres)" if key == "height" else ""))
+    return out
+
+
+# a crowd of people: these, mixed (CLIo's recipes for them)
+PEOPLE = ("person", "commuter", "traveller", "technician", "scientist", "hazmat", "woman", "woman_in_red", "tourist")
+ANYONE = "anyone"                 # in a crowd: people nobody has seen before, each made up (anyone())
+_SKIN = ("#f1c9a5", "#dcae8e", "#c68e68", "#a56b46", "#7a4a2e", "#4f2f1f")
+_HAIR = ("#17120f", "#3a2a1f", "#5a3620", "#8a5a2e", "#c9a24a", "#8d8f93", "#a23a1e")
+_CLOTH = ("#b3202e", "#d8793a", "#e3c62f", "#3f7a4d", "#2f6690", "#4c5a73", "#3b4252", "#6a4a7c", "#8a5a78", "#eef0f2",
+          "#22252b", "#b9a57e", "#6b4a2f")
+_SHOE = ("#1e1e22", "#2c2622", "#8a8f96", "#6b4a2f", "#eef0f2")
+
+
+def anyone(rng):
+    """A person made up: a model's spec (``{"motion": {...}, "colors": {...}}``) for a man or a woman of some
+    height and build, in clothes of some colours, now and then with a cap, a coat, a skirt, a backpack, a case.
+    ``rng`` is a ``random.Random``: the same one gives the same people."""
+    woman = rng.random() < 0.5
+    wear = {"hair": rng.choice(("long", "long", "bun", "tail", "short") if woman else ("short", "short", "short", "none", "tail"))}
+    skin = rng.choice(_SKIN)
+    colors = {"skin": skin, "glove": skin, "hair": rng.choice(_HAIR), "top": rng.choice(_CLOTH), "suit": rng.choice(_CLOTH),
+              "shoe": rng.choice(_SHOE)}
+    if rng.random() < 0.2:
+        wear["hat"] = "cap"
+        colors["hat"] = rng.choice(_CLOTH)
+    if rng.random() < 0.3:
+        wear["sleeves"] = "short"
+    if woman and rng.random() < 0.45:
+        wear.update(skirt=rng.choice(("short", "knee", "knee", "long")), legs="bare")
+        if rng.random() < 0.5:
+            colors["skirt"] = rng.choice(_CLOTH)
+    elif rng.random() < 0.2:
+        wear["legs"] = "short"
+    if rng.random() < 0.15:
+        wear["coat"] = "long"
+    if rng.random() < 0.2:
+        wear["pack"] = "on"
+        colors["pack"] = rng.choice(_CLOTH)
+    m = {"character": "woman" if woman else "person", "wear": wear, "build": round(rng.uniform(0.85, 1.25), 2),
+         "height": round((1.52 if woman else 1.62) + rng.uniform(0.0, 0.22), 2)}
+    roll = rng.random()
+    if roll < 0.3:
+        m["kit"] = "case" if roll < 0.2 else "trolley"
+    return {"motion": m, "colors": colors}
 
 
 def spec_named(name, models=None):
@@ -264,6 +348,17 @@ class Moves:
         self.metre = float(m.get("scale", METRE))
         if not self.metre > 0:
             raise ValueError("motion scale should be above 0")
+        # a person dressed otherwise, of another build or height (the body is one size: a height is a scale)
+        said = _look_problems(self.character, m)
+        if said:
+            raise ValueError(said[0])
+        named = _named_colours(self.character)
+        tints = {k: v for k, v in (spec.get("colors") or {}).items() if k in named} if isinstance(spec.get("colors"), dict) else {}
+        self.wear, self.build = dict(m.get("wear") or {}), float(m.get("build") or 1.0)
+        self.look = ((tuple(sorted(self.wear.items())), tuple(sorted(tints.items())), self.build)
+                     if named and (self.wear or tints or self.build != 1.0) else None)
+        if named:
+            self.metre *= float(m.get("height") or HEIGHT.get(self.character, TALL)) / TALL
         has = cm.clips.names(ch)
         asked = m.get("clips")
         if asked is not None:
@@ -275,7 +370,7 @@ class Moves:
         self.swims = bool(ch.get("octo")) and "swim" in self.clip_names
         self.key = (self.character, self.kit, tuple(sorted(style.items())), self.armed)
         self.falls = {}                                   # a monster's id -> the way it faced when it fell
-        self.shape = self.key + (detail,)
+        self.shape = self.key + (detail, self.look)
         got = _models.get(self.shape)
         if got is None:
             # the character standing, its weapons in hand: what the model is at rest
@@ -287,6 +382,8 @@ class Moves:
                 del S.events[:]
             pose = cm.clips.shift_pose(pose, -S.px, 0.0, -S.pz)
             rig = cm.rig.rig_for(ch, pose)
+            if self.look is not None:
+                rig = cm.rig.dressed(rig, self.wear, tints, self.build)
             sides, thin = DETAIL[detail]
             got = _models[self.shape] = (cm.mesh.build(rig, sides=sides, thin=thin), rig, pose)
         self.model, self.rig, standing = got
@@ -413,7 +510,7 @@ class Moves:
             base = "jab"                                  # people in plain clothes have fists, and no other weapon
         elif base not in self.clip_names:
             return None
-        mine = (self.shape if not lines else self.key + ("lines",), self.metre, name)
+        mine = (self.shape if not lines else self.shape + ("lines",), self.metre, name)
         if mine in _posed:
             return _posed[mine]
         key = self.key + (name,)

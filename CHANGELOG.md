@@ -7,9 +7,9 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 ### Added
 
 - **Models moved by CLIo Motion**: a model with `"motion"` (`"hound": {"motion": "hyena"}`) is one
-  of sixteen characters that walk by rule - a soldier with three kits, two machines, a hound, a
+  of seventeen characters that walk by rule - a soldier with three kits, two machines, a hound, a
   horse, a raptor, a scorpion, a mantis, a wasp, a dragon, an octopus, a plain four-legged
-  one, and four people for a crowd. Its shape is the character's stand-in and its clips (`idle`, `walk`, `run`, `attack`,
+  one, and five people for a crowd. Its shape is the character's stand-in and its clips (`idle`, `walk`, `run`, `attack`,
   `hit`, `die`, or any of the character's own) are worked out when first asked for, so the
   game's files hold none. In a level its monster strides, runs if it is fast, aims and fires
   or bites, staggers when hit, falls as a rag doll in one of three ways and lies where it fell
@@ -36,6 +36,14 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   their corners go to CLIo Picture as they are - with both, a thousand live bodies are about
   45 ms a frame where two hundred took 135 ms in Python. Checked against the Python when it is
   loaded; nothing needs it.
+- **Anyone at all** (CLIo Motion 0.27): a fifth person, `woman`, and for all five `"wear"`
+  (hair, a hat, a hood, a coat, a skirt, short sleeves, bare legs, a backpack, boots, a man's
+  body or a woman's), `"colors"` by name (`skin`, `hair`, `top`, `suit`, `skirt`, `shoe`...),
+  `"build"` and `"height"` in a model's `"motion"`. `--add model woman|woman_in_red|tourist`;
+  `--crowd anyone` and `{"crowd": "anyone"}` in a demo's clip are people made up, no two
+  alike, and the tech demo's yard of people is of them. The Gait Bench's panel "Who it is"
+  writes the line for `models.json`. (The library CLIo follows, 0.26.0, has no `woman`: she is
+  stepped in Python until CLIo follows 0.27.0.)
 - **People for a crowd** (CLIo Motion 0.26): four more characters - `person`, `technician`,
   `scientist`, `hazmat` - who are the soldier's body in plain clothes, an overall and hard hat,
   a lab coat or a hazmat suit, with `"kit"`: `"hands"`, `"case"` or `"trolley"` (a case on

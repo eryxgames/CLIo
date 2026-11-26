@@ -2515,7 +2515,35 @@ labelled as a sprite is. Model space: x to the right, y forward, z up; one unit 
   traveller, and `"colors"` makes one of them many (`{"torso": "#7a2e2e", "leg0": "#2b2b2b",
   "leg1": "#2b2b2b"}`). They carry no weapon: a soldier's kits are refused them, as theirs are
   a soldier; a monster with such a model that attacks throws a jab, and run live they attack
-  nobody. `python clio.py --crowd people` is a yard of all six of CLIo's.
+  nobody. `python clio.py --crowd people` is a yard of all of CLIo's.
+
+  **Anyone at all.** A fifth, `woman`, is the same skeleton with a body and hair of her own,
+  and each of the five can be dressed otherwise, built otherwise and of another height:
+
+  ```json
+  "woman_in_red": {"motion": {"character": "woman", "height": 1.64, "build": 0.94,
+                              "wear": {"skirt": "knee", "legs": "bare", "sleeves": "short"}},
+                   "colors": {"top": "#b3202e", "shoe": "#8f1a26", "hair": "#2a1a14"}}
+  ```
+
+  - `"wear"`, over what the character wears as it comes: `shape` (`m`, `f`), `hair` (`none`,
+    `short`, `long`, `bun`, `tail`), `hat` (`none`, `hard`, `cap`), `hood`, `coat` (`none`,
+    `lab`, `long`), `skirt` (`none`, `short`, `knee`, `long` - a dress is a skirt the colour of
+    the top), `sleeves` (`long`, `short`), `legs` (`long`, `short`, `bare`), `band`, `tank`,
+    `pack`, `boots` (each `none` or `on`; `true` and `false` do too) and `box` (`brief`,
+    `tool`: what a case in the hand is).
+  - `"colors"` by name: `skin`, `hair`, `top`, `suit` (the trousers), `skirt`, `shoe`, `glove`,
+    `hat`, `band`, `pack`, `box`, `trim` - beside the groups and the model's own colours, which
+    go on working.
+  - `"build"`: how thick the body is, 0.6 to 1.6 (1 as drawn). `"height"`: metres to the top
+    of the head (a man is 1.70 and a woman 1.61 unless it says); the body is one size and a
+    height is a scale, so a short person takes short steps.
+
+  The Gait Bench's panel "Who it is" shows all of this moving and writes the line to paste
+  here. `--add model woman|woman_in_red|tourist` are three ready-made, and a crowd of
+  `anyone` - `python clio.py --crowd anyone --count 40`, or `{"crowd": "anyone", "count": 24,
+  "seed": 3}` in a demo's clip - is people made up, no two alike (twenty kinds at most in one
+  yard; the same seed, the same people).
 
   In Python a live body costs about 0.12 ms a step (0.3 ms when it is in sight and its corners
   are wanted). **CLIo Motion's C core** steps it thirty to forty times as fast, the same to
@@ -2538,7 +2566,7 @@ labelled as a sprite is. Model space: x to the right, y forward, z up; one unit 
   which also makes clips for other engines and has the characters' templates for artists.
   `python clio.py GAME --add model soldier` (or `hound`, `walker`, and the people: `person`,
   `commuter` with a briefcase, `traveller` with a case on wheels, `technician`, `scientist`,
-  `hazmat`) puts one in a game.
+  `hazmat`, `woman`, `woman_in_red`, `tourist`) puts one in a game.
 
 `--check` checks the shapes, sizes, materials and mesh of every model, what a model's
 `"motion"` asks for, and that what names a model has one.
@@ -3156,7 +3184,7 @@ console of CLIo's own into your game: its simulator into `sims.json`, the models
 panels show (where your game has none by that name), and a scene that runs it, reached from
 your first scene, that sets the flag `reactor_done` when it is done and comes back. There are
 `reactor`, `scan`, `helm`, `bay` and `approach`; `--as ID` gives it a name of your own;
-`--add menu wheel|ring|bar` and `--add model door|beacon|hauler|soldier|hound|walker|person|commuter|traveller|technician|scientist|hazmat` do the same for a menu and a
+`--add menu wheel|ring|bar` and `--add model door|beacon|hauler|soldier|hound|walker|person|commuter|traveller|technician|scientist|hazmat|woman|woman_in_red|tourist` do the same for a menu and a
 model; `--add console list` says what there is. Nothing your game has is changed or replaced,
 and the game is checked afterwards. `python -m engine.panels --gallery` shows every widget once
 with the JSON that makes it.

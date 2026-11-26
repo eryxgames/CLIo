@@ -115,7 +115,9 @@ def problems(spec, data=None, where="demo.json"):
             from . import motion
             table = dict(table or {})
             for n in names:
-                if n not in table and isinstance(n, str) and motion.spec_named(n) is not None:
+                if n == motion.ANYONE:                     # people made up for the yard
+                    table[n] = {"motion": "person"}
+                elif n not in table and isinstance(n, str) and motion.spec_named(n) is not None:
                     table[n] = motion.spec_named(n)
             if len(names) > MOST_KINDS:
                 out.append("%s: a crowd is of %d kinds at most" % (at, MOST_KINDS))
@@ -481,14 +483,23 @@ class Player:
         from .firstperson import FX, View
         from .level import Level, TextConsole
         data = self.data(clip)
-        names = [clip["crowd"]] if isinstance(clip["crowd"], str) else list(clip["crowd"])[:MOST_KINDS]
-        specs = {}
-        for n in names:                                    # the game's model, a character as it comes, or a recipe's
+        asked = [clip["crowd"]] if isinstance(clip["crowd"], str) else list(clip["crowd"])[:MOST_KINDS]
+        count = max(1, min(MOST_CROWD, int(clip.get("count", 12))))
+        names, specs = [], {}
+        for n in asked:                                    # the game's model, a character as it comes, or a recipe's
+            if n == motion.ANYONE and n not in (data.models or {}):
+                import random                              # people made up, as many kinds as there is room for
+                rng = random.Random(int(clip.get("seed", 1)))
+                for i in range(max(1, min(count, MOST_KINDS - len(asked) + 1))):
+                    names.append("someone %d" % (i + 1))
+                    specs[names[-1]] = motion.anyone(rng)
+                continue
+            names.append(n)
             specs[n] = motion.spec_named(n, data.models)
             if specs[n] is None:
                 raise KeyError(n)
-        name = names[0] if len(names) == 1 else "bodies of %d kinds" % len(names)
-        count = max(1, min(MOST_CROWD, int(clip.get("count", 12))))
+        name = (names[0] if len(names) == 1 else "people, no two alike" if asked == [motion.ANYONE] and count <= len(names)
+                else "people of %d kinds" % len(names) if asked == [motion.ANYONE] else "bodies of %d kinds" % len(names))
         yard = _Yard(data, names, count, specs)
         lv = Level(yard, "_yard", seed=1)
         lv.console = TextConsole(lambda _t: None, None)

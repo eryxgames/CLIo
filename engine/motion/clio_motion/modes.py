@@ -380,6 +380,8 @@ def _stowed_props(S, ch, root, chest, u, f, zc):
             pl = _b._mix_place(_b._stow_place(kind, i, root, u, f, zc), _b._ready_place(kind, i, chest, u, f, 0, 0), S.armed.x)
             w = _b.prop_at(kind, pl["o"], pl["th"], pl["z"])
             w["stow"] = 1 - S.armed.x
+            if not S.ammo[i] > 0:
+                _b.unload(w)
             props.append(w)
     return props
 

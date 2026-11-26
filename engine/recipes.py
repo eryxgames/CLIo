@@ -76,6 +76,12 @@ MODELS = {
     "gunner": ("a heavy gunner in armour with a chaingun at the hip, moved by CLIo Motion", {"motion": "gunner"}),
     "twin_gunner": ("a heavy gunner with a chaingun in each hand", {"motion": {"character": "gunner", "kit": "chainguns"}}),
     "commando": ("a jungle commando - bare arms, a headband, a belt of rounds - with a chaingun", {"motion": "commando"}),
+    "shotgunner": ("a trooper with a shotgun, pumped between shots",
+                   {"motion": {"character": "soldier", "kit": "shotgun"}, "colors": {"#e2711d": "#3d7cc0", "#b9581a": "#2c5d94"}}),
+    "rocketeer": ("a trooper with a rocket launcher on the shoulder: steadied, fired, loaded again",
+                  {"motion": {"character": "soldier", "kit": "rpg"}, "colors": {"#e2711d": "#6b7a3a", "#b9581a": "#4d5a2c"}}),
+    "flamethrower": ("a heavy trooper with a flamethrower, its tanks on the back",
+                     {"motion": {"character": "gunner", "kit": "flamer"}, "colors": {"#5d6a66": "#8a3b24"}}),
     # people for a crowd (CLIo Motion's four who are not soldiers, and what they carry)
     "person": ("a person in plain clothes moved by CLIo Motion: walks, runs, staggers, falls and lies", {"motion": "person"}),
     "commuter": ("a person with a briefcase in the hand", {"motion": {"character": "person", "kit": "case"}}),

@@ -23,7 +23,7 @@ from .modes import (Ladder, dismount, enter_fly, enter_ladder, enter_swim, grab_
 from .kernel import (G, TAU, GaitState, Spring, clamp, decay, ease, frac, gait_params, idle_noise, idle_period,
                      ik2, lerp, lob, reach_chain, smooth, wrap_pi)
 
-__version__ = "0.28.0"
+__version__ = "0.29.0"
 __all__ = ["rig", "clips", "mesh", "native", "G", "TAU", "GaitState", "STYLE", "Spring", "State", "characters", "kit_fits", "kits_of", "create_state", "step_ground", "step", "upper_body", "start_reload", "pose_to_world", "KITS", "PROPS", "Ladder", "enter_fly", "enter_ladder", "enter_swim", "grab_ledge", "leave_fly", "leave_ladder", "leave_swim", "place", "stand", "mount_up", "dismount",
            "step_fly", "step_ladder", "step_ledge", "step_swim", "clamp", "decay", "ease", "frac", "gait_params",
            "idle_noise", "idle_period", "ik2", "lerp", "lob", "reach_chain", "smooth", "wrap_pi"]

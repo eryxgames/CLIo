@@ -44,6 +44,15 @@ PROPS = {
                  "magB": [0.30, -0.24], "kick": 0.32, "rise": 0.5, "rounds": 200, "reload": 3.2, "seat": 0.80},
     "sidegun": {"len": 1.05, "body": 0.50, "grip": [0.10, -0.07], "gripLow": [0.08, -0.16], "fore": None, "magA": [0.30, -0.07],
                 "magB": [0.30, -0.24], "kick": 0.32, "rise": 0.5, "rounds": 150, "reload": 3.2, "seat": 0.80},
+    # a shotgun: shouldered as a rifle is, its fore-end worked back and forward after every shot; 'magA' to 'magB' is a shell at
+    # the port. a launcher: a tube on the right shoulder; 'magA' to 'magB' is the rocket in its mouth (inside the tube when there
+    # is none: 'back'). a flamethrower: a lance at the hip, fed from the tanks on the back; 'magA' to 'magB' is its canister
+    "shotgun": {"len": 0.95, "body": 0.50, "grip": [0.26, -0.06], "gripLow": [0.245, -0.115], "fore": [0.58, -0.045], "magA": [0.42, -0.035],
+                "magB": [0.42, -0.08], "kick": 3.4, "rise": 10, "rounds": 8, "reload": 2.2, "seat": 0.80, "pump": 0.10},
+    "launcher": {"len": 0.95, "body": 0.30, "grip": [0.50, -0.07], "gripLow": [0.49, -0.16], "fore": [0.68, -0.06], "magA": [0.92, 0],
+                 "magB": [1.14, 0], "kick": 2.2, "rise": 3, "rounds": 1, "reload": 2.8, "seat": 0.78, "back": 0.62},
+    "flamer": {"len": 0.90, "body": 0.42, "grip": [0.10, -0.07], "gripLow": [0.08, -0.16], "fore": [0.40, -0.06], "magA": [0.22, -0.06],
+               "magB": [0.22, -0.20], "kick": 0.04, "rise": 0, "rounds": 120, "reload": 3.0, "seat": 0.80},
 }
 # civil: a kit for people who are not soldiers (and only for them); it is in the hand whether or not weapons are asked for.
 # pace: the fastest it can be taken along, as a Froude number's root (1 is a hurried jog)
@@ -54,7 +63,21 @@ KITS = {"rifle": {"props": ["rifle"], "rate": 9}, "pistols": {"props": ["pistol"
         # spin: seconds a chaingun's barrels take to come up to speed once the trigger is pulled - let go of it and they must
         # come up again. bodyKick: how hard each round pushes the body back, where that is not the body's own (0.5)
         "chaingun": {"props": ["chaingun"], "rate": 22, "spin": 0.35, "pace": 0.85, "bodyKick": 0.10},
-        "chainguns": {"props": ["sidegun", "sidegun"], "rate": 30, "spin": 0.35, "pace": 0.70, "bodyKick": 0.10}}
+        "chainguns": {"props": ["sidegun", "sidegun"], "rate": 30, "spin": 0.35, "pace": 0.70, "bodyKick": 0.10},
+        # a shotgun kicks hard and is pumped between shots; a launcher is steadied for a moment before it fires (its spin) and is
+        # loaded again as soon as it has (auto); a flamethrower is a stream of puffs for as long as the trigger is held
+        "shotgun": {"props": ["shotgun"], "rate": 1.4, "bodyKick": 0.9},
+        "rpg": {"props": ["launcher"], "rate": 0.5, "spin": 0.45, "pace": 0.85, "bodyKick": 1.3, "auto": True},
+        "flamer": {"props": ["flamer"], "rate": 14, "pace": 0.80, "bodyKick": 0.02, "stream": True}}
+
+
+def unload(w):
+    """An empty launcher has no rocket in its mouth: the one it is drawn with is drawn back inside the tube, out of sight."""
+    bk = PROPS[w["kind"]].get("back")
+    if bk:
+        for k in range(3):
+            w["magA"][k] -= w["dir"][k] * bk
+            w["magB"][k] -= w["dir"][k] * bk
 
 
 def kit_fits(ch, name):
@@ -119,7 +142,7 @@ def prop_at(kind, o, th, z):
 
 def _stow_place(kind, k, root, u, f, zc):
     down = math.atan2(-u[1], -u[0])
-    if kind == "rifle":         # muzzle down across the back
+    if kind in ("rifle", "shotgun", "launcher", "flamer"):         # muzzle down across the back
         return {"o": [root[0] + 0.65 * u[0] - 0.22 * f[0], root[1] + 0.65 * u[1] - 0.22 * f[1]], "th": down, "z": zc - 0.02}
     if kind == "chaingun":      # the same, and more of it
         return {"o": [root[0] + 0.72 * u[0] - 0.25 * f[0], root[1] + 0.72 * u[1] - 0.25 * f[1]], "th": down, "z": zc - 0.02}
@@ -138,13 +161,16 @@ def _stow_place(kind, k, root, u, f, zc):
 
 
 def _ready_place(kind, k, chest, u, f, W, kick):
-    if kind == "rifle":
+    if kind in ("rifle", "shotgun"):
         a = kick - 0.15                                      # the butt sits in the shoulder pocket
         return {"o": [chest[0] - 0.11 * u[0] + 0.10 * f[0] + math.cos(W) * a, chest[1] - 0.11 * u[1] + 0.10 * f[1] + math.sin(W) * a],
                 "th": W, "z": chest[2] + 0.04}
     # a chaingun is fired from the hip: it turns about a point in front of the right hip, and recoil drives it straight back.
     # One of a pair is out at its own side
-    if kind == "chaingun":
+    if kind == "launcher":      # a launcher lies on the right shoulder, two fifths of it behind
+        return {"o": [chest[0] + 0.06 * u[0] + math.cos(W) * (kick - 0.42), chest[1] + 0.06 * u[1] + math.sin(W) * (kick - 0.42)],
+                "th": W, "z": chest[2] + 0.16}
+    if kind in ("chaingun", "flamer"):
         return {"o": [chest[0] - 0.36 * u[0] + 0.10 * f[0] + math.cos(W) * (kick - 0.30), chest[1] - 0.36 * u[1] + 0.10 * f[1] + math.sin(W) * (kick - 0.30)],
                 "th": W, "z": chest[2] + 0.13}
     if kind == "sidegun":
@@ -230,6 +256,8 @@ def _fire_control(S, ch, inp, dt):
     S.rise.v += D["rise"]
     S.lean.v -= (kit and kit.get("bodyKick")) or m.get("bodyKick") or 0.5
     S.events.append({"type": "fire", "gun": g})
+    if kit and kit.get("auto") and S.ammo[g] == 0:           # a launcher is loaded again as soon as it has fired
+        start_reload(S, ch)
 
 
 def _fold_half(a):
@@ -508,11 +536,11 @@ def upper_body(S, ch, inp, st, dt, legs, B):
         for i, kind in enumerate(kit["props"]):
             rel = rs if an == "reload" and act["gun"] == i else -1
             Wi, slide = W, 0
-            if kind == "rifle" and rel >= 0:                 # muzzle dips while the hand is away
+            if kind in ("rifle", "shotgun", "launcher") and rel >= 0:                 # muzzle dips while the hand is away
                 Wi -= 0.32 * smooth(0, 0.12, rel) * (1 - smooth(0.84, 1, rel))
-            if kind == "rifle":
+            if kind in ("rifle", "shotgun", "launcher"):
                 Wi -= 0.45 * tk
-            if kind in ("chaingun", "sidegun") and rel >= 0:     # a new belt: the muzzle goes down while it is fed in
+            if kind in ("chaingun", "sidegun", "flamer") and rel >= 0:     # a new belt: the muzzle goes down while it is fed in
                 Wi -= 0.5 * smooth(0, 0.15, rel) * (1 - smooth(0.8, 1, rel))
             place = _ready_place(kind, i, chest, u, f, Wi, S.kick[i].x)
             if kind == "pistol" and rel >= 0:
@@ -561,16 +589,26 @@ def upper_body(S, ch, inp, st, dt, legs, B):
             if slide:
                 w["magA"] = [w["magA"][0] - w["up"][0] * slide, w["magA"][1] - w["up"][1] * slide, w["magA"][2]]
                 w["magB"] = [w["magB"][0] - w["up"][0] * slide, w["magB"][1] - w["up"][1] * slide, w["magB"][2]]
+            if not S.ammo[i] > 0:
+                unload(w)
             props.append(w)
     # hands: the right hand holds prop 0; the left holds prop 1, or the foregrip of a two-handed prop
     if props:
         hold[0] = props[0]["grip"]
         hold[1] = props[1]["grip"] if len(props) > 1 else props[0]["fore"]
-    if an == "reload" and act["gun"] == 0 and props and props[0]["kind"] == "rifle":
+    # a shotgun's fore-end is worked back and forward between shots
+    if props and props[0]["kind"] == "shotgun" and hold[1] and S.cool > 0 and an != "reload":
+        pm = PROPS["shotgun"]["pump"] * math.sin(math.pi * smooth(0.12, 0.70, 1 - S.cool * kit["rate"]))
+        d0 = props[0]["dir"]
+        hold[1] = [hold[1][0] - d0[0] * pm, hold[1][1] - d0[1] * pm, hold[1][2] - d0[2] * pm]
+    if an == "reload" and act["gun"] == 0 and props and props[0]["kind"] in ("rifle", "shotgun", "launcher"):
         # reloading the rifle: the off hand leaves the foregrip, takes the magazine to the pouch on the hip, comes back
         # with a fresh one, seats it and returns.  Every waypoint is a live point, so it works on the move.
         w0 = props[0]
         nn, seat, mlen, kq, mag_held = w0["up"], w0["magB"], 0.115, 0, True
+        bk = PROPS[w0["kind"]].get("back")
+        if bk and not S.ammo[0] > 0:                           # an empty launcher is loaded at its mouth
+            seat = [seat[0] + w0["dir"][0] * bk, seat[1] + w0["dir"][1] * bk, seat[2] + w0["dir"][2] * bk]
         pouch = [root[0] + 0.10 * u[0] + 0.12 * f[0], root[1] + 0.10 * u[1] + 0.12 * f[1], root[2] - 0.16]
         below = [seat[0] - 0.07 * nn[0], seat[1] - 0.07 * nn[1], seat[2]]
         if rs < 0.16:
@@ -592,6 +630,8 @@ def upper_body(S, ch, inp, st, dt, legs, B):
             hp = _lerp3(below, seat, smooth(0.74, 0.80, rs))
         else:
             hp = _lerp3(seat, w0["fore"], smooth(0.80, 1, rs))
+            mag_held = False
+        if w0["kind"] == "launcher" and rs < 0.40:           # there is nothing in its mouth to take out: the hand goes empty
             mag_held = False
         hold[1] = hp
         if mag_held:

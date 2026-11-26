@@ -7,7 +7,7 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 ### Added
 
 - **Models moved by CLIo Motion**: a model with `"motion"` (`"hound": {"motion": "hyena"}`) is one
-  of nineteen characters that walk by rule - three soldiers and their five weapons, two
+  of nineteen characters that walk by rule - three soldiers and their eight weapons, two
   machines, a hound, a horse, a raptor, a scorpion, a mantis, a wasp, a dragon, an octopus, a
   plain four-legged one, and five people for a crowd. Its shape is the character's stand-in and
   its clips (`idle`, `walk`, `run`, `attack`,
@@ -37,6 +37,11 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   their corners go to CLIo Picture as they are - with both, a thousand live bodies are about
   45 ms a frame where two hundred took 135 ms in Python. Checked against the Python when it is
   loaded; nothing needs it.
+- **Troopers** (CLIo Motion 0.29): three more weapons for any body that bears arms -
+  `"shotgun"` (pumped between shots), `"rpg"` (a launcher steadied, fired and loaded again)
+  and `"flamer"` (a flamethrower, its tanks on the back). `--add model
+  shotgunner|rocketeer|flamethrower`. A body run live holds the trigger as each needs: till
+  the launcher has fired, through a burst of flame.
 - **Gunners** (CLIo Motion 0.28): `gunner` and `commando`, two more bodies that bear arms, and
   two more weapons, `"chaingun"` and `"chainguns"`. Any armed body now carries any weapon
   (`{"character": "soldier", "kit": "chainguns"}`, `{"character": "commando", "kit":

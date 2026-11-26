@@ -2463,7 +2463,7 @@ labelled as a sprite is. Model space: x to the right, y forward, z up; one unit 
 
   `"colors"` repaints it: by one of its groups (`torso`, `head`, `leg0`, `arm1`, `prop0`, `tail`,
   `body`... - `--view-model`'s structure view shows them) or by one of its own colours
-  (`"#c26a1e": "#3b6ea8"`). Its two materials are `body` and `glow` (eyes, lamps); give either
+  (`"#e2711d": "#3b6ea8"`). Its two materials are `body` and `glow` (eyes, lamps); give either
   in `"materials"` to change it, and a material named after a group is used for that group.
 
   In a level, a monster with such a model strides while it moves (runs, if it comes two cells a
@@ -2508,8 +2508,12 @@ labelled as a sprite is. Model space: x to the right, y forward, z up; one unit 
   **Soldiers and their weapons.** Three bodies bear arms - `soldier`, `gunner` (heavy armour,
   shoulder pads, a drum of ammunition on the back) and `commando` (bare arms, a headband, a
   belt of rounds) - and any of them carries any weapon: `"kit"` is `"rifle"`, `"pistols"`,
-  `"sword"` (with a shield), `"chaingun"` (fired from the hip, both hands on it) or
-  `"chainguns"` (one in each hand). A soldier comes with the rifle and the other two with the
+  `"sword"` (with a shield), `"chaingun"` (fired from the hip, both hands on it),
+  `"chainguns"` (one in each hand), `"shotgun"` (eight shells; the fore-end is pumped between
+  shots), `"rpg"` (a launcher on the shoulder: steadied for half a second, fired, and loaded
+  again at once with a rocket brought up from the hip) or `"flamer"` (a flamethrower at the
+  hip, its two tanks on the back in place of the pack; a stream for as long as the trigger is
+  held, and walked with). A soldier comes with the rifle and the other two with the
   chaingun. A chaingun's barrels take a third of a second to come up before the first round,
   so its `attack` clip is a second long - the wait, then the burst - and a body run live holds
   the trigger that long; it is carried at a jog at most, and a pair at a walk.
@@ -2575,7 +2579,7 @@ labelled as a sprite is. Model space: x to the right, y forward, z up; one unit 
   Python, nothing to install); it is [CLIo Motion](https://github.com/eryxgames/clio-motion),
   which also makes clips for other engines and has the characters' templates for artists.
   `python clio.py GAME --add model soldier` (or `hound`, `walker`, `gunner`, `twin_gunner`,
-  `commando`, and the people: `person`,
+  `commando`, `shotgunner`, `rocketeer`, `flamethrower`, and the people: `person`,
   `commuter` with a briefcase, `traveller` with a case on wheels, `technician`, `scientist`,
   `hazmat`, `woman`, `woman_in_red`, `tourist`) puts one in a game.
 
@@ -3195,7 +3199,7 @@ console of CLIo's own into your game: its simulator into `sims.json`, the models
 panels show (where your game has none by that name), and a scene that runs it, reached from
 your first scene, that sets the flag `reactor_done` when it is done and comes back. There are
 `reactor`, `scan`, `helm`, `bay` and `approach`; `--as ID` gives it a name of your own;
-`--add menu wheel|ring|bar` and `--add model door|beacon|hauler|soldier|hound|walker|gunner|twin_gunner|commando|person|commuter|traveller|technician|scientist|hazmat|woman|woman_in_red|tourist` do the same for a menu and a
+`--add menu wheel|ring|bar` and `--add model door|beacon|hauler|soldier|hound|walker|gunner|twin_gunner|commando|shotgunner|rocketeer|flamethrower|person|commuter|traveller|technician|scientist|hazmat|woman|woman_in_red|tourist` do the same for a menu and a
 model; `--add console list` says what there is. Nothing your game has is changed or replaced,
 and the game is checked afterwards. `python -m engine.panels --gallery` shows every widget once
 with the JSON that makes it.

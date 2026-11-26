@@ -219,7 +219,7 @@ def record(ch, name, frames=8, fps=None, kit=None, style=None, armed=True, impul
             once("grab", {})
         elif S.kit == "sword":
             once("swing", {"kind": "slash"})
-        elif KITS.get(S.kit, {}).get("spin"):              # a chaingun: the trigger is held while the barrels come up
+        elif KITS.get(S.kit, {}).get("spin") or KITS.get(S.kit, {}).get("stream"):      # the trigger is held: a chaingun's barrels come up, a launcher is steadied, a flamethrower streams
             inp["fire"] = True
         else:
             inp["fire"] = True

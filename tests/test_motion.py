@@ -131,7 +131,7 @@ class People(unittest.TestCase):
                 said = model.problems({"a": {"motion": {"character": who, "kit": bad}}})
                 self.assertTrue(said and "carries one of: case, hands, trolley" in said[0], (who, said))
         said = model.problems({"a": {"motion": {"character": "soldier", "kit": "case"}}})
-        self.assertTrue(said and "carries one of: chaingun, chainguns, pistols, rifle, sword" in said[0], said)
+        self.assertTrue(said and "carries one of: chaingun, chainguns, flamer, pistols, rifle, rpg, shotgun, sword" in said[0], said)
 
     def test_they_are_dressed_differently(self):
         looks = {}
@@ -350,12 +350,12 @@ class Gunners(unittest.TestCase):
         self.assertGreater(max(abs(p[0]) for p in heavy.verts), 1.1 * max(abs(p[0]) for p in plain.verts))
 
     def test_any_weapon_in_any_armed_hands(self):
-        arms = ("chaingun", "chainguns", "pistols", "rifle", "sword")
+        arms = ("chaingun", "chainguns", "flamer", "pistols", "rifle", "rpg", "shotgun", "sword")
         for who in ("soldier", "gunner", "commando"):
             for kit in arms:
                 self.assertEqual(model.problems({"a": {"motion": {"character": who, "kit": kit}}}), [], (who, kit))
             said = model.problems({"a": {"motion": {"character": who, "kit": "case"}}})
-            self.assertTrue(said and "carries one of: chaingun, chainguns, pistols, rifle, sword" in said[0], said)
+            self.assertTrue(said and "carries one of: chaingun, chainguns, flamer, pistols, rifle, rpg, shotgun, sword" in said[0], said)
         said = model.problems({"a": {"motion": {"character": "person", "kit": "chaingun"}}})
         self.assertTrue(said and "carries one of: case, hands, trolley" in said[0], said)
         a = model.Model("a", {"motion": {"character": "soldier", "kit": "chainguns"}})
@@ -386,6 +386,31 @@ class Gunners(unittest.TestCase):
             got += [e for e in s.events if e == "fire" or (isinstance(e, dict) and e.get("type") == "fire")]
             del s.events[:]
         self.assertEqual(len(got), 1)
+
+    def test_the_troopers(self):
+        """A shotgun, a launcher, a flamethrower: recipes, clips, and the trigger held as each needs when run live."""
+        want = {"shotgunner": ("soldier", "shotgun", 0.5, 1, 1), "rocketeer": ("soldier", "rpg", 1.0, 1, 1),
+                "flamethrower": ("gunner", "flamer", 1.0, 5, 9)}
+        for name, (who, kit, long, least, most) in want.items():
+            spec = motion.spec_named(name)
+            self.assertEqual(model.problems({name: spec}), [], name)
+            m = model.Model(name, spec)
+            self.assertEqual((m.motion.character, m.motion.kit), (who, kit))
+            for clip in ("idle", "walk", "run", "attack", "hit", "die"):
+                self.assertIsNotNone(m.motion.clip(clip), (name, clip))
+            self.assertAlmostEqual(m.motion.clip("attack")[0], long, delta=0.1)
+            plain = model.Model("p", {"motion": {"character": who, "kit": kit}})
+            self.assertNotEqual({f[4] for f in m.faces}, {f[4] for f in plain.faces}, name)      # in colours of its own
+            a = motion.Actor(m, 1.0, 1.0, 0.0)
+            shots = []
+            for i in range(300):
+                a.step(1 / 60, speed=0.0, heading=0.0, attack=(i == 60))
+                shots += [i / 60.0 for e in a.events if e == "fire" or (isinstance(e, dict) and e.get("type") == "fire")]
+                del a.events[:]
+            self.assertTrue(least <= len(shots) <= most, (name, len(shots)))
+            self.assertLess(shots[-1], 1.0 + 0.7, name)                              # one attack, not a war
+        self.assertGreater(len(model.Model("f", motion.spec_named("flamethrower")).faces),      # its tanks on the back
+                           len(model.Model("g", {"motion": {"character": "gunner", "kit": "shotgun"}}).faces))
 
     def test_a_library_older_than_the_weapon_is_not_asked(self):
         class Old:                                        # stands in for a C library of before the chainguns

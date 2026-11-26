@@ -7,7 +7,7 @@ a horse, a raptor, a spider, a scorpion, a mantis, a wasp, a dragon, an octopus:
 
     "hound": {"motion": "hyena"}
     "guard": {"motion": {"character": "soldier", "kit": "pistols", "style": {"bounce": 1.3}},
-              "colors": {"#c26a1e": "#3b6ea8"}, "materials": {"body": {"rough": 0.5}}}
+              "colors": {"#e2711d": "#3b6ea8"}, "materials": {"body": {"rough": 0.5}}}
 
 Its shape is the character's stand-in, a few hundred triangles bound to its joints; its clips (``idle``,
 ``walk``, ``run``, ``attack``, ``hit``, ``die`` and any other the character has, named in ``"clips"``) are
@@ -697,9 +697,11 @@ class Actor:
             elif ch["mount"].get("civil"):
                 pass                                      # people in plain clothes attack nobody here
             else:
-                spin = (lib().KITS.get(mv.kit or ch["mount"].get("kit")) or {}).get("spin")
-                if spin:                                  # a chaingun: the trigger is held while the barrels come up, and
-                    self._burst = spin + 0.6              # through a burst
+                kit = lib().KITS.get(mv.kit or ch["mount"].get("kit")) or {}
+                if kit.get("auto"):                       # a launcher: held while it is steadied, till it has fired
+                    self._burst = kit["spin"] + 0.1
+                elif kit.get("spin") or kit.get("stream"):    # a chaingun: held while the barrels come up, and through a
+                    self._burst = (kit.get("spin") or 0.0) + 0.6    # burst; a flamethrower: a burst of flame
                 else:
                     once["fire"] = True
         if self._burst > 0 or inp.get("fire"):

@@ -41,7 +41,7 @@ EVENTS = ("hit", "jump", "land", "fire", "reload", "loaded", "throw", "grab", "p
 MODES = ("ground", "ladder", "ragdoll", "swim", "fly", "ledge", "ride")
 CALLS = {"enter_swim": 1, "leave_swim": 2, "enter_fly": 3, "leave_fly": 4, "enter_ladder": 5, "leave_ladder": 6, "grab_ledge": 7,
          "place": 8, "stand": 9, "dismount": 11}
-_KIT = {"rifle": 1, "pistols": 2, "sword": 3, "hands": 4, "case": 5, "trolley": 6, "chaingun": 7, "chainguns": 8}
+_KIT = {"rifle": 1, "pistols": 2, "sword": 3, "hands": 4, "case": 5, "trolley": 6, "chaingun": 7, "chainguns": 8, "shotgun": 9, "rpg": 10, "flamer": 11}
 _PUNCH = {"jab": 1, "cross": 2, "hook": 3}
 _SWING = {"slash": 1, "chop": 2, "thrust": 3}
 
@@ -167,7 +167,7 @@ def status():
     return _why
 
 
-_KIT_SINCE = {"hands": (0, 26), "case": (0, 26), "trolley": (0, 26), "chaingun": (0, 28), "chainguns": (0, 28)}
+_KIT_SINCE = {"hands": (0, 26), "case": (0, 26), "trolley": (0, 26), "chaingun": (0, 28), "chainguns": (0, 28), "shotgun": (0, 29), "rpg": (0, 29), "flamer": (0, 29)}
 
 
 def has_kit(kit):

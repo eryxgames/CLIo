@@ -124,7 +124,8 @@ def rig_for(ch, pose):
         if ch["mount"].get("civil"):                    # a person who is not a soldier: nothing, a case, or a case on wheels
             kit = "case" if "case" in kinds else "trolley" if "trolley" in kinds else "hands"
         else:
-            kit = ("chainguns" if "sidegun" in kinds else "chaingun" if "chaingun" in kinds else "sword" if "sword" in kinds
+            kit = ("chainguns" if "sidegun" in kinds else "chaingun" if "chaingun" in kinds else "shotgun" if "shotgun" in kinds
+                   else "rpg" if "launcher" in kinds else "flamer" if "flamer" in kinds else "sword" if "sword" in kinds
                    else "pistols" if "pistol" in kinds else "rifle")
         if kit != ch["mount"]["kit"]:
             name += "_" + kit

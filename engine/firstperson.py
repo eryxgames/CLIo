@@ -1994,6 +1994,13 @@ class View:
         engine/motion's Actor)."""
         if verts is None:
             verts = mdl.pose(clip, t)
+        fr = getattr(px, "frame", None)
+        if isinstance(verts, array):                      # a row of numbers (x y z...): CLIo Picture takes it as it is
+            if size != 1.0:
+                verts = array("d", [c * size for c in verts])
+                size = 1.0
+            if roll or fr is None or gone > 0 or self.gbuf is not None:
+                verts = list(zip(verts[0::3], verts[1::3], verts[2::3]))
         if roll:
             c, s, zc = math.cos(roll), math.sin(roll), mdl.height / 2.0
             verts = [(x, y * c + (z - zc) * s, zc - y * s + (z - zc) * c) for x, y, z in verts]
@@ -2011,6 +2018,8 @@ class View:
                                     mdl.smooth)
             if got is not False:
                 return got
+        if isinstance(verts, array):                      # this picture is drawn here after all: corner by corner
+            verts = list(zip(verts[0::3], verts[1::3], verts[2::3]))
         world = [(wx + x * rxw + y * fxw, wy + x * ryw + y * fyw, z + lift) for x, y, z in verts]
         if flat > 0 and gone <= 0:
             cx_, cy_, fx_, fy_, rx_, ry_ = cam
@@ -2148,7 +2157,7 @@ class View:
         live = None
         actor = getattr(m, "actor", None)
         if actor is not None and mdl.motion is not None:           # run live: as it is, where it is
-            live, heading, gone = actor.corners(), 0.0, 0.0
+            live, heading, gone = actor.packed(), 0.0, 0.0
         elif mdl.motion is not None:                               # what it shows of what the monster does
             clip, t, heading, sinks, ending = motion_mod.shown(mdl, m, fx, clip, t, heading, fast(m), deep(lv, mx, my))
             if ending:

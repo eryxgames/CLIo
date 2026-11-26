@@ -87,6 +87,7 @@
   "engine/motion/clio_motion/kernel.py",
   "engine/motion/clio_motion/mesh.py",
   "engine/motion/clio_motion/modes.py",
+  "engine/motion/clio_motion/native.py",
   "engine/motion/clio_motion/ragdoll.py",
   "engine/motion/clio_motion/rig.py",
   "engine/motion/clio_motion/rigs.json",

@@ -935,10 +935,11 @@ def mesh_draw(frame, mdl, verts, wx, wy, fxw, fyw, lift, cam, view, flat, zm, li
     elif not lib or not hasattr(lib, "clio_frame_mesh_draw") or not models_agree():
         return False
     try:
-        mesh = mesh_of(lib, mdl, len(verts))
+        packed = isinstance(verts, array)                # a row of numbers already (a body run live in C)
+        mesh = mesh_of(lib, mdl, len(verts) // 3 if packed else len(verts))
         if mesh is None:
             return False
-        flat_v = array("d", chain.from_iterable(verts))
+        flat_v = verts if packed and verts.typecode == "d" else array("d", verts if packed else chain.from_iterable(verts))
         if len(flat_v) != 3 * mesh.nverts:
             return False
         inst = _Instance(_ptr(flat_v), float(wx), float(wy), float(fxw), float(fyw), float(lift))

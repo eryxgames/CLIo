@@ -29,6 +29,13 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 - **Bodies run live**: `engine/motion`'s `Actor` runs one body with the motion core itself, step
   by step; a monster with `actor` set is drawn from it. The demo clip `crowd` shows a yard of
   them, and the tech demo has two.
+- **`--crowd MODEL`** (`--count N`, `--view lines`): a yard of one moved model, or of one of
+  CLIo Motion's characters, every body run live, until a key is pressed.
+- **CLIo Motion's C core**, when its library is there (`CLIO_MOTION_LIB`, or
+  `engine/motion/lib/`): bodies run live are stepped in it, thirty to forty times as fast, and
+  their corners go to CLIo Picture as they are - with both, a thousand live bodies are about
+  45 ms a frame where two hundred took 135 ms in Python. Checked against the Python when it is
+  loaded; nothing needs it.
 - **A console anywhere**: the effect `{"console": "reactor"}` (or `{"sim", "done", "fail",
   "quit"}`) opens a simulator from a scene's action, a conversation, an item, a menu, the effects
   after a level; it sets `<sim>_done` or `<sim>_failed` and the game goes on where it was.

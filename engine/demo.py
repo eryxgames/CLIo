@@ -29,6 +29,7 @@ from .term import strip_ansi, visible_len
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TECH = os.path.join(ROOT, "engine", "demos", "clio.json")
 KINDS = ("card", "logo", "level", "sim", "stage", "skirmish", "models", "crowd", "adventure")
+MOST_CROWD = 1000                                    # bodies in a crowd clip, at most
 SECONDS = {"card": 4, "logo": 5, "level": 25, "sim": 20, "stage": 20, "skirmish": 25, "models": 4, "crowd": 15,
            "adventure": 30}
 def _idle():
@@ -119,11 +120,11 @@ def problems(spec, data=None, where="demo.json"):
                     out.append("%s: %s has no %s '%s'" % (at, d.title, "model" if kind in ("models", "crowd") else kind, n))
                 elif kind == "crowd" and not (isinstance(table[n], dict) and table[n].get("motion") is not None):
                     out.append("%s: a crowd is of a model moved by CLIo Motion (\"motion\"); '%s' is not" % (at, n))
-        if kind == "crowd" and not (isinstance(clip.get("count", 12), int) and 1 <= clip.get("count", 12) <= 200):
-            out.append("%s: \"count\" should be a whole number from 1 to 200" % at)
+        if kind == "crowd" and not (isinstance(clip.get("count", 12), int) and 1 <= clip.get("count", 12) <= MOST_CROWD):
+            out.append("%s: \"count\" should be a whole number from 1 to %d" % (at, MOST_CROWD))
         for v in clip.get("views") or []:
-            if v not in ("pixel", "dots", "dots-fill"):
-                out.append("%s: no view '%s' (pixel, dots, dots-fill)" % (at, v))
+            if v not in ("pixel", "dots", "dots-fill") + (("lines",) if kind == "crowd" else ()):
+                out.append("%s: no view '%s' (pixel, dots, dots-fill%s)" % (at, v, ", lines" if kind == "crowd" else ""))
         if clip.get("render") not in (None, "classic", "mesh"):
             out.append("%s: \"render\" is classic or mesh" % at)
         if clip.get("skip_until") not in (None, "vehicle", "fight"):
@@ -481,7 +482,7 @@ class Player:
             spec = {"motion": name}
         if spec is None:
             raise KeyError(name)
-        count = max(1, min(200, int(clip.get("count", 12))))
+        count = max(1, min(MOST_CROWD, int(clip.get("count", 12))))
         yard = _Yard(data, name, count, spec)
         lv = Level(yard, "_yard", seed=1)
         lv.console = TextConsole(lambda _t: None, None)
@@ -504,7 +505,11 @@ class Player:
             W, H = sc.size()
             style = views[min(len(views) - 1, int((self.now() - start) / each))]
             if (W, H, style) != size:
-                size, view = (W, H, style), View(W, max(6, H - 3), style)
+                if style in ("lines",):                      # the yard in lines: every body a few dozen of them
+                    from .ahead import LevelView
+                    size, view = (W, H, style), LevelView(W, max(6, H - 3), style)
+                else:
+                    size, view = (W, H, style), View(W, max(6, H - 3), style)
             now = self.now()
             t = time.perf_counter()
             crowd.step(max(0.0, min(0.1, now - last)))
@@ -513,8 +518,9 @@ class Player:
             t = time.perf_counter()
             rows = view.render(lv, FX(), 0)
             self.ms = (time.perf_counter() - t) * 1000.0
-            self.note = "%s%d %s, each run live: %.1f ms the motion" % (
-                clip.get("caption", "") + "  " if clip.get("caption") else "", len(mobs), name.replace("_", " "), took)
+            self.note = "%s%d %s, each run live: %.1f ms the motion (%s)" % (
+                clip.get("caption", "") + "  " if clip.get("caption") else "", len(mobs), name.replace("_", " "), took,
+                "in C" if motion.fast() is not None else "Python")
             self.show([list(r) for r in rows], extra=style)
             self.wait(1 / 30.0)
 
@@ -633,12 +639,12 @@ class _Yard:
         self.models = dict(data.models or {}, **{model: spec})
         self.monsters = dict(data.monsters or {}, _crowd={"name": model.replace("_", " "), "tag": "c", "model": model,
                                                           "hp": 1, "attack": {"kind": "melee", "damage": [0, 0]}})
-        W = max(13, min(41, 9 + 2 * int(math.ceil(math.sqrt(count * 2.5)))))
-        D = max(8, min(30, 4 + int(math.ceil(count * 2.0 / (W - 6)))))
+        W = max(13, min(81, 9 + 2 * int(math.ceil(math.sqrt(count * 2.5)))))
+        D = max(8, min(60, 4 + int(math.ceil(count * 2.6 / (W - 6)))))
         grid = [["o"] * W for _ in range(D)]
         px = W // 2
         spots = sorted((abs(x - px) * 0.7 + (D - 1 - y), y, x) for y in range(D - 2) for x in range(1, W - 1)
-                       if (x + y) % 2 == 0 and abs(x - px) <= (D - 1 - y) + 1)
+                       if (x + y) % 2 == 0)
         for _d, y, x in spots[:count]:
             grid[y][x] = "c"
         grid[D - 1][px] = "@"

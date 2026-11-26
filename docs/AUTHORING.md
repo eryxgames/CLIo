@@ -2498,9 +2498,23 @@ labelled as a sprite is. Model space: x to the right, y forward, z up; one unit 
   what a game by beats wants. `engine/motion`'s `Actor` is one body run by the motion core
   itself, step by step - told how fast to go and which way, to attack, that it is hit, to fall -
   so that no two are in step, and a monster with `actor` set to one is drawn where its feet
-  have taken it. The demo clip `{"crowd": "hyena", "count": 24}` shows a yard of them; CLIo's
-  tech demo has two. A live body costs about 0.12 ms a step in Python (0.3 ms when it is in
-  sight and its corners are wanted), so a hundred are about 10 ms of a frame. The library is carried in the engine (`engine/motion/clio_motion/`: pure
+  have taken it. `python clio.py --crowd hyena --count 100` shows a yard of them (`--view
+  lines` in lines; any model of a game moved by CLIo Motion, or one of the characters by name),
+  as does the demo clip `{"crowd": "hyena", "count": 24}`; CLIo's tech demo (`python clio.py
+  --demo`) has two.
+
+  In Python a live body costs about 0.12 ms a step (0.3 ms when it is in sight and its corners
+  are wanted). **CLIo Motion's C core** steps it thirty to forty times as fast, the same to
+  nine digits, and hands its corners to CLIo Picture as they are: with both libraries, on the
+  machine this was tried on (a 100 x 30 terminal), 200 live bodies take about 1 ms of motion
+  and 7 ms of picture a frame, and 1000 about 10 ms and 35 ms; in Python alone 200 take 25 ms
+  and 110 ms. The library is CLIo Motion's `c/` built as a shared library (`make shared`, or
+  `build.bat`; its repository's workflow builds it for every machine). It is looked for in
+  `CLIO_MOTION_LIB` (`none` for none), then as `engine/motion/lib/clio_motion.dll`
+  (`libclio_motion.so`, `libclio_motion.dylib`), then where the system keeps libraries; it is
+  run against the Python on a short walk first and not used if the two differ. `--crowd` says
+  in its caption which is stepping the bodies. A body given a ground of its own is stepped in
+  Python. The library is carried in the engine (`engine/motion/clio_motion/`: pure
   Python, nothing to install); it is [CLIo Motion](https://github.com/eryxgames/clio-motion),
   which also makes clips for other engines and has the characters' templates for artists.
   `python clio.py GAME --add model soldier` (or `hound`, `walker`) puts one in a game.
@@ -3452,7 +3466,7 @@ there the same way.
 | `stage` | the stage, played by its bot (it looks for the way first: a second or more) |
 | `skirmish` | the skirmish, with the computer on every side; the view follows the fighting |
 | `models` | each model turning in a yard under the sky, `seconds` each, scaled to about one size (`size`) |
-| `crowd` | `count` (12; up to 200) bodies of one model moved by CLIo Motion - or of one of its characters by name (`"hyena"`) - wandering a yard, every one run live by the motion core; `views` take turns; the caption says what the motion took |
+| `crowd` | `count` (12; up to 1000) bodies of one model moved by CLIo Motion - or of one of its characters by name (`"hyena"`) - wandering a yard, every one run live by the motion core; `views` take turns (here `lines` too); the caption says what the motion took, and whether it ran in C or in Python |
 | `adventure` | a game (a folder under games/) played by typed `commands`, or its `"walkthrough"` |
 
 A clip plays its `seconds` (or less, if its game ends); `game` names another game's folder.

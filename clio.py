@@ -259,6 +259,28 @@ def play_demo(term, game=None, loop=False):
     return 0
 
 
+def play_crowd(term, game, name, count, view=None):
+    """--crowd: a yard of one model moved by CLIo Motion (or of one of its characters), every body run live."""
+    from engine import demo, motion
+    game_dir = resolve_game(game) if game else os.path.join(ROOT, "games", "rootless")
+    if not game_dir:
+        print("No game called '%s'. Try --list." % game)
+        return 2
+    clip = {"crowd": name, "count": count, "seconds": 3600, "views": [view if view in ("pixel", "dots", "dots-fill", "lines") else "pixel"]}
+    spec = {"title": "A crowd", "game": game_dir, "clips": [clip]}
+    from engine.data import GameData
+    wrong = demo.problems(spec, GameData(game_dir), "--crowd")
+    if wrong:
+        print("\n".join(w.replace("--crowd: clip 1: ", "") for w in wrong))
+        print("CLIo Motion's characters: %s." % ", ".join(motion.characters()))
+        return 2
+    if demo.play(term, spec) is None:
+        print("A crowd needs a terminal it can draw on (not a pipe, not TERM=dumb).")
+        print("Bodies run live are stepped by: %s" % motion.status())
+        return 2
+    return 0
+
+
 TERMUX_KEYS = r"""# Extra keys for playing CLIo's first-person levels in Termux. Put these lines in
 # ~/.termux/termux.properties (mkdir -p ~/.termux first), then run: termux-reload-settings
 # Swipe up on a key for the key above it. Volume Up + Q shows or hides the row; Volume Up +
@@ -508,6 +530,10 @@ def main(argv=None):
                          "is named")
     ap.add_argument("--attract", action="store_true",
                     help="like --demo, but over and over until a key is pressed (a kiosk, a shop window)")
+    ap.add_argument("--crowd", metavar="MODEL",
+                    help="show a crowd of one model moved by CLIo Motion, or of one of its characters (hyena, soldier, "
+                         "raptor, scorpion...), wandering a yard, every body run live; any key ends it")
+    ap.add_argument("--count", type=int, default=24, metavar="N", help="with --crowd: how many (24; up to 1000)")
     ap.add_argument("--termux-keys", action="store_true",
                     help="print a row of extra keys for Termux's keyboard that plays first-person levels, and exit")
     ap.add_argument("--realtime", nargs="?", type=float, const=0.8, metavar="SECONDS",
@@ -603,6 +629,8 @@ def main(argv=None):
             return 2
         key_test()
         return 0
+    if args.crowd:
+        return play_crowd(term, args.game, args.crowd, args.count, args.view)
     if args.demo or args.attract:
         return play_demo(term, args.game, args.attract)
     try:

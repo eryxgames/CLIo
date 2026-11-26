@@ -581,5 +581,110 @@ class Live(unittest.TestCase):
         self.assertTrue(any("8 hyena, each run live" in n for _t, n, _m in seen))
 
 
+class TheCCore(unittest.TestCase):
+    """Bodies run live are stepped in CLIo Motion's C library when it is there (CLIO_MOTION_LIB, engine/motion/lib)."""
+
+    def setUp(self):
+        if motion.fast() is None:
+            self.skipTest("CLIo Motion's C library is not here: %s" % motion.status())
+
+    def test_a_body_in_c_goes_as_one_in_python(self):
+        from array import array
+        from engine.motion.clio_motion import native
+        for name in ("hyena", "soldier"):
+            m = model.Model(name, {"motion": name})
+            fast = motion.Actor(m, 4.0, 5.0, 0.3)
+            self.assertIsNotNone(fast.body)
+            native.use(False)
+            try:
+                slow = motion.Actor(m, 4.0, 5.0, 0.3)
+            finally:
+                native.use(True)
+            self.assertIsNone(slow.body)
+            for i in range(150):
+                how = dict(speed=1.5 if i < 100 else 0.0, heading=1.1 if i > 40 else 0.3, attack=i == 120)
+                fast.step(1 / 30.0, **how)
+                slow.step(1 / 30.0, **how)
+            for a, b in ((fast.x, slow.x), (fast.y, slow.y), (fast.heading, slow.heading), (fast.speed, slow.speed)):
+                self.assertAlmostEqual(a, b, places=6)
+            self.assertLess(far(fast.corners(), slow.corners()), 1e-6, name)
+            self.assertLess(far(fast.corners(lines=True), slow.corners(lines=True)), 1e-6, name)
+            row = fast.packed()
+            self.assertIsInstance(row, array)
+            self.assertEqual(len(row), 3 * len(m.verts))
+            self.assertEqual(sorted(set(fast.events)), sorted(set(slow.events)), name)
+            fast.step(1 / 30.0, die=True)
+            for _ in range(120):
+                fast.step(1 / 30.0)
+            self.assertTrue(fast.down)
+            self.assertLess(max(p[2] for p in fast.corners()), 0.8 * m.height)
+            fast.stand()
+            fast.step(1 / 30.0)
+            self.assertGreater(max(p[2] for p in fast.corners()), 0.8 * m.height)
+
+    def test_a_model_of_ones_own_is_skinned_there_too(self):
+        from engine import gltf
+        from engine.motion.clio_motion import native
+        own = OnesOwnModel("glb")
+        own.dir = tempfile.mkdtemp(prefix="clio-test-motion-")
+        self.addCleanup(shutil.rmtree, own.dir, True)
+        path, _rig = own.glb()
+        spec, _notes = gltf.to_model(path, scale=0.4, motion="quad")
+        m = model.Model("own", spec)
+        fast = motion.Actor(m, 1.0, 1.0, 0.0)
+        native.use(False)
+        try:
+            slow = motion.Actor(m, 1.0, 1.0, 0.0)
+        finally:
+            native.use(True)
+        for _ in range(60):
+            fast.step(1 / 30.0, speed=1.0, heading=0.4)
+            slow.step(1 / 30.0, speed=1.0, heading=0.4)
+        self.assertLess(far(fast.corners(), slow.corners()), 1e-6)
+
+    def test_a_level_draws_it_and_a_crowd_of_a_thousand_steps_in_a_blink(self):
+        import time
+        lv, m = level_with({"motion": "hyena"})
+        view = View(80, 20, "pixel")
+        m.actor = motion.Actor(lv.models["g"], m.x, m.y, 0.0)
+        a = view.render(lv, FX(), 0)
+        for _ in range(20):
+            m.actor.step(1 / 30.0, speed=1.0, heading=0.0)
+        self.assertNotEqual(a, view.render(lv, FX(), 0))
+        mdl = model.Model("h", {"motion": "hyena"})
+        crowd = motion.Crowd(mdl, [(2 + k % 40, 2 + k // 40) for k in range(1000)], (1.0, 1.0, 45.0, 30.0), seed=5)
+        t = time.perf_counter()
+        for _ in range(10):
+            crowd.step(1 / 30.0)
+        self.assertLess((time.perf_counter() - t) / 10, 0.1)       # (about 10 ms where this was written; 180 in Python)
+
+    def test_one_with_a_ground_of_its_own_stays_in_python(self):
+        m = model.Model("h", {"motion": "hyena"})
+        self.assertIsNone(motion.Actor(m, 0.0, 0.0, 0.0, ground=lambda x, y: 0.1 * x).body)
+
+
+class TheCrowdCommand(unittest.TestCase):
+    def test_a_crowd_in_lines_and_what_is_not_there(self):
+        import io
+        from contextlib import redirect_stdout
+        import clio
+        from engine import demo
+        from engine.term import Term
+        from test_demo import player
+        self.assertEqual(demo.problems({"game": "rootless", "clips": [{"crowd": "hyena", "views": ["lines", "pixel"]}]}), [])
+        self.assertEqual(len(demo.problems({"game": "rootless", "clips": [{"models": ["hopper"], "views": ["lines"]}]})), 1)
+        p, seen, _fc = player([{"crowd": "soldier", "count": 6, "seconds": 1.0, "views": ["lines"]}], W=80, H=24)
+        self.assertEqual(p.run(), "done")
+        self.assertTrue(any("6 soldier, each run live" in n and ("in C" in n or "Python" in n) for _t, n, _m in seen))
+        term = Term(out=io.StringIO(), width=80, height=24, color=0, unicode=True, animate=False, env={})
+        out = io.StringIO()
+        with redirect_stdout(out):
+            self.assertEqual(clio.play_crowd(term, None, "unicorn", 5), 2)
+            self.assertEqual(clio.play_crowd(term, None, "hyena", 5), 2)      # nothing to draw on here
+        self.assertIn("has no model 'unicorn'", out.getvalue())
+        self.assertIn("characters: dragon, horse, hyena", out.getvalue())
+        self.assertIn("needs a terminal", out.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()

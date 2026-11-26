@@ -63,6 +63,27 @@ def characters():
     return sorted(_characters())
 
 
+def fast():
+    """The library's C core, loaded under Python (engine/motion/clio_motion/native.py), or None: bodies run live
+    are stepped in it when it is there - many times as fast, and the same to nine digits. It is looked for in
+    ``CLIO_MOTION_LIB`` (``none`` for none), then in engine/motion/lib/, then where the system keeps libraries; it
+    is checked against the Python before it is used."""
+    try:
+        from .clio_motion import native
+        return native if native.load() is not None else None
+    except Exception:                                    # a Python with no ctypes, a library that will not load
+        return None
+
+
+def status():
+    """What runs live bodies, in a line."""
+    try:
+        from .clio_motion import native
+        return native.status() if native.load() is not None else "Python (the C core: %s)" % native.status()
+    except Exception as e:
+        return "Python (%s)" % e
+
+
 def version():
     return lib().__version__
 
@@ -244,6 +265,7 @@ class Moves:
         self.materials = {"body": {"color": "#808080", "metal": 0.55 if machine else 0.0, "rough": 0.45 if machine else 0.75},
                           "glow": {"color": "#ffffff", "glow": 2.5}}
         self._lines = None                                # the same body for a display that draws lines, when asked for
+        self._bound = {}                                  # made ready for the C core: "mesh", "lines", "skin"
         self.skin = None                                  # a model of the game's own on this skeleton: its corners' joints
         if spec.get("skin") is not None:
             self.skin = self._skin(spec)
@@ -279,6 +301,21 @@ class Moves:
                 raise ValueError("a corner of the skin is carried by no joint")
             out.append([(j, w / total) for j, w in pairs])
         return out
+
+    def bound(self, native, what):
+        """The model made ready for the C core (clio_motion.native): ``"mesh"``, its ``"lines"`` or its ``"skin"``."""
+        got = self._bound.get(what)
+        if got is None:
+            if what == "skin":
+                s = self.metre
+                got = native.Skin([(-x / s, z / s, y / s) for x, y, z in self.rest], self.skin)
+            elif what == "lines":
+                self.lines()
+                got = native.bind(self._lines)
+            else:
+                got = native.bind(self.model, self.order)
+            self._bound[what] = got
+        return got
 
     def lines(self):
         """The body for a display that draws lines: ``(edges, faces)`` between the corners that ``pose`` gives
@@ -443,11 +480,18 @@ class Actor:
         k = self.cells
         self.ground = ground
         self.terrain = (lambda X, Z: ground(X * k, Z * k) / k) if ground is not None else _flat
-        self.S = cm.create_state(mv.ch, self.terrain)
-        cm.place(self.S, mv.ch, self.terrain, x / k, y / k, heading)
+        self.body, self.S = None, None
+        native = fast() if ground is None else None       # (a ground of its own: in Python, which can ask it)
+        if native is not None:
+            self.native = native
+            self.body = native.Body(mv.character, mv.style)
+            self.body.place(x / k, y / k, heading)
+        else:
+            self.S = cm.create_state(mv.ch, self.terrain)
+            cm.place(self.S, mv.ch, self.terrain, x / k, y / k, heading)
         self.inp = {"speed": 0.0, "armed": mv.armed, "kit": mv.kit, "heading": heading}
         self.sk, self.events, self.down, self.pose = None, [], False, None
-        self._once = {}
+        self._again = True                                # the inputs have changed since the C core was last given them
         self.step(MOST)
         if mv.kit:                                        # its other weapons brought up
             for _ in range(45):
@@ -455,20 +499,20 @@ class Actor:
 
     @property
     def x(self):
-        return self.S.px * self.cells
+        return (self.body.x if self.body is not None else self.S.px) * self.cells
 
     @property
     def y(self):
-        return self.S.pz * self.cells
+        return (self.body.z if self.body is not None else self.S.pz) * self.cells
 
     @property
     def heading(self):
-        return self.S.h
+        return self.body.heading if self.body is not None else self.S.h
 
     @property
     def speed(self):
         """Metres a second, as it is going."""
-        return self.S.v
+        return self.body.speed if self.body is not None else self.S.v
 
     def step(self, dt, speed=None, heading=None, attack=False, hit=None, die=None, aim=None, **more):
         """On by ``dt`` seconds. ``speed`` (metres a second) and ``heading`` stay as they were when not said.
@@ -477,14 +521,16 @@ class Actor:
         way the blow goes, as ``hit``). ``aim``: a point ``(x, y, height)`` in cells its weapons are turned on.
         Anything else is an input of the library's (``crouch``, ``jump``, ``reload``...)."""
         cm, mv, S, inp = self.cm, self.moves, self.S, self.inp
-        if dt <= 1e-6 and self.pose is not None:           # no time has passed
+        if dt <= 1e-6 and (self.pose is not None or self.body is not None):   # no time has passed
             return
         dt = max(dt, 1e-4)
-        if speed is not None:
-            inp["speed"] = float(speed)
-        if heading is not None:
-            inp["heading"] = float(heading)
-        inp["aim"] = [aim[0] / self.cells, aim[2] / self.cells, aim[1] / self.cells] if aim else None
+        if speed is not None and speed != inp["speed"]:
+            inp["speed"], self._again = float(speed), True
+        if heading is not None and heading != inp["heading"]:
+            inp["heading"], self._again = float(heading), True
+        aim = [aim[0] / self.cells, aim[2] / self.cells, aim[1] / self.cells] if aim else None
+        if aim != inp.get("aim"):
+            inp["aim"], self._again = aim, True
         once = dict(more)
         if attack:
             ch = mv.ch
@@ -494,17 +540,33 @@ class Actor:
                 once["pinch" if ch["arthro"].get("claw") else "sting"] = {}
             elif ch.get("octo"):
                 once["grab"] = {}
-            elif S.kit == "sword":
+            elif (mv.kit or ch["mount"].get("kit")) == "sword":
                 once["swing"] = {"kind": "slash"}
             else:
                 once["fire"] = True
         if hit:
             once["hit"] = {"impulse": [1.6 * hit[0], 0.0, 1.6 * hit[1]]}
         if die and not self.down:
-            push = die if isinstance(die, (tuple, list)) else (-math.cos(S.h), -math.sin(S.h))
+            push = die if isinstance(die, (tuple, list)) else (-math.cos(self.heading), -math.sin(self.heading))
             once["die"] = {"impulse": [2.4 * push[0], 1.0, 2.4 * push[1]]}
             self.down = True
         n = max(1, int(math.ceil(dt / MOST - 1e-9)))
+        if self.body is not None:                          # in C: the inputs are handed over only when they change
+            b = self.body
+            for k in range(n):
+                if k == 0 and (once or self._again):
+                    b.step(dt / n, dict(inp, **once) if once else inp)
+                    self._again = bool(once)               # (what is done once has to be taken back at the next step)
+                elif self._again:
+                    b.step(dt / n, inp)
+                    self._again = False
+                else:
+                    b.step(dt / n)
+            got = b.events()
+            if got:
+                self.events += got
+                del self.events[:-16]
+            return
         for k in range(n):
             if k == 0 and once:
                 inp.update(once)
@@ -520,12 +582,18 @@ class Actor:
     def stand(self):
         """Up again (a switch: there is no getting up)."""
         if self.down:
-            self.cm.stand(self.S, self.moves.ch, self.terrain)
+            if self.body is not None:
+                self.body.call("stand")
+            else:
+                self.cm.stand(self.S, self.moves.ch, self.terrain)
             self.down = False
 
     def corners(self, lines=False):
         """Its model's corners as it is now, about the spot it stands on, on the model's axes for a model that
         faces east (the view draws them with ``heading`` 0); ``lines``: its lines' corners."""
+        if self.body is not None:
+            flat = self.packed(lines)
+            return list(zip(flat[0::3], flat[1::3], flat[2::3]))
         pts, self.sk = self.moves.corners(self.pose, self.sk, lines)
         m, k = self.model.scale, self.cells
         ox, oy = self.S.pz * k, self.S.px * k
@@ -533,6 +601,20 @@ class Actor:
         if m == 1.0:
             return [(p[0] - ox, p[1] - oy, p[2] - oz) for p in pts]
         return [(p[0] * m - ox, p[1] * m - oy, p[2] * m - oz) for p in pts]
+
+    def packed(self, lines=False):
+        """``corners`` as one row of numbers (x y z x y z...), an ``array('d')``: what CLIo Picture takes as it is.
+        With the C core it is that core's own row, written again at the next call: use it before."""
+        b = self.body
+        if b is None:
+            from array import array
+            from itertools import chain
+            return array("d", chain.from_iterable(self.corners(lines)))
+        mv, k = self.moves, self.cells
+        if mv.skin is not None and not lines:              # from glTF's axes: x to the left, z forward
+            return b.skin(mv.bound(self.native, "skin"), (-k, 0.0, 0.0, 0.0, 0.0, k, 0.0, k, 0.0, -b.z * k, -b.x * k, 0.0))
+        return b.points(mv.bound(self.native, "lines" if lines else "mesh"),
+                        (0.0, 0.0, k, k, 0.0, 0.0, 0.0, k, 0.0, -b.z * k, -b.x * k, 0.0))
 
 
 class Crowd:

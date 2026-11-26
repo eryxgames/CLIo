@@ -520,7 +520,10 @@ class LevelPlace:
         else:
             heading = m.heading
         clip, sinks, ending = firstperson.doing(m, fx), 0.0, False
-        if mdl.motion is not None:
+        actor = getattr(m, "actor", None) if mdl.motion is not None else None
+        if actor is not None:                            # run live (engine/motion): as it is
+            heading = 0.0
+        elif mdl.motion is not None:
             from . import motion
             clip, t, heading, sinks, ending = motion.shown(mdl, m, fx, clip, t, heading, firstperson.fast(m),
                                                            firstperson.deep(self.lv, x, y))
@@ -528,7 +531,10 @@ class LevelPlace:
             return None
         if mdl.motion is not None:                       # a body of a few dozen lines, made for a display of lines
             edges, faces = mdl.motion.lines()
-            verts = [(p[0] * mdl.scale, p[1] * mdl.scale, p[2] * mdl.scale) for p in mdl.motion.pose(clip, t, lines=True)]
+            if actor is not None:
+                verts = actor.corners(lines=True)
+            else:
+                verts = [(p[0] * mdl.scale, p[1] * mdl.scale, p[2] * mdl.scale) for p in mdl.motion.pose(clip, t, lines=True)]
             origin, wound = range(len(verts)), True
         else:
             kept = getattr(mdl, "_lines", None)
@@ -558,6 +564,8 @@ class LevelPlace:
             if getattr(m, "gone", False):
                 continue
             x, y = self.moved.get(getattr(m, "id", None), (m.x, m.y))
+            if getattr(m, "actor", None) is not None:      # run live: it is where its feet took it
+                x, y = m.actor.x, m.actor.y
             if self.seen(x + 0.5, y + 0.5):
                 ground = self.floor(int(x), int(y))
                 dead = getattr(m, "dead", False)

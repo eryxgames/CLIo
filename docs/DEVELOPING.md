@@ -130,7 +130,7 @@ guide.
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 1116 tests, about a minute
+python -m unittest discover -s tests     # 1121 tests, about a minute
 python -m engine.vector                  # the vector display's reel (Ctrl-C ends)
 python -m engine.realm templates/realm 8 # a steward plays the realm starter over eight seeds
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
@@ -213,3 +213,10 @@ not change. A newer one is brought in from a checkout of
 [clio-motion](https://github.com/eryxgames/clio-motion) with
 `python tools/clio/carry.py PATH/TO/CLIo` (`--check` says whether the copy here is that
 version), then `python -m engine.editor.hosted` and the tests here.
+
+Its C core is optional, as CLIo Picture is: `engine/motion/clio_motion/native.py` loads
+`clio_motion.dll` / `libclio_motion.so` / `.dylib` from `CLIO_MOTION_LIB`, `engine/motion/lib/`
+or the system, checks it against the Python, and bodies run live (`engine/motion`'s `Actor`)
+are then stepped in it. With `CLIO_MOTION_LIB` set, `tests/test_motion.py`'s `TheCCore` compares
+the two; without it those tests are passed over. (There is no `--get-motion` yet: CLIo Motion
+has made no release for it to follow.)

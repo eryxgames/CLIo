@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 Daniel Sandner
-"""The optional downloads, offered from the launcher: CLIo Picture (faster first-person pictures) and Ballistic's C
-engine (sounds without Node.js) - the same as ``--get-picture`` and ``--get-ballistic``, asked about first, with
-the size and where it comes from. Nothing is downloaded unless the player says yes; CLIo plays without either.
+"""The optional downloads, offered from the launcher: CLIo Picture (faster first-person pictures), CLIo Motion's C
+core (crowds of bodies run live) and Ballistic's C engine (sounds without Node.js) - the same as
+``--get-picture``, ``--get-motion`` and ``--get-ballistic``, asked about first, with the size and where it comes
+from. Nothing is downloaded unless the player says yes; CLIo plays without any of them.
 """
 from __future__ import annotations
 
@@ -12,8 +13,10 @@ from .term import is_termux
 
 # the release zips' sizes, for asking first (bytes; from the releases CLIo follows)
 PICTURE_SIZE = {
-    "android-arm64-v8a": 47182, "android-armeabi-v7a": 49463, "android-x86_64": 48839, "linux-arm64": 44991,
-    "linux-x64": 45514, "macos-universal": 71190, "windows-arm64": 84434, "windows-x64": 100550,
+    "android-arm64-v8a": 74778, "android-armeabi-v7a": 75937, "android-x86_64": 77768, "linux-arm64": 70521,
+    "linux-x64": 72449, "macos-universal": 117616, "windows-arm64": 109058, "windows-x64": 126736,
+}
+MOTION_SIZE = {                   # (none yet: CLIo follows no release of it yet - engine/motion/fetch.py)
 }
 BALLISTIC_SIZE = {
     "android-arm64-v8a": 1206755, "android-armeabi-v7a": 1111941, "android-x86_64": 1332340, "linux-arm64": 703726,
@@ -72,6 +75,12 @@ def offers(env=None, plat=None):
         out.append(Offer("picture", "CLIo Picture", "faster first-person pictures", picture_fetch.RELEASE,
                          PICTURE_SIZE.get(plat), picture_fetch.SOURCE, here,
                          lambda out_fn: picture_fetch.get(out=out_fn, env=env, plat=plat)))
+    from .motion import fetch as motion_fetch
+    if plat in motion_fetch.SHA256:
+        here = bool(motion_fetch.installed(env, plat)) or bool(_motion_found(env))
+        out.append(Offer("motion", "CLIo Motion", "crowds of bodies run live", motion_fetch.RELEASE,
+                         MOTION_SIZE.get(plat), motion_fetch.SOURCE, here,
+                         lambda out_fn: motion_fetch.get(out=out_fn, env=env, plat=plat)))
     if plat in ballistic_fetch.SHA256:
         here = bool(ballistic_fetch.installed(env, plat)) or bool(ballistic.find_clib(env))
         source = getattr(ballistic_fetch, "SOURCE", "https://github.com/eigensoundlab/ballistic-engine")
@@ -85,6 +94,14 @@ def _picture_found(env):
     from . import picture
     try:
         return picture.find_lib(env)
+    except Exception:
+        return None
+
+
+def _motion_found(env):
+    from . import motion
+    try:
+        return motion.find_lib(env)
     except Exception:
         return None
 

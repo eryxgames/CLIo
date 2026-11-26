@@ -22,6 +22,7 @@ as Ballistic's sound engine is carried. Source: https://github.com/eryxgames/cli
 from __future__ import annotations
 
 import math
+import os
 
 SOURCE = "https://github.com/eryxgames/clio-motion"
 CLIPS = ("idle", "walk", "run", "attack", "hit", "die")      # what a model has unless it names its own,
@@ -70,15 +71,42 @@ def fast():
     is checked against the Python before it is used."""
     try:
         from .clio_motion import native
+        _fetched(native)
         return native if native.load() is not None else None
     except Exception:                                    # a Python with no ctypes, a library that will not load
         return None
+
+
+def _fetched(native):
+    """The folder --get-motion fills (engine/motion/fetch.py) is one more place the library is looked for in,
+    after ``CLIO_MOTION_LIB`` and engine/motion/lib/."""
+    from . import fetch
+    folder = os.path.join(fetch.home(), fetch.RELEASE)
+    if folder not in native.DIRS:
+        native.DIRS.append(folder)
+
+
+def find_lib(env=None):
+    """Where the library is, by ``env`` (``CLIO_MOTION_LIB``, engine/motion/lib/, what --get-motion fetched, the
+    system), or None."""
+    from . import fetch
+    from .clio_motion import native
+    env = os.environ if env is None else env
+    want = env.get("CLIO_MOTION_LIB")
+    if want:
+        return None if want.lower() in ("none", "off", "no", "0") else want
+    name = native.library_name()
+    for folder in (os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"), os.path.join(fetch.home(env), fetch.RELEASE)):
+        if os.path.isfile(os.path.join(folder, name)):
+            return os.path.join(folder, name)
+    return None
 
 
 def status():
     """What runs live bodies, in a line."""
     try:
         from .clio_motion import native
+        _fetched(native)
         return native.status() if native.load() is not None else "Python (the C core: %s)" % native.status()
     except Exception as e:
         return "Python (%s)" % e

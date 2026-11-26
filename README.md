@@ -119,7 +119,7 @@ Without one, a game is simply silent; the in-game `sound` command says what it f
 Two **optional downloads** make RØØTLESS nicer. The launcher offers them under **Downloads**
 (it says the size first and installs nothing without a yes):
 
-- **CLIo Picture** (about 50 KB, `--get-picture`): draws the first-person picture several times
+- **CLIo Picture** (about 100 KB, `--get-picture`): draws the first-person picture several times
   faster - the same picture, to the last pixel - and, from its release 0.10, the consoles' line
   displays, scans and views ahead.
 - **Ballistic's C engine** (about 1 MB, `--get-ballistic`): physically modelled shots, ricochets
@@ -187,6 +187,7 @@ python clio.py [game] [options]
   --no-sound      run silently
   --sounds SET    another set of sound effects (rootless: ballistic)
   --get-picture   install CLIo Picture for this machine (faster first-person pictures)
+  --get-motion    install CLIo Motion's C core for this machine (crowds of bodies run live)
   --shots DIR     draw the game's consoles, menus and models into DIR without playing it
   --add KIND NAME paste a working console, menu or model into the game (--add console list)
   --schema DIR    write JSON Schemas of the data files, for key completion in your editor

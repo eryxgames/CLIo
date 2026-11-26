@@ -36,6 +36,15 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   their corners go to CLIo Picture as they are - with both, a thousand live bodies are about
   45 ms a frame where two hundred took 135 ms in Python. Checked against the Python when it is
   loaded; nothing needs it.
+- **`--get-motion`**, and CLIo Motion's C core in the launcher's Downloads: the library for this
+  machine from the release of CLIo Motion that CLIo follows, checked against that release's
+  SHA-256, into your data folder, and then against CLIo's Python before it is used - as
+  `--get-picture` does. CLIo follows no release of it yet (0.25.0's has no files so far), so
+  for now `--get-motion` says how to build the library and Downloads does not list it;
+  `python -m engine.follow motion VERSION` is what makes CLIo follow one.
+- **`python -m engine.follow picture|motion VERSION`**, for those who look after CLIo: writes the
+  release CLIo follows, the checksum of each machine's zip and the sizes the launcher quotes
+  from the release's own `checksums.txt`, after downloading and checking every zip.
 - **A console anywhere**: the effect `{"console": "reactor"}` (or `{"sim", "done", "fail",
   "quit"}`) opens a simulator from a scene's action, a conversation, an item, a menu, the effects
   after a level; it sets `<sim>_done` or `<sim>_failed` and the game goes on where it was.
@@ -97,8 +106,9 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
   dot: a small scene is drawn both ways before the library is used, and it is not used if
   anything differs (`engine.vector.backend()` says which draws). Measured here: the reel's scan
   at 100 x 28, 27 ms to 5.4; a level as a scan, 27 to 3.4, in lines 13.4 to 3.6; the station's
-  helm console at 112 x 34, 11.3 to 5.0. `--get-picture` still fetches 0.9 until a 0.10 release
-  is pinned in `engine/picture/fetch.py`.
+  helm console at 112 x 34, 11.3 to 5.0. `--get-picture` (and the launcher's Downloads)
+  fetches **CLIo Picture 0.10.0** - it was 0.9.0 - and the sizes the launcher quotes before it
+  asks are that release's (they had stayed at 0.6.0's: 45 KB where the zip is now 72).
 - Changed with it: the way a line runs through a character (the `strokes` style, where there is
   no braille) is told by comparing its rise with its run, not by an arctangent - the same on
   every machine, and the same in the library. A line at exactly 22.5 degrees now counts as flat.

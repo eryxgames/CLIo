@@ -130,7 +130,7 @@ guide.
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 1121 tests, about a minute
+python -m unittest discover -s tests     # 1137 tests, a few minutes
 python -m engine.vector                  # the vector display's reel (Ctrl-C ends)
 python -m engine.realm templates/realm 8 # a steward plays the realm starter over eight seeds
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class
@@ -215,8 +215,25 @@ not change. A newer one is brought in from a checkout of
 version), then `python -m engine.editor.hosted` and the tests here.
 
 Its C core is optional, as CLIo Picture is: `engine/motion/clio_motion/native.py` loads
-`clio_motion.dll` / `libclio_motion.so` / `.dylib` from `CLIO_MOTION_LIB`, `engine/motion/lib/`
-or the system, checks it against the Python, and bodies run live (`engine/motion`'s `Actor`)
+`clio_motion.dll` / `libclio_motion.so` / `.dylib` from `CLIO_MOTION_LIB`, `engine/motion/lib/`,
+the folder `--get-motion` fills or the system, checks it against the Python, and bodies run live (`engine/motion`'s `Actor`)
 are then stepped in it. With `CLIO_MOTION_LIB` set, `tests/test_motion.py`'s `TheCCore` compares
-the two; without it those tests are passed over. (There is no `--get-motion` yet: CLIo Motion
-has made no release for it to follow.)
+the two; without it those tests are passed over. `--get-motion` (`engine/motion/fetch.py`) is
+`--get-picture` again: the zip for this machine from the release CLIo follows, its SHA-256
+against the one noted in `fetch.py`, the library and its LICENSE and NOTICE into the data
+folder, then the same check against the Python. While `SHA256` there is empty CLIo follows no
+release: `--get-motion` says how to build the library and the launcher's Downloads leaves it
+out.
+
+**Following a release** of CLIo Picture or CLIo Motion is one command, once the release has
+its files:
+
+```
+python -m engine.follow motion 0.25.0    # or: picture 0.10.0; --check only says what would change
+```
+
+It reads the release's `checksums.txt`, downloads every zip, checks each against that list and
+that the library is where `--get-...` looks for it, and writes `RELEASE`, `SHA256` and the
+sizes the launcher quotes (`engine/downloads.py`) - or nothing, if any zip is not right. Then
+the tests, and commit. `tests/test_follow.py` fails if the committed tables are not as the
+script writes them (the sizes were once left from an earlier release).

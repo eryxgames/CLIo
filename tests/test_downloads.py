@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 from engine import downloads  # noqa: E402
 from engine.audio.ballistic import fetch as ballistic_fetch  # noqa: E402
+from engine.motion import fetch as motion_fetch  # noqa: E402
 from engine.picture import fetch as picture_fetch  # noqa: E402
 
 
@@ -46,6 +47,13 @@ class FakeUI:
 
 
 class DownloadTests(unittest.TestCase):
+    def setUp(self):
+        # CLIo Picture and Ballistic here, whether or not a release of CLIo Motion is followed
+        # (that one's offer is in tests/test_motion_fetch.py)
+        followed = mock.patch.dict(motion_fetch.SHA256, {}, clear=True)
+        followed.start()
+        self.addCleanup(followed.stop)
+
     def test_sizes_in_words(self):
         self.assertEqual(downloads.size_text(45098), "45 KB")
         self.assertEqual(downloads.size_text(1206755), "1.2 MB")

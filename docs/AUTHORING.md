@@ -2511,8 +2511,13 @@ labelled as a sprite is. Model space: x to the right, y forward, z up; one unit 
   and 110 ms. The library is CLIo Motion's `c/` built as a shared library (`make shared`, or
   `build.bat`; its repository's workflow builds it for every machine). It is looked for in
   `CLIO_MOTION_LIB` (`none` for none), then as `engine/motion/lib/clio_motion.dll`
-  (`libclio_motion.so`, `libclio_motion.dylib`), then where the system keeps libraries; it is
-  run against the Python on a short walk first and not used if the two differ. `--crowd` says
+  (`libclio_motion.so`, `libclio_motion.dylib`), then in your data folder
+  (`~/.local/share/clio/motion/`, `%APPDATA%\clio\motion\` on Windows), then where the system
+  keeps libraries; it is run against the Python on a short walk first and not used if the two
+  differ. `python clio.py --get-motion` (and the launcher's **Downloads**) fetches it into your
+  data folder as `--get-picture` fetches CLIo Picture - from the release of CLIo Motion that
+  CLIo follows, checked against that release's checksum; while CLIo follows none, it says how
+  to build the library instead and the launcher does not offer it. `--crowd` says
   in its caption which is stepping the bodies. A body given a ground of its own is stepped in
   Python. The library is carried in the engine (`engine/motion/clio_motion/`: pure
   Python, nothing to install); it is [CLIo Motion](https://github.com/eryxgames/clio-motion),

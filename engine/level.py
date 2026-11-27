@@ -69,7 +69,7 @@ KEYMAP = {
     "home": "h", "pgup": "l", "end": "turn around", "pgdn": "use",
     "space": "f", "insert": "f", "enter": "use", "tab": "map", "center": "w", "delete": "w",
     "1": "1", "2": "2", "3": "3", "4": "4", "5": "5", "6": "6", "7": "7",
-    "?": "help", "f1": "help", "f2": "goggles", "f5": "save", "f9": "load", "]": "next", "esc": "menu",
+    "?": "help", "f1": "help", "f2": "goggles", "b": "goggles", "f5": "save", "f9": "load", "]": "next", "esc": "menu",
     "f3": "mag", "f4": "jet", "f6": "dive", "+": "jump", "f7": "jump", "f8": "jj",
     "shift-up": "look up", "shift-down": "look down", "ctrl-up": "look up", "ctrl-down": "look down",
     "alt-up": "look up", "alt-down": "look down",
@@ -125,10 +125,11 @@ SWIPE_GAP = 0.3              # seconds: a swipe sends a run of wheel steps; one 
 DUELLED = re.compile(r" =((?:won|lost|fled)(?::\d+)?)$")   # a duel's outcome on the line that started it
 META = re.compile(r"(?:save|load|saves)(?:\s+[\w-]+)?|\*[\w-]*|realtime(?:\s+(?:off|on|\d+(?:\.\d+)?))?")
 
-LINE_VIEWS = ("lines", "scan")        # a level's views in lines (engine/ahead.py): what is ahead; a surface scan
+LINE_VIEWS = ("lines", "scan", "plan")        # a level's views in lines (engine/ahead.py): what is ahead; a surface scan
 DETAILS = ("auto", "high", "low")     # a level's picture: "low" draws the floor and ceiling at half width
 
 STATE_MARK = {"aim": "!", "windup": "!", "charge": "»", "spin": "!!"}
+SCANNERS = ("scan", "plan")           # goggles that are a scanner: the level from above, not what is ahead
 STATE_ROLE = {"aim": "aim", "windup": "wind", "charge": "charge", "spin": "aim"}
 
 
@@ -152,7 +153,7 @@ class Cell:
                  "open_for", "closes_at", "from_side", "on_open", "height", "ceiling_height", "step",
                  "slope", "rise", "ceiling_slope", "ceiling_rise", "wet", "vacuum",
                  "ceiling_mag", "mag_off_on", "mag_delay", "high", "hatch", "mag_ceiling", "lamp", "world_up",
-                 "sheds", "mark")
+                 "sheds", "mark", "shelter")
 
     def __init__(self, x, y, ch, spec):
         self.x, self.y, self.ch = x, y, ch
@@ -164,7 +165,8 @@ class Cell:
         self.mag_delay = int(spec.get("mag_delay") or 0)  # ... so many beats after the event
         self.high = bool(spec.get("high"))              # a switch, exit or locker up by the ceiling: reached from it
         self.hatch = spec.get("hatch")                  # a hatch in the ceiling to the other of its name (the deck above)
-        self.mark = spec.get("mark") or None            # a place with a name: a scan shows it (a mission's point)
+        self.shelter = bool(spec.get("shelter"))        # where civilians are safe: one that reaches it is secured
+        self.mark = spec.get("mark") or ("SHELTER" if spec.get("shelter") else None)
         self.lamp = spec.get("lamp") or None            # a lamp here: its colour, reach, power... (engine/atmosphere.py)
         up = FACING.get(str(spec.get("world_up") or "").lower())
         self.world_up = up                              # a wall walked as a floor: which way in the map the world's up is
@@ -402,7 +404,8 @@ class Monster:
     # what a monster's mind holds (engine/ai): an older save's monsters get these
     DEFAULTS = {"tactic": None, "role": None, "squad": None, "seen_at": None, "post": None, "side": 0, "goal": None,
                 "said": None, "spot": None, "grenades_left": 0, "mines_left": 0, "lobbed": None, "dived": False,
-                "on_death": None, "civil": False, "spared": 0, "fled": -99}
+                "on_death": None, "civil": False, "spared": 0, "fled": -99, "ally": False, "follows": False,
+                "secured": False, "dest": None, "dwell": 0}
 
     def __init__(self, mid, kind, spec, x, y, tag):
         self.id, self.kind, self.spec = mid, kind, spec
@@ -420,7 +423,12 @@ class Monster:
         self.float = float(spec.get("float", 0.0))
         self.attack = spec.get("attack") or {}
         self.civil = bool(spec.get("civilian"))         # one of ours: it harms nobody, and the others go for it
-        self.awake = bool(spec.get("awake")) or self.civil
+        self.ally = bool(spec.get("ally")) and not self.civil    # one of ours that fights: it goes for them
+        self.awake = bool(spec.get("awake")) or self.civil or self.ally
+        self.follows = False                            # a civilian that goes where the player goes (to a shelter)
+        self.secured = False                            # ...and has reached one: out of the level, safe
+        self.dest = None                                # where a civilian is walking to, about its work
+        self.dwell = 0                                  # the beats it stays there yet
         self.spared = 0                                 # the beat until which it leaves ours alone (he shot it)
         self.fled = -99                                 # the beat one of ours last ran from somebody
         self.wake_on = None
@@ -466,10 +474,17 @@ class Monster:
     def name(self):
         return self.spec.get("name", self.kind)
 
+    @property
+    def ours(self):
+        """On the player's side: a civilian, or one that fights beside him."""
+        return self.civil or self.ally
+
     def label(self):
         mark = STATE_MARK.get(self.intent, "")
         role = STATE_ROLE.get(self.intent, "dim" if self.barrel else "boss" if self.spec.get("boss") else
-                              "good" if self.civil else "tag")
+                              "good" if self.ours else "tag")
+        if self.ours:                                    # (whatever it is at: it is not at him)
+            role = "good"
         if self.grudge is not None:
             role = "alert"
         return self.tag + mark, role
@@ -688,6 +703,7 @@ class Level:
         self.fires = {}
         self.total_kills = self.total_items = self.total_secrets = 0
         self.total_civil = 0                             # civilians in the level (monsters that are ours)
+        self.shelters = []                               # the cells where they are safe
         self.world = Chunks(self, wspec)
         self.grid = self.world
         self.cell = self.world.cell                      # the cells come from the world's chunks
@@ -808,8 +824,9 @@ class Level:
         self.timed_cells = [c for c in cells if c.open_for]
         self.belts = [c for c in cells if c.conveyor is not None]
         self.fires = {}                                  # (x, y) -> beats it burns on
-        self.total_kills = sum(1 for m in self.monsters if not m.barrel and not m.spec.get("boss") and not m.civil)
+        self.total_kills = sum(1 for m in self.monsters if not m.barrel and not m.spec.get("boss") and not m.ours)
         self.total_civil = sum(1 for m in self.monsters if m.civil)
+        self.shelters = [(c.x, c.y) for row in self.grid for c in row if c.shelter]
         self.total_items = sum(1 for it in self.items if not it.mine) + sum(
             sum(1 for i in (c.locker or ()) + (c.supply or ()) if not self.mine_id(i)) for c in cells)
         self.total_secrets = sum(1 for row in self.grid for c in row if c.secret)
@@ -1359,6 +1376,9 @@ class Level:
             lines.insert(len(head) + 2, ("civilians  %s   (%d of %d alive)" % (pct(alive, self.total_civil), alive,
                                                                               self.total_civil),
                                          "good" if alive == self.total_civil else "text" if alive else "hurt"))
+            if self.shelters:
+                lines.insert(len(head) + 3, ("secured    %d of %d" % (s.get("secured", 0), self.total_civil),
+                                             "good" if s.get("secured", 0) >= alive and alive else "text"))
         if self.spec.get("criticals") or self.cfg.get("criticals"):
             lines.append(("criticals  %d" % s.get("criticals", 0), "hit" if s.get("criticals") else "text"))
         if self.boss is not None and self.boss.gone:
@@ -1569,7 +1589,7 @@ class Level:
         m = re.fullmatch(r"look(?:\s+(up|down|ahead|level))?", t)
         if m:
             return self.look_at(m.group(1))
-        m = re.fullmatch(r"(?:goggles|nv|scanner|scan)(?:\s+(on|off))?", t)
+        m = re.fullmatch(r"(?:goggles|nv|scanner|scan|plan|base)(?:\s+(on|off))?", t)
         if m:
             return self.goggles(m.group(1))
         m = re.fullmatch(r"(?:mag|magboots)(?:\s+(on|off))?", t)
@@ -1964,7 +1984,7 @@ class Level:
     def goggles(self, how=None):
         """Put the TTY goggles on or take them off (a free action, as turning is): their battery lasts longer."""
         p = self.player
-        scan = self.spec.get("goggles") == "scan"        # this level's are a scanner: the level from above
+        scan = self.spec.get("goggles") in SCANNERS        # this level's are a scanner: the level from above
         name = "scanner" if scan else "goggles"
         if not p.goggles:
             self.say(("The %s's battery is flat." if p.had_goggles else "You have no %s.") % name, "dim")
@@ -2087,7 +2107,7 @@ class Level:
             return self.push_ball(m, nx - p.x, ny - p.y)
         if m is not None and m.barrel and not m.vehicle and not m.ball:
             return self.push_barrel(m, nx - p.x, ny - p.y)
-        if m is not None and m.civil and v is None and not flying and not p.ceiling:
+        if m is not None and m.ours and v is None and not flying and not p.ceiling:
             m.x, m.y = p.x, p.y                          # one of ours: he gives way, into the place just left
             self.say("%s lets you by." % m.tag, "dim")
             m = None
@@ -3600,7 +3620,7 @@ class Level:
     def cone(self):
         """What a shot with no target goes for: everything in sight, the nearest and most central first.
         (With only quarter turns, much is never straight ahead; the gun finds it anyway.)"""
-        return sorted([m for m in self.visible() if (m.awake or not m.spec.get("boss")) and not m.civil],
+        return sorted([m for m in self.visible() if (m.awake or not m.spec.get("boss")) and not m.ours],
                       key=lambda m: (self.dist(m) + abs(self.rel(m.x, m.y)[0]) * 0.5, m.id))
 
     def set_target(self, tag=None):
@@ -3615,7 +3635,7 @@ class Level:
                 return False
             self.target = found[0]
         else:
-            vis = [m for m in vis if not m.civil]        # (one of ours is aimed at only by name)
+            vis = [m for m in vis if not m.ours]        # (one of ours is aimed at only by name)
             if not vis:
                 self.say("Nobody to aim at.", "dim")
                 return False
@@ -3672,7 +3692,7 @@ class Level:
             ax, ay = self.ahead()
             if target is None or (target.x, target.y) != (ax, ay):
                 target = self.monster_at(ax, ay)
-                if target is not None and target.civil and not tag:      # one of ours: the blow is held
+                if target is not None and target.ours and not tag:      # one of ours: the blow is held
                     self.say("%s is in the way. You hold the blow." % target.tag, "dim")
                     return False
             if target is None:
@@ -3791,7 +3811,7 @@ class Level:
     def open_to(self, m):
         """Where a shot at this one counts for more, in words - or None: while it takes aim or winds up (it stands
         still for it), while it reels, and from behind it or from its side (it faces another way)."""
-        if not self.criticals or m.dead or m.gone or m.barrel or m.civil or m.spec.get("boss") or not m.awake:
+        if not self.criticals or m.dead or m.gone or m.barrel or m.ours or m.spec.get("boss") or not m.awake:
             return None
         if m.intent in ("aim", "windup", "spin"):
             return "as it aims"
@@ -3803,7 +3823,7 @@ class Level:
             off = abs((to - m.heading + math.pi) % (2 * math.pi) - math.pi)
             if off > math.radians(100):
                 return "from behind"
-        if m.grudge is not None and m.grudge.civil:
+        if m.grudge is not None and m.grudge.ours:
             return "while it is at %s" % m.grudge.tag
         return None
 
@@ -3867,10 +3887,10 @@ class Level:
             m.hp -= d
             if not m.awake:
                 self.wake(m, quiet=True)
-            if source is None and m.grudge is not None and m.grudge.civil and not lead.startswith("The "):
+            if source is None and m.grudge is not None and m.grudge.ours and not m.ours and not lead.startswith("The "):
                 m.grudge, m.spared = None, self.beat + 6     # his shot: it leaves the civilian for him, for a while
             if (source is not None and not source.dead and m is not source and not m.barrel and not m.civil
-                    and m.hp > 0 and m.grudge is not source and not m.spec.get("boss")):
+                    and not (m.ours and source.ours) and m.hp > 0 and m.grudge is not source and not m.spec.get("boss")):
                 m.grudge = source
                 turned.append(m)
         killed = [m for m, _ in hits if m.hp <= 0 and not (m.spec.get("boss") and m.spec.get("attack", {}).get("escape"))]
@@ -3919,10 +3939,20 @@ class Level:
             if m.on_death and not self.over:
                 self.event(m.on_death)
             return
+        if m.ally:                                       # one that fought beside him
+            where = self.sector(m.x, m.y)
+            self.say((m.spec.get("death") or "%s is down.") % m.tag + ("  (%s)" % where if where else ""), "hurt")
+            self.sfx((m.spec.get("sounds") or {}).get("death") or "hurt")
+            if m.on_death:
+                self.event(m.on_death)
+            self.update_seen()
+            return
         if m.civil:                                      # one of ours is down
             self.stats["lost"] = self.stats.get("lost", 0) + 1
             alive = self.total_civil - self.stats["lost"]
-            self.say((m.spec.get("death") or "%s is down.") % m.tag + "  (%d of %d alive)" % (alive, self.total_civil), "hurt")
+            where = self.sector(m.x, m.y)
+            self.say((m.spec.get("death") or "%s is down.") % m.tag + ("  %s:" % where if where else "") +
+                     "  (%d of %d alive)" % (alive, self.total_civil), "hurt")
             self.sfx((m.spec.get("sounds") or {}).get("death") or "hurt")
             self.interrupt = self.interrupt or "%s is down" % m.tag
             if m.on_death:
@@ -3962,7 +3992,7 @@ class Level:
         self.update_seen()
         clear = self.spec.get("on_clear")                # the level is clean: nobody left that counts as a kill
         if clear and clear not in self.events and not self.over and not any(
-                not o.dead and not o.gone and not o.barrel and not o.civil and not o.spec.get("boss")
+                not o.dead and not o.gone and not o.barrel and not o.ours and not o.spec.get("boss")
                 and not o.spec.get("falls") and o.wake_on != clear for o in self.monsters):
             self.event(clear)
 
@@ -4357,7 +4387,10 @@ class Level:
         self.moved, self.queue = [], []
         for m in list(self.monsters):
             if not m.dead and not m.gone and m.awake and not m.barrel:
+                was = (m.x, m.y)
                 self.act(m)
+                if m.spec.get("spares_civilians") and (m.x, m.y) == was and not m.stun:
+                    self.shoulder(m)
         for m, x0, y0 in self.moved:                    # it faces the way it went
             if (m.x, m.y) != (x0, y0):
                 m.heading = math.atan2(m.y - y0, m.x - x0)
@@ -4403,11 +4436,11 @@ class Level:
             p.goggles -= 1
             if not p.goggles:
                 p.goggles_on = False
-                self.say("The scanner goes dark." if self.spec.get("goggles") == "scan" else
+                self.say("The scanner goes dark." if self.spec.get("goggles") in SCANNERS else
                          "The goggles flicker out. Colours come back.", "dim")
             elif p.goggles == 5:
                 self.say("The scanner's battery is low: 5 more beats. (scanner off saves it)"
-                         if self.spec.get("goggles") == "scan" else
+                         if self.spec.get("goggles") in SCANNERS else
                          "The goggles' battery is low: 5 more beats. (goggles off saves it)", "alert")
         if p.sudo:
             p.sudo -= 1
@@ -4635,7 +4668,10 @@ class Level:
             m.grudge = None
         if m.civil:
             return self.civil_act(m)
-        if self.total_civil:
+        if m.ally:
+            if not self.ally_marks(m):                   # nobody to fight: it keeps its post
+                return
+        elif self.total_civil or self.allied:
             self.marks_civilian(m)
         if ai.brain.has(self, m):                        # a brain: it weighs what to do (engine/ai)
             return ai.brain.act(self, m)
@@ -4763,23 +4799,167 @@ class Level:
         where it was."""
         threat = None
         for o in self.monsters:
-            if o.civil or o.dead or o.gone or o.barrel or not o.awake or o.vehicle or o.spec.get("falls"):
+            if o.ours or o.dead or o.gone or o.barrel or not o.awake or o.vehicle or o.spec.get("falls"):
                 continue
             d = max(abs(o.x - m.x), abs(o.y - m.y))
             if d <= 6 and (threat is None or d < threat[0]) and self.sees(m.x, m.y, o.x, o.y):
                 threat = (d, o)
+        p = self.player
+        m.intent = None
+        if self.shelters and not m.follows and self.alarmed and max(abs(p.x - m.x), abs(p.y - m.y)) <= 1:
+            m.follows, m.dest, m.dwell = True, None, 0   # he has come for it: it goes where he goes
+            self.say("%s follows you." % m.tag, "good")
+        if m.follows:
+            home = self.ways_to_shelter(m)
+            near = home.get((m.x, m.y))
+            if near is not None and near <= 1:           # at the door of a shelter: safe, and out of the level
+                return self.secure(m)
+            if threat is not None and threat[0] <= 3:    # one of them close: it runs, as any would
+                m.fled = self.beat
+                if abs(threat[1].x - m.x) + abs(threat[1].y - m.y) > 1:
+                    self.step_towards(m, self.ways(threat[1].x, threat[1].y, limit=14), away=True)
+            elif near is not None and near <= 7:         # the shelter is near: it knows the way
+                best = None                              # the step that gets it nearest - round whoever is in
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):   # the way, and not back where it came from
+                    x, y = m.x + dx, m.y + dy
+                    d = home.get((x, y), 99)
+                    if self.free(x, y, skip=m) and d <= near + 1 and (x, y) != m.dest and (best is None or d < best[0]):
+                        best = (d, x, y)
+                if best is not None:
+                    self.moved.append((m, m.x, m.y))
+                    m.dest = (m.x, m.y)
+                    m.x, m.y = best[1], best[2]
+            elif max(abs(p.x - m.x), abs(p.y - m.y)) > 1:
+                self.step_towards(m, self.ways(p.x, p.y, limit=24))
+            return
         if threat is not None:
-            m.fled = self.beat
+            m.fled, m.dest, m.dwell = self.beat, None, 0
             if abs(threat[1].x - m.x) + abs(threat[1].y - m.y) > 1:
                 self.step_towards(m, self.ways(threat[1].x, threat[1].y, limit=14), away=True)
-        elif (m.x, m.y) != tuple(m.post) and (self.beat + m.id) % 2 == 0 and self.beat - m.fled > 4:
+            return
+        if self.beat - m.fled <= 4:
+            return
+        if m.dwell > 0:                                  # at its work: it stays a while (by something, it works at it)
+            m.dwell -= 1
+            if m.dest == "work":
+                m.intent = "work"
+            return
+        if m.dest is None or m.dest == "work":           # the next place to be: about where it was put
+            reach = int(m.spec.get("roam", 3))
+            spots = [(x, y) for x in range(m.post[0] - reach, m.post[0] + reach + 1)
+                     for y in range(m.post[1] - reach, m.post[1] + reach + 1)
+                     if (x, y) != (m.x, m.y) and self.free(x, y, skip=m) and self.sees(m.post[0], m.post[1], x, y)]
+            m.dest = self.rng.choice(spots) if spots and reach > 0 else None
+            if m.dest is None:
+                m.dwell = 6
+                return
+        if (m.x, m.y) == tuple(m.dest) or self.monster_at(*m.dest) not in (None, m):
+            by = any(self.cell(m.x + dx, m.y + dy).kind != "floor" or self.cell(m.x + dx, m.y + dy).solid
+                     for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))
+            m.dest, m.dwell = ("work" if by else None), self.rng.randint(3, 8)
+        elif (self.beat + m.id) % 2 == 0:                # a walk, not a run
+            was = (m.x, m.y)
+            self.step_towards(m, self.ways(m.dest[0], m.dest[1], limit=12))
+            if (m.x, m.y) == was:
+                m.dest = None
+
+    @property
+    def alarmed(self):
+        """Whether any of them is up and about (found once a beat)."""
+        if getattr(self, "_alarm", (None,))[0] != self.beat:
+            self._alarm = (self.beat, any(o.awake and not o.ours and not o.dead and not o.gone and not o.barrel
+                                          and not o.vehicle for o in self.monsters))
+        return self._alarm[1]
+
+    @property
+    def allied(self):
+        return any(o.ally and not o.dead and not o.gone for o in self.monsters)
+
+    def ways_to_shelter(self, m):
+        """The steps to the shelter nearest to this one, from the cells round it (kept for the beat)."""
+        x, y = min(self.shelters, key=lambda at: (max(abs(at[0] - m.x), abs(at[1] - m.y)), at))
+        if getattr(self, "_home", (None,))[0] != self.beat:
+            self._home = (self.beat, {})
+        if (x, y) not in self._home[1]:
+            self._home[1][(x, y)] = self.ways(x, y, limit=30)
+        return self._home[1][(x, y)]
+
+    def secure(self, m):
+        """A civilian has reached a shelter: it is out of the level, and safe."""
+        m.secured, m.gone, m.follows = True, True, False
+        self.stats["secured"] = self.stats.get("secured", 0) + 1
+        self.say("%s is secured.  (%d of %d)" % (m.tag, self.stats["secured"], self.total_civil), "good")
+        self.sfx("pickup")
+        done = self.spec.get("on_secured")
+        if done and done not in self.events and not any(c.civil and not c.dead and not c.gone for c in self.monsters):
+            self.event(done)
+        self.update_seen()
+
+    def sector(self, x, y):
+        """The name of the part of the level a cell is in (the level's ``"sectors"``), or None."""
+        for name, box in (self.spec.get("sectors") or {}).items():
+            if box[0] <= x <= box[2] and box[1] <= y <= box[3]:
+                return name
+        return None
+
+    def shoulder(self, m):
+        """One that is after the player alone, and has not moved: if one of ours stands in its way to him, it puts
+        him aside (they change places)."""
+        p = self.player
+        if abs(m.x - p.x) + abs(m.y - p.y) <= 1:
+            return
+        field = self.ways(p.x, p.y, limit=40)
+        d = field.get((m.x, m.y))
+        if d is None:
+            return
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            o = self.monster_at(m.x + dx, m.y + dy)
+            near = field.get((m.x + dx, m.y + dy))
+            if o is not None and o.ours and near is not None and near < d:
+                self.moved += [(m, m.x, m.y), (o, o.x, o.y)]
+                (m.x, m.y), (o.x, o.y) = (o.x, o.y), (m.x, m.y)
+                if m.seen or o.seen:
+                    self.say("%s puts %s aside." % (m.tag, o.tag), "alert")
+                return
+
+    def ally_marks(self, m):
+        """Whom one that fights beside him goes for: the nearest of them it sees - or, seeing none, it walks
+        towards one that is up within ten cells' walk, and failing that back to its post. True when it has one."""
+        best, sight = None, int(m.spec.get("sight", 8))
+        for o in self.monsters:
+            if (o.ours or o.dead or o.gone or o.barrel or not o.awake or o.vehicle or o.spec.get("falls")
+                    or o.spec.get("spares_civilians") or o.spec.get("boss")):    # (that one is his)
+                continue
+            d = max(abs(o.x - m.x), abs(o.y - m.y))
+            if d <= sight and (best is None or d < best[0]) and self.sees(m.x, m.y, o.x, o.y):
+                best = (d, o)
+        if best is not None:
+            if m.grudge is not best[1] and (m.seen or best[1].seen):
+                self.say("%s engages %s." % (m.tag, best[1].tag), "good")
+            m.grudge = best[1]
+            return True
+        m.grudge, m.intent = None, None
+        m.spin, m.spun = 0, False
+        field = self.ways(m.x, m.y, limit=int(m.spec.get("hunt", 10)))
+        near = None
+        for o in self.monsters:
+            if (o.ours or o.dead or o.gone or o.barrel or not o.awake or o.vehicle or o.spec.get("boss")
+                    or o.spec.get("spares_civilians")):
+                continue
+            d = field.get((o.x, o.y))
+            if d is not None and (near is None or d < near[0]):
+                near = (d, o)
+        if near is not None:
+            self.step_towards(m, self.ways(near[1].x, near[1].y, limit=14))
+        elif (m.x, m.y) != tuple(m.post):
             self.step_towards(m, self.ways(m.post[0], m.post[1], limit=40))
+        return False
 
     def marks_civilian(self, m):
         """Whom this one is after: the nearest of ours it sees, if he is not nearer and in its sight (and has not
         just shot it) - then it goes for that one as for another monster it has a grudge against."""
         if (m.barrel or m.spec.get("boss") or m.vehicle or m.spec.get("spares_civilians")
-                or (m.grudge is not None and not m.grudge.civil)):
+                or (m.grudge is not None and not m.grudge.ours)):
             return
         p = self.player
         sight = int(m.spec.get("sight", 8))
@@ -4787,7 +4967,7 @@ class Level:
         best = None
         if self.beat >= m.spared:
             for c in self.monsters:
-                if not c.civil or c.dead or c.gone:
+                if not c.ours or c.dead or c.gone:
                     continue
                 d = max(abs(c.x - m.x), abs(c.y - m.y))
                 if d <= sight and (best is None or d < best[0]) and self.sees(m.x, m.y, c.x, c.y):
@@ -4798,7 +4978,8 @@ class Level:
         if want is not m.grudge:
             m.grudge = want
             if want is not None and (m.seen or want.seen):
-                self.say("%s goes for %s." % (m.tag, want.tag), "alert")
+                where = self.sector(want.x, want.y)
+                self.say("%s goes for %s%s." % (m.tag, want.tag, " in %s" % where if where else ""), "alert")
                 self.interrupt = self.interrupt or "%s goes for %s" % (m.tag, want.tag)
 
     def ranged(self, m, foe, d):
@@ -5286,6 +5467,11 @@ class FrameConsole:
         if lv.total_civil:
             alive = lv.total_civil - lv.stats.get("lost", 0)
             segs.append((" ours %d/%d " % (alive, lv.total_civil), "good" if alive == lv.total_civil else "alert"))
+            if lv.shelters:
+                segs.append(("secured %d " % lv.stats.get("secured", 0), "good" if lv.stats.get("secured") else "dim"))
+        where = lv.sector(lv.player.x, lv.player.y)
+        if where:
+            segs.append((" %s " % where, "dim"))
         if lv.shots:
             segs.append((g["fire"] + " fire", "wind"))
         if lv.player.sudo:
@@ -5293,7 +5479,7 @@ class FrameConsole:
         if lv.player.boots:
             segs.append(("  boots: %d" % lv.player.boots, "toxic"))
         if lv.player.goggles:
-            name = "scanner" if lv.spec.get("goggles") == "scan" else "goggles"
+            name = "scanner" if lv.spec.get("goggles") in SCANNERS else "goggles"
             segs.append(("  %s: %d" % (name, lv.player.goggles), "secret") if lv.player.goggles_on else
                         ("  %s off: %d" % (name, lv.player.goggles), "dim"))
         p = lv.player
@@ -5848,6 +6034,7 @@ def play_scene(game, scene, resume_from=None):
     w.vars["_fp_player"] = lv.player.keep()
     stats = dict(lv.stats, beats=lv.beat, par=lv.par, secrets_total=lv.total_secrets, kills_total=lv.total_kills,
                  civilians_total=lv.total_civil, saved=lv.total_civil - lv.stats.get("lost", 0),
+                 secured=lv.stats.get("secured", 0),
                  items_total=lv.total_items)
     w.vars.setdefault("levels", {})[lv.id] = stats
     if outcome == "exit":

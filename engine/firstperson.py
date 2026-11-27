@@ -678,7 +678,7 @@ def fast(m):
 
 def doing(m, fx):
     """The clip a monster's model plays for what it does in this frame: attack, walk or idle."""
-    return ("attack" if m.intent in ("aim", "windup", "spin") or m.id in fx.emuzzle else
+    return ("attack" if m.intent in ("aim", "windup", "spin", "work") or m.id in fx.emuzzle else
             "walk" if m.id in fx.pos else "idle")
 
 

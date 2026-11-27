@@ -135,22 +135,38 @@ class Civilians(unittest.TestCase):
                    "##########"])
         c, g = one(lv, "c1"), one(lv, "g1")
         lv.moved, lv.queue = [], []                             # (as a beat has them)
-        g.awake = False                                         # asleep: nothing to run from
-        lv.civil_act(c)
-        self.assertEqual((c.x, c.y), (4, 1))
-        g.awake = True
         lv.civil_act(c)
         self.assertGreater(max(abs(c.x - g.x), abs(c.y - g.y)), 3)
-        self.assertEqual(c.fled, lv.beat)
+        self.assertEqual((c.fled, c.dest), (lv.beat, None))
         c.x, c.y = 6, 1                                         # at arm's length: no outrunning it
         lv.civil_act(c)
         self.assertEqual((c.x, c.y), (6, 1))
-        g.dead = True                                           # gone: back to his post, every other beat, after a while
-        lv.beat += 5
-        was = (c.x, c.y)
-        lv.beat += (lv.beat + c.id) % 2
-        lv.civil_act(c)
-        self.assertEqual(abs(c.x - 4), abs(was[0] - 4) - 1)
+
+    def test_left_alone_they_go_about_their_work(self):
+        rows = ["#########",
+                "#@......#",
+                "#...c...#",
+                "#.......#",
+                "#########"]
+        lv = made(rows)
+        c = one(lv, "c1")
+        been, worked = set(), 0
+        for _ in range(120):
+            lv.end_beat()
+            been.add((c.x, c.y))
+            worked += c.intent == "work"
+            self.assertLessEqual(max(abs(c.x - 4), abs(c.y - 2)), 3)       # never far from where it was put
+        self.assertGreater(len(been), 4)
+        self.assertGreater(worked, 0)                           # by a wall, it works at it (the clip of a reach)
+        from engine.firstperson import FX, doing
+        c.intent = "work"
+        self.assertEqual(doing(c, FX()), "attack")
+        lv = made(rows)
+        c = one(lv, "c1")
+        c.spec = dict(c.spec, roam=0)                           # ...or stands, when told to
+        for _ in range(30):
+            lv.end_beat()
+        self.assertEqual((c.x, c.y), (4, 2))
 
     def test_one_of_ours_dies_and_is_counted(self):
         lv = made(["######",
@@ -194,6 +210,200 @@ class Civilians(unittest.TestCase):
         c, g = one(again, "c1"), one(again, "g1")
         self.assertTrue(c.civil)
         self.assertEqual((again.total_civil, g.grudge is c or c.dead), (1, True))
+
+
+class Secured(unittest.TestCase):
+    ROWS = ["############",
+            "#x.@..c...s#",
+            "#..........#",
+            "############"]
+
+    def level(self, **spec):
+        return made(self.ROWS, {"x": {"shelter": True}, "s": {"monster": "grunt", "wake_on": "later"}}, **spec)
+
+    def test_one_he_comes_for_follows_him_to_the_shelter(self):
+        lv = self.level(on_secured="safe", events={"safe": "All of them are in."})
+        c, g = one(lv, "c1"), one(lv, "g1")
+        c.spec = dict(c.spec, roam=0)
+        self.assertEqual((lv.shelters, lv.cell(1, 1).mark), ([(1, 1)], "SHELTER"))
+        put(lv, 5, 1, 1)                                        # beside him, and nobody about: he stays at his work
+        lv.end_beat()
+        self.assertFalse(c.follows)
+        g.awake = True                                          # the alarm
+        g.stun = 99
+        lv.end_beat()
+        self.assertTrue(c.follows)
+        self.assertIn("c1 follows you", told(lv))
+        put(lv, 3, 1, 3)
+        for _ in range(10):
+            if c.gone:
+                break
+            lv.end_beat()
+        self.assertTrue(c.secured and c.gone and not c.dead)
+        self.assertEqual(abs(c.x - 1) + abs(c.y - 1), 1)        # at the shelter's door: that is in
+        self.assertEqual((lv.stats["secured"], lv.stats["lost"]), (1, 0))
+        self.assertIn("c1 is secured.  (1 of 1)", told(lv))
+        self.assertIn("All of them are in.", told(lv))          # the last of them: the level's on_secured
+        self.assertIn("secured    1 of 1", [t for t, _r in lv.end_lines()])
+        g.stun = 0
+        lv.marks_civilian(g)                                    # and nothing goes for one that is in
+        self.assertIsNone(g.grudge)
+
+    def test_a_follower_runs_from_one_that_is_close(self):
+        lv = self.level()
+        c, g = one(lv, "c1"), one(lv, "g1")
+        c.follows, g.awake, g.stun = True, True, 99
+        put(lv, 2, 1, 1)
+        g.x = 8
+        lv.end_beat()
+        self.assertEqual(max(abs(c.x - 8), abs(c.y - 1)), 3)    # away from it - which is his way too
+        g.x, g.y = 4, 1
+        c.x, c.y = 6, 1
+        lv.end_beat()
+        self.assertEqual(max(abs(c.x - 4), abs(c.y - 1)), 3)    # ...and away from him, when it is between them
+        g.x = 10                                                # far off: after him again
+        c.x, c.y = 6, 1
+        lv.end_beat()
+        self.assertEqual((c.x, c.y), (5, 1))
+
+    def test_no_shelter_nobody_follows(self):
+        lv = made(["#######", "#@c..g#", "#######"])
+        c = one(lv, "c1")
+        lv.end_beat()
+        self.assertFalse(c.follows)
+        self.assertNotIn("secured", "".join(t for t, _r in lv.end_lines()))
+
+
+class Allies(unittest.TestCase):
+    MEN = {"T": {"monster": "gun", "awake": False}}
+
+    def level(self, rows, **spec):
+        lv = made(rows, {"T": "trooper"}, **spec)
+        return lv
+
+    def setUp(self):
+        OURS["trooper"] = {"name": "trooper", "tag": "s", "hp": 400, "ally": True, "sight": 9,
+                           "attack": {"kind": "hitscan", "damage": [6, 6], "range": 8, "accuracy": [1.0] * 9}}
+
+    def tearDown(self):
+        OURS.pop("trooper", None)
+
+    def test_one_fights_them_and_they_fight_it(self):
+        lv = self.level(["###########",
+                         "#@.T....g.#",
+                         "###########"], weapons=PISTOL)
+        t, g = one(lv, "s1"), one(lv, "g1")
+        put(lv, 1, 1, 1)
+        self.assertTrue(t.ally and t.ours and t.awake and not t.civil)
+        self.assertEqual((lv.total_kills, lv.total_civil), (1, 0))
+        self.assertEqual(lv.cone(), [g])                        # his gun passes the trooper by
+        self.assertEqual(t.label()[1], "good")
+        lv.rng.random = lambda: 0.0
+        for _ in range(3):
+            lv.end_beat()
+        self.assertIs(t.grudge, g)
+        self.assertIn("s1 engages g1", told(lv))
+        self.assertLess(g.hp, 40)                               # it shoots
+        self.assertIs(g.grudge, t)                              # and is gone for (nearer than he is)
+        for _ in range(60):
+            if g.dead:
+                break
+            lv.end_beat()
+        self.assertTrue(g.dead)
+        self.assertEqual(lv.stats["kills"], 1)
+        self.assertIsNone(t.grudge)
+
+    def test_one_that_falls_is_not_a_civilian_lost(self):
+        lv = self.level(["#######", "#@.T.g#", "#######"], sectors={"GATE": [1, 1, 5, 1]})
+        t = one(lv, "s1")
+        lv.kill(t)
+        self.assertEqual((lv.stats["lost"], lv.stats["kills"]), (0, 0))
+        self.assertIn("s1 is down.  (GATE)", told(lv))
+
+    def test_it_walks_towards_the_fight_and_back(self):
+        lv = self.level(["#########",
+                         "#@T.#.g.#",
+                         "#...#...#",
+                         "#.......#",
+                         "#########"])
+        t, g = one(lv, "s1"), one(lv, "g1")
+        g.stun = 99
+        lv.moved, lv.queue = [], []
+        far = lv.ways(g.x, g.y).get((t.x, t.y))
+        self.assertFalse(lv.ally_marks(t))                      # out of sight, within ten cells' walk: towards it
+        self.assertEqual(lv.ways(g.x, g.y).get((t.x, t.y)), far - 1)
+        g.dead = True
+        self.assertFalse(lv.ally_marks(t))
+        self.assertEqual((t.x, t.y), (2, 1))                    # nobody: back to its post
+
+    def test_the_one_that_is_his_is_left_to_him(self):
+        lv = self.level(["##########",
+                         "#@....T.G#",
+                         "##########"])
+        t, G = one(lv, "s1"), one(lv, "G1")
+        lv.moved, lv.queue = [], []
+        self.assertFalse(lv.ally_marks(t))
+        self.assertIsNone(t.grudge)
+        G.x = 7                                                 # ...and it puts him aside, on its way
+        t.seen = True
+        lv.end_beat()
+        self.assertEqual((G.x, t.x), (6, 7))
+        self.assertIn("G1 puts s1 aside", told(lv))
+        self.assertEqual(t.hp, 400)
+
+
+class Plans(unittest.TestCase):
+    def level(self):
+        lv = made(["####E######",
+                   "#@..#.g.s.#",
+                   "#x.c+..1..#",
+                   "###########"], {"1": {"mark": "Store"}, "x": {"shelter": True}}, goggles="plan",
+                  sectors={"HALL": [1, 1, 3, 2], "LABS": [5, 1, 9, 2]})
+        put(lv, 1, 1, 1)
+        return lv
+
+    def test_a_cell_knows_its_sector(self):
+        lv = self.level()
+        self.assertEqual((lv.sector(1, 1), lv.sector(6, 2), lv.sector(4, 2)), ("HALL", "LABS", None))
+        g = one(lv, "g1")
+        c = one(lv, "c1")
+        c.x, c.y = 5, 2
+        lv.marks_civilian(g)
+        self.assertIn("g1 goes for c1 in LABS.", told(lv))
+
+    def test_the_plan_has_the_sectors_and_who_is_in_them(self):
+        lv = self.level()
+        view = ahead.LevelView(120, 30, "plan")
+        self.assertEqual(view.style, "plan")
+        text = ""
+        for phase in range(0, 12, 3):                           # (who blinks is there in one of them)
+            text += "\n".join("".join(c[0] or " " for c in row) for row in view.render(lv, phase=phase))
+        for word in ("PLAN  T", "YOU: HALL", "HALL", "LABS 1!", "STORE", "SHELTER", "EXIT", "+", ">", "G"):
+            self.assertIn(word, text, word)
+        self.assertNotIn("LABS 2!", text)                       # the one asleep is not on it
+        one(lv, "g1").dead = True
+        text = "\n".join("".join(c[0] or " " for c in row) for row in view.render(lv))
+        self.assertNotIn("LABS 1!", text)
+
+    def test_b_and_f2_open_it(self):
+        lv = self.level()
+        self.assertEqual((KEYMAP["b"], KEYMAP["f2"]), ("goggles", "goggles"))
+        lv.player.goggles, lv.player.had_goggles = 50, True
+        lv.run_line("goggles")
+        self.assertIn("Scanner on", told(lv))
+        term = Term(out=io.StringIO(), width=100, height=30, color=3, unicode=True, animate=False, env={})
+        con = FrameConsole(term, "pixel", keys=False, keymap=KEYMAP, animate=False)
+        con.layout()
+        self.assertEqual(con.view_for(lv).style, "plan")
+        rows = "".join(str(r) for r in con.rows(lv))
+        self.assertIn("secured 0", rows)
+        self.assertIn("HALL", rows)
+
+    def test_a_level_without_end_is_planned_round_him(self):
+        from engine.data import GameData
+        from test_levels import ROOTLESS
+        lv = Level(GameData(ROOTLESS), "sim1", seed=1)
+        self.assertEqual(len(ahead.LevelView(100, 30, "plan").render(lv)), 30)
 
 
 class CleanAndFallen(unittest.TestCase):

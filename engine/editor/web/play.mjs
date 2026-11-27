@@ -5,7 +5,7 @@
 // shares; what the game writes comes back as messages; sounds are played with WebAudio; saves and records are kept
 // in this browser (IndexedDB) and handed back on the next visit.
 //
-//   play.html?game=rootless      a game (rootless, depths, derelict); none: CLIo's own menu of games
+//   play.html?game=rootless      a game (rootless, ironlid, erebus, depths, derelict); none: CLIo's own menu of games
 //   play.html?demo               the tech demo
 //   play.html?edited=ID          the game the editor hands over (its Play button), as last saved
 //   ?pyodide=URL ?npm=URL        Python and xterm.js from elsewhere than jsDelivr (a local copy, another mirror)
@@ -16,7 +16,7 @@ const XTERM = NPM + "@xterm/xterm@6.0.0/";
 const FIT = NPM + "@xterm/addon-fit@0.11.0/lib/addon-fit.mjs";
 const WEBGL = NPM + "@xterm/addon-webgl@0.19.0/lib/addon-webgl.mjs";
 const RING = 65536;
-const GAMES = { rootless: "RØØTLESS", depths: "The Hollow", derelict: "Derelict" };
+const GAMES = { rootless: "RØØTLESS", ironlid: "IRONLID", erebus: "Erebus: Last Watch", depths: "The Hollow", derelict: "Derelict" };
 const $ = (id) => document.getElementById(id);
 const EMBEDDED = (() => { try { return window.top !== window.self; } catch (err) { return true; } })();
 const EDITED = query.get("edited");

@@ -732,8 +732,11 @@ class HostedTests(unittest.TestCase):
         with open(os.path.join(ROOT, "index.html"), encoding="utf-8") as f:
             page = f.read()
         self.assertIn('href="engine/editor/web/index.html"', page)       # by name: not every host finds a folder's page
+        with open(os.path.join(os.path.dirname(hosted.MANIFEST), "play.mjs"), encoding="utf-8") as f:
+            player = f.read()
         for game in hosted.PLAYED:
             self.assertIn('href="engine/editor/web/play.html?game=%s"' % game, page)
+            self.assertRegex(player, r"const GAMES = \{[^}]*\b%s:" % game)     # ...and the link starts that game
         web = os.path.dirname(hosted.MANIFEST)
         with open(os.path.join(web, "worker.js"), encoding="utf-8") as f:
             worker = f.read()

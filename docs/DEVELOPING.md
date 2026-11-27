@@ -130,7 +130,7 @@ guide.
 ## Tests
 
 ```
-python -m unittest discover -s tests     # 1195 tests, a few minutes
+python -m unittest discover -s tests     # 1209 tests, a few minutes
 python -m engine.vector                  # the vector display's reel (Ctrl-C ends)
 python -m engine.realm templates/realm 8 # a steward plays the realm starter over eight seeds
 python tests/bot.py 30                   # an automatic player runs the dungeon 30x per class

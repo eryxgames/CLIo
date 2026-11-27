@@ -62,10 +62,22 @@ const io = {
   removed(path) { postMessage({ type: "removed", path }); },
 };
 
+// One file of the site. A host that is asked for a few hundred files at once says "not now" to some (429, 5xx):
+// those are asked for again, a little later each time, before the page gives up.
 async function grab(path) {
-  const res = await fetch(ROOT + path, { cache: "no-cache" });
-  if (!res.ok) throw new Error(`Could not load ${path} (${res.status})`);
-  return new Uint8Array(await res.arrayBuffer());
+  for (let turn = 0; ; turn++) {
+    let res = null;
+    try {
+      res = await fetch(ROOT + path, { cache: "no-cache" });
+    } catch (e) {
+      if (turn >= 3) throw new Error(`Could not load ${path} (${e.message || e})`);
+    }
+    if (res && res.ok) return new Uint8Array(await res.arrayBuffer());
+    if (res && (turn >= 3 || (res.status < 500 && res.status !== 429))) {
+      throw new Error(`Could not load ${path} (${res.status})`);
+    }
+    await new Promise((done) => setTimeout(done, 400 * (turn + 1) * (turn + 1)));
+  }
 }
 
 async function start({ shared, argv, kept, game }) {

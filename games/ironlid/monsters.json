@@ -4,7 +4,7 @@
   "role": "civilian",
   "tag": "c",
   "model": "scientist",
-  "hp": 30,
+  "hp": 40,
   "civilian": true,
   "death": "%s is killed.",
   "sounds": {
@@ -21,7 +21,7 @@
   "role": "civilian",
   "tag": "c",
   "model": "technician",
-  "hp": 30,
+  "hp": 40,
   "civilian": true,
   "death": "%s is killed.",
   "sounds": {
@@ -38,7 +38,7 @@
   "role": "civilian",
   "tag": "c",
   "model": "hazmat",
-  "hp": 30,
+  "hp": 40,
   "civilian": true,
   "death": "%s is killed.",
   "sounds": {
@@ -55,7 +55,7 @@
   "role": "civilian",
   "tag": "c",
   "model": "researcher",
-  "hp": 30,
+  "hp": 40,
   "civilian": true,
   "death": "%s is killed.",
   "sounds": {
@@ -65,6 +65,44 @@
    "One of Halden's researchers.",
    "",
    "Harms nobody. Runs from what it sees coming."
+  ]
+ },
+ "trooper": {
+  "name": "trooper",
+  "role": "garrison",
+  "tag": "s",
+  "model": "trooper",
+  "hp": 40,
+  "ally": true,
+  "sight": 9,
+  "attack": {
+   "kind": "hitscan",
+   "damage": [
+    4,
+    8
+   ],
+   "range": 8,
+   "accuracy": [
+    0.9,
+    0.85,
+    0.75,
+    0.6,
+    0.5,
+    0.4,
+    0.32,
+    0.26,
+    0.2
+   ]
+  },
+  "sounds": {
+   "attack": "carbine",
+   "death": "civilian_down"
+  },
+  "death": "%s is down.",
+  "man": [
+   "One of the garrison, with the same carbine you have.",
+   "",
+   "Fights whoever of them it sees, and walks towards the shooting. They go for it as for you."
   ]
  },
  "android": {
@@ -78,8 +116,8 @@
   "attack": {
    "kind": "hitscan",
    "damage": [
-    4,
-    8
+    3,
+    7
    ],
    "range": 8,
    "keep": [

@@ -4,11 +4,11 @@
   "description": "A slab the size of a hand that clips to the lid. The battery is original.",
   "pickup": {
    "power": "goggles",
-   "beats": 160,
+   "beats": 400,
    "sprite": "scanner",
    "size": 0.4,
    "sound": "scanner_on",
-   "text": "The scanner: the outpost from above, in the lid. F2 switches it; the battery runs only while it is on."
+   "text": "The scanner: Halden's plan in the lid, with everybody on it. B or F2 switches it; the battery runs only while it is on."
   }
  },
  "medkit": {

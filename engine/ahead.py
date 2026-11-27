@@ -25,7 +25,7 @@ from . import vector
 from .vector import Camera, Wire
 
 LOOKS = ("terrain", "space")
-LEVEL_VIEWS = ("lines", "scan")   # a level's views drawn here (engine/level.py: "view")
+LEVEL_VIEWS = ("lines", "scan", "plan")   # a level's views drawn here (engine/level.py: "view")
 WALL = 1.0                        # how high a level's wall stands over the floor before it
 FAR = 12.0                        # how far it draws (tiles)
 EYE = 0.45                        # the eye above where the vehicle is
@@ -626,7 +626,7 @@ class LevelPlace:
                     open_to = getattr(self.lv, "open_to", None)
                     out.append({"x": x + 0.5, "y": y + 0.5, "wire": made[0], "top": made[1] + 0.08, "ground": ground,
                                 "label": None if dead else str(getattr(m, "kind", "?"))[:1].upper(),
-                                "bright": 0.55 if dead else 0.8 if getattr(m, "civil", False) else 1.3,
+                                "bright": 0.55 if dead else 0.8 if getattr(m, "ours", False) else 1.3,
                                 "critical": bool(open_to(m)) if open_to is not None and not dead else False})
                 elif not dead:
                     out.append({"x": x + 0.5, "y": y + 0.5, "z": ground + 0.5, "ground": ground, "legs": True, "size": 0.22,
@@ -659,11 +659,121 @@ class LevelPlace:
             if m.dead or m.gone or m.barrel or getattr(m, "vehicle", None):
                 continue
             x, y = self.moved.get(m.id, (m.x, m.y))
-            if getattr(m, "civil", False):
-                out.append({"at": (x, y), "label": "+", "bright": 0.9, "tall": 0.45})
+            if getattr(m, "ours", False):
+                out.append({"at": (x, y), "label": "+" if m.civil else "*", "bright": 0.9, "tall": 0.45})
             elif m.awake:
                 out.append({"at": (x, y), "label": str(m.kind)[:1].upper(), "bright": 1.4, "tall": 0.7, "blink": True})
         return out
+
+
+WALKED = ("floor", "door", "field")       # the kinds of cell a plan leaves open
+PLANNED = (72, 48)                        # the part of a level without end that a plan shows, round the player (cells)
+
+
+def plan(scope, lv, place=None, t=0.0):
+    """A level from straight above, as a drawing of it: the walls' faces as lines, doors as bars, and on it what
+    a game is played by - the level's ``"sectors"`` by name (with how many of them are in each: it blinks), the
+    places the map names, the way out, civilians (``+``), those who fight beside him (``*``), every one of them
+    that is awake (its letter, blinking) and the player, as an arrow the way he faces."""
+    moved = getattr(place, "moved", None) or {}
+    p = lv.player
+    x0, y0, W, H = 0, 0, lv.w, lv.h
+    if getattr(lv, "world", None) is not None or W * H > PLANNED[0] * PLANNED[1] * 4:
+        W, H = PLANNED
+        x0, y0 = p.x - W // 2, p.y - H // 2
+    top, foot = 8, 8                                     # a line of words above, one below (in dots)
+    s = min((scope.W - 8) / float(W), (scope.H - top - foot - 4) / float(H))
+    ox, oy = (scope.W - W * s) / 2.0, top + 2 + (scope.H - top - foot - 4 - H * s) / 2.0
+
+    def at(x, y):
+        return int(round(ox + (x - x0) * s)), int(round(oy + (y - y0) * s))
+
+    def seg(a, b, bright):
+        (ax, ay), (bx, by) = a, b
+        n = max(abs(bx - ax), abs(by - ay), 1)
+        for i in range(n + 1):
+            scope.dot(ax + (bx - ax) * i // n, ay + (by - ay) * i // n, bright)
+
+    def cell(x, y):
+        return lv.cell(x, y) if 0 <= x < lv.w and 0 <= y < lv.h or getattr(lv, "world", None) is not None else None
+
+    def walked(x, y):
+        c = cell(x, y)
+        return c is not None and c.kind in WALKED
+
+    def word(x, y, text, bright, dx=0, dy=0):
+        px, py = at(x + 0.5, y + 0.5)
+        col = max(0, min(scope.cols - len(text), px // 2 + dx - (len(text) // 2 if not dx else 0)))
+        scope.text(col, max(1, min(scope.rows_n - 2, py // 4 + dy)), text, bright=bright)
+
+    for y in range(y0, y0 + H):
+        for x in range(x0, x0 + W):
+            c = cell(x, y)
+            if c is None:
+                continue
+            if c.kind == "door":                         # a bar across the way through
+                if walked(x - 1, y) or walked(x + 1, y):
+                    seg(at(x + 0.5, y), at(x + 0.5, y + 1), 0.55)
+                else:
+                    seg(at(x, y + 0.5), at(x + 1, y + 0.5), 0.55)
+            if c.kind in WALKED:
+                continue
+            if walked(x, y - 1):
+                seg(at(x, y), at(x + 1, y), 1.0)
+            if walked(x, y + 1):
+                seg(at(x, y + 1), at(x + 1, y + 1), 1.0)
+            if walked(x - 1, y):
+                seg(at(x, y), at(x, y + 1), 1.0)
+            if walked(x + 1, y):
+                seg(at(x + 1, y), at(x + 1, y + 1), 1.0)
+    a, b = at(x0, y0), at(x0 + W, y0 + H)                # the sheet's edge, with a tick every five cells
+    for u, v in (((a[0], a[1]), (b[0], a[1])), ((b[0], a[1]), (b[0], b[1])), ((b[0], b[1]), (a[0], b[1])),
+                 ((a[0], b[1]), (a[0], a[1]))):
+        seg(u, v, 0.4)
+    for x in range(x0, x0 + W + 1, 5):
+        seg(at(x, y0), (at(x, y0)[0], a[1] - 2), 0.4)
+    for y in range(y0, y0 + H + 1, 5):
+        seg(at(x0, y), (a[0] - 2, at(x0, y)[1]), 0.4)
+    them = {}
+    people = []
+    for m in getattr(lv, "monsters", ()) or ():
+        if m.dead or m.gone or m.barrel or getattr(m, "vehicle", None):
+            continue
+        x, y = moved.get(m.id, (m.x, m.y))
+        if not (x0 <= x < x0 + W and y0 <= y < y0 + H):
+            continue
+        if getattr(m, "ours", False):
+            people.append((x, y, "+" if m.civil else "*", 1.3 if getattr(m, "follows", False) else 0.9))
+        elif m.awake:
+            name = lv.sector(int(x), int(y)) if hasattr(lv, "sector") else None
+            them[name] = them.get(name, 0) + 1
+            if int(t * 4 + m.id) % 2:
+                people.append((x, y, str(m.kind)[:1].upper(), 1.7))
+    here = lv.sector(p.x, p.y) if hasattr(lv, "sector") else None
+    for name, box in (getattr(lv, "spec", None) or {}).get("sectors", {}).items():
+        n = them.get(name, 0)
+        text = "%s %d!" % (name, n) if n else str(name)
+        bright = (1.7 if int(t * 3) % 2 else 0.8) if n else 1.2 if name == here else 0.6
+        word((box[0] + box[2]) / 2.0, box[1] - 0.45, text, bright)   # on its top wall: clear of who is in it
+    if getattr(lv, "world", None) is None:
+        for row in lv.grid:
+            for c in row:
+                name = getattr(c, "mark", None) or ("EXIT" if c.kind == "exit" else None)
+                if name:
+                    px, py = at(c.x + 0.5, c.y + 0.5)
+                    for dx, dy in ((0, -2), (1, -1), (2, 0), (1, 1), (0, 2), (-1, 1), (-2, 0), (-1, -1)):
+                        scope.dot(px + dx, py + dy, 1.4)
+                    word(c.x, c.y, str(name).upper(), 1.3, dx=2)
+    for x, y, ch, bright in people:
+        word(x, y, ch, bright)
+    px, py = at(moved.get("player", (p.x, p.y))[0] + 0.5, moved.get("player", (p.x, p.y))[1] + 0.5)
+    for k in range(8):                                   # he: a ring, and an arrow the way he faces
+        scope.dot(px + int(round(3 * math.cos(k * math.pi / 4))), py + int(round(3 * math.sin(k * math.pi / 4))), 1.8)
+    word(p.x, p.y, "^>v<"[int(p.facing) % 4], 2.0)
+    scope.text(1, 0, ("PLAN  %s%s" % (getattr(lv, "name", ""), "   you: %s" % here if here else ""))[:scope.cols - 8].upper(),
+               bright=1.0)
+    scope.text(scope.cols - 4, 0, "N ^", bright=0.7)
+    scope.text(1, scope.rows_n - 1, "^ you   + staff   * with you   A.. them   <> a place"[:scope.cols - 2], bright=0.6)
 
 
 class LevelView:
@@ -688,7 +798,9 @@ class LevelView:
         place.phase = phase
         scope = self.scope
         scope.clear()
-        if self.style == "scan":
+        if self.style == "plan":
+            plan(scope, lv, place, phase / 20.0)
+        elif self.style == "scan":
             x0, y0, W, H = 0, 0, place.W, place.H
             if W * H > SCANNED[0] * SCANNED[1] * 4:      # a level without end: what is round him
                 W, H = SCANNED

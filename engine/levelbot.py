@@ -111,7 +111,7 @@ class Bot(TextConsole):
             if found:
                 dx, dy = found
                 m = lv.monster_at(p.x + dx, p.y + dy)
-                if m is not None and not m.vehicle and not getattr(m, "civil", False):             # blocked by a monster: face it and shoot
+                if m is not None and not m.vehicle and not getattr(m, "ours", False):             # blocked by a monster: face it and shoot
                     return self.face(lv, dx, dy) or "f"
                 return self.face(lv, dx, dy) or "k"
         return None
@@ -165,7 +165,7 @@ class Bot(TextConsole):
             return None
         _, dx, dy = best
         m = lv.monster_at(p.x + dx, p.y + dy)
-        if m is not None and not m.vehicle and not getattr(m, "civil", False):             # blocked by a monster: face it and shoot
+        if m is not None and not m.vehicle and not getattr(m, "ours", False):             # blocked by a monster: face it and shoot
             return self.face(lv, dx, dy) or "f"
         return self.face(lv, dx, dy) or "k"
 
@@ -189,7 +189,7 @@ class Bot(TextConsole):
         if not self.open_cell(lv, (nx, ny), True):
             self.plan = None
             m = lv.monster_at(nx, ny)
-            if m is not None and not m.vehicle and not getattr(m, "civil", False):
+            if m is not None and not m.vehicle and not getattr(m, "ours", False):
                 return self.face(lv, nx - p.x, ny - p.y) or "f"
             path = self.window_path(lv, x, y, R)
             if len(path) < 2:
@@ -200,7 +200,7 @@ class Bot(TextConsole):
             self.plan = ((x, y), lv.beat, path)
             return turn
         m = lv.monster_at(nx, ny)
-        if m is not None and not m.vehicle and not getattr(m, "civil", False):
+        if m is not None and not m.vehicle and not getattr(m, "ours", False):
             return "f"
         self.plan = ((x, y), lv.beat, path[1:])
         return "k"

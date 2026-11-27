@@ -11,10 +11,12 @@ python clio.py ironlid --level relocation
 
 **Halden, the outpost.** Thane, of a garrison whose supplies arrived a hundred years late, stands
 guard at a research outpost when the machines come in. The helmet shows one colour. Its scanner
-(on the bench beside you; F2) shows the outpost from above: every one of them that is awake,
-the staff (`+`), and the places that matter. Six of the staff are there; three must live. They
-run from what they see, the machines go for whichever of them is nearest - unless you are
-nearer. When the outpost is quiet, something larger comes.
+(on the bench beside you; **B** or F2) shows Halden's plan: eleven sectors, each with how many of
+them are in it, the staff (`+`), the garrison's troopers (`*`) and you. Six of the staff are
+there, going about their work; two must live. They run from what they see, and the machines go
+for whoever of ours is nearest - unless you are nearer. Walk up to one and it follows you: bring
+it to the barracks, the shelter, and it is secured. Three troopers fight where they stand. The
+attack comes in two waves; when the outpost is quiet, something larger comes.
 
 **The relocation yard.** What was made of him sees in lines, and on whoever is open to a shot -
 while it aims, while it reels, from behind - there is a mark: a shot there counts twice. The
@@ -28,9 +30,10 @@ gunner at the ramp is its lock.
 | stalker, mantis, wasp | raptor, mantis, wasp | round your side; straight at you; from the air |
 | the Spider | spider | - |
 | the staff | scientist, technician, hazmat, woman | they do not |
+| trooper | soldier (rifle) | beside you |
 
 What it tries of the engine is in [Making games with CLIo](../../docs/AUTHORING.md): civilians,
-`on_clear`, `death_after` and `on_level_death`, a level's own `player`, `criticals`, the scan's
-marks, `"goggles": "scan"`, `"tint"`.
+a shelter and who is secured, allies, sectors and the plan, `on_clear`, `death_after` and
+`on_level_death`, a level's own `player`, `criticals`, `"tint"`.
 
 All rights reserved - see [LICENSE.md](LICENSE.md).

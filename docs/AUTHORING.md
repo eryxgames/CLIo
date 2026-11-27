@@ -1946,8 +1946,36 @@ status line has `ours 5/6`, the level's last page `civilians 83% (5 of 6 alive)`
 numbers in `levels` have `saved` and `civilians_total`. A level's `"protect": 3` (or
 `{"need": 3, "text": "Too few are left."}`) loses the level when fewer are alive.
 
+Left alone, a civilian **goes about its work**: it walks to a place within `"roam"` cells of
+where it was put (3; 0: it stands), stays a few beats - by a wall or a bench it works at it -
+and walks on.
+
+**A shelter, and who is secured.** A cell with `"shelter": true` is where civilians are safe
+(the plan and the scan name it SHELTER). Once any of the others is up, a civilian the player
+walks up to **follows him** (`c2 follows you`): it keeps at his heel, runs only from one of
+them within three cells, and within seven steps of the shelter makes for it by itself. There
+it is **secured** - out of the level, and counted: `secured 2` on the status line, on the
+level's last page and in `levels` (`secured`). `"on_secured": "name"` sets off an event when
+the last of the living is in. A level without a shelter has none of this.
+
+**Those who fight beside him.** A monster with `"ally": true` is on the player's side and
+armed: it goes for the nearest of the others it sees with its own `attack`, walks towards one
+that is up within `"hunt"` cells' walk (10), and otherwise keeps its post. They go for it as
+for a civilian, and it is no kill, not picked by his gun, and changes places with him. One
+with `"spares_civilians"` is left to the player - and puts aside whoever of ours stands in
+its way to him.
+
+**Sectors and the plan.** `"sectors": {"LABS": [15, 1, 22, 4], ...}` on a level names parts of
+its map (the corners of each, in cells). The status line says which the player is in, and
+what happens to ours says where (`a2 goes for c1 in LABS`). `"view": "plan"` - or
+`"goggles": "plan"`, a scanner on the goggles' battery, switched with **B** or F2 - draws the
+level from straight above: walls as lines, doors as bars, each sector's name with how many
+of the others are in it (`LABS 2!`, blinking), the shelter and other named cells, the way out,
+civilians `+`, allies `*`, every one of the others that is awake by its letter, and the player
+as an arrow.
+
 **A clean level.** `"on_clear": "name"` on a level sets off that event when nobody is left
-that counts as a kill - not civilians, barrels, a boss, nor whoever wakes on the event
+that counts as a kill - not civilians, allies, barrels, a boss, nor whoever wakes on the event
 itself. A wall that `opens_on` it, a monster that wakes on it: what comes when a place has
 been made quiet.
 

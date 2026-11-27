@@ -1,4 +1,7 @@
 {
+ "trooper": {
+  "motion": "soldier"
+ },
  "scientist": {
   "motion": "scientist"
  },

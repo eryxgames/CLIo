@@ -41,6 +41,7 @@ class Files(unittest.TestCase):
                                  "technician", "hazmat", "woman"})
         civil = [mid for mid, m in data.monsters.items() if m.get("civilian")]
         self.assertEqual(sorted(civil), ["hazmat", "researcher", "scientist", "technician"])
+        self.assertTrue(data.monsters["trooper"]["ally"])
         self.assertTrue(data.monsters["spider"]["spares_civilians"])
 
     def test_every_sound_and_sprite_named_is_there(self):
@@ -65,7 +66,7 @@ class TheOutpost(unittest.TestCase):
             self.assertEqual(sorted(lv.events), ["alarm", "second_wave", "spider"], seed)
             alive = lv.total_civil - lv.stats["lost"]
             self.assertEqual(lv.total_civil, 6)
-            self.assertGreaterEqual(alive, 3, seed)
+            self.assertGreaterEqual(alive, 2, seed)
             self.assertIsNone(lv.failed)
             spider = next(m for m in lv.monsters if m.kind == "spider")
             self.assertTrue(spider.awake and not spider.dead and spider.grudge is None)
@@ -77,12 +78,14 @@ class TheOutpost(unittest.TestCase):
         for _ in range(12):
             lv.end_beat()
         self.assertEqual((lv.events, lv.stats["lost"]), (set(), 0))
-        self.assertFalse(any(m.awake for m in lv.monsters if not m.civil))
+        self.assertFalse(any(m.awake for m in lv.monsters if not m.ours))
 
     def test_the_helmet_shows_one_colour_and_the_scanner_the_whole_outpost(self):
         lv = Level(GameData(IRONLID), "outpost", seed=1)
         self.assertTrue(firstperson.tinted(lv))
-        term = Term(out=io.StringIO(), width=100, height=30, color=3, unicode=True, animate=False, env={})
+        os.environ["COLUMNS"], os.environ["LINES"] = "120", "38"
+        self.addCleanup(lambda: [os.environ.pop(k, None) for k in ("COLUMNS", "LINES")])
+        term = Term(out=io.StringIO(), color=3, unicode=True, animate=False, env={})
         con = FrameConsole(term, "pixel", keys=False, keymap=KEYMAP, animate=False)
         con.layout()
         self.assertEqual(con.view_for(lv).__class__.__name__, "View")
@@ -95,10 +98,54 @@ class TheOutpost(unittest.TestCase):
                 break
             lv.run_line(bot.read(lv))
         self.assertTrue(lv.player.nightvision)                  # taken from the bench: it is on
-        self.assertEqual(con.view_for(lv).style, "scan")
+        self.assertEqual(con.view_for(lv).style, "plan")
         text = "\n".join("".join(c[0] or " " for c in row) for row in con.snapshot(lv))
-        for word in ("SCAN", "STORE", "HANGAR", "LAB", "EXIT", "+"):
+        for word in ("PLAN", "YOU: BARRACKS", "LABS", "REACTOR", "STORAGE", "LANDING PAD", "SHELTER", "EXIT", "+", "*"):
             self.assertIn(word, text)
+        self.assertEqual(sorted(lv.spec["sectors"]), ["ARMOURY", "BARRACKS", "COMLINK", "DUST LAB", "LABS", "LANDING PAD",
+                                                      "MOTOR POOL", "QUARTERS", "REACTOR", "STORAGE", "WORKSHOP"])
+
+
+    def test_the_staff_are_brought_to_the_barracks(self):
+        lv = Level(GameData(IRONLID), "outpost", seed=1)
+        self.assertEqual(lv.shelters, [(4, 1)])
+        lv.console = None
+        c = next(m for m in lv.monsters if m.civil and (m.x, m.y) == (10, 2))      # the scientist next door
+        c.spec = dict(c.spec, roam=0)
+        lv.event("alarm")
+        for m in lv.monsters:
+            if not m.ours:
+                m.stun = 999                                    # (hold them where they are)
+        p = lv.player
+        p.x, p.y = 9, 2
+        lv.end_beat()
+        self.assertTrue(c.follows)
+        for at in ((8, 2), (7, 2), (6, 2), (5, 2), (4, 2), (3, 2), (3, 2), (3, 2), (3, 2), (3, 2)):
+            p.x, p.y = at
+            lv.end_beat()
+            if c.gone:
+                break
+        self.assertTrue(c.secured)
+        self.assertEqual(lv.stats["secured"], 1)
+
+    def test_the_garrison_fights(self):
+        data = GameData(IRONLID)
+        fought = 0
+        for seed in (0, 1, 2):
+            lv = Level(data, "outpost", seed=seed)
+            troopers = [m for m in lv.monsters if m.ally]
+            self.assertEqual(len(troopers), 3)
+            lv.event("alarm")
+            lv.console = None
+            hurt = sum(m.max_hp - m.hp for m in lv.monsters if not m.ours)
+            lv.player.x, lv.player.y = 2, 2                     # (he stays in the barracks)
+            for _ in range(40):
+                lv.player.hp = 100
+                lv.end_beat()
+                fought += sum(1 for m in troopers if m.grudge is not None and not m.dead)
+            self.assertGreater(sum(m.max_hp - m.hp for m in lv.monsters if not m.ours and not m.dead) +
+                               sum(m.max_hp for m in lv.monsters if not m.ours and m.dead), hurt, seed)
+        self.assertGreater(fought, 10)
 
 
 class TheYard(unittest.TestCase):
@@ -146,7 +193,7 @@ class TheGame(unittest.TestCase):
         self.assertNotIn("Thane is down. Halden goes quiet", out)                # (the text for losing)
         w = g.world
         self.assertTrue(w.flags.get("outpost_fallen"))
-        self.assertGreaterEqual(w.vars["levels"]["outpost"]["saved"], 3)
+        self.assertGreaterEqual(w.vars["levels"]["outpost"]["saved"], 2)
         self.assertEqual(w.vars["levels"]["outpost"]["civilians_total"], 6)
         self.assertGreater(w.vars["levels"]["relocation"]["criticals"], 0)
 

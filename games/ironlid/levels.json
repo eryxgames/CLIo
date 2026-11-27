@@ -3,11 +3,12 @@
   "name": "Research Outpost Halden",
   "title": "HALDEN   THE OUTPOST",
   "intro": [
-   "Keep the staff alive. The scanner is on the bench: F2."
+   "Keep the staff alive: walk up to one and it follows you to the shelter.",
+   "The scanner is on the bench: B, or F2."
   ],
   "par": 220,
   "facing": "e",
-  "goggles": "scan",
+  "goggles": "plan",
   "tint": "green",
   "music": {
    "generate": {
@@ -18,23 +19,23 @@
   },
   "map": [
    "##############################",
-   "#.....#.......#........#.....#",
-   "#.@...+!..p...#...q....+..w.2#",
-   "#.n...#.......+........#.....#",
+   "#...x.#.......#........#.....#",
+   "#.@...+!..p...#...q....+..w..#",
+   "#.n...#.......+.....T..#.....#",
    "#.....#..&....#...m....#..c..#",
    "###+#######+#######+#####+####",
    "#..!.....#........#.........##",
    "#...p....+...z....+....b.a..##",
-   "#........#........#.........##",
-   "#..m.....#...s....#..h.h.h..##",
+   "#........#..T..m..#.......a.##",
+   "#..m.?...#...s?...#..h?h.h..##",
    "#####+########+#######+#######",
    "#.........#.........#........#",
-   "#..q......+....a.a..+...g.a..#",
-   "#.....k..3#..i....b.#........#",
+   "#..q....T.+....d.d..+...G.d..#",
+   "#.....k...#..i....B.#........#",
    "#.........J..i.f....#....m...#",
    "###########HHHH###############",
    "#............................#",
-   "#.............S......4.......#",
+   "#.............S..............#",
    "#............................#",
    "##############X###############",
    "##############.###############",
@@ -79,9 +80,22 @@
     "wake_on": "alarm",
     "squad": "pack"
    },
-   "g": {
+   "G": {
     "monster": "gunner",
-    "wake_on": "alarm"
+    "wake_on": "second_wave"
+   },
+   "d": {
+    "monster": "android",
+    "wake_on": "second_wave",
+    "squad": "second"
+   },
+   "B": {
+    "monster": "breacher",
+    "wake_on": "second_wave",
+    "squad": "second"
+   },
+   "?": {
+    "on_enter": "second_wave"
    },
    "f": {
     "monster": "burner",
@@ -108,27 +122,99 @@
     "door": true,
     "opens_on": "spider_down"
    },
-   "2": {
-    "mark": "LAB"
+   "x": {
+    "shelter": true
    },
-   "3": {
-    "mark": "STORE"
+   "T": {
+    "monster": "trooper"
    },
-   "4": {
-    "mark": "HANGAR"
+   "+": {
+    "door": true,
+    "open": true
    }
   },
   "squads": {
    "line": {
     "tactic": "fire_team"
    },
+   "second": {
+    "tactic": "fire_team"
+   },
    "pack": {
     "tactic": "swarm"
    }
   },
+  "sectors": {
+   "BARRACKS": [
+    1,
+    1,
+    5,
+    4
+   ],
+   "COMLINK": [
+    7,
+    1,
+    13,
+    4
+   ],
+   "LABS": [
+    15,
+    1,
+    22,
+    4
+   ],
+   "DUST LAB": [
+    24,
+    1,
+    28,
+    4
+   ],
+   "QUARTERS": [
+    1,
+    6,
+    8,
+    9
+   ],
+   "REACTOR": [
+    10,
+    6,
+    17,
+    9
+   ],
+   "MOTOR POOL": [
+    19,
+    6,
+    27,
+    9
+   ],
+   "STORAGE": [
+    1,
+    11,
+    9,
+    14
+   ],
+   "WORKSHOP": [
+    11,
+    11,
+    19,
+    14
+   ],
+   "ARMOURY": [
+    21,
+    11,
+    28,
+    14
+   ],
+   "LANDING PAD": [
+    1,
+    16,
+    28,
+    18
+   ]
+  },
   "events": {
    "alarm": "The alarm. They are inside: squads, and a pack.",
-   "second_wave": "The store's back wall comes down. Something was waiting behind it.",
+   "second_wave": "The south rooms wake: a second squad, a burner, a gunner.",
    "spider": "Halden is quiet. Then the hangar wall folds like paper.",
    "spider_down": "The way out of the hangar unlocks."
   },
@@ -139,18 +225,19 @@
    "The Spider stands over what is left."
   ],
   "protect": {
-   "need": 3,
+   "need": 2,
    "text": "Too few of Halden's staff are left alive."
   },
   "death_text": "outro_lose",
   "bot": [
    "scanner",
+   "b",
    "s",
    "k",
    "m",
    "c",
-   "g",
-   "4",
+   "G",
+   "S",
    "E"
   ]
  },

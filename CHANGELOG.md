@@ -2,9 +2,21 @@
 
 Notable changes to CLIo. Versions follow [semantic versioning](https://semver.org).
 
-## Unreleased
+## 3.7.0 - 2026-11-27
 
 ### Added
+
+- **A plan of the level** (`"view": "plan"`, or `"goggles": "plan"` with **B** or F2): the level
+  from straight above, by **sectors** (`"sectors"` on a level) - each with its name and how many
+  of them are in it - with the shelter, the way out and everybody on it. The status line says
+  which sector the player is in, and what happens to ours says where.
+- **Civilians go about their work**, walking between places near where they were put (`"roam"`).
+  Walked up to once the alarm is on, one **follows the player** to a cell with `"shelter": true`
+  and is **secured** there: counted, and out of the level (`"on_secured"`).
+- **Allies**: a monster with `"ally": true` fights beside the player - it goes for the others,
+  and they for it.
+- IRONLID's outpost has all of it: eleven sectors, the barracks for a shelter, three troopers
+  of the garrison, doors that stand open, and the attack in two waves.
 
 - **IRONLID** (`games/ironlid`), a test demo of what moves: two first-person levels whose every
   body is moved by CLIo Motion. *Halden, the outpost*: a garrison a hundred years behind its own
@@ -34,6 +46,8 @@ Notable changes to CLIo. Versions follow [semantic versioning](https://semver.or
 - The level bot takes the weapon it has rounds for by that weapon's own ammunition (a game whose
   fourth weapon is not fed with bullets had it fight with the fist).
 - A level's "no such target in sight" names the game, not Rootless.
+- In the browser, a file the host would not give at once (429, 503: it is asked for some five
+  hundred) is asked for again before the page gives up; `play.html?game=` takes Erebus and IRONLID.
 - `--view scan` in a level without end shows what is round the player; it tried to scan all two
   million cells a side, and ran out of memory.
 - The release says what itch.io made of the two uploads (`butler status`).

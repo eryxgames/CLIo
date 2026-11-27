@@ -42,6 +42,24 @@
     "pause": true
    },
    {
+    "goto": "ship"
+   }
+  ]
+ },
+ {
+  "id": "ship",
+  "name": "The Relocation Ship",
+  "area": "Halden",
+  "description": "Holds, a kennel, and a bridge built for something with more legs than a man.",
+  "level": "ship",
+  "on_level_exit": [
+   {
+    "story": "ship_end"
+   },
+   {
+    "pause": true
+   },
+   {
     "win": "outro"
    }
   ]

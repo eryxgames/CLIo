@@ -2,6 +2,18 @@
 
 Notable changes to CLIo. Versions follow [semantic versioning](https://semver.org).
 
+## 3.8.0 - 2026-11-28
+
+### Added
+
+- **IRONLID has a third level**, the relocation ship: holds, a kennel, and on the bridge the
+  Spider again - with a turret this time, and open to a critical while it comes round.
+
+- **A status bar that stays put**: `"settings": {"hud": "top"}` in game.json keeps a text game's
+  bar on the top line of the screen while the text scrolls under it, instead of printing it
+  before every prompt. A player chooses with `--hud top`, `--hud line` or `--hud off`. Erebus
+  and The Hollow have it; where a line cannot be kept the bar is printed as before.
+
 ## 3.7.0 - 2026-11-27
 
 ### Added

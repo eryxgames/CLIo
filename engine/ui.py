@@ -420,8 +420,9 @@ class UI:
     # ------------------------------------------------------------------ #
     # HUD, prompt, input
     # ------------------------------------------------------------------ #
-    def hud(self, parts, right=""):
-        """One status line: ``── ♥ 82/100 · Room · turn 12 ─────── ♪ ──``."""
+    def hud(self, parts, right="", pinned=False):
+        """One status line: ``── ♥ 82/100 · Room · turn 12 ─────── ♪ ──``. ``pinned``: kept at the top of the
+        screen where the terminal can, and not printed again each turn."""
         w = self.width
         h = self.g("hr")
         sep = self.c(" " + self.g("vr") + " ", "hud")
@@ -437,6 +438,11 @@ class UI:
         if right:
             s += " " + right + " "
         s += self.c(h * 2, "hud")
+        if pinned and self.term.pin(s):                     # kept at the top: nothing is printed here
+            if self._last != "blank":
+                self.term.line("")
+                self._last = "blank"
+            return
         if self._last != "blank":
             self.term.line("")
         self.term.line(s)

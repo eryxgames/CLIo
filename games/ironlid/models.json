@@ -165,5 +165,18 @@
     "glow": 0.9
    }
   }
+ },
+ "spider_gun": {
+  "motion": "spider",
+  "materials": {
+   "body": {
+    "metal": 0.2,
+    "rough": 0.5,
+    "glow": 0.9
+   }
+  },
+  "colors": {
+   "body": "#b9c0c8"
+  }
  }
 }

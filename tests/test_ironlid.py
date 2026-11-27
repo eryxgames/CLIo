@@ -29,7 +29,7 @@ class Files(unittest.TestCase):
     def test_nothing_is_wrong_with_them(self):
         data = GameData(IRONLID)
         self.assertEqual(data.validate(), [])
-        self.assertEqual(sorted(data.levels), ["outpost", "relocation"])
+        self.assertEqual(sorted(data.levels), ["outpost", "relocation", "ship"])
 
     def test_everybody_is_moved_by_clio_motion(self):
         data = GameData(IRONLID)
@@ -171,6 +171,29 @@ class TheYard(unittest.TestCase):
         self.assertEqual((con.view_for(lv).__class__.__name__, con.view_for(lv).style), ("LevelView", "lines"))
 
 
+class TheShip(unittest.TestCase):
+    def test_the_spider_is_beaten_where_it_is_open(self):
+        data = GameData(IRONLID)
+        for seed in (0, 1, 2):
+            outcome, lv = levelbot.play(data, "ship", seed)
+            self.assertEqual(outcome, "exit", seed)
+            spider = next(m for m in lv.monsters if m.kind == "spider_gun")
+            self.assertTrue(spider.dead)
+            self.assertIn("taken", lv.events)                   # its fall opens the helm
+            self.assertGreater(lv.stats["criticals"], 5, seed)
+
+    def test_it_is_open_as_its_turret_comes_round(self):
+        lv = Level(GameData(IRONLID), "ship", seed=1)
+        spider = next(m for m in lv.monsters if m.kind == "spider_gun")
+        spider.awake, spider.heading = True, 0.0
+        lv.player.x, lv.player.y = spider.x + 3, spider.y      # before it: shut
+        self.assertIsNone(lv.open_to(spider))
+        spider.intent = "spin"
+        self.assertEqual(lv.open_to(spider), "as it aims")
+        self.assertEqual((lv.player.weapon, lv.player.max_hp, lv.criticals), ("4", 130, 2.0))
+        self.assertEqual(lv.sector(spider.x, spider.y), "BRIDGE")
+
+
 class TheGame(unittest.TestCase):
     def play(self):
         term = Term(out=io.StringIO(), inp=lambda p: "", width=80, height=24, color=0, unicode=True, animate=False, env={})
@@ -186,9 +209,9 @@ class TheGame(unittest.TestCase):
 
     def test_from_the_outpost_to_the_ship(self):
         g, outcomes, out = self.play()
-        self.assertEqual(outcomes, [("outpost", "fallen"), ("relocation", "exit")])
+        self.assertEqual(outcomes, [("outpost", "fallen"), ("relocation", "exit"), ("ship", "exit")])
         self.assertEqual(g.over, "win")
-        for words in ("a hundred years late", "The spider does not hurry", "The ramp comes down", "END OF THE TEST DEMO"):
+        for words in ("a hundred years late", "The spider does not hurry", "The ramp comes down", "The bridge has no seat", "END OF THE TEST DEMO"):
             self.assertIn(words, out)
         self.assertNotIn("Thane is down. Halden goes quiet", out)                # (the text for losing)
         w = g.world

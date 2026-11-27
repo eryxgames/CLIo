@@ -12,11 +12,15 @@
   "show_once": false
  },
  "relocation_end": {
-  "text": "The ramp comes down under your hand as if it had been waiting for one like it.\n\nInside, in rows, in the dark: the staff of Halden, asleep and whole. And past them a bridge built for something with more legs than you have.",
+  "text": "The ramp comes down under your hand as if it had been waiting for one like it.\n\nInside, in rows, in the dark: the staff of Halden, asleep and whole. And past them, forward, a bridge built for something with more legs than you have. It is aboard.",
+  "show_once": false
+ },
+ "ship_end": {
+  "text": "The Spider folds its legs under it, and this time nothing in it goes off.\n\nThe bridge has no seat. It has a socket, and your arm fits it.\n\nThe holds wake a row at a time. Somebody asks what year it is. You tell them what the lid would have: nobody at Halden has ever been sure.",
   "show_once": false
  },
  "outro": {
-  "text": "END OF THE TEST DEMO.\n\nTwo levels, to try what moves: squads and packs, civilians, the scan, the lines and their criticals. `python clio.py ironlid --demo` shows the crowds.",
+  "text": "END OF THE TEST DEMO.\n\nThree levels, to try what moves: squads and packs, civilians and those who fight beside you, the plan, the lines and their criticals. `python clio.py ironlid --demo` shows the crowds.",
   "show_once": false
  },
  "outro_lose": {

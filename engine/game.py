@@ -883,10 +883,16 @@ class Game(Actions):
             parts.append(ui.term.paint("%s %d" % (ui.g("coin"), w.player["gold"]), "gold"))
         parts.append(ui.c("turn %d" % w.turn, "hud"))
         right = ui.c(ui.g("note"), "hud") if (self.audio.enabled and self.audio.music_on and self.audio.playing) else ""
-        ui.hud(parts, right)
+        ui.hud(parts, right, pinned=self.settings.get("hud") == "top")
 
     def run(self):
         """Play until the game ends or the player quits."""
+        try:
+            self.play()
+        finally:
+            self.term.unpin()
+
+    def play(self):
         try:
             self.term.set_title("CLIo - " + self.data.title)
             self.start()

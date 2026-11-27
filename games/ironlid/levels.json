@@ -369,5 +369,146 @@
    "g",
    "E"
   ]
+ },
+ "ship": {
+  "name": "The Relocation Ship",
+  "title": "HALDEN   THE SHIP",
+  "intro": [
+   "The lock's rack fits you: cells, plate. Forward to the bridge.",
+   "Shoot it as its turret comes round, or from behind."
+  ],
+  "par": 240,
+  "facing": "e",
+  "view": "lines",
+  "criticals": 2,
+  "music": {
+   "generate": {
+    "mood": "battle",
+    "seed": 31,
+    "sound": "rich"
+   }
+  },
+  "player": {
+   "health": 130,
+   "max_health": 130,
+   "armor": 25,
+   "weapons": [
+    "1",
+    "4"
+   ],
+   "weapon": "4",
+   "ammo": {
+    "bullets": 0,
+    "shells": 4,
+    "cells": 90
+   },
+   "max_ammo": {
+    "bullets": 200,
+    "shells": 40,
+    "cells": 200
+   }
+  },
+  "map": [
+   "##############################",
+   "#....#........#.......#......#",
+   "#.@..+...a....+...w...+..m...#",
+   "#....#........#.......#......#",
+   "###+####+########+#####+######",
+   "#.......#..........#.........#",
+   "#..c....#...r..r...+....b.b..#",
+   "#.......+..........#.........#",
+   "#####+###########+######+#####",
+   "#..........#.................#",
+   "#...h.h....+........Z....W...#",
+   "#..........#.................#",
+   "#..m...c...#.....c.......m...#",
+   "##########################X###",
+   "##########################.###",
+   "##########################E###"
+  ],
+  "legend": {
+   "m": "medkit",
+   "c": "cell",
+   "a": {
+    "monster": "android"
+   },
+   "b": {
+    "monster": "breacher"
+   },
+   "r": {
+    "monster": "stalker"
+   },
+   "h": {
+    "monster": "hound",
+    "squad": "kennel"
+   },
+   "w": {
+    "monster": "wasp"
+   },
+   "W": {
+    "monster": "wasp"
+   },
+   "Z": {
+    "monster": "spider_gun",
+    "on_death": "taken"
+   },
+   "X": {
+    "door": true,
+    "opens_on": "taken"
+   }
+  },
+  "squads": {
+   "kennel": {
+    "tactic": "swarm"
+   }
+  },
+  "sectors": {
+   "LOCK": [
+    1,
+    1,
+    4,
+    3
+   ],
+   "HOLD A": [
+    6,
+    1,
+    13,
+    3
+   ],
+   "HOLD B": [
+    15,
+    1,
+    21,
+    3
+   ],
+   "STORES": [
+    23,
+    1,
+    28,
+    3
+   ],
+   "KENNEL": [
+    1,
+    9,
+    10,
+    12
+   ],
+   "BRIDGE": [
+    12,
+    9,
+    28,
+    12
+   ]
+  },
+  "events": {
+   "taken": "The helm stands open."
+  },
+  "death_text": "outro_lose",
+  "bot": [
+   "m",
+   "c",
+   "Z",
+   "E"
+  ]
  }
 }

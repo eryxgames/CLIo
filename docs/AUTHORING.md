@@ -95,6 +95,7 @@ That is a finished game: `take corkscrew`, `use corkscrew on barrel`, `up`. It s
 | `palettes` | The game's own named colours, for every banner: `{"dusk": ["#ffd27a", "#ff6f91", "#5a2a8f"]}`. |
 | `banner_defaults` | The game's house style: what every banner uses unless it says otherwise. |
 | `show_title` | `false` hides the title text under the title art (it is hidden under a banner unless `true`). |
+| `settings` | How the game is shown unless the player says otherwise: `{"hud": "top"}` keeps the status bar (health, place, turn) on the top line of the screen while the text scrolls under it, instead of printing it before every prompt; `"hud": false` shows none; `"art": false`, `"brief": true`. A player chooses with `--hud top`, `--hud line` or `--hud off`. Where a line cannot be kept - output that is not a terminal, a screen under ten rows - the bar is printed as it always was. |
 | `intro` | Key of a text in `texts.json` (or the text itself) shown at the start. |
 | `music`, `title_music` | Default track and title-screen track. |
 | `max_hints`, `default_hint` | Hint budget and fallback hint. |

@@ -519,6 +519,9 @@ def main(argv=None):
     ap.add_argument("--test-display", action="store_true",
                     help="show a test page to check frames, symbols, colours and sprites on this terminal")
     ap.add_argument("--no-art", action="store_true", help="hide ASCII art and sprites")
+    ap.add_argument("--hud", choices=["top", "line", "off"],
+                    help="the status bar of a text game: kept at the top of the screen, printed before every "
+                         "prompt, or not shown (whatever the game says)")
     ap.add_argument("--view", choices=("pixel", "dots", "dots-fill", "lines", "scan"),
                     help="how first-person levels are drawn: pixel (half blocks), dots or dots-fill (braille), "
                          "lines (what is ahead, in lines) or scan (the level as a surface scan)")
@@ -721,6 +724,8 @@ def main(argv=None):
             return 1 if problems else 0
         audio = Silent() if args.no_sound else Audio()
         settings = {}
+        if args.hud:
+            settings["hud"] = {"top": "top", "line": True, "off": False}[args.hud]
         if args.no_art:
             settings["art"] = False
         if args.view:

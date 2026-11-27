@@ -1,6 +1,6 @@
 # IRONLID
 
-A test demo for CLIo: two first-person levels in which everybody is moved by
+A test demo for CLIo: three first-person levels in which everybody is moved by
 [CLIo Motion](https://github.com/eryxgames/clio-motion).
 
 ```
@@ -28,12 +28,15 @@ gunner at the ramp is its lock.
 | burner, heavy gunner | gunner (flamethrower, chaingun) | in line at three cells; two beats to spin up |
 | hound | hyena | a pack: keeps off, then all at once |
 | stalker, mantis, wasp | raptor, mantis, wasp | round your side; straight at you; from the air |
-| the Spider | spider | - |
+| the Spider | spider | at Halden, not to be beaten; aboard its ship, open as its turret comes round |
 | the staff | scientist, technician, hazmat, woman | they do not |
 | trooper | soldier (rifle) | beside you |
 
 What it tries of the engine is in [Making games with CLIo](../../docs/AUTHORING.md): civilians,
 a shelter and who is secured, allies, sectors and the plan, `on_clear`, `death_after` and
 `on_level_death`, a level's own `player`, `criticals`, `"tint"`.
+
+**The relocation ship.** Forward through the holds to the bridge, and the Spider again: it has a
+turret now, which takes two beats to come round. That is when it is open - and from behind.
 
 All rights reserved - see [LICENSE.md](LICENSE.md).

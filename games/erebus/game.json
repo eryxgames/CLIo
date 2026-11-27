@@ -10,6 +10,7 @@
  "initial_scene": "berth",
  "style": "techno",
  "show_title": true,
+ "settings": {"hud": "top"},
  "menus": "bar",
  "menu_look": "terminal",
  "menu_border": "single",

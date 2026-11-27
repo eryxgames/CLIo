@@ -21,6 +21,7 @@
   "max_hints": 5,
   "map_title": "The Depths",
   "show_title": false,
+  "settings": {"hud": "top"},
   "generator": {
     "type": "maze",
     "entry": "camp",

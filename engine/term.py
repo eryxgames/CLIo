@@ -465,6 +465,7 @@ class Term:
             self.ansi = _enable_windows_vt()
         elif env.get("TERM", "") == "dumb":
             self.ansi = False
+        self.pinned = 0                     # the rows the screen had when a line was pinned to its top (0: none is)
         self.roles = {}                     # theme role -> colour spec
         self.speed = 1.0                    # 0 = instant, 2 = slow
         self._cache = {}
@@ -551,9 +552,44 @@ class Term:
         return self.size()[1]
 
     # -- output ------------------------------------------------------------ #
+    def pin(self, text):
+        """Keeps one line at the top of the screen while the rest scrolls under it (a status bar that is not
+        printed again every turn). False where that cannot be done - no terminal, one that takes no escape
+        sequences, a screen under ten rows - and the caller prints the line as it always did."""
+        if not (self.is_tty and self.ansi):
+            return False
+        cols, rows = self.size()
+        if rows < 10:
+            self.unpin()
+            return False
+        out = ""
+        if self.pinned != rows:                         # the first time, and when the window changed its height
+            if not self.pinned:
+                out += "\n"                             # (so that the cursor is not on the line that is taken)
+            out += ESC + "7" + ESC + "[2;%dr" % rows + ESC + "8"
+            self.pinned = rows
+        was = self.at_line_start
+        self.pinned, rows = 0, self.pinned              # (written as it is: this is not what takes the screen)
+        self.write(out + ESC + "7" + ESC + "[1;1H" + ESC + "[2K" + truncate(text, cols) + ESC + "[0m" + ESC + "8")
+        self.pinned, self.at_line_start = rows, was
+        self.flush()
+        return True
+
+    def unpin(self):
+        """Gives the top line back: the whole screen scrolls again."""
+        if self.pinned:
+            self.pinned = 0
+            try:
+                self.out.write(ESC + "7" + ESC + "[r" + ESC + "8")
+                self.out.flush()
+            except Exception:
+                pass
+
     def write(self, s):
         if not s:
             return
+        if self.pinned and (ESC + "[2J" in s or ESC + "[H" in s or ESC + "[?1049" in s or ESC + "[1;1H" in s):
+            self.unpin()                                # something takes the whole screen: the line is let go
         if not self.unicode:
             s = to_ascii(s)
         elif self.subst and not s.isascii():
